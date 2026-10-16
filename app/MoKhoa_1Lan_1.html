@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mở khóa Quản trị — dùng 1 lần</title>
+<style>
+body{font:15px/1.5 "Segoe UI",Arial,sans-serif;background:#f5f7fa;color:#102a43;margin:0;display:flex;justify-content:center;padding:32px 16px}
+.card{background:#fff;border:1px solid #e6ebf1;border-radius:12px;max-width:520px;width:100%;padding:24px;box-shadow:0 2px 10px rgba(0,0,0,.05)}
+h1{font-size:19px;margin:0 0 6px}.muted{color:#687789;font-size:13px}label{display:block;font-size:13px;color:#687789;margin:12px 0 4px}
+select,input{width:100%;box-sizing:border-box;padding:9px 10px;border:1px solid #cfd8e3;border-radius:8px;font:inherit}
+button{margin-top:16px;width:100%;padding:10px;border:0;border-radius:8px;background:#0b7285;color:#fff;font:600 15px inherit;cursor:pointer}
+.err{color:#c92a2a;font-size:13px;min-height:18px;margin-top:8px}.ok{background:#ebfbee;border:1px solid #b2f2bb;border-radius:8px;padding:12px;margin-top:12px}
+.warn{background:#fff9db;border:1px solid #ffe066;border-radius:8px;padding:10px;font-size:13px;margin-top:12px}
+</style></head><body>
+<div class="card" id="box"><h1>🔓 Mở khóa tài khoản Quản trị (dùng 1 lần)</h1>
+<div class="muted">Công cụ cứu hộ cho máy này — đặt lại mật khẩu 1 tài khoản Quản trị khi đã quên mật khẩu, mã khôi phục và chưa có mật khẩu chủ. Mở bằng <b>đúng trình duyệt</b> đang mở app (trình duyệt mặc định).</div>
+<div id="body" class="muted" style="margin-top:12px">Đang đọc dữ liệu…</div></div>
+<script src="js/db.js"></script><script src="js/config.js"></script><script src="js/auth.js"></script>
+<script>
+(async function () {
+  'use strict';
+  var TOKEN = 'dd0b741a4a669c69', KEY = 'hak.auth.v1', USED = 'hak.unlock.used';
+  var body = document.getElementById('body');
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  try { await HAK.DB.open(); } catch (e) { /* vẫn dùng được localStorage */ }
+  var used = HAK.Store.get(USED, []) || [];
+  if (used.indexOf(TOKEN) >= 0) { body.innerHTML = '<div class="warn">Công cụ này <b>đã dùng</b> rồi — không dùng lại được. Mở app và đăng nhập bằng mật khẩu mới.</div>'; return; }
+  var d = HAK.Store.get(KEY, null);
+  var admins = d && Array.isArray(d.users) ? d.users.filter(function (u) { return u.role === 'admin'; }) : [];
+  if (!admins.length) { body.innerHTML = '<div class="warn">Không thấy tài khoản Quản trị nào trong trình duyệt này. Hãy mở file này bằng <b>đúng trình duyệt</b> đang dùng để mở app (thường là trình duyệt mặc định: Chrome hoặc Edge).</div>'; return; }
+  body.innerHTML = '<label for="u">Tài khoản Quản trị cần mở khóa</label><select id="u">' + admins.map(function (u) { return '<option value="' + esc(u.id) + '">' + esc(u.username) + ' — ' + esc(u.name) + (u.disabled ? ' (đang khóa)' : '') + '</option>'; }).join('') + '</select>' +
+    '<label for="p1">Mật khẩu mới (≥ 6 ký tự)</label><input id="p1" type="password" autocomplete="new-password">' +
+    '<label for="p2">Nhập lại mật khẩu mới</label><input id="p2" type="password" autocomplete="new-password">' +
+    '<button id="go" type="button">Đặt mật khẩu mới</button><div class="err" id="err"></div>' +
+    '<div class="warn">Chỉ dùng được <b>1 lần</b>. Sau khi đăng nhập lại, hãy đặt ngay <b>mật khẩu chủ của nhóm</b> (Cài đặt → 👤 Tài khoản → 🔐) và bấm <b>Sao lưu toàn bộ</b>.</div>';
+  document.getElementById('go').addEventListener('click', function () {
+    var err = document.getElementById('err'), p1 = document.getElementById('p1').value, p2 = document.getElementById('p2').value;
+    if (String(p1).length < 6) { err.textContent = 'Mật khẩu tối thiểu 6 ký tự.'; return; }
+    if (p1 !== p2) { err.textContent = 'Hai lần nhập không khớp.'; return; }
+    var d2 = HAK.Store.get(KEY, null), u = d2.users.find(function (x) { return x.id === document.getElementById('u').value; });
+    if (!u) { err.textContent = 'Không tìm thấy tài khoản.'; return; }
+    var salt = Array.from(crypto.getRandomValues(new Uint8Array(16)), function (b) { return 'abcdefghijkmnpqrstuvwxyz23456789'[b % 32]; }).join('');
+    u.salt = salt; u.hash = HAK.Auth._hash(p1, salt); u.disabled = false;
+    HAK.Store.set(KEY, d2); used.push(TOKEN); HAK.Store.set(USED, used);
+    try { sessionStorage.removeItem('hak.session'); } catch (e) { /* bỏ qua */ }
+    body.innerHTML = '<div class="ok">✅ Đã đặt mật khẩu mới cho <b>' + esc(u.username) + '</b>.<br>Đóng trang này, mở app (biểu tượng <b>HAK - Quan ly xuat hang</b>) và đăng nhập bằng mật khẩu mới.</div>' +
+      '<div class="warn">Công cụ đã tự vô hiệu — mở lại cũng không dùng được nữa.</div><p><a href="index.html">→ Mở app ngay</a></p>';
+  });
+})();
+</script></body></html>

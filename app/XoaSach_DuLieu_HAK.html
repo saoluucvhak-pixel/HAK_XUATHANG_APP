@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Xóa sạch dữ liệu HAK trên máy này</title>
+<style>
+body{font:15px/1.5 "Segoe UI",Arial,sans-serif;background:#f5f7fa;color:#102a43;margin:0;display:flex;justify-content:center;padding:32px 16px}
+.card{background:#fff;border:1px solid #e6ebf1;border-radius:12px;max-width:560px;width:100%;padding:24px;box-shadow:0 2px 10px rgba(0,0,0,.05)}
+h1{font-size:19px;margin:0 0 6px}.muted{color:#687789;font-size:13px}ul{padding-left:20px;margin:8px 0}
+input{width:100%;box-sizing:border-box;padding:9px 10px;border:1px solid #cfd8e3;border-radius:8px;font:inherit;margin-top:6px}
+button{margin-top:14px;width:100%;padding:10px;border:0;border-radius:8px;background:#c92a2a;color:#fff;font:600 15px inherit;cursor:pointer}
+button:disabled{background:#adb5bd;cursor:not-allowed}
+.warn{background:#fff5f5;border:1px solid #ffc9c9;border-radius:8px;padding:12px;font-size:14px;margin-top:12px}
+.ok{background:#ebfbee;border:1px solid #b2f2bb;border-radius:8px;padding:12px;margin-top:12px}
+</style></head><body>
+<div class="card"><h1>🗑 Xóa sạch dữ liệu "Quản lý xuất hàng" (HAK) trên máy này</h1>
+<div class="muted">Dùng khi bàn giao / cài lại máy cho người khác. <b>Đóng hết tab app HAK trước</b>, rồi mở file này bằng <b>đúng trình duyệt</b> đã dùng để mở app (thường là trình duyệt mặc định). Chỉ xóa dữ liệu của app HAK — không đụng các trang web, mật khẩu, lịch sử khác của trình duyệt.</div>
+<div id="body" style="margin-top:12px">Đang kiểm tra…</div></div>
+<script>
+(async function () {
+  'use strict';
+  var body = document.getElementById('body'), DBS = ['hak-app', 'hak-archive'];
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  var keys = []; try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (/^hak/.test(k)) keys.push(k); } } catch (e) { /* bị chặn */ }
+  var users = []; try { var a = JSON.parse(localStorage.getItem('hak.auth.v1') || 'null'); users = a && a.users ? a.users : []; } catch (e) { /* bỏ qua */ }
+  var dbs = DBS;
+  try { if (indexedDB.databases) { var list = await indexedDB.databases(); dbs = DBS.filter(function (n) { return list.some(function (x) { return x.name === n; }); }); } } catch (e) { /* trình duyệt cũ: xóa cả 2 */ }
+  if (!keys.length && !dbs.length) { body.innerHTML = '<div class="ok">✅ Trình duyệt này <b>không còn dữ liệu</b> của app HAK. Nếu app vẫn đòi mật khẩu, app đang mở bằng trình duyệt khác — bấm chuột phải file này → Open with → chọn trình duyệt đó.</div>'; return; }
+  body.innerHTML = '<div><b>Tìm thấy trong trình duyệt này:</b><ul>' +
+    '<li>Tài khoản: ' + (users.length ? users.map(function (u) { return '<b>' + esc(u.username) + '</b> (' + (u.role === 'admin' ? 'Quản trị' : 'Nhân viên') + ')'; }).join(', ') : '—') + '</li>' +
+    '<li>' + keys.length + ' mục cài đặt (công ty, kho, danh mục HĐ, mẫu Word, đồng bộ Google Sheet…)</li>' +
+    '<li>Kho dữ liệu: ' + (dbs.length ? dbs.map(esc).join(', ') + ' (đợt Excel đã nhập, Lưu trữ biên bản, nhật ký chứng từ)' : '—') + '</li></ul></div>' +
+    '<div class="warn">⚠ Xóa là <b>mất hẳn</b>, không lấy lại được (trừ khi có file sao lưu <b>HAK_SaoLuuToanBo_….json</b>). Dữ liệu Google Sheet và file Word / PDF / Excel đã tải về <b>không</b> bị ảnh hưởng.<br><br>Gõ <b>XOA HET</b> vào ô dưới để xác nhận:</div>' +
+    '<input id="cf" autocomplete="off" placeholder="XOA HET"><button id="go" type="button" disabled>Xóa sạch dữ liệu HAK trên trình duyệt này</button>';
+  var cf = document.getElementById('cf'), go = document.getElementById('go');
+  cf.addEventListener('input', function () { go.disabled = cf.value.trim().toUpperCase() !== 'XOA HET'; });
+  go.addEventListener('click', async function () {
+    go.disabled = true; go.textContent = 'Đang xóa…';
+    try { Object.keys(localStorage).forEach(function (k) { if (/^hak/.test(k)) localStorage.removeItem(k); }); } catch (e) { /* bỏ qua */ }   // đọc lại lúc bấm: tab app vừa đóng có thể vừa ghi thêm
+    try { Object.keys(sessionStorage).forEach(function (k) { if (/^hak/.test(k)) sessionStorage.removeItem(k); }); } catch (e) { /* bỏ qua */ }
+    var fail = [];
+    for (var j = 0; j < DBS.length; j++) {
+      await new Promise(function (res) {
+        var name = DBS[j], rq;
+        try { rq = indexedDB.deleteDatabase(name); } catch (e) { fail.push(name); return res(); }
+        rq.onsuccess = function () { res(); }; rq.onerror = function () { fail.push(name); res(); };
+        rq.onblocked = function () { fail.push(name + ' (app đang mở — đóng hết tab app rồi bấm lại)'); res(); };
+      });
+    }
+    var left = 0; try { for (var i = 0; i < localStorage.length; i++) if (/^hak/.test(localStorage.key(i))) left++; } catch (e) { /* bỏ qua */ }
+    body.innerHTML = fail.length || left
+      ? '<div class="warn">Chưa xóa hết: ' + esc(fail.join('; ')) + (left ? ' · còn ' + left + ' mục cài đặt' : '') + '. Đóng <b>tất cả</b> tab / cửa sổ app HAK rồi mở lại file này và làm lại.</div>'
+      : '<div class="ok">✅ Đã xóa sạch dữ liệu app HAK trên trình duyệt này.<br>Tiếp theo: gỡ phần mềm (Cài đặt Windows → Ứng dụng → <b>HAK - Quan ly xuat hang</b> → Gỡ cài đặt), xóa thư mục <b>%LOCALAPPDATA%\\HAK</b> nếu còn, rồi cài bản mới. Mở app lần đầu sẽ hiện màn <b>Tạo tài khoản Quản trị</b>.</div>';
+  });
+})();
+</script></body></html>
