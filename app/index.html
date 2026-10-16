@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="vi" data-bs-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HAK · QUẢN LÝ XUẤT HÀNG</title>
+  <!-- Thư viện chạy offline (thư mục libs/) -->
+  <link rel="stylesheet" href="libs/bootstrap.min.css">
+  <link rel="stylesheet" href="css/fonts.css">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230e7c86'/%3E%3Ctext x='32' y='42' font-size='28' font-weight='800' text-anchor='middle' fill='white' font-family='Arial'%3EHAK%3C/text%3E%3C/svg%3E">
+  <script>
+    /* Áp dụng giao diện sáng/tối ngay khi tải để tránh nháy màn hình */
+    (function () {
+      try {
+        var t = JSON.parse(localStorage.getItem('hak.theme') || 'null');
+        if (!t) t = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-bs-theme', t);
+      } catch (e) { /* mặc định sáng */ }
+    })();
+  </script>
+</head>
+<body>
+
+<!-- Thanh tiến độ mỏng trên cùng + màn hình Loading -->
+<div id="topProgress"><div class="bar"></div></div>
+<div id="loading" class="loading-overlay d-none" role="status" aria-live="polite">
+  <div class="loading-box">
+    <div class="spinner-border text-primary mb-3" style="width:2.6rem;height:2.6rem"></div>
+    <div id="loadingMsg" class="fw-semibold mb-2">Đang xử lý…</div>
+    <div class="progress" style="height:8px"><div id="loadingBar" class="progress-bar progress-bar-striped progress-bar-animated" style="width:0%"></div></div>
+    <div id="loadingPct" class="small muted mt-2">0%</div>
+  </div>
+</div>
+
+<div class="app">
+  <!-- ======================= SIDEBAR ======================= -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sb-brand">
+      <div class="sb-logo">HAK</div>
+      <div><div class="sb-title">QUẢN LÝ XUẤT HÀNG</div><div class="sb-sub">Xuất hàng · Logistics</div></div>
+    </div>
+    <nav class="sb-nav">
+      <div class="sb-label">Bắt đầu</div>
+      <a class="sb-link" href="#/home" data-nav="home"><span class="ico">🏠</span> Tổng quan</a>
+      <a class="sb-link" href="#/file" data-nav="file"><span class="ico">📂</span> Nhập liệu <span class="dot"></span></a>
+      <div class="sb-label">Chứng từ</div>
+      <a class="sb-link" href="#/chungtu" data-nav="chungtu"><span class="ico">🧾</span> Chứng từ xuất hàng</a>
+      <div class="sb-label">Loại biên bản</div>
+      <a class="sb-link" href="#/guikho" data-nav="guikho"><span class="ico">📄</span> Trung chuyển gửi kho <span class="dot"></span></a>
+      <a class="sb-link" href="#/xuatkhogui" data-nav="xuatkhogui"><span class="ico">📦</span> Xuất hàng kho gửi <span class="dot"></span></a>
+      <a class="sb-link" href="#/xuatkhau" data-nav="xuatkhau"><span class="ico">📤</span> Xuất khẩu <span class="dot"></span></a>
+      <a class="sb-link" href="#/uythac" data-nav="uythac"><span class="ico">🚢</span> Ủy thác xuất khẩu <span class="dot"></span></a>
+      <a class="sb-link" href="#/dieuchuyen" data-nav="dieuchuyen"><span class="ico">🔄</span> Điều chuyển <span class="dot"></span></a>
+      <a class="sb-link" href="#/traodoi" data-nav="traodoi"><span class="ico">🤝</span> Trao đổi hàng hóa <span class="dot"></span></a>
+      <a class="sb-link" href="#/xuatban" data-nav="xuatban"><span class="ico">💰</span> Xuất bán <span class="dot"></span></a>
+      <div class="sb-label">Hệ thống</div>
+      <a class="sb-link" href="#/catalog" data-nav="catalog"><span class="ico">📇</span> Danh mục HĐ &amp; khách hàng</a>
+      <a class="sb-link" href="#/report" data-nav="report"><span class="ico">📊</span> Báo cáo tổng hợp</a>
+      <a class="sb-link" href="#/archive" data-nav="archive"><span class="ico">🗄️</span> Lưu trữ <span class="cnt d-none" id="archCount"></span></a>
+      <a class="sb-link" href="#/settings" data-nav="settings"><span class="ico">⚙️</span> Cài đặt</a>
+      <a class="sb-link" href="#/help" data-nav="help"><span class="ico">📘</span> Hướng dẫn</a>
+    </nav>
+    <div class="sb-foot">
+      <div class="sb-file" id="sbFile">Chưa chọn file Excel</div>
+      <button class="btn btn-sm btn-outline-light w-100" id="btnThemeSb" type="button">🌓 Đổi giao diện sáng / tối</button>
+    </div>
+  </aside>
+  <div class="sb-backdrop" id="sbBackdrop"></div>
+
+  <!-- ======================= NỘI DUNG ======================= -->
+  <div class="content">
+    <header class="topbar">
+      <button class="btn btn-outline-secondary d-lg-none" id="btnMenu" type="button" aria-label="Mở menu">☰</button>
+      <h1 id="pageTitle">Tổng quan</h1>
+      <button class="btn btn-sm btn-outline-secondary ms-auto" id="btnSearch" type="button" title="Tìm kiếm chung (Ctrl+K)">🔍 <span class="d-none d-md-inline">Tìm kiếm</span> <kbd class="d-none d-md-inline">Ctrl K</kbd></button>
+      <span class="badge badge-soft rounded-pill d-none d-sm-inline" id="topFileChip"></span>
+      <span class="d-flex align-items-center gap-1" id="topUser"></span>
+      <button class="btn btn-sm btn-outline-secondary" id="btnTheme" type="button" title="Sáng / tối">🌓</button>
+    </header>
+
+    <!-- ---------- TRANG CHỦ ---------- -->
+    <section class="page" id="page-home" hidden>
+      <div id="homeIntro">
+      <div class="hero mb-4">
+        <h2>Tạo biên bản từ Bảng Cân Xuất Hàng</h2>
+        <p>Nhập liệu (chọn hình thức, thêm file Excel từng đợt), chọn loại biên bản, nhập vài thông số rồi bấm <b>Tạo biên bản</b>. Tổng xe, tổng tấn, thời gian, xe trả về và phụ lục phiếu cân được tự tính — chạy hoàn toàn offline trên máy bạn.</p>
+        <a href="#/file" class="btn btn-light btn-lg fw-semibold">📂 Nhập liệu</a>
+      </div>
+      <div class="row g-3 mb-4">
+        <div class="col-md-4"><div class="step"><div class="n">1</div><div><b>Chọn loại biên bản + file Excel</b><div class="muted small">Mỗi loại có file riêng, không lẫn nhau. Tự nhận diện cột, thống kê, cảnh báo.</div></div></div></div>
+        <div class="col-md-4"><div class="step"><div class="n">2</div><div><b>Nhập thông số</b><div class="muted small">Lọc theo tàu / ngày, chọn công ty, kho, nhập số hợp đồng…</div></div></div></div>
+        <div class="col-md-4"><div class="step"><div class="n">3</div><div><b>Tạo biên bản file Word</b><div class="muted small">Tải về .docx hoàn chỉnh, có phụ lục tự sang trang.</div></div></div></div>
+      </div>
+      </div>
+      <div id="dashBody"></div>
+      <div class="sec-title mb-2">Mở nhanh loại biên bản</div>
+      <div class="row g-3 mb-4" id="homeCards">
+        <div class="col-sm-6 col-lg-4 col-xl-3"><a class="card doc-card" href="#/guikho"><div class="card-body"><div class="big">📄</div><h6 class="mt-2 mb-1">Trung chuyển gửi kho</h6><div class="muted small">Biên bản xác nhận hàng gửi kho + phụ lục bảng kê xe.</div></div></a></div>
+        <div class="col-sm-6 col-lg-4 col-xl-3"><a class="card doc-card" href="#/xuatkhogui"><div class="card-body"><div class="big">📦</div><h6 class="mt-2 mb-1">Xuất hàng kho gửi</h6><div class="muted small">Bảng xác nhận hàng gửi kho xuất khẩu theo từng tàu.</div></div></a></div>
+        <div class="col-sm-6 col-lg-4 col-xl-3"><a class="card doc-card" href="#/xuatkhau"><div class="card-body"><div class="big">📤</div><h6 class="mt-2 mb-1">Xuất khẩu</h6><div class="muted small">Bảng tổng hợp hàng xuất khẩu qua cân theo từng tàu.</div></div></a></div>
+        <div class="col-sm-6 col-lg-4 col-xl-3"><a class="card doc-card" href="#/uythac"><div class="card-body"><div class="big">🚢</div><h6 class="mt-2 mb-1">Ủy thác xuất khẩu</h6><div class="muted small">Theo từng tàu: qua cân, xe trả về, thực giao, chứng thư.</div></div></a></div>
+        <div class="col-sm-6 col-lg-4 col-xl-3"><a class="card doc-card" href="#/dieuchuyen"><div class="card-body"><div class="big">🔄</div><h6 class="mt-2 mb-1">Điều chuyển nội bộ</h6><div class="muted small">Quyết định + Biên bản giao nhận (Công ty ⇄ Chi nhánh).</div></div></a></div>
+        <div class="col-sm-6 col-lg-4 col-xl-3"><a class="card doc-card" href="#/traodoi"><div class="card-body"><div class="big">🤝</div><h6 class="mt-2 mb-1">Trao đổi hàng hóa</h6><div class="muted small">Bảng chi tiết cân hàng lô trao đổi theo tháng.</div></div></a></div>
+        <div class="col-sm-6 col-lg-4 col-xl-3"><a class="card doc-card" href="#/xuatban"><div class="card-body"><div class="big">💰</div><h6 class="mt-2 mb-1">Xuất bán</h6><div class="muted small">Biên bản giao nhận hàng hóa lô xuất bán, đơn giá / thành tiền.</div></div></a></div>
+      </div>
+      <div class="card"><div class="card-header">📊 Trạng thái dữ liệu</div><div class="card-body" id="homeStatus"></div></div>
+    </section>
+
+    <!-- ---------- CHỌN FILE EXCEL ---------- -->
+    <section class="page" id="page-file" hidden>
+      <div class="row g-3">
+        <div class="col-12">
+          <div class="card mb-3"><div class="card-body py-3">
+            <div class="sec-title mb-2">① Chọn hình thức (loại biên bản / chứng từ)</div>
+            <div class="d-flex flex-wrap gap-2" id="fileTypes"></div>
+            <div class="form-text mt-2" id="fileTypeHint"></div>
+          </div></div>
+          <label class="dropzone d-block locked" id="dropzone" for="fileInput">
+            <div class="big mb-2">📂</div>
+            <div class="fs-5 fw-semibold">② Kéo thả hoặc bấm để thêm file Bảng Cân Xuất Hàng của từng đợt</div>
+            <div class="muted">Mỗi file = một đợt, có thể chọn nhiều file cùng lúc · .xlsx · .xls · .xlsm · .csv — không giới hạn số phiếu cân</div>
+            <input type="file" id="fileInput" accept=".xlsx,.xls,.xlsm,.csv" multiple hidden disabled>
+          </label>
+          <div class="small muted mt-2">Chưa có file? <a href="#" data-sample-xlsx>⬇ Tải file Excel mẫu</a> (bảng cân + danh sách xe, tài xế của đợt — 1 file = 1 đợt).</div>
+        </div>
+      </div>
+      <div class="card mt-3" id="batchCard" hidden>
+        <div class="card-body py-3">
+          <div class="sec-title mb-2" id="batchTitle">Các đợt đã nạp</div>
+          <div class="tbl-wrap" style="max-height:260px"><table class="table mb-2"><thead><tr><th>#</th><th>File đợt</th><th class="num">Xe</th><th class="num">Tấn</th><th>Từ → đến</th><th>DS xe</th><th></th></tr></thead><tbody id="batchBody"></tbody></table></div>
+          <div class="small" id="batchSummary"></div>
+          <div class="form-text">Bấm một dòng để xem chi tiết / chỉnh cột của đợt đó. Các trang biên bản dùng dữ liệu <b>gộp tất cả đợt</b> (tự bỏ phiếu trùng).</div>
+        </div>
+      </div>
+      <div class="card mt-3" id="vehCard">
+        <div class="card-body py-3">
+          <div class="d-flex flex-wrap align-items-center gap-2">
+            <div class="fs-3">🚚</div>
+            <div class="flex-grow-1" style="min-width:220px">
+              <div class="fw-semibold">Danh sách xe &amp; tài xế <span class="text-primary" id="vehFor"></span> <span class="muted small fw-normal">(riêng từng đợt — chỉ áp cho bảng cân của đợt đó, không dùng cho lô / tàu khác)</span></div>
+              <div class="small" id="vehStatus"></div>
+            </div>
+            <label class="btn btn-outline-primary mb-0" for="vehInput" id="vehAttach">⬆ Gắn file danh sách xe</label>
+            <input type="file" id="vehInput" accept=".xlsx,.xls,.xlsm,.csv" hidden>
+            <button class="btn btn-outline-secondary" id="vehClear" type="button" hidden>Bỏ danh sách</button>
+            <button class="btn btn-outline-success" id="vehTpl" type="button">⬇ Tải file Excel mẫu</button>
+          </div>
+          <div class="d-flex flex-wrap align-items-center gap-2 mt-2" id="vehPickWrap" hidden>
+            <span class="small fw-semibold">Dự phòng — dùng danh sách của đợt khác:</span>
+            <select class="form-select form-select-sm" id="vehPick" style="flex:1 1 18rem;min-width:0;max-width:100%"></select>
+            <button class="btn btn-sm btn-outline-primary" id="vehUse" type="button">Dùng danh sách này</button>
+          </div>
+          <div class="small mt-2" id="vehMatch"></div>
+        </div>
+      </div>
+      <div id="fileResult" class="mt-3" hidden>
+        <div class="row g-3 align-items-end mb-3">
+          <div class="col-md-5"><div class="card"><div class="card-body py-3"><div class="muted small">Đợt đang xem</div><div class="fw-semibold text-break" id="fileName"></div><div class="muted small" id="fileMeta"></div></div></div></div>
+          <div class="col-md-4"><label class="form-label">Chọn Sheet</label><select class="form-select" id="sheetSelect"></select></div>
+          <div class="col-md-3 d-grid"><button class="btn btn-outline-primary" id="btnReparse" type="button">↻ Đọc lại sheet</button></div>
+        </div>
+        <div id="fileAlerts" class="mb-3"></div>
+        <div class="row g-3 mb-3" id="statTiles"></div>
+        <div class="row g-3">
+          <div class="col-xl-7">
+            <div class="card h-100">
+              <div class="card-header">🧭 Ánh xạ cột <span class="muted small fw-normal">(tự nhận diện — có thể chỉnh)</span>
+                <button class="btn btn-sm btn-outline-secondary ms-auto" id="btnResetMap" type="button">Nhận diện lại</button></div>
+              <div class="card-body" id="mapBody"></div>
+            </div>
+          </div>
+          <div class="col-xl-5">
+            <div class="card h-100">
+              <div class="card-header">🏷️ Thống kê theo nhãn / tàu</div>
+              <div class="card-body"><div class="tbl-wrap" style="max-height:340px"><table class="table"><thead><tr><th>Nhãn (cột ghi chú)</th><th class="num">Số xe</th><th class="num">Tấn</th><th>Từ → đến</th></tr></thead><tbody id="groupBody"></tbody></table></div></div>
+            </div>
+          </div>
+          <div class="col-xl-5">
+            <div class="card h-100">
+              <div class="card-header">🚛 Số chuyến từng xe
+                <input class="form-control form-control-sm ms-auto" style="max-width:150px" id="plateSearch" placeholder="Tìm biển số…"></div>
+              <div class="card-body"><div class="tbl-wrap" style="max-height:380px"><table class="table"><thead><tr><th>Biển số</th><th class="num">Số chuyến</th><th class="num">Tấn</th></tr></thead><tbody id="plateBody"></tbody></table></div></div>
+            </div>
+          </div>
+          <div class="col-xl-7">
+            <div class="card h-100">
+              <div class="card-header">👁️ Xem trước dữ liệu <span class="muted small fw-normal" id="previewInfo"></span></div>
+              <div class="card-body">
+                <div class="tbl-wrap" style="max-height:380px"><table class="table"><thead><tr><th>Dòng</th><th>Số phiếu</th><th>Giờ cân 1</th><th>Giờ cân 2</th><th>Biển số</th><th>Tài xế</th><th>ĐVVC</th><th class="num">Cân 1</th><th class="num">Cân 2</th><th class="num">KL (kg)</th><th>Nhãn</th></tr></thead><tbody id="previewBody"></tbody></table></div>
+                <div class="pager mt-2"><button class="btn btn-sm btn-outline-secondary" id="prevPrev" type="button">‹</button><span id="prevPage"></span><button class="btn btn-sm btn-outline-secondary" id="prevNext" type="button">›</button></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ---------- 4 TRANG SINH BIÊN BẢN (dựng bằng main.js) ---------- -->
+    <section class="page" id="page-guikho" hidden></section>
+    <section class="page" id="page-xuatkhogui" hidden></section>
+    <section class="page" id="page-xuatkhau" hidden></section>
+    <section class="page" id="page-uythac" hidden></section>
+    <section class="page" id="page-dieuchuyen" hidden></section>
+    <section class="page" id="page-traodoi" hidden></section>
+    <section class="page" id="page-xuatban" hidden></section>
+
+    <!-- ---------- BÁO CÁO TỔNG HỢP ---------- -->
+    <section class="page" id="page-report" hidden>
+      <div class="card mb-3"><div class="card-body">
+        <div class="row g-2 align-items-end">
+          <div class="col-6 col-md-3"><label class="form-label">Từ ngày</label><input type="date" class="form-control" id="repFrom"></div>
+          <div class="col-6 col-md-3"><label class="form-label">Đến ngày</label><input type="date" class="form-control" id="repTo"></div>
+          <div class="col-6 col-md-3 d-grid"><button class="btn btn-outline-secondary" id="repReset" type="button">Đặt lại</button></div>
+          <div class="col-12 d-flex align-items-center gap-2" id="repScopeWrap"></div>
+          <div class="col-6 col-md-3 d-grid"><button class="btn btn-success" id="repXls" type="button">📊 Xuất Excel</button></div>
+        </div>
+        <div class="form-text">Số liệu lấy từ các hồ sơ trong 🗄️ Lưu trữ; lọc theo <b>ngày bắt đầu</b> của hồ sơ. Bỏ trống ngày = tất cả.</div>
+      </div></div>
+      <div class="card mb-3" id="repEmpty"><div class="card-body text-center muted py-4">Chưa có hồ sơ nào trong Lưu trữ. Hãy xuất biên bản (Word / PDF / Excel) — app tự lưu và báo cáo sẽ hiện ở đây.</div></div>
+      <div id="repMain" class="d-none">
+        <div class="row g-2 mb-3" id="repCards"></div>
+        <div class="card mb-3"><div class="card-body"><div class="sec-title">Tổng hợp theo loại biên bản</div>
+          <div class="tbl-wrap"><table class="table"><thead><tr><th>Loại</th><th class="num">Hồ sơ</th><th class="num">Xe</th><th class="num">Qua cân (tấn)</th><th class="num">Xe trả về</th><th class="num">Thực giao (tấn)</th></tr></thead><tbody id="repByType"></tbody></table></div>
+          <div class="form-text">Thực giao = qua cân − xe trả về (chỉ Ủy thác và Xuất hàng kho gửi có xe trả về). Không cộng chung các loại vì cùng một lô hàng có thể đi qua nhiều loại biên bản.</div></div></div>
+        <div class="card mb-3"><div class="card-body"><div class="sec-title">Theo tháng (tấn thực giao)</div>
+          <div class="tbl-wrap"><table class="table"><thead id="repMonthHead"></thead><tbody id="repMonthBody"></tbody></table></div></div></div>
+        <div class="card mb-3"><div class="card-body"><div class="sec-title">Theo tàu (Xuất khẩu / Ủy thác / Xuất hàng kho gửi)</div>
+          <div class="tbl-wrap"><table class="table"><thead><tr><th>Tàu</th><th>Loại</th><th>Thời gian</th><th>Bên</th><th class="num">Xe</th><th class="num">Qua cân</th><th class="num">Xe trả về</th><th class="num">Thực giao</th></tr></thead><tbody id="repShips"></tbody></table></div></div></div>
+        <div class="card mb-3"><div class="card-body">
+          <div class="sec-title d-flex flex-wrap align-items-center gap-2 mb-2">
+            <span>Theo đơn vị vận chuyển (theo tàu / theo đợt, chi tiết theo ngày)</span>
+            <select class="form-select form-select-sm w-auto ms-auto" id="repCarrierShip" style="min-width:260px"><option value="">— Chọn tàu hoặc đợt —</option></select>
+            <button class="btn btn-sm btn-outline-success" id="repXlsCarrier" type="button">📊 Xuất Excel (tất cả tàu / đợt)</button>
+          </div>
+          <div class="form-text mt-0 mb-2">Đọc lại các dòng phiếu cân từ 🗄️ Lưu trữ khi chọn (có thể mất vài giây với tàu/đợt nhiều xe). Xuất khẩu / Ủy thác / Xuất hàng kho gửi chọn theo <b>tàu</b> (gộp mọi hồ sơ cùng tên); Trung chuyển gửi kho / Điều chuyển nội bộ / Trao đổi hàng hóa / Xuất bán không có tàu nên chọn theo <b>đợt</b> (mỗi hồ sơ là 1 đợt). Đơn vị vận chuyển lấy từ cột ĐVVC / nhà xe / chủ xe trong Excel cân.</div>
+          <div id="repCarrierBody"><div class="muted small">Chọn tàu hoặc đợt ở trên để xem chi tiết theo đơn vị vận chuyển.</div></div>
+        </div></div>
+        <div class="card mb-3"><div class="card-body">
+          <div class="sec-title d-flex flex-wrap align-items-center gap-2 mb-2">
+            <span>📑 Xuất hàng theo hợp đồng (mẫu XUATHANG — 2 sheet NL_DH_XB · NL_PC_XH)</span>
+            <button class="btn btn-sm btn-success ms-auto" id="repXlsXH" type="button">📊 Xuất Excel Xuất hàng</button>
+            <button class="btn btn-sm btn-outline-primary" id="repGsXH" type="button" title="Đẩy các lô có hồ sơ cân (trong khoảng lọc) lên Google Sheet — thay toàn bộ phiếu của lô đó">☁ Đồng bộ Google Sheet</button>
+          </div>
+          <div class="form-text mt-0 mb-2">Xuất khẩu / Ủy thác / Xuất bán / Trao đổi, gộp theo hợp đồng trong 📇 Danh mục. Sheet phiếu cân: Ngày xuất = ngày cân, Số BKLS = số đã cấp khi tạo BKLS (hồ sơ chưa tạo BKLS để trống), Khối lượng (M3) = tấn ÷ 0,7. Cột nền xám là cột bổ sung ngoài mẫu gốc.</div>
+          <div class="small muted mb-2" id="repGsStatus"></div>
+          <div class="alert alert-warning py-2 mb-2 small d-none" id="repXHWarn"></div>
+          <div class="tbl-wrap"><table class="table table-sm"><thead><tr><th>Hình thức</th><th>Tàu</th><th>Số TKHQ / HĐ</th><th>Khách hàng</th><th class="num">Hồ sơ</th><th class="num">Xe</th><th class="num">Thực giao (tấn)</th><th class="num">KL_MT (tấn)</th><th class="num">Chênh lệch</th></tr></thead><tbody id="repXHBody"></tbody></table></div>
+        </div></div>
+        <div class="card mb-3"><div class="card-body"><div class="sec-title">Hồ sơ được tính <span class="muted text-lowercase" id="repRecCount"></span></div>
+          <div class="alert alert-warning py-2 mb-2 d-none" id="repDupNote">⚠ Có hồ sơ <b>trùng kỳ</b> (cùng loại, cùng tàu / bên giao-nhận và khoảng ngày chồng nhau). Mặc định chỉ tính bản mới nhất; bạn có thể tick lại nếu thật sự là lô khác.</div>
+          <div class="tbl-wrap"><table class="table"><thead><tr><th></th><th>Hồ sơ</th><th>Loại</th><th>Thời gian</th><th class="num">Xe</th><th class="num">Tấn</th><th></th></tr></thead><tbody id="repRecBody"></tbody></table></div></div></div>
+      </div>
+    </section>
+
+    <!-- ---------- CHỨNG TỪ XUẤT HÀNG (BKLS + PXKKVCNB) ---------- -->
+    <section class="page" id="page-chungtu" hidden>
+      <div class="d-flex align-items-start gap-3 mb-3"><div class="fs-1">🧾</div><div><h4 class="mb-1">Chứng từ xuất hàng</h4>
+        <div class="muted">Lập Phiếu xuất kho kiêm vận chuyển nội bộ (PXKKVCNB, Excel import Bkav) cho <b>một đợt</b> đã nhập ở mục Nhập liệu. Bảng kê lâm sản (BKLS) nay lập ở trang <b>Tạo biên bản</b> của từng hình thức.</div></div></div>
+      <div class="card mb-3"><div class="card-body">
+        <div class="sec-title mb-2">① Hình thức</div>
+        <div class="d-flex flex-wrap gap-2" id="ctTypes"></div>
+        <div class="form-text mt-2" id="ctTypeHint"></div>
+      </div></div>
+      <div id="ctNoType" class="alert alert-info">Chọn hình thức ở trên để bắt đầu.</div>
+      <div id="ctNoData" class="alert alert-warning d-none">Chưa có đợt nào cho hình thức này. <a href="#/file" class="alert-link" id="ctGoData">Nhập liệu cho hình thức này</a> để thêm file Excel cân của đợt.</div>
+      <div id="ctBody" class="d-none"><div class="row g-3"><div class="col-xl-8">
+        <div class="card mb-3"><div class="card-body">
+          <div class="sec-title">② Chọn đợt</div>
+          <select class="form-select" id="ctBatch"></select>
+          <div class="form-text" id="ctBatchInfo"></div>
+        </div></div>
+        <div id="ctForm"></div>
+      </div><div class="col-xl-4"><div class="sticky-side">
+        <div class="card mb-3"><div class="card-header">🧮 Đợt được chọn</div><div class="card-body">
+          <div class="row text-center mb-3"><div class="col-6"><div class="sum-big" id="ctTrips">0</div><div class="muted small">xe (phiếu cân)</div></div>
+            <div class="col-6"><div class="sum-big" id="ctTons">0</div><div class="muted small">tấn</div></div></div>
+          <ul class="sum-list" id="ctSumList"></ul></div></div>
+        <div id="ctMsgs" class="mb-3"></div>
+        <div class="d-grid gap-2">
+          <button class="btn btn-primary btn-lg" id="ctPxk" type="button">📊 Tạo PXKKVCNB (Excel)</button>
+        </div>
+        <div class="form-text text-center mt-2" id="ctHint"></div>
+      </div></div></div></div>
+      <div class="card mt-3" id="ctLogCard"><div class="card-header">🕘 Chứng từ đã lập <span class="muted small fw-normal" id="ctLogCount"></span></div>
+        <div class="card-body p-0"><div class="tbl-wrap" style="max-height:none"><table class="table mb-0"><thead><tr><th>Thời gian</th><th>Chứng từ</th><th>Hình thức</th><th>Của</th><th>Đợt</th><th>Số</th><th class="num">Xe</th><th class="num">Tấn</th><th>Người lập</th><th></th></tr></thead><tbody id="ctLogBody"></tbody></table></div>
+        <div class="form-text px-3 py-2 mb-0">Nhật ký dùng để cảnh báo trùng số PXK / BKLS và gợi ý số kế tiếp. Xóa dòng chỉ xóa nhật ký, không ảnh hưởng file đã tải.</div></div></div>
+    </section>
+
+    <!-- ---------- LƯU TRỮ ---------- -->
+    <section class="page" id="page-archive" hidden>
+      <div class="card mb-3"><div class="card-body">
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+          <div class="sec-title mb-0">🗄️ Hồ sơ đã xuất</div><span class="muted small" id="archCountInfo"></span><span class="muted small" id="archSize"></span>
+          <div class="ms-auto d-flex flex-wrap gap-2">
+            <button class="btn btn-sm btn-outline-secondary" id="archBackup" type="button">⬇ Sao lưu (.json)</button>
+            <label class="btn btn-sm btn-outline-secondary mb-0">⬆ Khôi phục<input type="file" accept=".json,.zip,application/json,application/zip" hidden id="archRestore"></label>
+            <button class="btn btn-sm btn-outline-primary admin-only" id="archPrune" type="button">📦 Xuất &amp; dọn hồ sơ cũ</button>
+            <button class="btn btn-sm btn-outline-danger" id="archClear" type="button">🗑 Xóa tất cả</button>
+          </div>
+        </div>
+        <div class="row g-2 mb-2">
+          <div class="col-12 col-md-6"><input class="form-control" id="archSearch" placeholder="Tìm theo tên tàu, tháng, tên file…"></div>
+          <div class="col-12 col-md-4"><select class="form-select" id="archType"><option value="">Tất cả loại</option></select></div>
+          <div class="col-12 col-md-2 d-flex align-items-center" id="archScopeWrap"></div>
+        </div>
+        <div class="card border-primary-subtle mb-2 d-none admin-only" id="archPrunePanel"><div class="card-body py-2" id="archPruneBody"></div></div>
+        <div class="alert alert-warning py-2 mb-2 d-none" id="archMemWarn">Trình duyệt đang không cho lưu lâu dài (chế độ ẩn danh?) — hồ sơ chỉ giữ tạm đến khi đóng trang. Hãy bấm <b>Sao lưu</b> nếu cần giữ.</div>
+        <div class="tbl-wrap d-none" id="archTableWrap"><table class="table table-hover align-middle">
+          <thead><tr><th>Cập nhật</th><th>Loại</th><th>Hồ sơ</th><th class="num">Xe</th><th class="num">Tấn</th><th>Đã xuất</th><th></th></tr></thead>
+          <tbody id="archBody"></tbody></table></div>
+        <div class="text-center mt-2"><button class="btn btn-sm btn-outline-secondary d-none" id="archMore" type="button">Hiện thêm</button></div>
+        <div class="text-center muted py-4" id="archEmpty">Chưa có hồ sơ. Mỗi lần bấm <b>Tạo biên bản / Tải PDF / Xuất Excel / Tạo BKLS</b>, app tự lưu thông số và dữ liệu phiếu cân vào đây để tải lại sau mà không cần chọn lại file Excel.</div>
+        <div class="form-text mt-2">Hồ sơ được lưu <b>trong trình duyệt của máy này</b> (không lên mạng). Xóa dữ liệu trình duyệt sẽ mất — hãy <b>Sao lưu (.json)</b> định kỳ; máy khác mở app rồi bấm <b>Khôi phục</b> để dùng lại. Tải lại dùng <b>mẫu Word và thông tin công ty hiện hành</b> trong Cài đặt.</div>
+      </div></div>
+    </section>
+
+    <!-- ---------- DANH MỤC HỢP ĐỒNG XUẤT KHẨU & KHÁCH HÀNG (js/catalog.js dựng nội dung) ---------- -->
+    <section class="page" id="page-catalog" hidden><div id="catalogRoot"></div></section>
+    <section class="page" id="page-help" hidden><div id="helpRoot"></div></section>
+
+    <!-- ---------- CÀI ĐẶT ---------- -->
+    <section class="page" id="page-settings" hidden>
+      <ul class="nav nav-pills mb-3 flex-wrap gap-1" role="tablist">
+        <li class="nav-item admin-only"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#tab-company" type="button">🏢 Công ty</button></li>
+        <li class="nav-item admin-only"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-wh" type="button">🏭 Kho</button></li>
+        <li class="nav-item admin-only"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-tpl" type="button">📑 Mẫu Word</button></li>
+        <li class="nav-item admin-only"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-general" type="button">🛠️ Chung</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-account" type="button">👤 Tài khoản</button></li>
+      </ul>
+      <div class="tab-content">
+        <div class="tab-pane fade show active" id="tab-company">
+          <div class="card"><div class="card-header">Danh sách công ty <span class="muted small fw-normal">— bấm ✏ Sửa để chỉnh, 💾 Lưu để ghi</span>
+            <button class="btn btn-sm btn-primary ms-auto" id="btnAddCompany" type="button">＋ Thêm công ty</button></div>
+            <div class="card-body" id="companyList"></div></div>
+        </div>
+        <div class="tab-pane fade" id="tab-wh">
+          <div class="card"><div class="card-header">Danh sách kho / cảng
+            <button class="btn btn-sm btn-primary ms-auto" id="btnAddWh" type="button">＋ Thêm kho</button></div>
+            <div class="card-body"><div class="tbl-wrap" style="max-height:none"><table class="table"><thead><tr><th style="min-width:180px">Tên kho</th><th>Tên rút gọn</th><th style="min-width:200px">Địa chỉ</th><th title="Chữ ghi vào cột &quot;Kho xuất&quot; ở phụ lục — hiện trong dropdown của trang Xuất hàng kho gửi / Ủy thác">Ghi phụ lục</th><th title="Ký hiệu kho (vd HAKĐN) — hiện trong dropdown &quot;Ký hiệu kho gửi&quot;">Ký hiệu kho</th><th>Loại kho</th><th></th></tr></thead><tbody id="whList"></tbody></table></div></div></div>
+        </div>
+        <div class="tab-pane fade" id="tab-tpl">
+          <div class="card mb-3"><div class="card-header">Template DOCX cho từng loại biên bản</div>
+            <div class="card-body"><p class="muted small mb-3">Mỗi loại dùng một template Word có placeholder dạng <kbd class="ph">{{ten}}</kbd>. Bạn có thể tải mẫu hiện tại về, chỉnh trong Word rồi upload lại — không cần sửa mã nguồn.</p>
+              <div id="tplList"></div></div></div>
+          <div class="card"><div class="card-header">📖 Danh sách placeholder</div>
+            <div class="card-body"><div class="tbl-wrap" style="max-height:none"><table class="table"><thead><tr><th>Placeholder</th><th>Ý nghĩa</th></tr></thead><tbody id="phList"></tbody></table></div></div></div>
+        </div>
+        <div class="tab-pane fade" id="tab-account"><div id="authAccount"></div></div>
+        <div class="tab-pane fade" id="tab-general">
+          <div class="card"><div class="card-header">Cài đặt chung</div><div class="card-body" id="generalBody"></div></div>
+          <div class="card mt-3"><div class="card-header">🚚 Bảng đổi mã đơn vị vận chuyển <span class="muted small fw-normal">— mã trong file danh sách xe → tên in ở cột ĐVVC</span>
+            <button class="btn btn-sm btn-primary ms-auto" id="btnAddCarrier" type="button">＋ Thêm mã</button></div>
+            <div class="card-body" id="carrierList"></div></div>
+          <div class="card mt-3"><div class="card-header">☁ Đồng bộ Google Sheet <span class="muted small fw-normal">— báo cáo Xuất hàng (NL_DH_XB · NL_PC_XH), 1 chiều app → Sheet</span></div>
+            <div class="card-body" id="gsyncBody"></div></div>
+          <div class="card mt-3 admin-only"><div class="card-header">📦 Gói cấu hình cài đặt <span class="muted small fw-normal">— cài app cho máy / công ty khác</span></div>
+            <div class="card-body" id="packBody"></div></div>
+          <div class="card mt-3"><div class="card-header">💾 Bộ nhớ &amp; sao lưu toàn bộ <span class="muted small fw-normal">— cài đặt, danh sách xe, mẫu Word, form, đợt Excel, nhật ký chứng từ, Lưu trữ</span></div>
+            <div class="card-body" id="backupBody"></div></div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- Modal chọn xe trả về (trang Ủy thác) -->
+<div class="modal fade" id="returnModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Chọn xe trả về (không lên được tàu)</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Dán danh sách số phiếu <span class="muted fw-normal">(cách nhau bằng dấu phẩy, khoảng trắng hoặc xuống dòng; nhập "7996" khớp "7996/2026/XK")</span></label>
+          <textarea class="form-control" id="retPaste" rows="2" placeholder="7996, 7997"></textarea>
+          <button class="btn btn-sm btn-outline-primary mt-2" id="retApply" type="button">Áp dụng danh sách</button>
+          <span class="small ms-2" id="retPasteMsg"></span>
+        </div>
+        <input class="form-control mb-2" id="retSearch" placeholder="Tìm theo số phiếu hoặc biển số…">
+        <div class="tbl-wrap" style="max-height:340px"><table class="table"><thead><tr><th style="width:36px"></th><th>Số phiếu</th><th>Giờ cân 1</th><th>Biển số</th><th class="num">KL (kg)</th></tr></thead><tbody id="retBody"></tbody></table></div>
+        <div class="small muted mt-2" id="retInfo"></div>
+      </div>
+      <div class="modal-footer"><span class="me-auto fw-semibold" id="retCount"></span>
+        <button class="btn btn-outline-secondary" id="retClear" type="button">Bỏ chọn hết</button>
+        <button class="btn btn-primary" data-bs-dismiss="modal" type="button">Xong</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast thông báo -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3" id="toasts"></div>
+
+<!-- Thư viện (offline) -->
+<script src="libs/bootstrap.bundle.min.js"></script>
+<script src="libs/xlsx.full.min.js"></script>
+<script src="libs/pizzip.min.js"></script>
+<script src="libs/docxtemplater.min.js"></script>
+<script src="libs/jszip.min.js"></script>
+<script src="libs/FileSaver.min.js"></script>
+<!-- libs/exceljs.min.js, libs/docx-preview.min.js: nạp khi cần (HAK.UI.needLib) — khởi động nhanh hơn -->
+
+<!-- Mã nguồn ứng dụng -->
+<script src="js/db.js"></script>
+<script src="js/config.js"></script>
+<script src="js/excel.js"></script>
+<script src="js/vehicles.js"></script>
+<script src="js/generator.js"></script>
+<script src="js/templates-data.js"></script>
+<script src="js/word.js"></script>
+<script src="js/exporter.js"></script>
+<script src="js/archive.js"></script>
+<script src="js/report.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/pages.js"></script>
+<script src="js/settings.js"></script>
+<script src="js/bkls.js"></script>
+<script src="js/records.js"></script>
+<script src="js/catalog.js"></script>
+<script src="js/backup.js"></script>
+<script src="js/gsync.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/chungtu.js"></script>
+<script src="js/search.js"></script>
+<script src="js/dashboard.js"></script>
+<script src="js/help.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
