@@ -44,3 +44,10 @@ Kiểm tra: 153 kiểm thử tự động (11 kiểm thử mới cho đọc tờ
 - Mỗi hợp đồng một dòng: số hồ sơ, **số chuyến xe**, KL qua cân, xe trả về, **thực giao**, **kho xuất**, tàu, thời gian cân, chênh lệch MT chứng thư − thực giao, chứng thư, tờ khai đã thông quan, thuế phải nộp / còn phải nộp, trạng thái. Dòng nhỏ bên dưới là từng đợt thực hiện.
 - **Bấm vào một dòng** (hợp đồng hoặc đợt) để xem **chi tiết xuất hàng từng xe**: ngày, giờ cân 1 / 2, số phiếu, biển số, tài xế, đơn vị vận chuyển, kho xuất, KL, hồ sơ, xe trả về (tô vàng), số BKLS. Có **bộ lọc smart** (tìm không dấu, biển số, đơn vị vận chuyển, tài xế, kho xuất, hồ sơ, khoảng ngày, chỉ xe trả về); **Xuất Excel** và **Tải PDF** đúng phần đang xem.
 - Hồ sơ cân chưa gắn được hợp đồng hiện ở dòng "(chưa gắn hợp đồng)" kèm cảnh báo.
+
+**Gắn đợt giao hàng vào hợp đồng (2.15.0):** hợp đồng có trước, giao hàng sau; gắn một đợt giao hàng (một lần tải phiếu cân / lập phiếu xuất kho, có thể kéo dài nhiều ngày) vào hợp đồng chính là **thực hiện hợp đồng**.
+- Vào **📑 Tình hình hợp đồng**: khung **📥 Đợt giao hàng chưa gắn hợp đồng** hiện sẵn các đợt (hình thức, hồ sơ, tàu, từ ngày → đến ngày, số xe, tấn, kho xuất). Tick một hoặc nhiều đợt cùng hình thức → **Gắn … vào hợp đồng…** → chọn hợp đồng. Hoặc bấm **＋ Gắn đợt** ngay ở dòng hợp đồng.
+- **Điều kiện gắn:** hợp đồng **Xuất khẩu** và **Ủy thác XK** phải có **tàu** và **tờ khai hải quan** trước (chưa có tờ khai thì chưa thực hiện được hợp đồng) — hợp đồng còn thiếu hiện mờ kèm "thiếu: tàu + tờ khai hải quan". Hợp đồng **Xuất bán** và **Trao đổi** không cần tàu, tờ khai (chưa có chi tiết thì app tự tạo chi tiết trống).
+- **Gỡ:** mở chi tiết hợp đồng → bảng "Các đợt giao hàng của hợp đồng" → **Gỡ khỏi hợp đồng**.
+- Trung chuyển / điều chuyển (chưa bán) **không gắn hợp đồng**, không tính vào thực giao.
+- Ở trang **Tạo biên bản**, ô "Chọn dòng chi tiết hợp đồng" cũng khóa hợp đồng Xuất khẩu / Ủy thác chưa đủ tàu + tờ khai.

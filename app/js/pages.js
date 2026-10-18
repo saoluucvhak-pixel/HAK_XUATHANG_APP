@@ -592,7 +592,9 @@
   function contractOptions(type, sel) {
     const list = hasCatalog() ? HAK.Catalog.contracts(type).slice().sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.ship || '').localeCompare(a.ship || '')) : [];
     const tl = hasCatalog() && HAK.Catalog.TYPES[type] ? HAK.Catalog.TYPES[type].label : '';
-    const opt = (c) => '<option value="' + esc(c.id) + '"' + (c.id === sel ? ' selected' : '') + '>' + esc(HAK.Catalog.label(c) + (c.date ? ' · ' + HAK.Catalog.util.vnDate(c.date) : '')) + '</option>';
+    // Xuất khẩu / Ủy thác: chỉ chọn được chi tiết đã có TÀU và TỜ KHAI hải quan (chưa có tờ khai thì chưa thực hiện được hợp đồng); Xuất bán / Trao đổi không cần.
+    const gate = (c) => { try { const rd = HAK.CustomsModel.detailReady(HAK.Catalog.parent(c.parentId), c, HAK.Customs ? HAK.Customs.activeDecls() : []); return rd.ok ? '' : ' — chưa có ' + rd.missing.join(' + ') + ' (nhập ở Danh mục)'; } catch (e) { return ''; } };
+    const opt = (c) => { const g = gate(c); return '<option value="' + esc(c.id) + '"' + (c.id === sel ? ' selected' : '') + (g && c.id !== sel ? ' disabled' : '') + '>' + esc(HAK.Catalog.label(c) + (c.date ? ' · ' + HAK.Catalog.util.vnDate(c.date) : '') + g) + '</option>'; };
     const head = '<option value="">' + esc(list.length ? '— Không dùng danh mục (nhập tay) —' : '— Chưa có hợp đồng ' + tl + ' trong Danh mục —') + '</option>';
     // v2.6.2: hợp đồng liên quan công ty đang làm lên trước; hợp đồng công ty khác vẫn chọn được (nhóm riêng) — "mặc định, vẫn đổi được".
     const co = HAK.Auth && HAK.Auth.company ? HAK.Auth.company() : '';

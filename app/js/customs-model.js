@@ -105,6 +105,32 @@
     });
     return out;
   }
-  HAK.CustomsModel = { STATUS, STATUS_ORDER, PAY_KIND, newDecl, newSupp, newPay, active: act, sum, totals, setStatus, statusDate, contractStatus, validate, upsert, merge, copy, digits };
+  /**
+   * Điều kiện gắn đợt giao hàng (hồ sơ cân) vào hợp đồng:
+   *  - Xuất khẩu / Ủy thác XK: phải nhập TÀU và TỜ KHAI hải quan trước (chưa có tờ khai thì chưa thực hiện được hợp đồng).
+   *  - Xuất bán / Trao đổi: không cần tờ khai và tàu.
+   * Trả về {need, ok, missing[], detailId}: detailId = chi tiết (tàu) sẽ nhận hồ sơ.
+   */
+  function readiness(contract, customs) {
+    const c = contract || {}, need = c.type === 'xuatkhau' || c.type === 'uythac';
+    const details = (c.details || []).filter((d) => !d.deletedAt);
+    if (!need) return { need: false, ok: true, missing: [], detailId: details[0] ? details[0].id : '' };
+    const decls = act(customs).filter((d) => d.contractId === c.id);
+    const withShip = details.filter((d) => String(d.ship || '').trim());
+    const ready = withShip.find((d) => decls.some((x) => !x.detailId || x.detailId === d.id)) || null, pick = ready || withShip[0] || null;
+    const missing = [];
+    if (!withShip.length) missing.push('tàu'); if (!decls.length) missing.push('tờ khai hải quan');
+    return { need: true, ok: !!ready, missing, detailId: pick ? pick.id : '' };
+  }
+  /** Một chi tiết (tàu) đã đủ điều kiện nhận đợt giao hàng chưa → {ok, missing[]} (xem readiness). */
+  function detailReady(contract, detail, customs) {
+    const c = contract || {}, d = detail || {};
+    if (!(c.type === 'xuatkhau' || c.type === 'uythac')) return { ok: true, missing: [] };
+    const missing = [];
+    if (!String(d.ship || '').trim()) missing.push('tàu');
+    if (!act(customs).some((x) => x.contractId === c.id && (!x.detailId || x.detailId === d.id))) missing.push('tờ khai hải quan');
+    return { ok: !missing.length, missing };
+  }
+  HAK.CustomsModel = { detailReady, readiness, STATUS, STATUS_ORDER, PAY_KIND, newDecl, newSupp, newPay, active: act, sum, totals, setStatus, statusDate, contractStatus, validate, upsert, merge, copy, digits };
   if (typeof module === 'object' && module.exports) module.exports = HAK.CustomsModel;
 })(typeof window !== 'undefined' ? window : globalThis);

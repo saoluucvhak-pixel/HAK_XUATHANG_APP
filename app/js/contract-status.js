@@ -89,13 +89,14 @@
       const c = g.c, tot = g.tot, cu = g.cust, tt = cu ? cu.tot : null;
       const head = '<tr class="table-light fw-semibold csr-row" data-csr-g="' + gi + '" style="cursor:pointer"><td>' + esc(g.f.no) + '<div class="small muted fw-normal">' + esc(typeLabel(g.f.type)) + (c && c.date ? ' · ' + esc(vnDate(c.date)) : '') + '</div></td><td>' + esc(g.f.buyer) + '</td><td>' + esc(g.khos.join(', ')) + '</td><td>' + esc(g.ships.join(', ')) + '</td>' +
         '<td class="num">' + int(tot.recs) + '</td><td class="num">' + int(tot.trips) + '</td><td class="num">' + ton(tot.kg) + '</td><td class="num">' + int(tot.retTrips) + '</td><td class="num">' + ton(tot.delKg) + '</td><td class="num">' + esc(c ? dec(c.contractQty, 0) : '') + '</td><td class="num ' + (g.gap !== null && Math.abs(g.gap) >= 0.005 ? 'text-danger' : '') + '">' + (g.gap === null ? '' : dec(g.gap)) + '</td>' +
-        '<td>' + esc(g.from) + (g.to && g.to !== g.from ? ' → ' + esc(g.to) : '') + '</td><td class="num">' + (cu ? cu.tot.certs + '/' + cu.tot.details : '') + '</td><td class="num">' + (cu ? cu.tot.cleared + '/' + cu.tot.decls : '') + '</td><td class="num">' + esc(tt ? money(tt.payable) : '') + '</td><td class="num ' + (tt && tt.remaining > 0 ? 'text-danger' : '') + '">' + esc(tt ? money(tt.remaining) : '') + '</td><td>' + (c && HAK.Customs ? HAK.Customs.contractBadge(c.id) : '') + '</td></tr>';
+        '<td>' + esc(g.from) + (g.to && g.to !== g.from ? ' → ' + esc(g.to) : '') + '</td><td class="num">' + (cu ? cu.tot.certs + '/' + cu.tot.details : '') + '</td><td class="num">' + (cu ? cu.tot.cleared + '/' + cu.tot.decls : '') + '</td><td class="num">' + esc(tt ? money(tt.payable) : '') + '</td><td class="num ' + (tt && tt.remaining > 0 ? 'text-danger' : '') + '">' + esc(tt ? money(tt.remaining) : '') + '</td><td>' + (c && HAK.Customs ? HAK.Customs.contractBadge(c.id) : '') + (c ? ' <button class="btn btn-sm btn-outline-primary ms-1" type="button" data-csr-assign="' + gi + '" title="Gắn đợt giao hàng chưa có hợp đồng vào hợp đồng này">＋ Gắn đợt</button>' : '') + '</td></tr>';
       const sub = g.lots.map((L, li) => '<tr class="small csr-row" data-csr-g="' + gi + '" data-csr-l="' + li + '" style="cursor:pointer"><td class="ps-4">' + esc(lotLabel(L)) + '</td><td></td><td>' + esc(Array.from(new Set(L.recs.map(khoOf).filter(Boolean))).join(', ')) + '</td><td></td><td class="num">' + int(L.recs.length) + '</td><td class="num">' + (L.recs.length ? int(L.trips) : '') + '</td><td class="num">' + (L.recs.length ? ton(L.kg) : '') + '</td><td class="num">' + (L.recs.length ? int(L.retTrips) : '') + '</td><td class="num">' + (L.recs.length ? ton(L.delKg) : '') + '</td><td class="num">' + esc(L.c && hasNum(L.c.mt) ? dec(L.c.mt) + ' MT' : '') + '</td><td class="num">' + (L.recs.length && L.c && hasNum(L.c.mt) ? dec(L.c.mt - L.delKg / 1000) : '') + '</td><td>' + esc(L.from) + (L.to && L.to !== L.from ? ' → ' + esc(L.to) : '') + '</td><td></td><td></td><td></td><td></td><td>' + (L.recs.length ? '<span class="badge badge-soft">Xem xe ▸</span>' : '<span class="muted">chưa có phiếu cân</span>') + '</td></tr>').join('');
       return head + sub;
     }).join('') : '<tr><td colspan="17" class="muted text-center py-4">Chưa có hợp đồng / hồ sơ cân khớp bộ lọc. Phiếu cân lấy từ các hồ sơ đã xuất trong 🗄️ Lưu trữ (Xuất khẩu, Ủy thác, Xuất bán, Trao đổi) có gắn hợp đồng.</td></tr>';
     const un = (state.unlinked || []).length;
     $('#csrWarn').innerHTML = un ? '⚠ ' + un + ' hồ sơ cân chưa gắn được hợp đồng (lập biên bản không chọn hợp đồng và tên tàu không khớp) — hiện ở các dòng "(chưa gắn hợp đồng)".' : '';
     $('#csrWarn').classList.toggle('d-none', !un);
+    drawUnlinked();
     ['#csrXls', '#csrPdf'].forEach((s) => { const b = $(s); if (b) b.disabled = !list.length; });
   }
   async function render() {
@@ -106,12 +107,70 @@
     finally { state.loading = false; }
   }
 
+
+  /* ---------------- Gắn đợt giao hàng (hồ sơ cân) vào hợp đồng ---------------- */
+  const GATED = ['xuatkhau', 'uythac'];
+  const recKho = (r) => khoOf(r);
+  const recLine = (r) => '<td>' + esc(typeLabel(r.type)) + '</td><td>' + esc(r.title || '') + '</td><td>' + esc(r.ship || '') + '</td><td>' + esc(r.from || '') + (r.to && r.to !== r.from ? ' → ' + esc(r.to) : '') + '</td><td class="num">' + int(r.trips) + '</td><td class="num">' + ton(r.kg) + '</td><td>' + esc(recKho(r)) + '</td>';
+  function drawUnlinked() {
+    const host = $('#csrUnlinked'); if (!host) return;
+    const list = (state.unlinked || []).slice().sort((a, b) => (a.fromTs || 0) - (b.fromTs || 0));
+    if (!list.length) { host.innerHTML = ''; return; }
+    host.innerHTML = '<div class="border rounded p-2"><div class="d-flex flex-wrap align-items-center gap-2 mb-1"><b>📥 Đợt giao hàng chưa gắn hợp đồng (' + list.length + ')</b><span class="small muted">Chỉ hồ sơ Xuất khẩu, Ủy thác, Xuất bán, Trao đổi; trung chuyển / điều chuyển không gắn hợp đồng.</span>' +
+      '<button class="btn btn-sm btn-primary ms-auto" id="csrAssignBtn" type="button" disabled>Gắn các đợt đã tick vào hợp đồng…</button></div><div class="tbl-wrap"><table class="table table-sm align-middle mb-0"><thead><tr><th><input type="checkbox" class="form-check-input" id="csrAllUn" aria-label="Chọn tất cả"></th><th>Hình thức</th><th>Hồ sơ / đợt giao hàng</th><th>Tàu</th><th>Từ ngày → đến ngày</th><th class="num">Số xe</th><th class="num">Tấn</th><th>Kho xuất</th></tr></thead><tbody>' +
+      list.map((r) => '<tr><td><input type="checkbox" class="form-check-input csr-un" data-id="' + esc(r.id) + '" data-type="' + esc(r.type) + '"></td>' + recLine(r) + '</tr>').join('') + '</tbody></table></div></div>';
+  }
+  function unTicked() { return Array.from(document.querySelectorAll('#csrUnlinked .csr-un:checked')).map((x) => ({ id: x.dataset.id, type: x.dataset.type })); }
+  function ensureAssignModal() {
+    let m = $('#csrAssign'); if (m) return m;
+    m = document.createElement('div'); m.className = 'modal fade'; m.id = 'csrAssign'; m.tabIndex = -1;
+    m.innerHTML = '<div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Gắn đợt giao hàng vào hợp đồng</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button></div>' +
+      '<div class="modal-body"><label class="form-label" for="csrAsContract">Hợp đồng</label><select class="form-select mb-1" id="csrAsContract"></select><div class="small muted mb-3" id="csrAsHelp"></div>' +
+      '<div class="sec-title mb-1">Các đợt giao hàng chưa gắn (cùng hình thức)</div><div class="tbl-wrap"><table class="table table-sm align-middle"><thead><tr><th></th><th>Hồ sơ / đợt giao hàng</th><th>Tàu</th><th>Từ → đến</th><th class="num">Xe</th><th class="num">Tấn</th><th>Kho xuất</th></tr></thead><tbody id="csrAsRecs"></tbody></table></div></div>' +
+      '<div class="modal-footer"><div class="me-auto text-danger small" id="csrAsErr" role="alert"></div><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Hủy</button><button type="button" class="btn btn-primary" id="csrAsSave">Gắn vào hợp đồng</button></div></div></div>';
+    document.body.append(m); return m;
+  }
+  /** pre = {type, recIds[], contractId}: gắn từ danh sách đã tick (recIds) hoặc từ một hợp đồng (contractId). */
+  function openAssign(pre) {
+    const m = ensureAssignModal(), type = pre.type, scope = HAK.Auth && HAK.Auth.scopeIds ? HAK.Auth.scopeIds('report') : null;
+    const decls = HAK.Customs ? HAK.Customs.activeDecls() : [];
+    const contracts = K().parents().filter((c) => c.type === type && (!scope || !K().relatedTo || K().relatedTo(c, scope)));
+    $('#csrAsContract').innerHTML = '<option value="">— Chọn hợp đồng —</option>' + contracts.map((c) => { const rd = HAK.CustomsModel.readiness(c, decls), ship = (HAK.ContractModel.active(c).find((d) => d.ship) || {}).ship || ''; return '<option value="' + esc(c.id) + '"' + (c.id === pre.contractId ? ' selected' : '') + (rd.ok ? '' : ' disabled') + '>' + esc((c.no || c.id) + (custName(c.buyerId) ? ' · ' + custName(c.buyerId) : '') + (ship ? ' · ' + ship : '') + (rd.ok ? '' : ' — thiếu: ' + rd.missing.join(' + '))) + '</option>'; }).join('');
+    $('#csrAsContract').disabled = !!pre.contractId;
+    $('#csrAsHelp').innerHTML = GATED.indexOf(type) >= 0 ? 'Hợp đồng ' + esc(typeLabel(type)) + ' phải có <b>tàu</b> và <b>tờ khai hải quan</b> trước mới gắn được (chưa có tờ khai thì chưa thực hiện được hợp đồng). Hợp đồng còn thiếu hiện mờ — nhập ở <a href="#/catalog">Danh mục</a>.' : 'Hợp đồng ' + esc(typeLabel(type)) + ' không cần tờ khai và tàu.';
+    const recs = (state.unlinked || []).filter((r) => r.type === type).sort((a, b) => (a.fromTs || 0) - (b.fromTs || 0));
+    $('#csrAsRecs').innerHTML = recs.length ? recs.map((r) => '<tr><td><input type="checkbox" class="form-check-input csr-as" data-id="' + esc(r.id) + '"' + ((pre.recIds || []).indexOf(r.id) >= 0 ? ' checked' : '') + '></td><td>' + esc(r.title || '') + '</td><td>' + esc(r.ship || '') + '</td><td>' + esc(r.from || '') + (r.to && r.to !== r.from ? ' → ' + esc(r.to) : '') + '</td><td class="num">' + int(r.trips) + '</td><td class="num">' + ton(r.kg) + '</td><td>' + esc(recKho(r)) + '</td></tr>').join('') : '<tr><td colspan="7" class="muted text-center py-3">Không còn đợt giao hàng nào chưa gắn của hình thức này.</td></tr>';
+    $('#csrAsErr').textContent = '';
+    $('#csrAsSave').onclick = async () => {
+      const cid = $('#csrAsContract').value, ids = Array.from(document.querySelectorAll('#csrAsRecs .csr-as:checked')).map((x) => x.dataset.id);
+      if (!cid) { $('#csrAsErr').textContent = 'Chọn hợp đồng.'; return; } if (!ids.length) { $('#csrAsErr').textContent = 'Tick ít nhất một đợt giao hàng.'; return; }
+      const btn = $('#csrAsSave'); btn.disabled = true;
+      try {
+        const detailId = await HAK.Customs.ensureDetail(cid);
+        await HAK.Archive.setContract(ids, detailId);
+        bootstrap.Modal.getOrCreateInstance(m).hide(); toast('Đã gắn ' + ids.length + ' đợt giao hàng vào hợp đồng.', 'success'); await render();
+      } catch (e) { $('#csrAsErr').textContent = 'Chưa gắn: ' + (e.message || e); } finally { btn.disabled = false; }
+    };
+    bootstrap.Modal.getOrCreateInstance(m).show();
+  }
+  async function unassign(recId) {
+    await HAK.Archive.setContract([recId], '');
+    const m = $('#csrModal'); if (m) bootstrap.Modal.getOrCreateInstance(m).hide();
+    toast('Đã gỡ đợt giao hàng khỏi hợp đồng.', 'info'); await render();
+  }
+  function drawDetailRecs() {
+    const d = state.detail, host = $('#csrRecs'); if (!d || !host) return;
+    const recs = d.lots.flatMap((L) => L.recs).sort((a, b) => (a.fromTs || 0) - (b.fromTs || 0));
+    host.innerHTML = '<div class="sec-title mb-1">Các đợt giao hàng của hợp đồng (' + recs.length + ')</div><div class="tbl-wrap mb-2"><table class="table table-sm align-middle mb-0"><thead><tr><th>Hồ sơ / đợt giao hàng</th><th>Từ ngày → đến ngày</th><th class="num">Số xe</th><th class="num">Tấn</th><th class="num">Xe trả về</th><th>Kho xuất</th><th></th></tr></thead><tbody>' +
+      recs.map((r) => '<tr><td>' + esc(r.title || '') + '</td><td>' + esc(r.from || '') + (r.to && r.to !== r.from ? ' → ' + esc(r.to) : '') + '</td><td class="num">' + int(r.trips) + '</td><td class="num">' + ton(r.kg) + '</td><td class="num">' + int(r.retTrips) + '</td><td>' + esc(recKho(r)) + '</td><td class="text-end">' + (r.contract ? '<button class="btn btn-sm btn-outline-danger" type="button" data-csr-un="' + esc(r.id) + '">Gỡ khỏi hợp đồng</button>' : '<span class="small muted">ghép theo tên tàu</span>') + '</td></tr>').join('') + '</tbody></table></div>';
+  }
+
   /* ---------------- Chi tiết xuất hàng từng xe ---------------- */
   function ensureModal() {
     let m = $('#csrModal'); if (m) return m;
     m = document.createElement('div'); m.className = 'modal fade'; m.id = 'csrModal'; m.tabIndex = -1;
     m.innerHTML = '<div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><div><h5 class="modal-title" id="csrTitle"></h5><div class="small muted" id="csrSub"></div></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button></div>' +
-      '<div class="modal-body"><div class="row g-2 mb-2" id="csrChips"></div><div id="csrDSmart" class="mb-2"></div><div class="d-flex justify-content-end gap-2 mb-2"><button class="btn btn-sm btn-success" id="csrDXls" type="button">📊 Xuất Excel</button><button class="btn btn-sm btn-outline-primary" id="csrDPdf" type="button">🖨️ Tải PDF</button></div>' +
+      '<div class="modal-body"><div id="csrRecs"></div><div class="row g-2 mb-2" id="csrChips"></div><div id="csrDSmart" class="mb-2"></div><div class="d-flex justify-content-end gap-2 mb-2"><button class="btn btn-sm btn-success" id="csrDXls" type="button">📊 Xuất Excel</button><button class="btn btn-sm btn-outline-primary" id="csrDPdf" type="button">🖨️ Tải PDF</button></div>' +
       '<div class="tbl-wrap"><table class="table table-sm align-middle"><thead><tr><th class="num">STT</th><th>Ngày</th><th>Giờ cân 1</th><th>Giờ cân 2</th><th>Số phiếu</th><th>Biển số</th><th>Tài xế</th><th>Đơn vị vận chuyển</th><th>Kho xuất</th><th class="num">KL hàng (kg)</th><th class="num">Tấn</th><th>Hồ sơ / biên bản</th><th>Trả về</th><th>Số BKLS</th></tr></thead><tbody id="csrTrips"></tbody></table></div><div class="small muted" id="csrMore"></div></div></div></div>';
     document.body.append(m);
     $('#csrDXls').addEventListener('click', () => exportTrips().catch((e) => toast(e.message || String(e), 'error')));
@@ -150,7 +209,7 @@
     ensureModal();
     $('#csrTitle').textContent = 'Chi tiết xuất hàng từng xe — ' + state.detail.title;
     $('#csrSub').textContent = [typeLabel(g.f.type), g.f.buyer, g.c && g.c.date ? 'ký ' + vnDate(g.c.date) : ''].filter(Boolean).join(' · ');
-    mountTripFilter(); drawTrips(); bootstrap.Modal.getOrCreateInstance($('#csrModal')).show();
+    drawDetailRecs(); mountTripFilter(); drawTrips(); bootstrap.Modal.getOrCreateInstance($('#csrModal')).show();
   }
 
   /* ---------------- Excel / PDF ---------------- */
@@ -205,11 +264,19 @@
   function init() {
     const host = $('#page-contractstatus'); if (!host || host.dataset.bound) return; host.dataset.bound = '1';
     host.addEventListener('click', (e) => {
+      const asg = e.target.closest('[data-csr-assign]');
+      if (asg) { const g = filtered()[+asg.dataset.csrAssign]; if (g && g.c) openAssign({ type: g.c.type, contractId: g.c.id, recIds: [] }); return; }
+      if (e.target.closest('#csrAssignBtn')) { const t = unTicked(); if (!t.length) return; const types = Array.from(new Set(t.map((x) => x.type))); if (types.length > 1) { toast('Chọn các đợt cùng một hình thức (Xuất khẩu, Ủy thác, Xuất bán hoặc Trao đổi) để gắn cùng lúc.', 'warning'); return; } openAssign({ type: types[0], recIds: t.map((x) => x.id) }); return; }
       const row = e.target.closest('[data-csr-g]'); if (row && !e.target.closest('a,button')) { showTrips(+row.dataset.csrG, row.dataset.csrL === undefined ? undefined : +row.dataset.csrL).catch((x) => toast(x.message || String(x), 'error')); return; }
       if (e.target.closest('#csrXls')) exportSummary().catch((x) => toast(x.message || String(x), 'error'));
       else if (e.target.closest('#csrPdf')) pdfSummary().catch((x) => toast(x.message || String(x), 'error'));
       else if (e.target.closest('#csrReload')) render();
     });
+    host.addEventListener('change', (e) => {
+      if (e.target.id === 'csrAllUn') document.querySelectorAll('#csrUnlinked .csr-un').forEach((x) => { x.checked = e.target.checked; });
+      if (e.target.id === 'csrAllUn' || e.target.classList.contains('csr-un')) { const b = $('#csrAssignBtn'); if (b) b.disabled = !unTicked().length; }
+    });
+    document.addEventListener('click', (e) => { const u = e.target.closest('[data-csr-un]'); if (u) HAK.UI.confirmClick(u, () => unassign(u.dataset.csrUn).catch((x) => toast(x.message || String(x), 'error')), 'Gỡ?'); });
     root.addEventListener('hak:catalog', () => { if (!host.hidden) render(); });
   }
   HAK.ContractStatus = { render, init, load, state };

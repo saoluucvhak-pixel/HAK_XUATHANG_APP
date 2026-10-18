@@ -194,6 +194,13 @@
     return unpack(s);
   }
 
+  /** Gắn / gỡ hợp đồng cho các hồ sơ (đợt giao hàng): detailId = mã chi tiết hợp đồng (rỗng = gỡ). Chỉ sửa meta; dữ liệu phiếu cân giữ nguyên. */
+  async function setContract(ids, detailId) {
+    let n = 0;
+    for (const id of ids) { const m = await getOne('meta', id); if (!m) continue; m.contract = detailId || ''; m.linkedAt = detailId ? Date.now() : 0; await putBoth(m); n++; }
+    return n;
+  }
+
   /** Tải lại Word / PDF / Excel từ hồ sơ (không cần file Excel cân). */
   async function regenerate(id, mode) {
     const { toast } = HAK.UI;
@@ -401,5 +408,5 @@
     updateBadge();
   }
 
-  HAK.Archive = { closeVerified,decode:unpack,SOFT_WARN, save, list, load, ensureStats, regenerate, exportAll, importFile, collectItems, importItems, render, init, updateBadge, get state() { return state; } };
+  HAK.Archive = { setContract, closeVerified,decode:unpack,SOFT_WARN, save, list, load, ensureStats, regenerate, exportAll, importFile, collectItems, importItems, render, init, updateBadge, get state() { return state; } };
 })(typeof window !== 'undefined' ? window : globalThis);

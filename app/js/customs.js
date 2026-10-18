@@ -673,5 +673,18 @@
   }
 
   function render() { draw(); const v = csView(); if (v) v.refresh(); }
-  HAK.Customs = { printReport, contractPdfSpec, customsPdfSpec, pdfReport, render, draw, contractBadge, detailCells, execPicker, bindExec, link, drawReport, drawContractReport, exportContractReport, contractReportModel, initReport, exportReport, suggestLink, importFiles };
+  /** Gắn đợt giao hàng cần một chi tiết (tàu) của hợp đồng: Xuất bán / Trao đổi chưa có thì tự tạo chi tiết trống. Trả về mã chi tiết. */
+  async function ensureDetail(contractId) {
+    let id = '';
+    await commit((next) => {
+      const c = (next.contracts || []).find((x) => x.id === contractId); if (!c) throw Error('Không tìm thấy hợp đồng.');
+      const rd = CM().readiness(c, next.customs || []);
+      if (rd.need && !rd.ok) throw Error('Hợp đồng ' + (c.no || '') + ' cần nhập ' + rd.missing.join(' và ') + ' trước khi gắn đợt giao hàng.');
+      if (rd.detailId) { id = rd.detailId; return; }
+      const d = HAK.ContractModel.child(c.id, {}); (c.details = c.details || []).push(d); c.revision = (c.revision || 0) + 1; id = d.id;
+    });
+    return id;
+  }
+  const activeDecls = () => decls();
+  HAK.Customs = { ensureDetail, activeDecls, printReport, contractPdfSpec, customsPdfSpec, pdfReport, render, draw, contractBadge, detailCells, execPicker, bindExec, link, drawReport, drawContractReport, exportContractReport, contractReportModel, initReport, exportReport, suggestLink, importFiles };
 })(window);

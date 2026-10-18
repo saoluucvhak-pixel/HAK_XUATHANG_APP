@@ -146,3 +146,15 @@ test('giấy nộp tiền: đọc người nộp thuế khi thiếu dấu ":", t
   assert.equal(P.parseReceiptText('Hải quan cửa khẩu\nNSNN: Công Ty TNHH Hoàng Anh Khôi : Mã số thuế: 0401447476'+row).payer,'Công Ty TNHH Hoàng Anh Khôi');
   assert.equal(P.parseReceiptText('Người nộp thay: ........\nCÔNG TY TNHH HOÀNG ANH KHÔI\nMã số thuế: 0401447476'+row).payer,'CÔNG TY TNHH HOÀNG ANH KHÔI','không có nhãn rõ → lấy dòng tên công ty đầu tiên');
 });
+test('điều kiện gắn đợt giao hàng: Xuất khẩu / Ủy thác cần tàu + tờ khai; Xuất bán / Trao đổi không cần',()=>{
+  const decl=[M.newDecl({no:'308629701721',contractId:'c1'})];
+  const xk={id:'c1',type:'xuatkhau',details:[{id:'d1',ship:'M/V A'}]};
+  assert.deepEqual([M.readiness(xk,decl).ok,M.readiness(xk,decl).detailId],[true,'d1']);
+  assert.deepEqual(M.readiness(xk,[]).missing,['tờ khai hải quan']);
+  assert.deepEqual(M.readiness({id:'c2',type:'uythac',details:[]},decl).missing,['tàu','tờ khai hải quan']);
+  assert.deepEqual(M.readiness({id:'c3',type:'uythac',details:[{id:'d3',ship:''}]},[]).missing,['tàu','tờ khai hải quan']);
+  assert.equal(M.readiness({id:'c1',type:'xuatkhau',details:[{id:'d1',ship:'M/V A',deletedAt:'x'}]},decl).ok,false);
+  const ban={id:'c4',type:'xuatban',details:[]};assert.deepEqual([M.readiness(ban,[]).need,M.readiness(ban,[]).ok],[false,true]);
+  assert.equal(M.readiness({id:'c5',type:'traodoi',details:[{id:'d5'}]},[]).detailId,'d5');
+  const other=[M.newDecl({no:'308629701722',contractId:'c9'})];assert.equal(M.readiness(xk,other).ok,false,'tờ khai của hợp đồng khác không tính');
+});
