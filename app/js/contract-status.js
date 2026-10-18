@@ -111,21 +111,26 @@
     let m = $('#csrModal'); if (m) return m;
     m = document.createElement('div'); m.className = 'modal fade'; m.id = 'csrModal'; m.tabIndex = -1;
     m.innerHTML = '<div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><div><h5 class="modal-title" id="csrTitle"></h5><div class="small muted" id="csrSub"></div></div><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button></div>' +
-      '<div class="modal-body"><div class="row g-2 mb-2" id="csrChips"></div><div class="d-flex flex-wrap gap-2 mb-2"><input class="form-control" id="csrQ" style="max-width:22rem" placeholder="Tìm số phiếu, biển số, tài xế, đơn vị vận chuyển…" aria-label="Tìm xe">' +
-      '<select class="form-select w-auto" id="csrKho" aria-label="Lọc kho xuất"><option value="">Mọi kho xuất</option></select><label class="form-check mb-0 align-self-center"><input class="form-check-input" type="checkbox" id="csrRet"> Chỉ xe trả về</label>' +
-      '<span class="ms-auto d-flex gap-2"><button class="btn btn-sm btn-success" id="csrDXls" type="button">📊 Xuất Excel</button><button class="btn btn-sm btn-outline-primary" id="csrDPdf" type="button">🖨️ Tải PDF</button></span></div>' +
+      '<div class="modal-body"><div class="row g-2 mb-2" id="csrChips"></div><div id="csrDSmart" class="mb-2"></div><div class="d-flex justify-content-end gap-2 mb-2"><button class="btn btn-sm btn-success" id="csrDXls" type="button">📊 Xuất Excel</button><button class="btn btn-sm btn-outline-primary" id="csrDPdf" type="button">🖨️ Tải PDF</button></div>' +
       '<div class="tbl-wrap"><table class="table table-sm align-middle"><thead><tr><th class="num">STT</th><th>Ngày</th><th>Giờ cân 1</th><th>Giờ cân 2</th><th>Số phiếu</th><th>Biển số</th><th>Tài xế</th><th>Đơn vị vận chuyển</th><th>Kho xuất</th><th class="num">KL hàng (kg)</th><th class="num">Tấn</th><th>Hồ sơ / biên bản</th><th>Trả về</th><th>Số BKLS</th></tr></thead><tbody id="csrTrips"></tbody></table></div><div class="small muted" id="csrMore"></div></div></div></div>';
     document.body.append(m);
-    $('#csrQ').addEventListener('input', HAK.UI.debounce(drawTrips, 150)); $('#csrKho').addEventListener('change', drawTrips); $('#csrRet').addEventListener('change', drawTrips);
     $('#csrDXls').addEventListener('click', () => exportTrips().catch((e) => toast(e.message || String(e), 'error')));
     $('#csrDPdf').addEventListener('click', () => pdfTrips().catch((e) => toast(e.message || String(e), 'error')));
     return m;
   }
   const tripRow = (t) => { const r = t.row, kho = khoOf(t.rec); return { ts: r.ts1 === null || r.ts1 === undefined ? 0 : r.ts1, date: r.dateStr || '', t1: r.time1 || '', t2: r.time2 || '', ticket: r.ticket || '', plate: r.plate || '', driver: r.driver || '', carrier: r.carrier || '', kho, kg: r.net, rec: t.rec.title || '', ret: t.isRet, bkls: t.bkls || '', ship: t.lot.ship || '', lot: lotLabel(t.lot), weigher: r.weigher || '' }; };
-  function visibleTrips() {
-    const d = state.detail, q = fold(($('#csrQ') || {}).value || '').trim(), kho = ($('#csrKho') || {}).value || '', onlyRet = !!($('#csrRet') || {}).checked;
-    return d.rows.filter((x) => (!kho || x.kho === kho) && (!onlyRet || x.ret) && (!q || fold([x.ticket, x.plate, x.driver, x.carrier, x.rec, x.bkls, x.date].join(' ')).includes(q)));
+  /** Bộ lọc smart của bảng từng xe: dựng lại mỗi lần mở (dữ liệu mỗi hợp đồng khác nhau), giữ bộ lọc đã lưu theo màn hình. */
+  function tripFields(rows) {
+    const f = F(), opt = (get) => () => Array.from(new Set(rows.map(get).filter(Boolean))).sort().map((v) => ({ value: v, label: v }));
+    return [f.multi('plate', 'Biển số', opt((x) => x.plate), (x) => x.plate), f.multi('carrier', 'Đơn vị vận chuyển', opt((x) => x.carrier), (x) => x.carrier), f.multi('driver', 'Tài xế', opt((x) => x.driver), (x) => x.driver),
+      f.multi('kho', 'Kho xuất', opt((x) => x.kho), (x) => x.kho), f.multi('rec', 'Hồ sơ / biên bản', opt((x) => x.rec), (x) => x.rec), { key: 'ret', label: 'Chỉ xe trả về', type: 'bool', match: (x) => x.ret }];
   }
+  function mountTripFilter() {
+    const d = state.detail; d.view = F().mount('#csrDSmart', { screenId: 'contract-trips', source: () => d.rows, fields: tripFields(d.rows), searchPlaceholder: 'Tìm số phiếu, biển số, tài xế, đơn vị vận chuyển, hồ sơ…',
+      matchQ: (x, q) => F().core.hay([x.ticket, x.plate, x.driver, x.carrier, x.rec, x.bkls, x.date, x.kho]).includes(q), matchDate: (x, fr, to) => F().dateMatch(x.date, fr, to), onApply: () => drawTrips(),
+      summary: (r) => [{ label: 'Xe', value: r.rows.length }, { label: 'Khối lượng', value: ton(sum(r.rows.map((x) => x.kg))) + ' tấn' }] });
+  }
+  function visibleTrips() { const d = state.detail; return d && d.view ? d.view.filter(d.rows).rows : (d ? d.rows : []); }
   function drawTrips() {
     const d = state.detail; if (!d) return;
     const all = visibleTrips(), shown = all.slice(0, 500), kg = sum(all.filter((x) => !x.ret).map((x) => x.kg)), ret = all.filter((x) => x.ret);
@@ -141,13 +146,11 @@
     let items;
     try { items = await HAK.Report.xhTrips(lots, (n, total) => Loading.show('Đang đọc hồ sơ ' + n + '/' + total + '…')); } finally { Loading.hide(); }
     const rows = items.map(tripRow).sort((a, b) => a.ts - b.ts);
-    state.detail = { g, lots, rows, title: (g.f.no || '(chưa gắn hợp đồng)') + (li !== undefined ? ' — ' + lotLabel(lots[0]) : '') };
+    state.detail = { g, lots, rows, view: null, title: (g.f.no || '(chưa gắn hợp đồng)') + (li !== undefined ? ' — ' + lotLabel(lots[0]) : '') };
     ensureModal();
     $('#csrTitle').textContent = 'Chi tiết xuất hàng từng xe — ' + state.detail.title;
     $('#csrSub').textContent = [typeLabel(g.f.type), g.f.buyer, g.c && g.c.date ? 'ký ' + vnDate(g.c.date) : ''].filter(Boolean).join(' · ');
-    $('#csrQ').value = ''; $('#csrRet').checked = false;
-    $('#csrKho').innerHTML = '<option value="">Mọi kho xuất</option>' + Array.from(new Set(rows.map((x) => x.kho).filter(Boolean))).map((k) => '<option>' + esc(k) + '</option>').join('');
-    drawTrips(); bootstrap.Modal.getOrCreateInstance($('#csrModal')).show();
+    mountTripFilter(); drawTrips(); bootstrap.Modal.getOrCreateInstance($('#csrModal')).show();
   }
 
   /* ---------------- Excel / PDF ---------------- */

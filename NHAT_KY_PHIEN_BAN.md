@@ -293,7 +293,7 @@ Thủy chốt 28/09/2026: "1. bỏ Trao đổi KHÔNG đồng bộ lên Google S
 
 ## v2.15.0 — Trang "Tình hình hợp đồng" (theo phiếu cân)
 - Menu mới **📑 Tình hình hợp đồng** (dưới Báo cáo tổng hợp; báo cáo tổng hợp giữ nguyên): mỗi hợp đồng có số chuyến xe, số hồ sơ, KL qua cân / xe trả về / thực giao, **kho xuất**, tàu, thời gian cân, chênh lệch MT chứng thư ↔ thực giao, chứng thư, tờ khai, thuế; dòng nhỏ từng đợt thực hiện. Bộ lọc smart (hình thức, bên mua, trạng thái, kho xuất, tàu, chỉ hợp đồng có phiếu cân, chỉ hợp đồng lệch KL).
-- **Bấm một dòng** → chi tiết xuất hàng từng xe (ngày, giờ cân 1/2, số phiếu, biển số, tài xế, đơn vị vận chuyển, kho xuất, KL, hồ sơ, xe trả về, số BKLS) có tìm kiếm / lọc kho / chỉ xe trả về. Xuất Excel và Tải PDF cho cả bảng tổng hợp và bảng từng xe.
+- **Bấm một dòng** → chi tiết xuất hàng từng xe (ngày, giờ cân 1/2, số phiếu, biển số, tài xế, đơn vị vận chuyển, kho xuất, KL, hồ sơ, xe trả về, số BKLS) có **bộ lọc smart** (tìm không dấu, biển số, đơn vị vận chuyển, tài xế, kho xuất, hồ sơ, khoảng ngày, chỉ xe trả về). Xuất Excel và Tải PDF cho cả bảng tổng hợp và bảng từng xe.
 
 ## v2.14.8 — Bộ lọc smart và PDF cho tờ khai, báo cáo
 - Tab 🛃 Tờ khai hải quan dùng bộ lọc smart (tìm kiếm, ngày mở, trạng thái, hợp đồng, tàu, loại hình, còn phải nộp, có khai bổ sung).
