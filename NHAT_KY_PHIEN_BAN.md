@@ -291,6 +291,9 @@ Thủy chốt 28/09/2026: "1. bỏ Trao đổi KHÔNG đồng bộ lên Google S
 - pages.js generateBkls: không chặn khi thiếu Số BKLS / hệ số / tên bên mua — tự điền hoặc để trống + cảnh báo.
 - tests/parse-num.test.cjs, tests/numfmt.test.cjs.
 
+## v2.14.4 — Gợi ý khai bổ sung
+- Tờ khai cùng số vận đơn với một tờ khai có số nhỏ hơn: hiện gợi ý và nút "Chuyển thành khai bổ sung của …". Chuyển xong, tờ khai thành dòng khai bổ sung (thuế sau bổ sung, KL, ngày), giấy nộp tiền đã gắn chuyển sang tờ khai gốc, tờ khai độc lập bị xóa (khôi phục được).
+
 ## v2.14.3 — Giấy nộp tiền thuế (mẫu cũ có dòng "Tờ khai HQ số")
 - Đọc ngày và loại hình của tờ khai ghi trên giấy ("Tờ khai HQ số(1): … ngày: 11/06/2026 Loại hình XNK(1): B11"); khi tạo tờ khai mới từ giấy nộp tiền thì điền sẵn ngày mở và loại hình. Kiểm thử thêm 2 mẫu thật (DN0106/26, QC0206/26).
 

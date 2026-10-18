@@ -216,6 +216,26 @@
     catch (e) { toast(e.message || String(e), 'error'); }
   }
 
+  /** Tờ khai khác cùng số vận đơn nhưng số nhỏ hơn → có thể tờ khai này là khai bổ sung của nó. */
+  function parentCandidate(d) {
+    if (!d || !d.bill || d.deletedAt || CM().active(d.supplements).length) return null;
+    return decls().filter((x) => x.id !== d.id && x.bill === d.bill && x.no < d.no).sort((a, b) => a.no.localeCompare(b.no))[0] || null;
+  }
+  /** Chuyển tờ khai thành khai bổ sung (bảng con) của tờ khai gốc; giấy nộp tiền đã gắn chuyển sang tờ khai gốc, tờ khai độc lập bị xóa (khôi phục được). */
+  async function convertToSupp(id) {
+    const child = customsList().find((x) => x.id === id), parent = parentCandidate(child); if (!child || !parent) return;
+    try {
+      await commit((next) => {
+        const p = next.customs.find((x) => x.id === parent.id), c = next.customs.find((x) => x.id === id);
+        const round = Math.max(1, ...CM().active(p.supplements).map((x) => x.round || 1)) + 1;
+        (p.supplements = p.supplements || []).push(CM().newSupp({ no: c.no, date: c.changedAt || c.openDate || today(), round, reason: 'Khai bổ sung theo tờ khai ' + c.no, taxVnd: c.taxVnd, qtyBdmt: c.qtyBdmt }));
+        CM().active(c.payments).forEach((x) => p.payments.push(x));
+        c.payments = []; c.deletedAt = new Date().toISOString(); delete c.detailId; c.revision = (c.revision || 0) + 1; p.revision = (p.revision || 0) + 1;
+      });
+      st.sel = parent.id; draw(); core().render(); toast('Tờ khai ' + child.no + ' đã chuyển thành khai bổ sung của tờ khai ' + parent.no + '.', 'success');
+    } catch (e) { toast(e.message || String(e), 'error'); }
+  }
+
   /* ---------------- Nhập file .xls / OCR ---------------- */
   async function sheetRows(file) {
     if (!root.XLSX) throw Error('Thư viện đọc Excel chưa nạp.');
@@ -392,6 +412,7 @@
     const supp = (d.supplements || []).filter((x) => !x.deletedAt).sort((a, b) => (a.round || 0) - (b.round || 0)), pays = (d.payments || []).filter((x) => !x.deletedAt);
     box.innerHTML = '<div class="border rounded p-3"><div class="d-flex flex-wrap gap-2 align-items-center mb-2"><h6 class="mb-0">Tờ khai ' + esc(d.no) + '</h6>' + statusBadge(d.status) + (c ? contractBadge(c.id) : '') +
       '<div class="btn-group btn-group-sm ms-auto" role="group" aria-label="Đổi trạng thái">' + statusOpts().map((o) => '<button type="button" class="btn ' + (d.status === o[0] ? 'btn-primary' : 'btn-outline-primary') + '" data-cs-set="' + o[0] + '"' + (off ? ' disabled' : '') + '>' + o[1] + '</button>').join('') + '</div></div>' +
+      (parentCandidate(d) ? '<div class="alert alert-info py-2 small d-flex flex-wrap align-items-center gap-2">Tờ khai này cùng số vận đơn với tờ khai <b>' + esc(parentCandidate(d).no) + '</b> — có thể là <b>khai bổ sung</b> của tờ khai đó.<button type="button" class="btn btn-sm btn-outline-primary ms-auto" data-cs="to-supp">Chuyển thành khai bổ sung của ' + esc(parentCandidate(d).no) + '</button></div>' : '') +
       '<div class="small mb-2">' + flow + '</div><div class="row g-2 mb-3">' + info('Hợp đồng', c ? contractLabel(c) : '') + info('Đợt thực hiện', det ? [det.ship, det.product].filter(Boolean).join(' · ') : '') + info('Tàu / chuyến', d.ship) + info('Hàng hóa', d.goods) + info('KL (BDMT)', d.qtyBdmt != null ? money(d.qtyBdmt) : '') + info('Trị giá hóa đơn (USD)', d.invoiceUsd != null ? money(d.invoiceUsd) : '') + info('Tỷ giá', d.exchangeRate != null ? money(d.exchangeRate) : '') + info('Thuế suất', d.taxRate != null ? d.taxRate + '%' : '') + info('Số chứng thư', d.certNo) + info('Người nhập khẩu', d.importer) + info('Số vận đơn', d.bill) + info('Ghi chú', d.note) + '</div>' +
       '<div class="d-flex flex-wrap gap-2 align-items-center mb-1"><h6 class="mb-0">Khai bổ sung</h6><span class="small muted">(bảng con)</span><span class="ms-auto d-flex gap-2"><label class="btn btn-sm btn-outline-secondary mb-0">⬆ Nhập khai bổ sung từ file<input type="file" id="csImportSupp" accept=".xls,.xlsx,.xlsm" hidden' + (off ? ' disabled' : '') + '></label><button class="btn btn-sm btn-primary" type="button" data-cs="supp-add"' + (off ? ' disabled' : '') + '>＋ Thêm khai bổ sung</button></span></div>' +
       '<div class="tbl-wrap mb-3"><table class="table table-sm align-middle"><thead><tr><th>Số tờ khai bổ sung</th><th>Ngày</th><th class="num">Lần</th><th>Lý do</th><th class="num">KL (BDMT)</th><th class="num">Thuế XK sau bổ sung</th><th class="num">Chênh lệch</th><th></th></tr></thead><tbody>' +
@@ -405,7 +426,7 @@
     host.addEventListener('click', (e) => {
       const t = e.target;
       const act = t.closest('[data-cs]');
-      if (act) { const a = act.dataset.cs; if (a === 'add') openDecl(null); else if (a === 'supp-add') openSupp(st.sel); else if (a === 'pay-add') openPay(st.sel); return; }
+      if (act) { const a = act.dataset.cs; if (a === 'add') openDecl(null); else if (a === 'supp-add') openSupp(st.sel); else if (a === 'pay-add') openPay(st.sel); else if (a === 'to-supp') HAK.UI.confirmClick(act, () => convertToSupp(st.sel), 'Chuyển?'); return; }
       const ed = t.closest('[data-cs-edit]'); if (ed) { openDecl(ed.dataset.csEdit); return; }
       const del = t.closest('[data-cs-del]'); if (del) { HAK.UI.confirmClick(del, () => removeDecl(del.dataset.csDel), 'Xóa?'); return; }
       const rs = t.closest('[data-cs-restore]'); if (rs) { removeDecl(rs.dataset.csRestore, true); return; }
