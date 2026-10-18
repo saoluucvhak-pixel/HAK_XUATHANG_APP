@@ -323,6 +323,16 @@
         </div>
         <div class="form-text text-center mt-2" id="ctHint"></div>
       </div></div></div></div>
+      <div class="card mt-3" id="ctFixCard"><div class="card-header">🧩 Điền số hợp đồng vào file phiếu xuất kho đã tạo</div><div class="card-body">
+        <div class="row g-2 align-items-end">
+          <div class="col-md-5"><label class="form-label" for="ctFixFiles">File phiếu xuất kho (.xlsx, chọn được nhiều file)</label><input class="form-control" type="file" id="ctFixFiles" accept=".xlsx,.xls" multiple></div>
+          <div class="col-md-5"><label class="form-label" for="ctFixContract">Hợp đồng</label><select class="form-select" id="ctFixContract"></select></div>
+          <div class="col-md-2 d-grid"><button class="btn btn-primary" id="ctFixRun" type="button" disabled>Điền và lưu</button></div>
+          <div class="col-12"><label class="form-check mb-0"><input class="form-check-input" type="checkbox" id="ctFixAll"> Ghi đè cả những dòng đã có số hợp đồng (mặc định chỉ điền dòng đang trống)</label></div>
+        </div>
+        <div class="form-text mt-2">Dùng cho các file phiếu xuất kho tạo từ trước khi có ô Hợp đồng: app điền số hợp đồng vào cột <b>HopDongSo</b> rồi lưu thành file mới (tên thêm <b>_DaDienHD</b>); file gốc không bị sửa. Hợp đồng Xuất khẩu / Ủy thác phải có tàu và tờ khai hải quan.</div>
+        <div class="small mt-2" id="ctFixResult" aria-live="polite"></div>
+      </div></div>
       <div class="card mt-3" id="ctLogCard"><div class="card-header">🕘 Chứng từ đã lập <span class="muted small fw-normal" id="ctLogCount"></span></div>
         <div id="ctLogFilter" class="p-3"></div><div class="card-body p-0"><div class="tbl-wrap" style="max-height:none"><table class="table mb-0"><thead><tr><th>Thời gian</th><th>Chứng từ</th><th>Hình thức</th><th>Của</th><th>Đợt</th><th>Số</th><th class="num">Xe</th><th class="num">Tấn</th><th>Người lập</th><th></th></tr></thead><tbody id="ctLogBody"></tbody></table></div>
         <div class="form-text px-3 py-2 mb-0">Nhật ký dùng để cảnh báo trùng số PXK / BKLS và gợi ý số kế tiếp. Xóa dòng chỉ xóa nhật ký, không ảnh hưởng file đã tải.</div></div></div>

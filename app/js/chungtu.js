@@ -161,6 +161,48 @@
   }
 
   /* ---------------- Lưu / nạp trạng thái ---------------- */
+
+  /* ---------------- Điền bổ sung số hợp đồng vào file phiếu xuất kho đã tạo ---------------- */
+  function fillFixContracts() {
+    const sel = $('#ctFixContract'); if (!sel || !HAK.Catalog) return;
+    const K = HAK.Catalog, cur = sel.value, decls = HAK.Customs ? HAK.Customs.activeDecls() : [];
+    const list = K.parents().filter((c) => ['xuatkhau', 'uythac', 'xuatban', 'traodoi'].indexOf(c.type) >= 0).sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+    const cust = (id) => { const x = K.customer(id); return x ? x.name : ''; };
+    sel.innerHTML = '<option value="">— Chọn hợp đồng —</option>' + list.map((c) => { const rd = HAK.CustomsModel.readiness(c, decls), ship = (HAK.ContractModel.active(c).find((d) => d.ship) || {}).ship || ''; return '<option value="' + esc(c.id) + '"' + (rd.ok ? '' : ' disabled') + '>' + esc((c.no || c.id) + (cust(c.buyerId) ? ' · ' + cust(c.buyerId) : '') + (ship ? ' · ' + ship : '') + (rd.ok ? '' : ' — thiếu: ' + rd.missing.join(' + '))) + '</option>'; }).join('');
+    if (Array.prototype.some.call(sel.options, (o) => o.value === cur)) sel.value = cur;
+  }
+  const fixReady = () => { const b = $('#ctFixRun'); if (b) b.disabled = !($('#ctFixFiles').files.length && $('#ctFixContract').value); };
+  /** Điền HopDongSo cho từng file: chỉ dòng trống (hoặc tất cả khi tick ghi đè); lưu thành file mới, không sửa file gốc. */
+  async function runFix() {
+    const files = Array.from($('#ctFixFiles').files), c = HAK.Catalog.parent($('#ctFixContract').value), all = $('#ctFixAll').checked, out = $('#ctFixResult');
+    if (!files.length || !c) return;
+    const no = c.no || '', lines = [], btn = $('#ctFixRun'); btn.disabled = true; out.innerHTML = '';
+    try {
+      for (const f of files) {
+        try {
+          const wb = root.XLSX.read(await f.arrayBuffer(), { type: 'array' }), name = wb.SheetNames.indexOf('PXK') >= 0 ? 'PXK' : wb.SheetNames[0], ws = wb.Sheets[name];
+          const aoa = root.XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: true });
+          if (!aoa.length || aoa[0].indexOf('IDChungTu/MaBill') < 0) throw new Error('không phải file phiếu xuất kho (không có cột IDChungTu/MaBill)');
+          let col = aoa[0].indexOf('HopDongSo'); if (col < 0) { col = aoa[0].length; aoa[0].push('HopDongSo'); }
+          let filled = 0, kept = 0;
+          for (let i = 1; i < aoa.length; i++) {
+            const row = aoa[i]; if (!row.some((x) => String(x).trim() !== '')) continue;
+            while (row.length <= col) row.push('');
+            if (String(row[col]).trim() === '' || all) { if (row[col] !== no) filled++; row[col] = no; } else kept++;
+          }
+          wb.Sheets[name] = root.XLSX.utils.aoa_to_sheet(aoa);
+          const blob = new Blob([root.XLSX.write(wb, { bookType: 'xlsx', type: 'array' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+          const outName = f.name.replace(/\.xlsx?$/i, '') + '_DaDienHD.xlsx';
+          const saved = await HAK.Word.Files.saveBlob(blob, outName);
+          if (saved) {
+            lines.push('✔ <b>' + esc(f.name) + '</b> → ' + esc(outName) + ': điền ' + G.fmtInt(filled) + ' dòng' + (kept ? ', giữ nguyên ' + G.fmtInt(kept) + ' dòng đã có số hợp đồng' : '') + '.');
+            const rec = HAK.Issued && HAK.Issued.list.find((x) => x.kind === 'pxk' && x.fileName === f.name);
+            if (rec) { rec.contract = ''; rec.contractNo = no; await HAK.Issued.update(rec); }
+          } else lines.push('• <b>' + esc(f.name) + '</b>: đã hủy lưu.');
+        } catch (e) { lines.push('<span class="text-danger">✖ <b>' + esc(f.name) + '</b>: ' + esc(e.message || String(e)) + '</span>'); }
+      }
+    } finally { out.innerHTML = lines.join('<br>'); fixReady(); }
+  }
   function persist() {
     if (st.type && built) st.vals[st.type] = readVals();
     HAK.Store.set(KEY, { type: st.type, batchName: st.batchName, vals: st.vals, last: st.last || null });
@@ -181,6 +223,7 @@
   function render() {
     if (!HAK.App || !built) return;
     renderLog();
+    fillFixContracts();
     fillOptions();
     fillContracts();
     renderTypes();
@@ -361,6 +404,7 @@
     st.type = t;
     render();
     if (t) applyVals(withCompany(Object.assign(defaultsFor(t), st.vals[t] || {})));
+    $('#ctFixFiles').addEventListener('change', fixReady); $('#ctFixContract').addEventListener('change', fixReady); $('#ctFixRun').addEventListener('click', () => runFix().catch((e) => toast(e.message || String(e), 'error')));
     $('#ctTypes').addEventListener('click', (e) => { const b = e.target.closest('[data-ct]'); if (b) switchType(b.dataset.ct); });
     $('#ctBatch').addEventListener('change', (e) => { resetDup(); st.batchName = e.target.value; persist(); updateSummary(); });
     const form = $('#ctForm');

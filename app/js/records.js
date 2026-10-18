@@ -90,6 +90,7 @@
       catch (e) { console.warn('Không ghi được nhật ký chứng từ:', e); warn('Không ghi được nhật ký chứng từ vừa lập.'); }
       return rec;
     },
+    async update(rec) { try { await DB().put('issued', rec); } catch (e) { console.warn('Không cập nhật được nhật ký:', e); } return rec; },
     async remove(id) {
       this.list = this.list.filter((r) => r.id !== id);
       try { await DB().del('issued', id); } catch (e) { console.warn('Không xóa được nhật ký:', e); }
