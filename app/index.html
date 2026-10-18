@@ -209,6 +209,7 @@
     <section class="page" id="page-report" hidden>
       <div class="card mb-3"><div class="card-body">
         <div class="row g-2 align-items-end">
+          <div class="col-12 col-md-3"><label class="form-label">Năm</label><select class="form-select" id="repYear"><option value="">Tất cả năm</option></select></div>
           <div class="col-6 col-md-3"><label class="form-label">Từ ngày</label><input type="date" class="form-control" id="repFrom"></div>
           <div class="col-6 col-md-3"><label class="form-label">Đến ngày</label><input type="date" class="form-control" id="repTo"></div>
           <div class="col-6 col-md-3 d-grid"><button class="btn btn-outline-secondary" id="repReset" type="button">Đặt lại</button></div>
@@ -224,6 +225,7 @@
           <div class="tbl-wrap"><table class="table"><thead><tr><th>Loại</th><th class="num">Hồ sơ</th><th class="num">Xe</th><th class="num">Qua cân (tấn)</th><th class="num">Xe trả về</th><th class="num">Thực giao (tấn)</th></tr></thead><tbody id="repByType"></tbody></table></div>
           <div class="form-text">Thực giao = qua cân − xe trả về (chỉ Ủy thác và Xuất hàng kho gửi có xe trả về). Không cộng chung các loại vì cùng một lô hàng có thể đi qua nhiều loại biên bản.</div></div></div>
         <div class="card mb-3"><div class="card-body"><div class="sec-title">Theo tháng (tấn thực giao)</div>
+          <div class="tbl-wrap mb-3"><table class="table"><thead id="repYearHead"></thead><tbody id="repYearBody"></tbody></table></div>
           <div class="tbl-wrap"><table class="table"><thead id="repMonthHead"></thead><tbody id="repMonthBody"></tbody></table></div></div></div>
         <div class="card mb-3"><div class="card-body"><div class="sec-title">Theo tàu (Xuất khẩu / Ủy thác / Xuất hàng kho gửi)</div>
           <div class="tbl-wrap"><table class="table"><thead><tr><th>Tàu</th><th>Loại</th><th>Thời gian</th><th>Bên</th><th class="num">Xe</th><th class="num">Qua cân</th><th class="num">Xe trả về</th><th class="num">Thực giao</th></tr></thead><tbody id="repShips"></tbody></table></div></div></div>

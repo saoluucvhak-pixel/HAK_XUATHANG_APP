@@ -250,3 +250,7 @@ Thủy chốt 28/09/2026: "1. bỏ Trao đổi KHÔNG đồng bộ lên Google S
 - v2.7 Phase 2 (tùy Thủy): phân vùng / tab + biểu tượng mới cho Nhập liệu, Danh mục HĐ, Báo cáo, Tổng quan, Chứng từ.
 - Gom mã nguồn (hiện nhiều file JS) thành 1 bản dựng để cài nhanh hơn; kiểm thử tự động đóng gói kèm app.
 - Hiện số phiên bản trong app (để biết máy đang chạy bản nào).
+
+## v2.8.0 — Sao lưu / báo cáo theo năm
+- Lưu trữ: 📦 dọn hồ sơ cũ đổi sang chọn **Năm** (theo ngày bắt đầu hồ sơ, khớp Báo cáo), xóa khỏi máy là tùy chọn; file `HAK_LuuTru_Nam<năm>.json`; cảnh báo phần dữ liệu không nằm trong file (đợt Excel, nhật ký PXK/BKLS).
+- Báo cáo: ô chọn Năm, bảng + sheet Excel "Theo năm", tên file xuất có kỳ báo cáo.
