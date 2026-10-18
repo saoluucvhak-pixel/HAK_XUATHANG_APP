@@ -55,7 +55,11 @@ jobs:
           Remove-Item installer/app/MoKhoa_1Lan*.html, installer/app/XoaSach_DuLieu*.html -ErrorAction SilentlyContinue
           $ver = (Select-String -Path installer/setup.nsi -Pattern '!define VERSION "([^"]+)"').Matches[0].Groups[1].Value
           "VERSION=$ver" | Out-File -FilePath $env:GITHUB_ENV -Append
-          & "${env:ProgramFiles(x86)}\NSIS\makensis.exe" /DVERSION=$ver installer/setup.nsi
+          $mk = @("${env:ProgramFiles(x86)}\NSIS\makensis.exe", "$env:ProgramFiles\NSIS\makensis.exe", "C:\ProgramData\chocolatey\lib\nsis\tools\makensis.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $mk) { $cmd = Get-Command makensis -ErrorAction SilentlyContinue; if ($cmd) { $mk = $cmd.Source } }
+          if (-not $mk) { Get-ChildItem 'C:\Program Files*' -Filter makensis.exe -Recurse -ErrorAction SilentlyContinue | Select-Object -First 3 | ForEach-Object { Write-Host "found: $($_.FullName)" }; throw 'makensis.exe not found' }
+          Write-Host "makensis: $mk"
+          & $mk /DVERSION=$ver installer/setup.nsi
           if ($LASTEXITCODE -ne 0) { throw 'makensis failed' }
           Move-Item installer/HAK_QuanLyXuatHang_Setup.exe "HAK_QuanLyXuatHang_Setup_v$ver.exe"
           Get-FileHash "HAK_QuanLyXuatHang_Setup_v$ver.exe" -Algorithm SHA256 | Format-List
