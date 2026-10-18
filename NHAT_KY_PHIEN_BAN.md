@@ -291,6 +291,10 @@ Thủy chốt 28/09/2026: "1. bỏ Trao đổi KHÔNG đồng bộ lên Google S
 - pages.js generateBkls: không chặn khi thiếu Số BKLS / hệ số / tên bên mua — tự điền hoặc để trống + cảnh báo.
 - tests/parse-num.test.cjs, tests/numfmt.test.cjs.
 
+## v2.14.6 — OCR ảnh nhỏ / mờ
+- HAKDocs.exe phóng ảnh nhỏ (vd 579×776 gửi qua Zalo) lên cạnh dài ~2600 px trước khi đọc, và đọc thêm một lượt ở độ phóng khác để bổ sung dòng bị bỏ sót. Giấy nộp tiền: bỏ dòng trùng giữa hai lượt đọc; hiện cảnh báo đỏ khi OCR gần như không đọc được chữ nào (kèm cách chụp lại).
+- Cần cài lại bộ setup để HAKDocs.exe mới có hiệu lực.
+
 ## v2.14.5 — OCR giấy nộp tiền chịu lỗi hơn
 - Số tờ khai: nhận cả khi OCR nhầm chữ/số (3O86…), thiếu hoặc thừa 1 chữ số (kèm cảnh báo), dùng thêm chữ OCR thuần để tìm số; ô số tờ khai trong hộp thoại gõ sửa được và tự chọn tờ khai trùng số.
 - Người nộp thuế: nhận khi thiếu dấu ":", tên ở dòng kế, nhãn sai chính tả; có "Người nộp thay" thì ghi kèm.

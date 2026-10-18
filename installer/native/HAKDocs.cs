@@ -42,20 +42,27 @@ class HAKDocs {
  static T Win<T>(IAsyncOperation<T> op){var until=DateTime.UtcNow.AddMinutes(2);while(op.Status==AsyncStatus.Started){if(DateTime.UtcNow>until){op.Cancel();throw new TimeoutException("Windows OCR operation timed out.");}Thread.Sleep(15);}return op.GetResults();}
  static void Win(IAsyncAction op){var until=DateTime.UtcNow.AddMinutes(2);while(op.Status==AsyncStatus.Started){if(DateTime.UtcNow>until){op.Cancel();throw new TimeoutException("Windows PDF operation timed out.");}Thread.Sleep(15);}op.GetResults();}
  static Task<object> Read(byte[] bytes,int from,int to,string language,string kind="document"){return Task.Run(()=>ReadSync(bytes,from,to,language,kind));}
+ static OcrResult OcrScaled(BitmapDecoder decoder,OcrEngine engine,double scale){
+  var transform=new BitmapTransform{ScaledWidth=(uint)Math.Max(1.0,decoder.PixelWidth*scale),ScaledHeight=(uint)Math.Max(1.0,decoder.PixelHeight*scale),InterpolationMode=BitmapInterpolationMode.Fant};
+  using(var bitmap=Win(decoder.GetSoftwareBitmapAsync(BitmapPixelFormat.Bgra8,BitmapAlphaMode.Premultiplied,transform,ExifOrientationMode.RespectExifOrientation,ColorManagementMode.DoNotColorManage))){
+   return Win(engine.RecognizeAsync(bitmap));
+  }
+ }
  static object ReadImage(byte[] bytes,OcrEngine engine,string tag){
   using(var input=new InMemoryRandomAccessStream()){
    using(var writer=new DataWriter(input)){writer.WriteBytes(bytes);Win<uint>(writer.StoreAsync());writer.DetachStream();} input.Seek(0);
    var decoder=Win(BitmapDecoder.CreateAsync(input));
-   double scale=Math.Min(1.0,(double)OcrEngine.MaxImageDimension/Math.Max(decoder.PixelWidth,decoder.PixelHeight));
-   var transform=new BitmapTransform{ScaledWidth=(uint)Math.Max(1.0,decoder.PixelWidth*scale),ScaledHeight=(uint)Math.Max(1.0,decoder.PixelHeight*scale)};
-   using(var bitmap=Win(decoder.GetSoftwareBitmapAsync(BitmapPixelFormat.Bgra8,BitmapAlphaMode.Premultiplied,transform,ExifOrientationMode.RespectExifOrientation,ColorManagementMode.DoNotColorManage))){
-    var result=Win(engine.RecognizeAsync(bitmap));
-    var positioned=result.Lines.Select(l=>new {text=l.Text,x=l.Words.Min(w=>w.BoundingRect.X),y=l.Words.Min(w=>w.BoundingRect.Y),width=l.Words.Max(w=>w.BoundingRect.Right)-l.Words.Min(w=>w.BoundingRect.X),height=l.Words.Max(w=>w.BoundingRect.Bottom)-l.Words.Min(w=>w.BoundingRect.Y)}).OrderBy(l=>l.y).ToArray();
-    var rows=new List<List<int>>();for(int i=0;i<positioned.Length;i++){var l=positioned[i];var row=rows.LastOrDefault(r=>Math.Abs(positioned[r[0]].y-l.y)<Math.Min(positioned[r[0]].height,l.height)*0.6);if(row==null){row=new List<int>();rows.Add(row);}row.Add(i);}
-    var rowText=String.Join("\n",rows.Select(r=>String.Join(" : ",r.OrderBy(i=>positioned[i].x).Select(i=>positioned[i].text))));
-    var pages=new List<object>();pages.Add(new{page=1,text=String.Join("\n",result.Lines.Select(l=>l.Text)),rowsText=rowText,lines=positioned,supplementalText=""});
-    return new {app="hak-windows-ocr",backend="Windows.Media.Ocr",language=tag,totalPages=1,from=1,to=1,pages,warnings=tag.StartsWith("vi")?new string[0]:new[]{"Windows OCR language is "+tag+". Verify Vietnamese text against the original image."}};
-   }
+   // Ảnh chụp điện thoại gửi qua Zalo / email thường rất nhỏ (vd 579x776) → phóng lên tới cạnh dài ~2600 px (tối đa 4 lần) thì Windows OCR mới đọc được chữ nhỏ.
+   double max=Math.Min(2600.0,(double)OcrEngine.MaxImageDimension),longSide=Math.Max(decoder.PixelWidth,decoder.PixelHeight);
+   double scale=Math.Min(max/longSide,4.0);if(scale<=0)scale=1.0;
+   var result=OcrScaled(decoder,engine,scale);
+   var positioned=result.Lines.Select(l=>new {text=l.Text,x=l.Words.Min(w=>w.BoundingRect.X),y=l.Words.Min(w=>w.BoundingRect.Y),width=l.Words.Max(w=>w.BoundingRect.Right)-l.Words.Min(w=>w.BoundingRect.X),height=l.Words.Max(w=>w.BoundingRect.Bottom)-l.Words.Min(w=>w.BoundingRect.Y)}).OrderBy(l=>l.y).ToArray();
+   var rows=new List<List<int>>();for(int i=0;i<positioned.Length;i++){var l=positioned[i];var row=rows.LastOrDefault(r=>Math.Abs(positioned[r[0]].y-l.y)<Math.Min(positioned[r[0]].height,l.height)*0.6);if(row==null){row=new List<int>();rows.Add(row);}row.Add(i);}
+   var rowText=String.Join("\n",rows.Select(r=>String.Join(" : ",r.OrderBy(i=>positioned[i].x).Select(i=>positioned[i].text))));
+   // Lượt thứ hai ở độ phóng nhỏ hơn: engine OCR đôi khi đọc được dòng mà lượt đầu bỏ sót (lượt này chỉ bổ sung chữ, không có tọa độ).
+   string extra="";try{var second=OcrScaled(decoder,engine,Math.Max(0.5,scale*0.7));extra=String.Join("\n",second.Lines.Select(l=>l.Text));}catch(Exception){}
+   var pages=new List<object>();pages.Add(new{page=1,text=String.Join("\n",result.Lines.Select(l=>l.Text)),rowsText=rowText,lines=positioned,supplementalText=extra});
+   return new {app="hak-windows-ocr",backend="Windows.Media.Ocr",language=tag,totalPages=1,from=1,to=1,pages,warnings=tag.StartsWith("vi")?new string[0]:new[]{"Windows OCR language is "+tag+". Verify Vietnamese text against the original image."}};
   }
  }
  static object ReadSync(byte[] bytes,int from,int to,string language,string kind){

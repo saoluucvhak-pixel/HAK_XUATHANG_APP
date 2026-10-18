@@ -8,7 +8,7 @@ Unicode true
 
 Name "HAK - Quan ly xuat hang"
 !ifndef VERSION
-  !define VERSION "2.14.5"
+  !define VERSION "2.14.6"
 !endif
 OutFile "HAK_QuanLyXuatHang_Setup.exe"
 VIProductVersion "${VERSION}.0"

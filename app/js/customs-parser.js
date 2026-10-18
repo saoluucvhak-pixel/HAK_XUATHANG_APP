@@ -179,6 +179,8 @@
       if (!/(thue|le\s*phi|phi\b)/.test(f)) return;
       const t = tableLine(l); if (!t || t.amount === null) return;
       const ds = declNumbers(l), content = t.content.replace(/^\d+\s+/, '') || (kind(l) === 'fee' ? 'Lệ phí' : 'Thuế xuất khẩu');
+      const dup = out.lines.some((x) => x.amount === t.amount && x.kind === kind(l) && (x.no || '') === (ds.length ? ds[0].no : ''));   // cùng dòng đọc lại ở lượt OCR thứ hai
+      if (dup) return;
       out.lines.push({ no: ds.length ? ds[0].no : '', noFuzzy: ds.length ? ds[0].fuzzy : false, declDate: '', declType: '', amount: t.amount, kind: kind(l), content, periodDate: t.date, chapter: t.chapter, ndkt: t.ndkt, dbhc: t.dbhc });
     });
     // Dạng "Tờ khai HQ số(1): 308629701720 …" + dòng "Thuế xuất khẩu … 551.696.640 đ" (không có số tờ khai trên dòng nộp) → gán số tờ khai duy nhất
