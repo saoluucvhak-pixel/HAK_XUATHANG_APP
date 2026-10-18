@@ -91,3 +91,18 @@ test('gộp bản sao lưu: bảng con gộp theo id, ô trống không ghi đè
   const m=M.merge(local,incoming);
   assert.equal(m.length,2);assert.equal(m[0].ship,'A');assert.equal(m[0].taxVnd,5);assert.equal(m[0].payments.length,2);
 });
+test('giấy nộp tiền mẫu mới: Mã hiệu, Số, Số tham chiếu, người nộp, kỳ thuế, mã chương, NDKT, ĐBHC',()=>{
+  const t='GIẤY NỘP TIỀN VÀO NGÂN SÁCH NHÀ NƯỚC : Mã hiệu: 262021301A\nTiền mặt : Chuyển khoản : Số: 6753554\nLoại tiền: VNĐ USD Khác : Số tham chiếu: 20202026100713485801\nNSNN: Công Ty TNHH Hoàng Anh Khôi : Mã số thuế: 0401447476\nKỳ thuế/ : Nội dung các khoản nộp : Số nguyên tệ : Số tiền VND : Mã : Mã : Mã\n13/08/2026 : Thue xuat khau : 815.572.800 : 815.572.800 : 754 : 1851 : 48TTT\nTổng cộng: 815.572.800 : 815.572.800\nNgày 14 tháng 08 năm 2026';
+  const r=P.parseReceiptText(t);
+  assert.equal(r.receiptNo,'6753554');assert.equal(r.formCode,'262021301A');assert.equal(r.refNo,'20202026100713485801');
+  assert.equal(r.payer,'Công Ty TNHH Hoàng Anh Khôi');assert.equal(r.payerTax,'0401447476');assert.equal(r.date,'2026-08-14');assert.equal(r.total,815572800);
+  assert.equal(r.lines.length,1);const l=r.lines[0];
+  assert.deepEqual([l.amount,l.kind,l.periodDate,l.chapter,l.ndkt,l.dbhc,l.content],[815572800,'tax','2026-08-13','754','1851','48TTT','Thue xuat khau']);
+  assert.deepEqual(r.warnings,[]);
+});
+test('giấy nộp tiền mẫu mới: OCR tách ô lẫn lộn, số tham chiếu tách khoảng trắng, không số tờ khai → gán số tờ khai duy nhất trên giấy',()=>{
+  const t='Mã hiệu : 262021301A Số : 6753554\nSố tham chiếu : 2020 2026 1007 1348 5801\nNgười nộp thuế : CÔNG TY TNHH HOÀNG ANH KHÔI\nTờ khai HQ số: 308847091251\n13/08/2026 Thuế xuất khẩu 815.572.800 815.572.800 754 1851 48TTT\nTổng cộng 815.572.800';
+  const r=P.parseReceiptText(t);
+  assert.equal(r.refNo,'20202026100713485801');assert.equal(r.receiptNo,'6753554');assert.equal(r.payer,'CÔNG TY TNHH HOÀNG ANH KHÔI');
+  assert.equal(r.lines.length,1);assert.equal(r.lines[0].no,'308847091251');assert.equal(r.lines[0].chapter,'754');assert.equal(r.total,815572800);
+});

@@ -42,7 +42,7 @@
   /** Giấy nộp tiền vào NSNN (bảng con): mỗi dòng nộp cho 1 tờ khai. kind: tax | fee. */
   function newPay(v) {
     v = v || {};
-    const p = { id: v.id || uid('nt-'), receiptNo: String(v.receiptNo || '').trim(), date: v.date || '', amount: numOrNull(v.amount), kind: v.kind === 'fee' ? 'fee' : 'tax', content: v.content || '', note: v.note || '' };
+    const p = { id: v.id || uid('nt-'), receiptNo: String(v.receiptNo || '').trim(), date: v.date || '', amount: numOrNull(v.amount), kind: v.kind === 'fee' ? 'fee' : 'tax', content: v.content || '', note: v.note || '', formCode: v.formCode || '', refNo: digits(v.refNo), periodDate: v.periodDate || '', chapter: String(v.chapter || ''), ndkt: String(v.ndkt || ''), dbhc: String(v.dbhc || ''), payer: v.payer || '' };
     if (v.deletedAt) p.deletedAt = v.deletedAt;
     return p;
   }

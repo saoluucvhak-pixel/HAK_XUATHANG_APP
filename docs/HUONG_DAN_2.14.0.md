@@ -31,3 +31,5 @@
 - Hai file mẫu `…701721` và `…701722` cùng ngày mở nhưng khác số lượng và thuế (551.696.640 và 563.502.948); giấy nộp tiền mẫu ghi `…701720`. App đọc đúng như trên file / ảnh và không tự coi tờ khai nào là bổ sung của tờ khai nào: nếu 722 là khai bổ sung của 721 thì chọn tờ khai 721 → Nhập khai bổ sung từ file (rồi xóa tờ khai 722 độc lập).
 
 Kiểm tra: 153 kiểm thử tự động (11 kiểm thử mới cho đọc tờ khai, giấy nộp tiền, thuế, trạng thái hợp đồng, gộp sao lưu); chạy thử trên giao diện thật với 2 file .xls mẫu: nhập 2 tờ khai tự gắn hợp đồng theo tàu, OCR giấy nộp tiền (giả lập), đổi trạng thái → hợp đồng "Đã hoàn thành", báo cáo.
+
+**Cập nhật 2.14.1 — giấy nộp tiền mẫu mới:** OCR đọc thêm Số giấy nộp tiền (vd 6753554), Mã hiệu (262021301A), Số tham chiếu (20 chữ số), Người nộp thuế, Kỳ thuế / ngày quyết định, Mã chương (754), Mã NDKT (1851), Mã ĐBHC (48TTT). Số tiền lấy cột Số tiền VND. Giấy không ghi số tờ khai thì dòng nộp tự gắn tờ khai bạn đang mở (đổi được trong ô "Gắn vào tờ khai"). Ô nào OCR không đọc được thì để trống để nhập tay.

@@ -115,41 +115,61 @@
     return out;
   }
 
-  /* ---------------- Giấy nộp tiền vào NSNN (mẫu C1-02/NS) ---------------- */
+  /* ---------------- Giấy nộp tiền vào NSNN (mẫu C1-02/NS, cả mẫu cũ lẫn mẫu mới có "Mã hiệu / Số tham chiếu") ---------------- */
   /** Dãy 12 chữ số bị OCR tách bằng khoảng trắng ("3086 2970 1720") → nối lại. */
   function declNumbers(line) {
-    const found = [], re = /\d[\d ]{9,16}\d/g; let m;
+    const found = [], re = /(?<![\d.,])(?:\d{12}|\d{4} \d{4} \d{4})(?![\d.,]\d)(?!\d)/g; let m;
     while ((m = re.exec(line))) { const d = m[0].replace(/\s/g, ''); if (d.length === 12) found.push({ no: d, at: m.index, end: m.index + m[0].length }); }
     return found;
   }
+  const isMoney = (t) => /^\d{1,3}(\.\d{3})+$/.test(t) || /^\d{5,11}$/.test(t);
+  /** Một dòng của bảng: nhiều ô cách nhau " : " hoặc khoảng trắng; số tiền là ô có dấu "." nghìn (hoặc ≥ 5 chữ số). */
+  function tableLine(line) {
+    const words = String(line).split(/[\s:：|]+/).filter(Boolean), clean1 = (w) => w.replace(/đ$/i, '');
+    const idx = []; words.forEach((w, i) => { if (isMoney(clean1(w))) idx.push(i); });
+    if (!idx.length) return null;
+    const after = words.slice(idx[idx.length - 1] + 1).map((w) => w.replace(/[^\dA-Za-z]/g, ''));
+    return {
+      amount: vn(clean1(words[idx[idx.length - 1]])),
+      content: clean(words.slice(0, idx[0]).filter((w) => /[a-z]/i.test(fold(w)) && !/\d/.test(w)).join(' ')),
+      chapter: after.find((w) => /^\d{3}$/.test(w)) || '', ndkt: after.find((w) => /^\d{4}$/.test(w)) || '', dbhc: after.find((w) => /^\d{2}[A-Za-z]{3}$/.test(w)) || '',
+      date: dmy(line)
+    };
+  }
   function parseReceiptText(text) {
-    const lines = String(text || '').split(/\r?\n/).map(clean).filter(Boolean), flat = fold(lines.join('\n'));
-    const out = { receiptNo: '', date: '', payer: '', payerTax: '', lines: [], total: null, warnings: [] };
-    const no = /\b([a-z]{2,3}\s?\d{3,6}\s?\/\s?\d{2})\b/i.exec(lines.join('\n').replace(/\bso\s*:/gi, 'So '));
+    const lines = String(text || '').split(/\r?\n/).map(clean).filter(Boolean), flat = lines.map(fold).join('\n'), flatSp = flat.replace(/\s*[:：]\s*(?=\S)/g, ': ');
+    const out = { receiptNo: '', formCode: '', refNo: '', date: '', payer: '', payerTax: '', lines: [], total: null, warnings: [] };
+    // Số tham chiếu (20 chữ số, có thể bị tách khoảng trắng) · Mã hiệu · Số giấy nộp tiền
+    const ref = /so\s*tham\s*chieu\s*[:：]*\s*(\d[\d ]{8,30}\d)/.exec(flatSp); if (ref) out.refNo = ref[1].replace(/\s/g, '');
+    const form = /ma\s*hieu\s*[:：]*\s*([a-z0-9]{6,14})\b/.exec(flatSp); if (form) out.formCode = form[1].toUpperCase();
+    const no = /(?:^|[\s|])so\s*(?:[:：]\s*)+([a-z]{0,3}\d{4,10}(?:\s?\/\s?\d{2})?)(?![\d\/])/.exec(flatSp);
     if (no) out.receiptNo = no[1].replace(/\s/g, '').toUpperCase();
-    const dt = /ngay\s*(\d{1,2})\s*thang\s*(\d{1,2})\s*nam\s*(\d{4})/.exec(flat);
-    if (dt) out.date = iso(dt[1], dt[2], dt[3]);
-    const payer = /nguoi nop thue\s*:?\s*([^\n]+)/.exec(flat); if (payer) { const i = flat.indexOf(payer[0]); out.payer = clean(lines.join('\n').slice(i + payer[0].indexOf(payer[1]), i + payer[0].length)); }
-    const mst = /ma so thue\s*:?\s*(\d[\d ]{8,13}\d)/.exec(flat); if (mst) out.payerTax = mst[1].replace(/\s/g, '');
-    const tot = /tong cong\s*:?\s*([\d.,]+)/.exec(flat); if (tot) out.total = money(tot[1]);
-    const kind = (s) => (/le\s*phi/.test(fold(s)) ? 'fee' : 'tax');
-    // Dạng bảng: STT | Số tờ khai | Năm | Sắc thuế/nội dung | Số tiền | …
-    lines.forEach((l) => {
-      const ds = declNumbers(l); if (!ds.length || /to khai hq so/i.test(fold(l))) return;
-      const tail = l.slice(ds[0].end), amt = money(tail.replace(/\b20\d{2}\b/, ' ')); if (amt === null) return;
-      out.lines.push({ no: ds[0].no, amount: amt, kind: kind(l), content: clean(tail.replace(/[\d.,]+/g, ' ').replace(/[:：|]+/g, ' ')) || (kind(l) === 'fee' ? 'Lệ phí mở TTHQ' : 'Thuế xuất khẩu') });
-    });
-    // Dạng "Tờ khai HQ số(1): 308629701720 ngày: 11/06/2026 …" + dòng "Thuế xuất khẩu … 551.696.640 đ"
-    if (!out.lines.length) {
-      let no2 = ''; for (const l of lines) { const ds = declNumbers(l); if (ds.length) { no2 = ds[0].no; break; } }
-      const taxLine = lines.find((l) => /thue\s*xuat/.test(fold(l)) && money(l) !== null);
-      const amt = taxLine ? money(taxLine) : out.total;
-      if (no2 && amt !== null) out.lines.push({ no: no2, amount: amt, kind: 'tax', content: taxLine ? clean(taxLine.replace(/[\d.,]+\s*đ?$/i, '')) : 'Thuế xuất khẩu' });
+    const dt = /ngay\s*(\d{1,2})\s*thang\s*(\d{1,2})\s*nam\s*(\d{4})/.exec(flat); if (dt) out.date = iso(dt[1], dt[2], dt[3]);
+    // Người nộp: "Người nộp thuế: CÔNG TY …" · "NSNN: Công Ty TNHH …" · "Người nộp thay: …"
+    for (const l of lines) {
+      const f = fold(l), m = /(?:nguoi nop (?:thue|tien|thay)|nsnn|doi tuong nop)[^:]{0,20}[:：]\s*(?:[:：]\s*)*((?:cong ty|cty|doanh nghiep|tnhh)\b.+)$/.exec(f);
+      if (m) { out.payer = clean(l.slice(f.length - m[1].length).replace(/\s*[:：|].*$/, '')); break; }
     }
+    const mst = /ma\s*so\s*thue\s*[:：]*\s*(\d[\d ]{8,13}\d)/.exec(flatSp); if (mst) out.payerTax = mst[1].replace(/\s/g, '');
+    const totalLine = lines.find((l) => /tong\s*cong/.test(fold(l))), tl = totalLine ? tableLine(totalLine.replace(/^.*?tong\s*cong/i, '')) : null;
+    if (tl) out.total = tl.amount;
+    const kind = (s) => (/le\s*phi/.test(fold(s)) ? 'fee' : 'tax');
+    // Số tờ khai duy nhất xuất hiện trong giấy (bỏ dòng "Số tham chiếu") → dùng cho dòng nộp không ghi số tờ khai
+    const nos = []; lines.forEach((l) => { if (/tham\s*chieu/.test(fold(l))) return; declNumbers(l).forEach((d) => { if (nos.indexOf(d.no) < 0) nos.push(d.no); }); });
+    lines.forEach((l) => {
+      const f = fold(l); if (/tong\s*cong|tham\s*chieu|ma\s*so\s*thue|so\s*tien\s*ghi\s*bang/.test(f)) return;
+      if (!/(thue|le\s*phi|phi\b)/.test(f)) return;
+      const t = tableLine(l); if (!t || t.amount === null) return;
+      const ds = declNumbers(l), content = t.content.replace(/^\d+\s+/, '') || (kind(l) === 'fee' ? 'Lệ phí' : 'Thuế xuất khẩu');
+      out.lines.push({ no: ds.length ? ds[0].no : '', amount: t.amount, kind: kind(l), content, periodDate: t.date, chapter: t.chapter, ndkt: t.ndkt, dbhc: t.dbhc });
+    });
+    // Dạng "Tờ khai HQ số(1): 308629701720 …" + dòng "Thuế xuất khẩu … 551.696.640 đ" (không có số tờ khai trên dòng nộp) → gán số tờ khai duy nhất
+    out.lines.forEach((x) => { if (!x.no && nos.length === 1) x.no = nos[0]; });
+    if (!out.lines.length && out.total !== null) out.lines.push({ no: nos.length === 1 ? nos[0] : '', amount: out.total, kind: 'tax', content: 'Thuế xuất khẩu', periodDate: '', chapter: '', ndkt: '', dbhc: '' });
     if (out.total === null && out.lines.length) out.total = out.lines.reduce((a, x) => a + x.amount, 0);
-    if (!out.receiptNo) out.warnings.push('Chưa đọc được SỐ giấy nộp tiền (góc trên bên phải: "Số: DN0206/26").');
+    if (!out.receiptNo) out.warnings.push('Chưa đọc được SỐ giấy nộp tiền (góc trên bên phải, ô "Số:"). Nhập tay theo giấy gốc.');
     if (!out.date) out.warnings.push('Chưa đọc được ngày nộp tiền.');
-    if (!out.lines.length) out.warnings.push('Chưa đọc được dòng nộp nào (số tờ khai + số tiền). Nhập tay sau khi đối chiếu ảnh gốc.');
+    if (!out.lines.length) out.warnings.push('Chưa đọc được dòng nộp nào (nội dung + số tiền). Nhập tay sau khi đối chiếu ảnh gốc.');
     else if (out.total !== null && Math.abs(out.lines.reduce((a, x) => a + x.amount, 0) - out.total) > 0.5) out.warnings.push('Tổng các dòng khác "Tổng cộng" trên giấy — kiểm tra lại số tiền.');
     return out;
   }

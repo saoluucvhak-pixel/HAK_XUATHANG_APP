@@ -196,8 +196,10 @@
     const cur = id ? (d.payments || []).find((x) => x.id === id) : null;
     openModal({
       title: (cur ? 'Sửa' : 'Thêm') + ' giấy nộp tiền — tờ khai ' + d.no,
-      fields: [{ id: 'receiptNo', label: 'Số giấy nộp tiền', col: 4, help: 'Vd DN0206/26' }, { id: 'date', label: 'Ngày nộp', type: 'date', col: 4 }, { id: 'kind', label: 'Loại khoản nộp', type: 'select', options: Object.keys(CM().PAY_KIND).map((k) => [k, CM().PAY_KIND[k]]), col: 4 },
-        { id: 'content', label: 'Nội dung', col: 8 }, { id: 'amount', label: 'Số tiền (VNĐ)', type: 'num', col: 4 }, { id: 'note', label: 'Ghi chú', type: 'textarea', col: 12 }],
+      fields: [{ id: 'receiptNo', label: 'Số giấy nộp tiền', col: 3, help: 'Vd 6753554 hoặc DN0206/26' }, { id: 'formCode', label: 'Mã hiệu', col: 3, help: 'Vd 262021301A' }, { id: 'refNo', label: 'Số tham chiếu', col: 6 },
+        { id: 'date', label: 'Ngày nộp', type: 'date', col: 3 }, { id: 'periodDate', label: 'Kỳ thuế / ngày quyết định', type: 'date', col: 3 }, { id: 'kind', label: 'Loại khoản nộp', type: 'select', options: Object.keys(CM().PAY_KIND).map((k) => [k, CM().PAY_KIND[k]]), col: 3 }, { id: 'amount', label: 'Số tiền VND', type: 'num', col: 3 },
+        { id: 'content', label: 'Nội dung khoản nộp', col: 6 }, { id: 'chapter', label: 'Mã chương', col: 2 }, { id: 'ndkt', label: 'Mã NDKT / tiểu mục', col: 2 }, { id: 'dbhc', label: 'Mã ĐBHC', col: 2 },
+        { id: 'payer', label: 'Người nộp thuế', col: 12 }, { id: 'note', label: 'Ghi chú', type: 'textarea', col: 12 }],
       values: cur || Object.assign({ date: today(), kind: 'tax', content: 'Thuế xuất khẩu' }, prefill || {}),
       async onSave(v) {
         await commit((next) => {
@@ -284,28 +286,32 @@
     } catch (e) { toast(ocrHelp(e), 'error'); } finally { Loading.hide(); }
   }
   function openReceiptReview(p, text) {
-    const list = decls(), lines = p.lines.map((ln) => {
-      const exact = list.find((d) => d.no === ln.no), near = !exact && list.find((d) => diff(d.no, ln.no) <= 2);
-      return Object.assign({}, ln, { target: exact ? exact.id : near ? near.id : '', near: !!near, found: !!exact });
+    const list = decls(), cur = customsList().find((d) => d.id === st.sel && !d.deletedAt);
+    const lines = p.lines.length ? p.lines : [{ no: '', amount: null, kind: 'tax', content: 'Thuế xuất khẩu', periodDate: '', chapter: '', ndkt: '', dbhc: '' }];
+    lines.forEach((ln) => {
+      const exact = ln.no && list.find((d) => d.no === ln.no), near = !exact && ln.no && list.find((d) => diff(d.no, ln.no) <= 2);
+      ln.target = exact ? exact.id : near ? near.id : (!ln.no && cur ? cur.id : ''); ln.near = !!near; ln.guess = !ln.no && !!cur;
     });
-    const opt = (ln, sel) => '<option value="">— chọn tờ khai —</option>' + list.map((d) => '<option value="' + esc(d.id) + '"' + (d.id === sel ? ' selected' : '') + '>' + esc(d.no + (d.ship ? ' · ' + d.ship : '')) + '</option>').join('') + '<option value="__new">＋ Tạo tờ khai ' + esc(ln.no) + '</option>';
-    const table = '<div class="col-12"><div class="sec-title mt-2 mb-1">Các dòng nộp đọc được</div><div class="tbl-wrap"><table class="table table-sm align-middle"><thead><tr><th></th><th>Số tờ khai trên giấy</th><th>Gắn vào tờ khai</th><th>Loại</th><th>Nội dung</th><th class="num">Số tiền</th></tr></thead><tbody>' +
-      (lines.length ? lines.map((ln, i) => '<tr><td><input class="form-check-input" type="checkbox" id="cs-ln-on-' + i + '"' + (ln.target ? ' checked' : '') + '></td><td class="mono">' + esc(ln.no) + (ln.near ? '<div class="small text-warning">gần khớp — kiểm tra</div>' : '') + '</td><td><select class="form-select form-select-sm" id="cs-ln-t-' + i + '">' + opt(ln, ln.target) + '</select></td>' +
-        '<td><select class="form-select form-select-sm" id="cs-ln-k-' + i + '"><option value="tax"' + (ln.kind === 'tax' ? ' selected' : '') + '>Thuế XK</option><option value="fee"' + (ln.kind === 'fee' ? ' selected' : '') + '>Lệ phí / khác</option></select></td>' +
-        '<td><input class="form-control form-control-sm" id="cs-ln-c-' + i + '" value="' + esc(ln.content) + '"></td><td><input class="form-control form-control-sm text-end" id="cs-ln-a-' + i + '" data-numfmt="num" value="' + esc(money(ln.amount)) + '"></td></tr>').join('') : '<tr><td colspan="6" class="muted">Không đọc được dòng nào. Thêm giấy nộp tiền thủ công ở khung của tờ khai.</td></tr>') + '</tbody></table></div></div>';
+    const opt = (ln, sel) => '<option value="">— chọn tờ khai —</option>' + list.map((d) => '<option value="' + esc(d.id) + '"' + (d.id === sel ? ' selected' : '') + '>' + esc(d.no + (d.ship ? ' · ' + d.ship : '')) + '</option>').join('') + (ln.no ? '<option value="__new">＋ Tạo tờ khai ' + esc(ln.no) + '</option>' : '');
+    const inp = (id, v, w, cls) => '<input class="form-control form-control-sm ' + (cls || '') + '" id="' + id + '" style="min-width:' + w + '" value="' + esc(v || '') + '">';
+    const table = '<div class="col-12"><div class="sec-title mt-2 mb-1">Các dòng nộp đọc được</div><div class="tbl-wrap"><table class="table table-sm align-middle"><thead><tr><th></th><th>Số tờ khai trên giấy</th><th>Gắn vào tờ khai</th><th>Loại</th><th>Nội dung</th><th>Kỳ thuế</th><th>Chương</th><th>NDKT</th><th>ĐBHC</th><th class="num">Số tiền VND</th></tr></thead><tbody>' +
+      lines.map((ln, i) => '<tr><td><input class="form-check-input" type="checkbox" id="cs-ln-on-' + i + '"' + (ln.target && ln.amount !== null ? ' checked' : '') + '></td><td class="mono">' + esc(ln.no || '—') + (ln.near ? '<div class="small text-warning">gần khớp — kiểm tra</div>' : '') + (ln.guess ? '<div class="small text-warning" style="font-family:inherit;min-width:9rem">giấy không ghi số tờ khai — tự chọn tờ khai đang mở</div>' : '') + '</td><td><select class="form-select form-select-sm" id="cs-ln-t-' + i + '" style="min-width:12rem">' + opt(ln, ln.target) + '</select></td>' +
+        '<td><select class="form-select form-select-sm" style="min-width:8.5rem" id="cs-ln-k-' + i + '"><option value="tax"' + (ln.kind === 'tax' ? ' selected' : '') + '>Thuế XK</option><option value="fee"' + (ln.kind === 'fee' ? ' selected' : '') + '>Lệ phí / khác</option></select></td>' +
+        '<td>' + inp('cs-ln-c-' + i, ln.content, '9rem') + '</td><td><input type="date" class="form-control form-control-sm" id="cs-ln-d-' + i + '" value="' + esc(ln.periodDate || '') + '"></td><td>' + inp('cs-ln-h-' + i, ln.chapter, '4rem') + '</td><td>' + inp('cs-ln-n-' + i, ln.ndkt, '4.5rem') + '</td><td>' + inp('cs-ln-b-' + i, ln.dbhc, '5rem') + '</td>' +
+        '<td><input class="form-control form-control-sm text-end" id="cs-ln-a-' + i + '" data-numfmt="num" style="min-width:8rem" value="' + esc(money(ln.amount)) + '"></td></tr>').join('') + '</tbody></table></div></div>';
     openModal({
       title: 'Giấy nộp tiền vào NSNN — kiểm tra kết quả OCR', saveLabel: 'Lưu các dòng đã tick',
-      fields: [{ id: 'receiptNo', label: 'Số giấy nộp tiền', col: 4 }, { id: 'date', label: 'Ngày nộp', type: 'date', col: 4 }, { id: 'payer', label: 'Người nộp thuế', col: 4, ro: false }],
-      values: { receiptNo: p.receiptNo, date: p.date, payer: p.payer }, extraHtml: table,
-      notice: (p.warnings.length ? '<div class="alert alert-warning py-2 small">' + p.warnings.map((w) => '⚠ ' + esc(w)).join('<br>') + '</div>' : '') + '<details class="mb-2"><summary class="small">Xem chữ OCR</summary><pre class="small text-wrap">' + esc(text) + '</pre></details><div class="small text-muted mb-1">Ảnh chụp nghiêng, mờ hoặc có dấu mộc đè dễ bị đọc sai số — đối chiếu với giấy gốc trước khi lưu. App chỉ lưu số liệu, không lưu ảnh.</div>',
-      onOpen() { ['receiptNo', 'date', 'payer'].forEach((k) => { const el = $('#cs-f-' + k); if (el && el.value) el.classList.add('ocr-filled'); }); },
+      fields: [{ id: 'receiptNo', label: 'Số giấy nộp tiền', col: 3 }, { id: 'formCode', label: 'Mã hiệu', col: 3 }, { id: 'refNo', label: 'Số tham chiếu', col: 6 }, { id: 'date', label: 'Ngày nộp', type: 'date', col: 3 }, { id: 'payer', label: 'Người nộp thuế', col: 9 }],
+      values: { receiptNo: p.receiptNo, formCode: p.formCode, refNo: p.refNo, date: p.date, payer: p.payer }, extraHtml: table,
+      notice: (p.warnings.length ? '<div class="alert alert-warning py-2 small">' + p.warnings.map((w) => '⚠ ' + esc(w)).join('<br>') + '</div>' : '') + '<details class="mb-2"><summary class="small">Xem chữ OCR</summary><pre class="small text-wrap">' + esc(text) + '</pre></details><div class="small text-muted mb-1">Ảnh chụp nghiêng, mờ hoặc có dấu mộc đè dễ bị đọc sai số — đối chiếu với giấy gốc trước khi lưu. Ô nào OCR không đọc được thì để trống, nhập tay theo giấy gốc. App chỉ lưu số liệu, không lưu ảnh.</div>',
+      onOpen() { ['receiptNo', 'formCode', 'refNo', 'date', 'payer'].forEach((k) => { const el = $('#cs-f-' + k); if (el && el.value) el.classList.add('ocr-filled'); }); },
       async onSave(v) {
         const picked = [];
         lines.forEach((ln, i) => {
           if (!$('#cs-ln-on-' + i).checked) return;
           const t = $('#cs-ln-t-' + i).value; if (!t) throw Error('Dòng ' + (i + 1) + ': chưa chọn tờ khai để gắn.');
           const amount = NF().parse($('#cs-ln-a-' + i).value, 'num'); if (amount === null) throw Error('Dòng ' + (i + 1) + ': số tiền không hợp lệ.');
-          picked.push({ no: ln.no, target: t, amount, kind: $('#cs-ln-k-' + i).value, content: $('#cs-ln-c-' + i).value.trim() });
+          picked.push({ no: ln.no, target: t, amount, kind: $('#cs-ln-k-' + i).value, content: $('#cs-ln-c-' + i).value.trim(), periodDate: $('#cs-ln-d-' + i).value, chapter: $('#cs-ln-h-' + i).value.trim(), ndkt: $('#cs-ln-n-' + i).value.trim(), dbhc: $('#cs-ln-b-' + i).value.trim() });
         });
         if (!picked.length) throw Error('Chưa tick dòng nào để lưu.');
         let n = 0;
@@ -314,8 +320,9 @@
           picked.forEach((x) => {
             let d = x.target === '__new' ? null : next.customs.find((y) => y.id === x.target);
             if (!d) { d = CM().newDecl({ no: x.no, status: 'opened', note: 'Tạo từ giấy nộp tiền ' + (v.receiptNo || ''), supplements: [], payments: [] }); next.customs.push(d); }
-            if ((d.payments || []).some((y) => !y.deletedAt && y.receiptNo && y.receiptNo === v.receiptNo && y.amount === x.amount && y.kind === x.kind)) return;   // nhập lại cùng giấy → không nhân đôi
-            (d.payments = d.payments || []).push(CM().newPay({ receiptNo: v.receiptNo, date: v.date, kind: x.kind, content: x.content, amount: x.amount }));
+            const same = (y) => !y.deletedAt && ((y.refNo && v.refNo && y.refNo === CM().digits(v.refNo) && y.amount === x.amount) || (y.receiptNo && y.receiptNo === v.receiptNo && y.amount === x.amount && y.kind === x.kind));
+            if ((d.payments || []).some(same)) return;   // nhập lại cùng giấy → không nhân đôi
+            (d.payments = d.payments || []).push(CM().newPay({ receiptNo: v.receiptNo, formCode: v.formCode, refNo: v.refNo, date: v.date, payer: v.payer, kind: x.kind, content: x.content, amount: x.amount, periodDate: x.periodDate, chapter: x.chapter, ndkt: x.ndkt, dbhc: x.dbhc }));
             d.revision = (d.revision || 0) + 1; n++;
           });
         });
@@ -390,9 +397,9 @@
       '<div class="tbl-wrap mb-3"><table class="table table-sm align-middle"><thead><tr><th>Số tờ khai bổ sung</th><th>Ngày</th><th class="num">Lần</th><th>Lý do</th><th class="num">KL (BDMT)</th><th class="num">Thuế XK sau bổ sung</th><th class="num">Chênh lệch</th><th></th></tr></thead><tbody>' +
       (supp.length ? supp.map((x) => '<tr><td class="mono">' + esc(x.no || '(trên tờ khai gốc)') + '</td><td>' + esc(vnDate(x.date)) + '</td><td class="num">' + esc(x.round) + '</td><td>' + esc(x.reason) + '</td><td class="num">' + esc(money(x.qtyBdmt)) + '</td><td class="num">' + esc(money(x.taxVnd)) + '</td><td class="num">' + (x.taxVnd != null && d.taxVnd != null ? esc((x.taxVnd - d.taxVnd > 0 ? '+' : '') + money(x.taxVnd - d.taxVnd)) : '') + '</td><td class="text-end text-nowrap"><div class="btn-group btn-group-sm"><button class="btn btn-outline-primary" data-cs-child="supp" data-id="' + esc(x.id) + '" data-act="edit" type="button"' + (off ? ' disabled' : '') + '>Sửa</button><button class="btn btn-outline-danger" data-cs-child="supp" data-id="' + esc(x.id) + '" data-act="del" type="button" aria-label="Xóa"' + (off ? ' disabled' : '') + '>🗑</button></div></td></tr>').join('') : '<tr><td colspan="8" class="muted">Chưa có khai bổ sung.</td></tr>') + '</tbody></table></div>' +
       '<div class="d-flex flex-wrap gap-2 align-items-center mb-1"><h6 class="mb-0">Giấy nộp tiền</h6><span class="small muted">(bảng con)</span><span class="ms-auto"><button class="btn btn-sm btn-primary" type="button" data-cs="pay-add"' + (off ? ' disabled' : '') + '>＋ Thêm giấy nộp tiền</button></span></div>' +
-      '<div class="tbl-wrap"><table class="table table-sm align-middle"><thead><tr><th>Số giấy nộp tiền</th><th>Ngày nộp</th><th>Loại</th><th>Nội dung</th><th class="num">Số tiền</th><th></th></tr></thead><tbody>' +
-      (pays.length ? pays.map((x) => '<tr><td class="mono">' + esc(x.receiptNo) + '</td><td>' + esc(vnDate(x.date)) + '</td><td>' + esc(CM().PAY_KIND[x.kind] || '') + '</td><td>' + esc(x.content) + '</td><td class="num">' + esc(money(x.amount)) + '</td><td class="text-end text-nowrap"><div class="btn-group btn-group-sm"><button class="btn btn-outline-primary" data-cs-child="pay" data-id="' + esc(x.id) + '" data-act="edit" type="button"' + (off ? ' disabled' : '') + '>Sửa</button><button class="btn btn-outline-danger" data-cs-child="pay" data-id="' + esc(x.id) + '" data-act="del" type="button" aria-label="Xóa"' + (off ? ' disabled' : '') + '>🗑</button></div></td></tr>').join('') : '<tr><td colspan="6" class="muted">Chưa có giấy nộp tiền.</td></tr>') + '</tbody>' +
-      '<tfoot><tr><th colspan="4">Thuế XK phải nộp ' + esc(money(t.payable)) + ' đ · đã nộp thuế ' + esc(money(t.paidTax)) + ' đ · lệ phí đã nộp ' + esc(money(t.paidFee)) + ' đ</th><th class="num ' + (t.remaining > 0 ? 'text-danger' : 'text-success') + '">Còn ' + esc(money(t.remaining)) + '</th><th></th></tr></tfoot></table></div></div>';
+      '<div class="tbl-wrap"><table class="table table-sm align-middle"><thead><tr><th>Số giấy nộp tiền</th><th>Mã hiệu</th><th>Số tham chiếu</th><th>Ngày nộp</th><th>Kỳ thuế</th><th>Loại</th><th>Nội dung</th><th>Chương</th><th>NDKT</th><th class="num">Số tiền</th><th></th></tr></thead><tbody>' +
+      (pays.length ? pays.map((x) => '<tr><td class="mono">' + esc(x.receiptNo) + '</td><td class="mono">' + esc(x.formCode) + '</td><td class="mono small">' + esc(x.refNo) + '</td><td>' + esc(vnDate(x.date)) + '</td><td>' + esc(vnDate(x.periodDate)) + '</td><td>' + esc(CM().PAY_KIND[x.kind] || '') + '</td><td>' + esc(x.content) + '</td><td>' + esc(x.chapter) + '</td><td>' + esc(x.ndkt) + '</td><td class="num">' + esc(money(x.amount)) + '</td><td class="text-end text-nowrap"><div class="btn-group btn-group-sm"><button class="btn btn-outline-primary" data-cs-child="pay" data-id="' + esc(x.id) + '" data-act="edit" type="button"' + (off ? ' disabled' : '') + '>Sửa</button><button class="btn btn-outline-danger" data-cs-child="pay" data-id="' + esc(x.id) + '" data-act="del" type="button" aria-label="Xóa"' + (off ? ' disabled' : '') + '>🗑</button></div></td></tr>').join('') : '<tr><td colspan="11" class="muted">Chưa có giấy nộp tiền.</td></tr>') + '</tbody>' +
+      '<tfoot><tr><th colspan="8">Thuế XK phải nộp ' + esc(money(t.payable)) + ' đ · đã nộp thuế ' + esc(money(t.paidTax)) + ' đ · lệ phí đã nộp ' + esc(money(t.paidFee)) + ' đ</th><th colspan="2" class="num ' + (t.remaining > 0 ? 'text-danger' : 'text-success') + '">Còn ' + esc(money(t.remaining)) + '</th><th></th></tr></tfoot></table></div></div>';
   }
   function bind(host) {
     host.addEventListener('click', (e) => {
@@ -479,8 +486,8 @@
       rows.map((d) => { const t = CM().totals(d), c = contractOf(d.contractId); return [d.no, vnDate(d.openDate), d.round || 1, d.type || '', c ? c.no : '', c ? CM().contractStatus(customsList(), c.id).label : '', d.ship || '', d.goods || '', d.qtyBdmt, CM().STATUS[d.status], vnDate(CM().statusDate(d, 'cleared')), t.payable, t.paidTax, t.remaining, t.paidFee]; }), { total: true });
     R.buildSheet(wb, 'Khai bổ sung', 'KHAI BỔ SUNG', sub, [{ h: 'Tờ khai gốc', w: 16 }, { h: 'Số tờ khai bổ sung', w: 18 }, { h: 'Ngày', w: 12 }, { h: 'Lần', w: 8, n: NI }, { h: 'Lý do', w: 40 }, { h: 'KL (BDMT)', w: 12, n: ND }, { h: 'Thuế XK sau bổ sung (đ)', w: 20, n: NI }],
       rows.flatMap((d) => CM().active(d.supplements).map((x) => [d.no, x.no, vnDate(x.date), x.round, x.reason, x.qtyBdmt, x.taxVnd])));
-    R.buildSheet(wb, 'Giấy nộp tiền', 'GIẤY NỘP TIỀN VÀO NGÂN SÁCH NHÀ NƯỚC', sub, [{ h: 'Tờ khai', w: 16 }, { h: 'Số giấy nộp tiền', w: 18 }, { h: 'Ngày nộp', w: 12 }, { h: 'Loại', w: 16 }, { h: 'Nội dung', w: 34 }, { h: 'Số tiền (đ)', w: 16, n: NI }],
-      rows.flatMap((d) => CM().active(d.payments).map((x) => [d.no, x.receiptNo, vnDate(x.date), CM().PAY_KIND[x.kind], x.content, x.amount])), { total: true });
+    R.buildSheet(wb, 'Giấy nộp tiền', 'GIẤY NỘP TIỀN VÀO NGÂN SÁCH NHÀ NƯỚC', sub, [{ h: 'Tờ khai', w: 16 }, { h: 'Số giấy nộp tiền', w: 16 }, { h: 'Mã hiệu', w: 14 }, { h: 'Số tham chiếu', w: 24 }, { h: 'Ngày nộp', w: 12 }, { h: 'Kỳ thuế / ngày quyết định', w: 14 }, { h: 'Loại', w: 16 }, { h: 'Nội dung', w: 30 }, { h: 'Mã chương', w: 10 }, { h: 'Mã NDKT', w: 10 }, { h: 'Mã ĐBHC', w: 10 }, { h: 'Số tiền VND', w: 16, n: NI }],
+      rows.flatMap((d) => CM().active(d.payments).map((x) => [d.no, x.receiptNo, x.formCode, x.refNo, vnDate(x.date), vnDate(x.periodDate), CM().PAY_KIND[x.kind], x.content, x.chapter, x.ndkt, x.dbhc, x.amount])), { total: true });
     const name = 'TinhHinhKhaiHaiQuan_' + (from || to ? (from || '').slice(0, 4) || (to || '').slice(0, 4) : 'TatCa') + '.xlsx';
     if (!await HAK.Word.Files.saveBlob(new Blob([await wb.xlsx.writeBuffer()], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), name)) return;
     toast('Đã xuất: ' + name, 'success');
