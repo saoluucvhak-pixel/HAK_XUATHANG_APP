@@ -1,7 +1,7 @@
 (function(root){
 'use strict';
 const HAK=root.HAK=root.HAK||{};
-const labels={no:'Số hợp đồng',ship:'Tàu / chuyến',date:'Ngày ký',priceUsd:'Đơn giá',currency:'Tiền tệ',qty:'Khối lượng BDMT',contractProduct:'Tên hàng hóa hợp đồng',contractQty:'KL hợp đồng (BDMT)',deliverId:'Bên giao trên chứng thư',receiverId:'Bên nhận trên chứng thư',certNo:'Số chứng thư',certDate:'Ngày chứng thư',mt:'Tấn tươi (MT)',bdmt:'Tấn khô (BDMT)',moisture:'Độ ẩm (%)',fromDate:'Ngày cân từ',toDate:'Ngày cân đến'};
+const labels={no:'Số hợp đồng',ship:'Tàu / chuyến',date:'Ngày ký',priceUsd:'Đơn giá',currency:'Tiền tệ',qty:'Khối lượng BDMT',contractProduct:'Tên hàng hóa hợp đồng',contractQty:'KL hợp đồng (BDMT)',deliverId:'Bên giao trên chứng thư',receiverId:'Bên nhận trên chứng thư',certNo:'Số chứng thư',certDate:'Ngày chứng thư',mt:'Tấn tươi (MT)',bdmt:'Tấn khô (BDMT)',moisture:'Độ ẩm (%)',fromDate:'Ngày cân từ',toDate:'Ngày cân đến',product:'Hàng hóa thực hiện',tkhq:'Số tờ khai HQ'};
 function number(s){s=s.replace(/\s/g,'');const a=s.lastIndexOf(','),b=s.lastIndexOf('.');if(a>=0&&b>=0)return Number(s.replace(a>b?/\./g:/,/g,'').replace(',','.'));if(/^[1-9]\d{0,2}([.,]\d{3})+$/.test(s))return Number(s.replace(/[.,]/g,''));return Number(s.replace(',','.'));}
 const READER_VERSION='2.9.6';
 function contractNumber(input){
@@ -28,6 +28,7 @@ function contractNumberFromPages(pages){
 }
 
 function contractPrice(source){
+ if(HAK.DocExtract){const robust=HAK.DocExtract.price(source,number);if(robust)return robust;}   // v2.13.0: chịu lỗi OCR ("USD17 4.00" = 174,00; nhãn và số ở 2 dòng)
  const candidates=[];
  for(const raw of String(source||'').split('\n')){
   const line=raw.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[đĐ]/g,'d');
@@ -47,9 +48,14 @@ function contractPrice(source){
  return distinct.length===1&&['USD','VND'].includes(distinct[0].currency)?distinct[0]:null;
 }
 function parse(text,kind){
+ if(kind==='certificate'&&HAK.DocExtract)text=HAK.DocExtract.tidy(text);   // bỏ dấu nháy lạc (TU'OI), nối "23.789, 17"
  const original=text; text=text.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[đĐ]/g,c=>c==='đ'?'d':'D');
  const found=[];const add=(key,re,convert)=>{const m=re.exec(text);if(m){const value=convert?convert(m[1]):m[1].trim();if(value!==''&&value!=null&&!Number.isNaN(value))found.push({key,value,evidence:original.slice(m.index,m.index+m[0].length)});}};
  if(kind==='certificate'){
+  if(HAK.DocExtract){const X=HAK.DocExtract,v=X.vessel(original),pr=X.product(original),per=X.inspectionPeriod(original);
+   if(v)found.push({key:'ship',value:v.value,evidence:v.evidence});
+   if(pr)found.push({key:'product',value:pr.value,evidence:pr.evidence});
+   if(per)found.push({key:'fromDate',value:per.from,evidence:per.evidence},{key:'toDate',value:per.to,evidence:per.evidence});}
   add('ship',/\bMV\.?\s+([A-Z][A-Z0-9 ._-]*?V\.?\s*\d+[A-Z0-9]*)/i,s=>'MV '+s.trim());
   add('certNo',/(?:^|\n)\s*S[o6]\s*[:：]\s*([A-Z0-9][A-Z0-9/._-]{5,})/i);
   add('mt',/([\d.,]+)\s*(?:TAN TUOI|WET (?:METRIC )?TONS?|GMT)\b/i,number);
@@ -63,10 +69,13 @@ function parse(text,kind){
  }else{
   const no=contractNumber(original);if(no)found.push(no);
   const price=contractPrice(original);if(price){found.push({key:'priceUsd',value:price.value,evidence:price.evidence},{key:'currency',value:price.currency,evidence:price.evidence});}
-  add('date',/(?:^|\n)(\d{1,2}[- ](?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4})/i,s=>{const m=/^(\d+)[- ]([A-Za-z]+)\s+(\d+)$/.exec(s),months=['January','February','March','April','May','June','July','August','September','October','November','December'];return iso(m[1]+'/'+(months.findIndex(x=>x.toLowerCase()===m[2].toLowerCase())+1)+'/'+m[3]);});
+  const monthDate=s=>{const m=/^(\d+)[- ]([A-Za-z]+)\s+(\d+)$/.exec(s),months=['January','February','March','April','May','June','July','August','September','October','November','December'];return iso(m[1]+'/'+(months.findIndex(x=>x.toLowerCase()===m[2].toLowerCase())+1)+'/'+m[3]);};
+  const MONTHS='(?:January|February|March|April|May|June|July|August|September|October|November|December)';
+  add('date',new RegExp('(?:^|\\n)(\\d{1,2}[- ]'+MONTHS+'\\s+\\d{4})','i'),monthDate);
+  add('date',new RegExp('(?:^|\\n)\\s*date\\s*[:：]\\s*(\\d{1,2}[- ]'+MONTHS+'\\s+\\d{4})','i'),monthDate);   // v2.13.0: "Date: 27-July 2026"
   add('ship',/(?:tau|vessel)\s*[:：]?\s*((?:MV\.?\s*)?[A-Z][A-Z0-9 ._-]*?V\.?\s*\d+[A-Z0-9]*)/i);
   add('qty',/(?:S[o6]\s*lu[qou]+ng)\s*la\s*[:：]?\s*([\d.,]+)\s*BDMT/i,number);
-  add('date',/lap\s*(?:vao)?\s*ngay\s*(\d{1,2}\s*thang\s*\d{1,2}\s*nam\s*\d{4})/i,s=>iso(s.replace(/\s*(?:thang|nam)\s*/g,'/')));
+  add('date',/l.{0,2}p\s*(?:vao)?\s*ngay\s*(\d{1,2}\s*thang\s*\d{1,2}\s*nam\s*\d{4})/i,s=>iso(s.replace(/\s*(?:thang|nam)\s*/g,'/')));
   add('ship',/(?:vessel|t[aà]u)\s*[:：]?\s*((?:M\.?\s*V\.?\s*)?[A-Z][A-Z0-9 ._-]{3,65})/);
   add('qty',/(?:quantity|kh[oố]i\s*l[uượơ]ng)[^\d\n]{0,35}([\d.,]+)\s*BDMT/i,number);
  }
@@ -91,16 +100,14 @@ function render(){if(!panel)return;panel.replaceChildren();panel.append(el('stro
 }
 async function ocr(rec){const token=epoch;busy=true;render();const status=el('p','Đang đọc PDF bằng Windows OCR…');panel.append(status);try{const result=await api('ocr',{base64:rec.base64,kind});if(token!==epoch)return;status.textContent='Đã đọc '+result.pages.length+' trang · OCR '+result.language+'. Luôn đối chiếu số liệu với PDF gốc.';const text=result.pages.map(p=>(p.rowsText||p.text)+'\n'+(p.supplementalText||'')).join('\n');const details=el('details'),summary=el('summary','Xem chữ OCR');details.append(summary,el('pre',text,'small text-wrap'));panel.append(details);
  if(kind==='contract'&&HAK.ContractParser){renderContractSuggestions(result.pages,rec);return;}
- const suggestions=parse(text,kind);if(kind==='certificate')renderCertificateParties(result.pages);if(!suggestions.length)panel.append(el('p','Chưa nhận dạng chắc chắn được ô dữ liệu. Bạn có thể xem chữ OCR và nhập sau khi đối chiếu.','text-warning'));
- for(const s of suggestions){const target=document.getElementById('cf-'+s.key);if(!target)continue;const label=el('label',null,'d-block border rounded p-2 mt-1'),check=el('input');check.type='checkbox';check.checked=false;label.append(check,document.createTextNode(' '+labels[s.key]+(s.derived?' — tính từ khối lượng':'')+': '+s.value+(target.value?' (hiện có: '+target.value+')':'')),el('small',' — '+s.evidence,s.derived?'d-block text-warning':'d-block muted'));check.dataset.key=s.key;check.dataset.value=s.value;label.classList.add('ocr-proposal');panel.append(label);}
- const apply=el('button','Điền các ô đã chọn','btn btn-primary mt-2');apply.type='button';apply.onclick=()=>{panel.querySelectorAll('.ocr-proposal input:checked').forEach(c=>{const target=document.getElementById('cf-'+c.dataset.key);target.value=c.dataset.value;target.dispatchEvent(new Event('input',{bubbles:true}));c.checked=false;});};if(suggestions.length)panel.append(apply);
+ renderCertificateReview(result.pages,text);
  }catch(e){if(token===epoch)status.textContent='Chưa đọc được: '+e.message+'. Kiểm tra app được mở bằng HAKDocs.exe.';}finally{if(token===epoch){busy=false;panel.querySelectorAll('button').forEach(b=>b.disabled=false);panel.querySelector('input[type=file]').disabled=false;}}}
 function renderContractSuggestions(pages,rec){
  const result=HAK.ContractParser.extract(pages),review=el('div',null,'border rounded p-2 mt-2');
  review.append(el('strong','Đề xuất từ hợp đồng — chọn và đối chiếu trước khi điền'));
  const numberProposal=contractNumberFromPages(pages);const common=parse(pages.map(p=>(p.rowsText||p.text)+'\n'+p.text).join('\n'),'contract').filter(s=>!['qty','ship','no'].includes(s.key));if(numberProposal)common.unshift(numberProposal);if(result.product)common.push({key:'contractProduct',value:result.product,evidence:'Tên hàng từ nội dung hợp đồng'});if(result.lots.length)common.push({key:'contractQty',value:result.lots.reduce((n,l)=>n+l.qty,0),evidence:result.lots.map(l=>'Trang '+l.page+': '+l.evidence).join('; ')});
  const selected=[];
- function offer(label,value,evidence,apply){const row=el('label',null,'d-block p-2 border-bottom'),check=el('input');check.type='checkbox';row.append(check,document.createTextNode(' '+label+': '+value),el('small',evidence,'d-block muted'));review.append(row);selected.push({check,apply});}
+ function offer(label,value,evidence,apply,pre){const row=el('label',null,'d-block p-2 border-bottom'),check=el('input');check.type='checkbox';check.checked=!!pre;row.append(check,document.createTextNode(' '+label+': '+value),el('small',evidence,'d-block muted'));review.append(row);selected.push({check,apply,auto:!!pre,label});}
  const typeTarget=document.getElementById('cf-type');if(typeTarget)offer('Hình thức hợp đồng',result.type==='uythac'?'Ủy thác xuất khẩu':'Xuất khẩu','Theo nội dung PDF',()=>{typeTarget.value=result.type;typeTarget.dispatchEvent(new Event('input',{bubbles:true}));});
  for(const s of common){const target=document.getElementById('cf-'+s.key);if(!target)continue;if(s.key==='no'){
   const box=el('div',null,'border border-primary rounded p-3 mt-2 mb-2'),label=el('label',null,'d-block fw-semibold'),check=el('input');check.type='checkbox';label.append(check,document.createTextNode(' Số hợp đồng nhận dạng được'));
@@ -108,21 +115,25 @@ function renderContractSuggestions(pages,rec){
   const status=el('p','Có thể sửa ký tự OCR (ví dụ Đ/D) trước khi điền.','small muted mt-1 mb-0');
   const applyNumber=()=>{const v=value.value.trim();if(!v){status.textContent='Chưa có số hợp đồng để điền.';return;}target.value=v;target.dispatchEvent(new Event('input',{bubbles:true}));status.textContent='Đã điền số hợp đồng: '+v;check.checked=false;};
   const button=el('button',target.value?'Thay số hợp đồng hiện có':'Điền số hợp đồng','btn btn-primary mt-2');button.type='button';button.dataset.ocrContractNumber='';button.onclick=applyNumber;
-  box.append(label,value,el('small','Trang '+s.page+' · '+s.evidence,'d-block muted mt-1'));if(s.correction)box.append(el('small',s.correction,'d-block text-warning'));box.append(button,status);review.append(box);selected.push({check,apply:applyNumber});continue;
- }offer(labels[s.key],s.value,s.evidence,()=>{if(['contractProduct','product'].includes(s.key)&&target.tagName==='SELECT'&&!Array.from(target.options).some(o=>o.value===s.value)){const option=document.createElement('option');option.value=s.value;option.textContent=s.value+' (OCR — bổ sung khi lưu)';target.append(option);}target.value=s.value;target.dispatchEvent(new Event('input',{bubbles:true}));});}
+  box.append(label,value,el('small','Trang '+s.page+' · '+s.evidence,'d-block muted mt-1'));if(s.correction)box.append(el('small',s.correction,'d-block text-warning'));box.append(button,status);review.append(box);selected.push({check,apply:applyNumber});if(!target.value){applyNumber();target.classList.add('ocr-filled');}continue;
+ }offer(labels[s.key],s.value,s.evidence+(target.value&&!['currency'].includes(s.key)?' · hiện có: '+target.value:''),()=>fill(target,s.key,s.value),!target.value);}
+ if(!common.some(x=>x.key==='priceUsd'))review.append(el('p','Chưa đọc được ĐƠN GIÁ trên PDF (OCR có thể bỏ sót dòng giá in đậm / gạch chân). Xem chữ OCR hoặc PDF gốc rồi nhập tay ô Đơn giá.','text-warning'));
+ if(!result.lots.length)review.append(el('p','Chưa đọc được KHỐI LƯỢNG (BDMT) trên PDF. Xem chữ OCR hoặc PDF gốc rồi nhập tay ô KL hợp đồng.','text-warning'));
  if(!numberProposal)review.append(el('p','Chưa nhận dạng chắc chắn số hợp đồng. Xem chữ OCR và đối chiếu PDF để nhập số.','text-warning'));
  for(const [role,title] of [['exporter','Bên xuất khẩu / nhận ủy thác'],['principal','Bên ủy thác'],['buyer','Bên mua hàng']]){
   const party=result.parties[role],target=document.getElementById('cf-'+role+'Id');if(!party||!target)continue;
   const customers=options.customers?options.customers():[],matched=HAK.ContractParser.matchParty(party,customers);
-  offer(title,matched?matched.name:party.name,'Trang '+party.page+' · '+party.evidence+(party.tax?' · MST: '+party.tax:''),()=>{
-   target.value=matched?matched.id:'__new';target.dispatchEvent(new Event('input',{bubbles:true}));
-   if(!matched){const prefix='cf-'+role+'Id';document.getElementById(prefix+'-newName').value=party.name;const tax=document.getElementById(prefix+'-newTax');if(tax)tax.value=party.tax||'';}
-  });
+  offer(title,matched?matched.name:party.name,'Trang '+party.page+' · '+party.evidence+(party.tax?' · MST: '+party.tax:'')+(party.address?' · Địa chỉ: '+party.address:''),()=>{
+   target.value=matched?matched.id:'__new';target.dispatchEvent(new Event('input',{bubbles:true}));target.classList.add('ocr-filled');
+   if(!matched)fillNewParty('cf-'+role+'Id',party);
+  },!target.value);
+  if(matched&&!matched.address&&party.address)offer('Địa chỉ của '+matched.name,party.address,'Khách hàng này chưa có địa chỉ trong Danh mục — bổ sung từ hợp đồng',()=>saveAddress(matched,party.address),true);
  }
  if(result.lots.length)review.append(el('p','KL hợp đồng được cộng từ các lô trên PDF. Chỉ thêm đợt thực hiện khi giao hàng; OCR hợp đồng không tạo dòng thực hiện.','small muted'));
- const apply=el('button','Điền các mục đã chọn','btn btn-primary mt-2');apply.type='button';apply.onclick=()=>{
-  selected.filter(x=>x.check.checked).forEach(x=>{x.apply();x.check.checked=false;});
-
+ const done=[];selected.filter(x=>x.auto).forEach(x=>{try{x.apply();done.push(x.label);x.check.checked=false;x.check.parentNode.classList.add('text-success');}catch(e){}});
+ if(done.length)review.insertBefore(el('p','Đã tự điền '+done.length+' ô trống: '+done.join(', ')+'. Các ô tô vàng là chữ OCR — đối chiếu với PDF gốc rồi mới Lưu.','small text-success mb-1 mt-1'),review.children[1]||null);
+ const apply=el('button','Điền các mục đã tick','btn btn-primary mt-2');apply.type='button';apply.onclick=()=>{
+  selected.filter(x=>!x.auto&&x.check.checked).forEach(x=>{x.apply();x.check.checked=false;});
  };review.append(apply);panel.append(review);
 }
 function certificateParties(pages){
@@ -135,10 +146,56 @@ function certificateParties(pages){
  }
  if(!result.deliverId&&companies[0])result.deliverId=clean(companies[0]);
  if(!result.receiverId&&companies[1])result.receiverId=clean(companies[1]);
+ if(HAK.DocExtract){const rich=HAK.DocExtract.certificateParties(pages);for(const role of Object.keys(rich)){if(!result[role]&&rich[role].name)result[role]={name:rich[role].name,tax:'',page:rich[role].page,evidence:rich[role].evidence};if(result[role]){result[role].address=rich[role].address||'';result[role].name=HAK.DocExtract.tidyName(result[role].name);}}}   // v2.13.0: địa chỉ ngay dưới tên bên
  return result;
 }
-function renderCertificateParties(pages){
- for(const [key,party] of Object.entries(certificateParties(pages))){const target=document.getElementById('cf-'+key);if(!target)continue;const matched=HAK.ContractParser.matchParty(party,options.customers?options.customers():[]),row=el('label',null,'d-block border rounded p-2 mt-1'),check=el('input');check.type='checkbox';row.append(check,document.createTextNode(' '+labels[key]+': '+(matched?matched.name:party.name)),el('small','Trang '+party.page+' · '+party.evidence,'d-block muted'));const apply=el('button','Điền bên này','btn btn-sm btn-outline-primary ms-2');apply.type='button';apply.onclick=()=>{if(!check.checked)return;target.value=matched?matched.id:'__new';target.dispatchEvent(new Event('input',{bubbles:true}));if(!matched){document.getElementById('cf-'+key+'-newName').value=party.name;}check.checked=false;};row.append(apply);panel.append(row);}
+/** Điền 1 ô từ đề xuất OCR: ô chọn thì chọn / thêm tùy chọn; ô số thì hiện dạng Việt (6.500, 13.010,81); rồi báo cho form biết. */
+function fill(target,key,value){
+ const foldKey=HAK.ContractParser?HAK.ContractParser.fold:(x=>String(x).toLowerCase());
+ if(target.tagName==='SELECT'){let opt=Array.from(target.options).find(o=>o.value===String(value)||foldKey(o.textContent)===foldKey(String(value)));if(!opt){opt=document.createElement('option');opt.value=String(value);opt.textContent=value+' (OCR — bổ sung khi lưu)';target.append(opt);}target.value=opt.value;}
+ else if(target.dataset&&target.dataset.numfmt&&HAK.NumFmt&&value!==''&&!Number.isNaN(Number(value)))target.value=HAK.NumFmt.txt(Number(value),target.dataset.numfmt);
+ else target.value=value;
+ target.classList.add('ocr-filled');target.dispatchEvent(new Event('input',{bubbles:true}));
+}
+/** Bên mới (chưa có trong Danh mục): điền tên + địa chỉ (+ MST) vào các ô "mới". */
+function fillNewParty(selectId,party){
+ const n=document.getElementById(selectId+'-newName');if(n)n.value=party.name||'';
+ const a=document.getElementById(selectId+'-newAddr');if(a&&party.address)a.value=party.address;
+ const t=document.getElementById(selectId+'-newTax');if(t&&party.tax)t.value=party.tax;
+}
+/** Khách hàng đã có nhưng chưa có địa chỉ → bổ sung địa chỉ đọc từ chứng thư / hợp đồng. */
+function saveAddress(customer,address){
+ if(!HAK.Catalog||!HAK.Catalog.upsertCustomer)return;
+ const res=HAK.Catalog.upsertCustomer({id:customer.id,kind:customer.kind,name:customer.name,address,country:customer.country,tax:customer.tax,note:customer.note});
+ if(res&&res.error){if(HAK.UI)HAK.UI.toast(res.error,'error');return;}
+ if(HAK.Catalog.persist)HAK.Catalog.persist();
+ customer.address=address;
+}
+/** Khung đề xuất dùng chung: tick sẵn + TỰ ĐIỀN các ô đang trống (tô nền vàng); ô đã có dữ liệu thì để bạn tick tay. */
+function makeReview(title){
+ const review=el('div',null,'border rounded p-2 mt-2'),selected=[];review.append(el('strong',title));
+ const offer=(label,value,evidence,apply,pre)=>{const row=el('label',null,'d-block p-2 border-bottom'),check=el('input');check.type='checkbox';check.checked=!!pre;row.append(check,document.createTextNode(' '+label+': '+value),el('small',evidence,'d-block muted'));review.append(row);selected.push({check,apply,auto:!!pre,label});};
+ const finish=(container)=>{
+  const done=[];selected.filter(x=>x.auto).forEach(x=>{try{x.apply();done.push(x.label);x.check.checked=false;x.check.parentNode.classList.add('text-success');}catch(e){}});
+  if(done.length){review.insertBefore(el('p','Đã tự điền '+done.length+' ô trống: '+done.join(', ')+'. Các ô tô vàng là chữ OCR — đối chiếu với PDF gốc rồi mới Lưu.','small text-success mb-1 mt-1'),review.children[1]||null);}
+  const rest=selected.filter(x=>!x.auto);
+  if(rest.length){const apply=el('button','Điền các mục đã tick','btn btn-primary mt-2');apply.type='button';apply.onclick=()=>{selected.filter(x=>!x.auto&&x.check.checked).forEach(x=>{x.apply();x.check.checked=false;});};review.append(apply);}
+  if(!selected.length)review.append(el('p','Chưa nhận dạng chắc chắn ô dữ liệu nào. Xem chữ OCR và nhập tay sau khi đối chiếu.','text-warning'));
+  container.append(review);
+ };
+ return {offer,finish,selected};
+}
+function renderCertificateReview(pages,text){
+ const suggestions=parse(text,'certificate'),parties=certificateParties(pages),R=makeReview('Đề xuất từ chứng thư — ô trống được tự điền');
+ for(const s of suggestions){const target=document.getElementById('cf-'+s.key);if(!target)continue;R.offer(labels[s.key]+(s.derived?' — tính từ khối lượng':''),s.value,s.evidence+(target.value?' · hiện có: '+target.value:''),()=>fill(target,s.key,s.value),!target.value&&!s.derived);}
+ const customers=options.customers?options.customers():[];
+ for(const [key,party] of Object.entries(parties)){
+  const target=document.getElementById('cf-'+key);if(!target||!party.name)continue;
+  const matched=HAK.ContractParser.matchParty(party,customers);
+  R.offer(labels[key],(matched?matched.name:party.name),'Trang '+party.page+' · '+party.evidence+(party.address?' · Địa chỉ: '+party.address:''),()=>{target.value=matched?matched.id:'__new';target.dispatchEvent(new Event('input',{bubbles:true}));target.classList.add('ocr-filled');if(!matched)fillNewParty('cf-'+key,party);},!target.value);
+  if(matched&&!matched.address&&party.address)R.offer('Địa chỉ của '+matched.name,party.address,'Khách hàng này chưa có địa chỉ trong Danh mục — bổ sung từ chứng thư',()=>saveAddress(matched,party.address),true);
+ }
+ R.finish(panel);
 }
 async function mount(container,type,ids,opts){options=opts||{};const token=++epoch;kind=type;draft=[];busy=true;loadError='';panel=el('div',null,'col-12');container.append(panel);panel.textContent='Đang mở tệp đính kèm…';try{const files=await Promise.all(ids.map(id=>HAK.DB.get('attachments',id)));if(token!==epoch)return;if(files.some(x=>!x))throw Error('Thiếu PDF đã đính kèm. Hãy khôi phục từ Sao lưu toàn bộ để giữ tệp gốc.');draft=files;busy=false;render();}catch(e){if(token===epoch){busy=false;loadError=e.message;panel.textContent=loadError;panel.classList.add('text-danger');}}}
 async function commit(){if(loadError)throw Error(loadError);if(busy)throw Error('Đợi đọc / tải PDF xong rồi lưu.');if(draft.length&&!HAK.DB.usable())throw Error('Bộ nhớ trình duyệt chưa sẵn sàng để lưu PDF bền vững.');for(const rec of draft){const saved=Object.assign({},rec);delete saved.fresh;await HAK.DB.put('attachments',saved);}return draft.map(x=>x.id);}

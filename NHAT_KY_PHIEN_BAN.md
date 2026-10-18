@@ -290,3 +290,9 @@ Thủy chốt 28/09/2026: "1. bỏ Trao đổi KHÔNG đồng bộ lên Google S
 - excel.js parseNum: "0,123" → 0.123 (trước 123).
 - pages.js generateBkls: không chặn khi thiếu Số BKLS / hệ số / tên bên mua — tự điền hoặc để trống + cảnh báo.
 - tests/parse-num.test.cjs, tests/numfmt.test.cjs.
+
+## v2.13.0 — OCR chịu lỗi: khối lượng, đơn giá, tàu, hàng, ngày, địa chỉ
+- js/doc-extract.js (HAK.DocExtract): inspectionPeriod, vessel, product (khôi phục dấu "Dăm gỗ keo"), certificateParties + addressAfter/addressLabelled/respace/tidyName, price (ghép số bị tách, nhãn–số 2 dòng, loại phí/phạt), quantityFallback, tidy. Hàm thuần, kiểm thử Node.
+- contract-parser.js: BDMT có lỗi OCR (BDMI, 8DMT), nhãn Quantity ở dòng trước, fallback số trước BDMT, địa chỉ bên, 'c6ng ty', tiêu đề "BEN UY THAC" dính chữ, bỏ "Product :", g6→go.
+- document-import.js: certificate dùng bộ đọc mới (ship, product, fromDate/toDate), contractPrice thử bộ mới trước, ngày "Date: 27-July 2026" / "l~p vao ngay"; khung đề xuất dùng chung (makeReview): ô trống TỰ ĐIỀN + tô vàng (.ocr-filled), ô có dữ liệu để tick tay, địa chỉ khách hàng (ô địa chỉ của khách mới, hoặc bổ sung địa chỉ cho khách đã có), nhắc nhập tay khi không đọc được giá / KL, số hiển thị kiểu Việt. Đổi bài thử số hợp đồng: ô trống được điền ngay.
+- tests/doc-extract.test.cjs (13 kiểm thử, dữ liệu mô phỏng — không đưa nội dung hợp đồng thật vào kho công khai).

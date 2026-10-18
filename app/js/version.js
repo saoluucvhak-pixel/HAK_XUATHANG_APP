@@ -5,7 +5,7 @@
 (function (root) {
   'use strict';
   const HAK = (root.HAK = root.HAK || {});
-  HAK.VERSION = '2.12.7';
+  HAK.VERSION = '2.13.0';
   function paint() {
     if (!root.document) return;
     root.document.querySelectorAll('[data-hak-version]').forEach((el) => { el.textContent = 'v' + HAK.VERSION; });

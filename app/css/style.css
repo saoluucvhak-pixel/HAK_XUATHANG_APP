@@ -425,3 +425,6 @@ svg.i { width: 1.1em; height: 1.1em; vertical-align: -.18em; flex: none; }
 .hl-badge.hl-ok { background: rgba(47,158,68,.14); color: #2f9e44; } .hl-badge.hl-warn { background: rgba(240,140,0,.16); color: #d9480f; } .hl-badge.hl-bad { background: rgba(224,49,49,.14); color: #e03131; }
 [data-bs-theme="dark"] .hl-badge.hl-warn { color: #ffa94d; }
 .min-w-0 { min-width: 0; }
+
+/* v2.13.0: ô vừa được OCR tự điền — tô vàng nhạt để người dùng đối chiếu với PDF gốc */
+.ocr-filled { background-color: #fff6cc !important; box-shadow: inset 0 0 0 1px #e0b100; }

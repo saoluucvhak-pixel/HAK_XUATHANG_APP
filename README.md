@@ -1,5 +1,7 @@
 # HAK Quản lý xuất hàng
 
+- [Bản 2.13.0 — OCR đọc khối lượng, đơn giá, tàu, hàng, ngày, địa chỉ](docs/HUONG_DAN_2.13.0.md)
+
 - [Bản 2.12.7 — ô số có dấu phân cách, tạo BKLS không bị chặn](docs/HUONG_DAN_2.12.7.md)
 
 - [Bản 2.12.6 — sửa nguyên nhân gốc trong HAKDocs.exe](docs/HUONG_DAN_2.12.6.md)
