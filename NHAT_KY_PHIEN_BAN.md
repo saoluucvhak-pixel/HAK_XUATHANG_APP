@@ -265,3 +265,6 @@ Thủy chốt 28/09/2026: "1. bỏ Trao đổi KHÔNG đồng bộ lên Google S
 ## v2.12.1 — Cảnh báo phiếu trùng khác khối lượng
 - main.js mergeSlot: gom dòng theo G.omitKey; phiếu trùng giữa các file mà khác net/gross/tare → ds.conflicts; mặc định giữ đợt trước, lựa chọn "dùng đợt sau" lưu ở HAK.Store 'hak.dupprefer.<loại>'.
 - Khung vàng + nút "Xem & chọn" (hộp thoại từng phiếu, chọn tất cả), toast sau khi nạp, thêm vào ds.warnings.
+
+## v2.12.2 — Sửa lỗi cài đè
+- installer/setup.nsi: macro StopHakDocs (taskkill HAKDocs.exe, chờ 1,2 giây) chạy trước khi cài đè và trước khi gỡ cài đặt — HAKDocs.exe tự chạy ngầm (--serve) nên khóa file ("Error opening file for writing ...\native\HAKDocs.exe").

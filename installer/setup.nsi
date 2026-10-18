@@ -8,7 +8,7 @@ Unicode true
 
 Name "HAK - Quan ly xuat hang"
 !ifndef VERSION
-  !define VERSION "2.12.1"
+  !define VERSION "2.12.2"
 !endif
 OutFile "HAK_QuanLyXuatHang_Setup.exe"
 VIProductVersion "${VERSION}.0"
@@ -52,8 +52,16 @@ RequestExecutionLevel user
 ;--------------------------------
 ; Cai dat
 
+; HAKDocs.exe chay ngam (--serve) sau khi dung app nen khoa file khi cap nhat -> dung truoc khi ghi de / go cai.
+!macro StopHakDocs
+  nsExec::Exec 'taskkill /F /T /IM HAKDocs.exe'
+  Pop $0
+  Sleep 1200
+!macroend
+
 Section "Ung dung Quan ly xuat hang" SecApp
   SectionIn RO
+  !insertmacro StopHakDocs
   SetOutPath "$INSTDIR"
   ; Recovery/reset utilities must never ship to end users.
   File /r /x "MoKhoa_1Lan*.html" /x "XoaSach_DuLieu*.html" "app\*.*"
@@ -80,6 +88,7 @@ SectionEnd
 ; Go cai (KHONG dong du lieu trinh duyet - chi xoa file chuong trinh)
 
 Section "Uninstall"
+  !insertmacro StopHakDocs
   Delete "$SMPROGRAMS\HAK\Quan ly xuat hang.lnk"
   RMDir "$SMPROGRAMS\HAK"
   Delete "$DESKTOP\HAK - Quan ly xuat hang.lnk"

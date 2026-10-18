@@ -1,5 +1,7 @@
 # HAK Quản lý xuất hàng
 
+- [Bản 2.12.2 — sửa lỗi cài đè khi app đang chạy ngầm](docs/HUONG_DAN_2.12.2.md)
+
 - [Bản 2.12.1 — cảnh báo phiếu trùng khác khối lượng](docs/HUONG_DAN_2.12.1.md)
 
 - [Bản 2.12.0 — bỏ phiếu cân](docs/HUONG_DAN_2.12.0.md)
