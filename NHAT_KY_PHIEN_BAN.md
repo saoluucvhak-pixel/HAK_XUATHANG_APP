@@ -268,3 +268,7 @@ Thủy chốt 28/09/2026: "1. bỏ Trao đổi KHÔNG đồng bộ lên Google S
 
 ## v2.12.2 — Sửa lỗi cài đè
 - installer/setup.nsi: macro StopHakDocs (taskkill HAKDocs.exe, chờ 1,2 giây) chạy trước khi cài đè và trước khi gỡ cài đặt — HAKDocs.exe tự chạy ngầm (--serve) nên khóa file ("Error opening file for writing ...\native\HAKDocs.exe").
+
+## v2.12.3 — Chữ vỡ font khi tạo Word, lỗi lưu tệp
+- docx-worker.js: Blob(atob(...)) mã hóa UTF-8 hai lần → chữ tiếng Việt trong worker thành "Ä ang…"; đổi sang Uint8Array.from(atob(...)). tests/docx-worker.test.cjs thêm kiểm thử (thất bại trước khi sửa).
+- word.js saveBlob: thử lại khi HAKDocs trả 409 "OCR is processing another document" (≤ 40 lần × 1,5 giây); lỗi mạng và tệp > ~26 MB báo rõ bằng tiếng Việt. Giữ nguyên nguyên tắc không tự chuyển sang tải của trình duyệt (tests/download-save.test.cjs).

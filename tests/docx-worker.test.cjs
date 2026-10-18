@@ -7,3 +7,10 @@ test('worker timeout terminates stalled rendering instead of keeping loading for
 test('invalid template reports a worker error and releases the worker',async()=>{const h=harness();await assert.rejects(h.render(new Uint8Array([1,2,3]),{}));assert.equal(h.stopped,1);});
 
 test('all nine shipped Word templates render successfully through the actual worker',async()=>{const w={HAK:{}};vm.runInNewContext(fs.readFileSync(require.resolve('../app/js/templates-data.js'),'utf8'),{window:w});for(const [name,b64] of Object.entries(w.HAK.TEMPLATES)){const h=harness();const bytes=await h.render(new Uint8Array(Buffer.from(b64,'base64')),{});const xml=new Zip(bytes).file('word/document.xml').asText();assert.ok(xml.includes('w:document'),name);assert.ok(!xml.includes('{{'),name);assert.equal(h.stopped,1);}});
+test('Vietnamese text inside the worker source is not double-encoded (no mojibake in progress messages)',async()=>{
+ let source='';class W{constructor(url){this.pending=fetch(url).then(r=>r.text()).then(t=>{source=t;});}postMessage(){}terminate(){}}
+ const ctx={window:{Worker:W,HAK:{UI:{Loading:{set(){}}}}},Blob,URL,atob,Error,Uint8Array,setTimeout,clearTimeout,fetch};vm.createContext(ctx);
+ for(const f of ['docx-worker-source.js','docx-worker.js'])vm.runInContext(fs.readFileSync(require.resolve('../app/js/'+f),'utf8'),ctx);
+ ctx.window.HAK.DocxWorker.render(new Uint8Array(),{},20).catch(()=>{});await new Promise(r=>setTimeout(r,300));
+ assert.ok(source.includes('Đang điền dữ liệu vào mẫu…'),'worker source must contain the correctly decoded Vietnamese text');assert.ok(!source.includes('Ä'));
+});

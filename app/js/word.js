@@ -129,8 +129,18 @@
         // Native Save As does not depend on browser user-activation surviving document generation.
         const raw=new Uint8Array(await blob.arrayBuffer());let binary='';for(let i=0;i<raw.length;i+=16384)binary+=String.fromCharCode.apply(null,raw.subarray(i,i+16384));
         if(HAK.UI&&HAK.UI.Loading)HAK.UI.Loading.hide();
-        const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),180000);let response;try{response=await fetch('http://127.0.0.1:31879/save-download',{method:'POST',headers:{'Content-Type':'application/json','X-HAK-Client':'documents-v1'},body:JSON.stringify({name,base64:btoa(binary)}),signal:controller.signal});}finally{clearTimeout(timer);}
-        const result=await response.json();if(!response.ok)throw Error(result.error||'Không lưu được tệp.');if(result.canceled)return false;if(HAK.Downloads)HAK.Downloads.saved(result.path,result.warning);return result.path;
+        const encoded=btoa(binary);
+        // Trình hỗ trợ (HAKDocs) từ chối gói > 36 MB mà không đọc hết → trình duyệt chỉ báo "Failed to fetch": báo rõ nguyên nhân trước khi gửi.
+        if(encoded.length>36*1024*1024-4096)throw Error('tệp quá lớn ('+Math.round(raw.length/1048576)+' MB), vượt giới hạn ~26 MB của trình hỗ trợ lưu tệp. Thu hẹp phạm vi (ngày / số phiếu / biển số) rồi tạo lại');
+        const send=async()=>{const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),180000);try{return await fetch('http://127.0.0.1:31879/save-download',{method:'POST',headers:{'Content-Type':'application/json','X-HAK-Client':'documents-v1'},body:JSON.stringify({name,base64:encoded}),signal:controller.signal});}finally{clearTimeout(timer);}};
+        let response;
+        for(let attempt=0;;attempt++){
+          try{response=await send();}catch(err){if(err&&err.name==='AbortError')throw err;throw Error('không kết nối được trình hỗ trợ lưu tệp (HAKDocs) — có thể nó đã tắt khi cài bản mới hoặc sau thời gian dài không dùng');}
+          if(response.status!==409||attempt>=40)break;       // 409 = trình hỗ trợ đang bận (hộp Lưu còn mở / tệp trước chưa xong) → đợi rồi thử lại
+          if(attempt===2&&HAK.UI&&HAK.UI.toast)HAK.UI.toast('Trình hỗ trợ lưu tệp đang bận — đang đợi để lưu tiếp…','info');
+          await new Promise(ok=>setTimeout(ok,1500));
+        }
+        const result=await response.json();if(!response.ok)throw Error(response.status===409?'trình hỗ trợ lưu tệp vẫn đang bận — đóng hộp Lưu còn mở (nếu có) rồi bấm lại':result.error||'Không lưu được tệp.');if(result.canceled)return false;if(HAK.Downloads)HAK.Downloads.saved(result.path,result.warning);return result.path;
       } catch(e) {
         if(HAK.UI)HAK.UI.toast(e.name==='AbortError'?'Chờ chọn nơi lưu quá 3 phút. Đóng hộp Lưu thành còn mở rồi thử lại.':'Chưa lưu tệp: '+e.message+'. Mở app bằng lối tắt của bản cài mới rồi thử lại.','error');
         return false;

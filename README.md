@@ -1,5 +1,7 @@
 # HAK Quản lý xuất hàng
 
+- [Bản 2.12.3 — sửa chữ vỡ font khi tạo Word, lỗi "Chưa lưu tệp"](docs/HUONG_DAN_2.12.3.md)
+
 - [Bản 2.12.2 — sửa lỗi cài đè khi app đang chạy ngầm](docs/HUONG_DAN_2.12.2.md)
 
 - [Bản 2.12.1 — cảnh báo phiếu trùng khác khối lượng](docs/HUONG_DAN_2.12.1.md)
