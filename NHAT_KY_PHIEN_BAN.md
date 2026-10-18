@@ -280,3 +280,7 @@ Thủy chốt 28/09/2026: "1. bỏ Trao đổi KHÔNG đồng bộ lên Google S
 ## v2.12.5 — Không còn báo lỗi chặn khi lưu tệp
 - word.js saveBlob: lỗi mạng / 409 sau thử lại / tệp > ~26 MB / lỗi helper → browserDownload (FileSaver hoặc thẻ <a download>) + toast thông tin, thay cho toast lỗi. AbortError (3 phút) và Hủy hộp Lưu giữ nguyên. Gợi ý "hộp Lưu của Windows" chỉ hiện khi chờ > 1,2 giây. Đảo quyết định cũ "không tự dùng tải của trình duyệt" (người dùng: báo lỗi mỗi lần bấm là rườm rà).
 - tests/download-save.test.cjs: 10 kiểm thử (fallback, bận, quá lớn, hủy, gợi ý chậm).
+
+## v2.12.6 — Sửa gốc HAKDocs.exe
+- installer/native/HAKDocs.cs: FileBusy riêng cho /save-download, /download-files, /verify-download, /downloads (hàng đợi ≤ 10 phút) — Busy chỉ còn cho /ocr (409 như cũ); ForceForeground (ALT + SetForegroundWindow) cho hộp Lưu; yêu cầu > 36 MB được đọc bỏ rồi trả 413 (trước: ngắt kết nối → "Failed to fetch"); tự tắt sau 24 giờ thay vì 4.
+- build-setup.yml: biên dịch HAKDocs.exe bằng installer/native/build.ps1 trước khi đóng bộ cài + smoke test (/status, download-files list, 40 MB → 413).

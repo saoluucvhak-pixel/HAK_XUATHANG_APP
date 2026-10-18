@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['app/**', 'installer/setup.nsi', '.github/workflows/build-setup.yml']
+    paths: ['app/**', 'installer/setup.nsi', 'installer/native/**', '.github/workflows/build-setup.yml']
     tags: ['v*']
 permissions:
   contents: write
@@ -19,6 +19,34 @@ jobs:
       - run: npm test
       - name: Install NSIS
         run: choco install nsis -y --no-progress
+      - name: Build HAKDocs.exe from source (Windows OCR + Save helper)
+        shell: pwsh
+        run: |
+          & ./installer/native/build.ps1
+          if (-not (Test-Path app/native/HAKDocs.exe)) { throw 'HAKDocs.exe was not built' }
+          Get-Item app/native/HAKDocs.exe | Format-List Name, Length, LastWriteTime
+      - name: Smoke-test HAKDocs.exe
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath app/native/HAKDocs.exe -ArgumentList '--serve' -PassThru -WindowStyle Hidden
+          try {
+            $ok = $false
+            for ($i = 0; $i -lt 20 -and -not $ok; $i++) {
+              Start-Sleep -Milliseconds 500
+              try { $r = Invoke-WebRequest -Uri http://127.0.0.1:31879/status -UseBasicParsing; $ok = ($r.StatusCode -eq 200) } catch { }
+            }
+            if (-not $ok) { throw 'HAKDocs --serve did not answer /status' }
+            Write-Host "status: $($r.Content)"
+            $h = @{ 'X-HAK-Client' = 'documents-v1'; 'Content-Type' = 'application/json' }
+            # file operations answer normally (list saved downloads)
+            $l = Invoke-WebRequest -Uri http://127.0.0.1:31879/download-files -Method Post -Headers $h -Body '{"action":"list"}' -UseBasicParsing
+            if ($l.StatusCode -ne 200) { throw "download-files list returned $($l.StatusCode)" }
+            # an oversized request must get a real 413 answer (not a connection reset => browser 'Failed to fetch')
+            $big = New-Object byte[] (40MB)
+            $b = Invoke-WebRequest -Uri http://127.0.0.1:31879/save-download -Method Post -Headers $h -Body $big -UseBasicParsing -SkipHttpErrorCheck
+            if ($b.StatusCode -ne 413) { throw "oversized request returned $($b.StatusCode), expected 413" }
+            Write-Host 'HAKDocs smoke test passed'
+          } finally { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue }
       - name: Build setup.exe
         shell: pwsh
         run: |

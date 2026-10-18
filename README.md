@@ -1,5 +1,7 @@
 # HAK Quản lý xuất hàng
 
+- [Bản 2.12.6 — sửa nguyên nhân gốc trong HAKDocs.exe](docs/HUONG_DAN_2.12.6.md)
+
 - [Bản 2.12.5 — tự tải qua trình duyệt khi trình hỗ trợ lưu tệp lỗi](docs/HUONG_DAN_2.12.5.md)
 
 - [Bản 2.12.4 — tạo BKLS nhanh hơn, hướng dẫn khi hộp Lưu mở](docs/HUONG_DAN_2.12.4.md)

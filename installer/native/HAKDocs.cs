@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Net;
 using System.Net.Sockets;
 using System.Web.Script.Serialization;
@@ -16,7 +17,11 @@ using Windows.Graphics.Imaging;
 using Windows.Media.Ocr;
 using Windows.Globalization;
 class HAKDocs {
- const int Port=31879,MaxBytes=26*1024*1024;static readonly JavaScriptSerializer Json=new JavaScriptSerializer{MaxJsonLength=45*1024*1024};static readonly SemaphoreSlim Busy=new SemaphoreSlim(1,1);
+ const int Port=31879,MaxBytes=26*1024*1024;static readonly JavaScriptSerializer Json=new JavaScriptSerializer{MaxJsonLength=45*1024*1024};static readonly SemaphoreSlim Busy=new SemaphoreSlim(1,1);static readonly SemaphoreSlim FileBusy=new SemaphoreSlim(1,1);
+ [DllImport("user32.dll")]static extern bool SetForegroundWindow(IntPtr hWnd);
+ [DllImport("user32.dll")]static extern void keybd_event(byte bVk,byte bScan,uint dwFlags,UIntPtr dwExtraInfo);
+ /* Hộp Lưu phải nổi lên trên cửa sổ trình duyệt: Windows chặn tiến trình nền chiếm foreground → nhấn/nhả ALT 1 lần để được phép SetForegroundWindow. */
+ static void ForceForeground(IntPtr h){try{keybd_event(0x12,0,0,UIntPtr.Zero);keybd_event(0x12,0,2,UIntPtr.Zero);SetForegroundWindow(h);}catch{}}
  static string Root {get{return Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,".."));}}
  [System.Runtime.InteropServices.DllImport("shell32.dll")]static extern int SHGetKnownFolderPath(ref Guid id,uint flags,IntPtr token,out IntPtr path);
  static string Downloads(){var id=new Guid("374DE290-123F-4565-9164-39C4925E467B");IntPtr p;int hr=SHGetKnownFolderPath(ref id,0,IntPtr.Zero,out p);if(hr!=0)System.Runtime.InteropServices.Marshal.ThrowExceptionForHR(hr);try{return System.Runtime.InteropServices.Marshal.PtrToStringUni(p);}finally{System.Runtime.InteropServices.Marshal.FreeCoTaskMem(p);}}
@@ -30,7 +35,7 @@ class HAKDocs {
  static object SaveDownload(Dictionary<string,object> data){
   var name=Path.GetFileName((string)Get(data,"name","ChungTu.docx"));var ext=Path.GetExtension(name).ToLowerInvariant();if(!new[]{".docx",".xlsx",".xls",".csv",".zip",".json",".pdf",".txt",".gs"}.Contains(ext))throw new Exception("Unsupported download format.");
   var bytes=Convert.FromBase64String((string)Get(data,"base64",""));object result=null;Exception error=null;
-  var thread=new Thread(()=>{try{using(var dialog=new System.Windows.Forms.SaveFileDialog()){dialog.Title="Lưu chứng từ HAK";dialog.FileName=name;var previous=SavedDownloads().FirstOrDefault();dialog.InitialDirectory=previous!=null&&Directory.Exists(Path.GetDirectoryName(previous))?Path.GetDirectoryName(previous):Downloads();dialog.Filter="Tệp "+ext+"|*"+ext;dialog.DefaultExt=ext.TrimStart('.');dialog.AddExtension=true;dialog.OverwritePrompt=true;dialog.RestoreDirectory=true;using(var owner=new System.Windows.Forms.Form()){owner.ShowInTaskbar=false;owner.TopMost=true;owner.Opacity=0;owner.Width=1;owner.Height=1;owner.StartPosition=System.Windows.Forms.FormStartPosition.CenterScreen;owner.Show();owner.Activate();if(dialog.ShowDialog(owner)!=System.Windows.Forms.DialogResult.OK){result=new{canceled=true};return;}File.WriteAllBytes(dialog.FileName,bytes);string warning="";try{RememberDownload(dialog.FileName);}catch{warning="Đã lưu tệp nhưng chưa ghi được lịch sử tải.";}result=new{canceled=false,path=dialog.FileName,warning};}}}catch(Exception e){error=e;}});thread.SetApartmentState(ApartmentState.STA);thread.Start();thread.Join();if(error!=null)throw error;return result;
+  var thread=new Thread(()=>{try{using(var dialog=new System.Windows.Forms.SaveFileDialog()){dialog.Title="Lưu chứng từ HAK";dialog.FileName=name;var previous=SavedDownloads().FirstOrDefault();dialog.InitialDirectory=previous!=null&&Directory.Exists(Path.GetDirectoryName(previous))?Path.GetDirectoryName(previous):Downloads();dialog.Filter="Tệp "+ext+"|*"+ext;dialog.DefaultExt=ext.TrimStart('.');dialog.AddExtension=true;dialog.OverwritePrompt=true;dialog.RestoreDirectory=true;using(var owner=new System.Windows.Forms.Form()){owner.ShowInTaskbar=false;owner.TopMost=true;owner.Opacity=0;owner.Width=1;owner.Height=1;owner.StartPosition=System.Windows.Forms.FormStartPosition.CenterScreen;owner.Show();owner.Activate();owner.BringToFront();ForceForeground(owner.Handle);if(dialog.ShowDialog(owner)!=System.Windows.Forms.DialogResult.OK){result=new{canceled=true};return;}File.WriteAllBytes(dialog.FileName,bytes);string warning="";try{RememberDownload(dialog.FileName);}catch{warning="Đã lưu tệp nhưng chưa ghi được lịch sử tải.";}result=new{canceled=false,path=dialog.FileName,warning};}}}catch(Exception e){error=e;}});thread.SetApartmentState(ApartmentState.STA);thread.Start();thread.Join();if(error!=null)throw error;return result;
  }
  static object Status(){return new {app="hak-windows-ocr",version=1,backend="Windows.Media.Ocr",languages=OcrEngine.AvailableRecognizerLanguages.Select(l=>l.LanguageTag).ToArray(),maxBytes=MaxBytes};}
  static byte[] ParseFile(string path){var f=new FileInfo(path);if(!f.Exists||f.Length>MaxBytes)throw new Exception("PDF exceeds the 26 MB limit or is missing.");return File.ReadAllBytes(path);}
@@ -77,8 +82,10 @@ class HAKDocs {
    if(method=="OPTIONS"){await Reply(stream,200,new{ok=true},origin=="null");return;}
    if(method=="GET"&&path=="/status"){await Reply(stream,200,Status(),origin=="null");return;}
    if(method!="POST"||(path!="/ocr"&&path!="/downloads"&&path!="/save-download"&&path!="/download-files"&&path!="/verify-download")||!headers.ContainsKey("X-HAK-Client")||headers["X-HAK-Client"]!="documents-v1"){await Reply(stream,403,new{error="Invalid local OCR request."},origin=="null");return;}
-   int length;if(!headers.ContainsKey("Content-Length")||!Int32.TryParse(headers["Content-Length"],out length)||length<1||length>36*1024*1024){await Reply(stream,413,new{error="PDF request is too large."},origin=="null");return;}
-   if(!await Busy.WaitAsync(0)){await Reply(stream,409,new{error="OCR is processing another document. Please wait."},origin=="null");return;}
+   int length;if(!headers.ContainsKey("Content-Length")||!Int32.TryParse(headers["Content-Length"],out length)||length<1||length>36*1024*1024){int declared;if(headers.ContainsKey("Content-Length")&&Int32.TryParse(headers["Content-Length"],out declared)&&declared>0){var sink=new byte[65536];long left=Math.Min((long)declared,256L*1024*1024);try{while(left>0){int got=await stream.ReadAsync(sink,0,(int)Math.Min((long)sink.Length,left));if(got<=0)break;left-=got;}}catch{}}await Reply(stream,413,new{error="Request is too large (limit 36 MB)."},origin=="null");return;}
+   var gate=path=="/ocr"?Busy:FileBusy;
+   if(path=="/ocr"){if(!await gate.WaitAsync(0)){await Reply(stream,409,new{error="OCR is processing another document. Please wait."},origin=="null");return;}}
+   else if(!await gate.WaitAsync(TimeSpan.FromMinutes(10))){await Reply(stream,409,new{error="A Save dialog is still open. Close it and try again."},origin=="null");return;}
    object response=null;int responseCode=200;
    try {var body=new byte[length];int count=0;while(count<length){int n=await stream.ReadAsync(body,count,length-count);if(n==0)throw new Exception("Incomplete request.");count+=n;}
     var data=Json.Deserialize<Dictionary<string,object>>(Encoding.UTF8.GetString(body));
@@ -89,12 +96,12 @@ class HAKDocs {
     else {var bytes=Convert.FromBase64String((string)Get(data,"base64",""));
     var job=Read(bytes,Convert.ToInt32(Get(data,"from",1)),Convert.ToInt32(Get(data,"to",0)),(string)Get(data,"language",""),(string)Get(data,"kind","document"));
     response=await job;}
-   }catch(Exception e){responseCode=400;response=new{error=e.Message};}finally{Busy.Release();}
+   }catch(Exception e){responseCode=400;response=new{error=e.Message};}finally{gate.Release();}
    await Reply(stream,responseCode,response,origin=="null");
   }
  }
  static async Task Reply(Stream s,int code,object data,bool cors){var bytes=Encoding.UTF8.GetBytes(Json.Serialize(data));var head="HTTP/1.1 "+code+" "+(code==200?"OK":"Error")+"\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-store\r\nConnection: close\r\nContent-Length: "+bytes.Length+"\r\n"+(cors?"Access-Control-Allow-Origin: null\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type, X-HAK-Client\r\nAccess-Control-Allow-Private-Network: true\r\n":"")+"\r\n";var h=Encoding.ASCII.GetBytes(head);await s.WriteAsync(h,0,h.Length);await s.WriteAsync(bytes,0,bytes.Length);}
- static void Serve(){using(var single=new Mutex(false,"Local\\HAK.WindowsOCR.31879")){if(!single.WaitOne(0))return;try{var listener=new TcpListener(IPAddress.Loopback,Port);listener.Start();DateTime last=DateTime.UtcNow;while(DateTime.UtcNow-last<TimeSpan.FromHours(4)){if(!listener.Pending()){Thread.Sleep(200);continue;}var c=listener.AcceptTcpClient();last=DateTime.UtcNow;Task.Run(async()=>{try{await Handle(c);}catch{c.Close();}});}listener.Stop();}finally{single.ReleaseMutex();}}}
+ static void Serve(){using(var single=new Mutex(false,"Local\\HAK.WindowsOCR.31879")){if(!single.WaitOne(0))return;try{var listener=new TcpListener(IPAddress.Loopback,Port);listener.Start();DateTime last=DateTime.UtcNow;while(DateTime.UtcNow-last<TimeSpan.FromHours(24)){if(!listener.Pending()){Thread.Sleep(200);continue;}var c=listener.AcceptTcpClient();last=DateTime.UtcNow;Task.Run(async()=>{try{await Handle(c);}catch{c.Close();}});}listener.Stop();}finally{single.ReleaseMutex();}}}
  [STAThread]static int Main(string[] args){try{
   if(args.Length>0&&args[0]=="--status"){Console.WriteLine(Json.Serialize(Status()));return 0;}
   if(args.Length>=3&&args[0]=="--ocr"){var result=Read(ParseFile(args[1]),args.Length>3?Int32.Parse(args[3]):1,args.Length>4?Int32.Parse(args[4]):0,"",args.Length>5?args[5]:"document").GetAwaiter().GetResult();File.WriteAllText(args[2],Json.Serialize(result),new UTF8Encoding(false));return 0;}
