@@ -1,0 +1,42 @@
+name: Build Windows setup
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['app/**', 'installer/setup.nsi', '.github/workflows/build-setup.yml']
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  setup:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm run check
+      - run: npm test
+      - name: Install NSIS
+        run: choco install nsis -y --no-progress
+      - name: Build setup.exe
+        shell: pwsh
+        run: |
+          Copy-Item app installer/app -Recurse
+          Copy-Item installer/icon/app.ico installer/app/app.ico
+          Remove-Item installer/app/MoKhoa_1Lan*.html, installer/app/XoaSach_DuLieu*.html -ErrorAction SilentlyContinue
+          $ver = (Select-String -Path installer/setup.nsi -Pattern '!define VERSION "([^"]+)"').Matches[0].Groups[1].Value
+          & "${env:ProgramFiles(x86)}\NSIS\makensis.exe" /DVERSION=$ver installer/setup.nsi
+          if ($LASTEXITCODE -ne 0) { throw 'makensis failed' }
+          Move-Item installer/HAK_QuanLyXuatHang_Setup.exe "HAK_QuanLyXuatHang_Setup_v$ver.exe"
+          Get-FileHash "HAK_QuanLyXuatHang_Setup_v$ver.exe" -Algorithm SHA256 | Format-List
+          "SETUP=HAK_QuanLyXuatHang_Setup_v$ver.exe" | Out-File -FilePath $env:GITHUB_ENV -Append
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HAK_QuanLyXuatHang_Setup
+          path: HAK_QuanLyXuatHang_Setup_v*.exe
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: HAK_QuanLyXuatHang_Setup_v*.exe

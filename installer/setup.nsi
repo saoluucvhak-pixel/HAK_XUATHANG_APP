@@ -7,7 +7,15 @@ Unicode true
 !include "MUI2.nsh"
 
 Name "HAK - Quan ly xuat hang"
+!ifndef VERSION
+  !define VERSION "2.11.1"
+!endif
 OutFile "HAK_QuanLyXuatHang_Setup.exe"
+VIProductVersion "${VERSION}.0"
+VIAddVersionKey "ProductName" "HAK - Quan ly xuat hang"
+VIAddVersionKey "CompanyName" "HAK Group"
+VIAddVersionKey "FileVersion" "${VERSION}"
+VIAddVersionKey "FileDescription" "HAK Quan ly xuat hang Setup"
 
 ; Cai theo tung nguoi dung (khong can quyen Admin), duong dan CO DINH de
 ; du lieu da luu trong trinh duyet (localStorage gan voi duong dan file)
@@ -30,7 +38,7 @@ RequestExecutionLevel user
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
 
-!define MUI_FINISHPAGE_RUN "$INSTDIR\index.html"
+!define MUI_FINISHPAGE_RUN "$INSTDIR\native\HAKDocs.exe"
 !define MUI_FINISHPAGE_RUN_TEXT "Mo ung dung ngay bay gio"
 !define MUI_FINISHPAGE_LINK "Xem huong dan su dung (HUONG_DAN.md)"
 !define MUI_FINISHPAGE_LINK_LOCATION "$INSTDIR\HUONG_DAN.md"
@@ -54,8 +62,8 @@ Section "Ung dung Quan ly xuat hang" SecApp
 
   ; Shortcut ngoai Desktop va trong Start Menu - gan icon rieng (app.ico), khong dung icon trang mac dinh
   CreateDirectory "$SMPROGRAMS\HAK"
-  CreateShortcut "$SMPROGRAMS\HAK\Quan ly xuat hang.lnk" "$INSTDIR\index.html" "" "$INSTDIR\app.ico" 0
-  CreateShortcut "$DESKTOP\HAK - Quan ly xuat hang.lnk" "$INSTDIR\index.html" "" "$INSTDIR\app.ico" 0
+  CreateShortcut "$SMPROGRAMS\HAK\Quan ly xuat hang.lnk" "$INSTDIR\native\HAKDocs.exe" "" "$INSTDIR\app.ico" 0
+  CreateShortcut "$DESKTOP\HAK - Quan ly xuat hang.lnk" "$INSTDIR\native\HAKDocs.exe" "" "$INSTDIR\app.ico" 0
 
   ; Uninstaller + muc trong "Apps & features"
   WriteUninstaller "$INSTDIR\Uninstall.exe"
@@ -80,6 +88,8 @@ Section "Uninstall"
   RMDir /r "$INSTDIR\js"
   RMDir /r "$INSTDIR\libs"
   RMDir /r "$INSTDIR\templates"
+  RMDir /r "$INSTDIR\workers"
+  RMDir /r "$INSTDIR\native"
   Delete "$INSTDIR\index.html"
   Delete "$INSTDIR\HUONG_DAN.md"
   Delete "$INSTDIR\app.ico"
