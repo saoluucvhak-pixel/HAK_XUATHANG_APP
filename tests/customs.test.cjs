@@ -106,3 +106,11 @@ test('giấy nộp tiền mẫu mới: OCR tách ô lẫn lộn, số tham chi�
   assert.equal(r.refNo,'20202026100713485801');assert.equal(r.receiptNo,'6753554');assert.equal(r.payer,'CÔNG TY TNHH HOÀNG ANH KHÔI');
   assert.equal(r.lines.length,1);assert.equal(r.lines[0].no,'308847091251');assert.equal(r.lines[0].chapter,'754');assert.equal(r.total,815572800);
 });
+test('giấy nộp tiền: số tờ khai ghi dạng nhãn, bị tách khoảng trắng / dấu chấm, hoặc nằm ở dòng nội dung',()=>{
+  const base='Mã hiệu: 262021301A Số: 6753554\nSố tham chiếu: 20202026100713485801\n13/08/2026 : Thue xuat khau : 815.572.800 : 815.572.800 : 754 : 1851 : 48TTT\nTổng cộng: 815.572.800';
+  for(const extra of['Nộp thuế xuất khẩu theo TK 308847091251 ngày 13/08/2026','Tờ khai số: 3088 4709 1251','Số tờ khai : : 308.847.091.251','Nội dung: Nop thue XK to khai so 308847091251']){
+    const r=P.parseReceiptText(base+'\n'+extra);
+    assert.equal(r.lines.length,1,extra);assert.equal(r.lines[0].no,'308847091251',extra);assert.equal(r.lines[0].amount,815572800,extra);assert.equal(r.refNo,'20202026100713485801');
+  }
+  const same=P.parseReceiptText('13/08/2026 : Thue xuat khau 308847091251 : 815.572.800 : 815.572.800 : 754');assert.equal(same.lines[0].no,'308847091251');
+});

@@ -291,6 +291,9 @@ Thủy chốt 28/09/2026: "1. bỏ Trao đổi KHÔNG đồng bộ lên Google S
 - pages.js generateBkls: không chặn khi thiếu Số BKLS / hệ số / tên bên mua — tự điền hoặc để trống + cảnh báo.
 - tests/parse-num.test.cjs, tests/numfmt.test.cjs.
 
+## v2.14.2 — Số tờ khai trên giấy nộp tiền
+- Đọc số tờ khai ghi theo nhãn ("Tờ khai số: …", "theo TK …"), bị OCR tách khoảng trắng / dấu chấm, hoặc nằm ở dòng nội dung; trước đây chỉ đọc dãy 12 số liền.
+
 ## v2.14.1 — OCR giấy nộp tiền mẫu mới
 - Đọc thêm Số giấy nộp tiền (vd 6753554), Mã hiệu, Số tham chiếu, Người nộp thuế, Kỳ thuế / ngày quyết định, Mã chương, Mã NDKT, Mã ĐBHC. Giấy không ghi số tờ khai thì tự chọn tờ khai đang mở. Các cột này hiện trong bảng giấy nộp tiền và sheet Excel.
 

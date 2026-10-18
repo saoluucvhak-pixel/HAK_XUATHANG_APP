@@ -118,8 +118,11 @@
   /* ---------------- Giấy nộp tiền vào NSNN (mẫu C1-02/NS, cả mẫu cũ lẫn mẫu mới có "Mã hiệu / Số tham chiếu") ---------------- */
   /** Dãy 12 chữ số bị OCR tách bằng khoảng trắng ("3086 2970 1720") → nối lại. */
   function declNumbers(line) {
-    const found = [], re = /(?<![\d.,])(?:\d{12}|\d{4} \d{4} \d{4})(?![\d.,]\d)(?!\d)/g; let m;
-    while ((m = re.exec(line))) { const d = m[0].replace(/\s/g, ''); if (d.length === 12) found.push({ no: d, at: m.index, end: m.index + m[0].length }); }
+    const found = [], add = (d, at, end) => { if (d.length === 12 && !found.some((x) => x.no === d)) found.push({ no: d, at, end }); };
+    const f = fold(line), lab = /(?:to\s*khai|\btk\b|\bhq\b)[^0-9]{0,30}?((?:\d[\s.,\-]?){11,16}\d)/g; let m;
+    while ((m = lab.exec(f))) add(m[1].replace(/\D/g, ''), m.index, m.index + m[0].length);   // "Tờ khai số: 3088 4709 1251", "TK 308.847.091.251"
+    const re = /(?<![\d.,])(?:\d{12}|\d{4} \d{4} \d{4})(?![\d.,]\d)(?!\d)/g;
+    while ((m = re.exec(line))) add(m[0].replace(/\s/g, ''), m.index, m.index + m[0].length);
     return found;
   }
   const isMoney = (t) => /^\d{1,3}(\.\d{3})+$/.test(t) || /^\d{5,11}$/.test(t);
