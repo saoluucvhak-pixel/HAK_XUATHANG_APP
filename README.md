@@ -19,3 +19,6 @@ Xem [hướng dẫn](docs/HUONG_DAN_2.10.0.md) để lưu nháp, mở/sửa hồ
 ## Đóng năm và xem riêng file cũ (2.11.0)
 
 Xem [hướng dẫn đóng năm](docs/HUONG_DAN_2.11.0.md). Chỉ dọn sau khi file đã được kiểm chứng và người dùng xác nhận.
+
+## Báo cáo theo năm
+Trang Báo cáo có ô **Năm** (chọn nhanh 01/01–31/12, tính theo ngày bắt đầu hồ sơ), bảng và sheet Excel **Theo năm**; tên file xuất có kỳ báo cáo, ví dụ `BaoCaoTongHop_Nam2025_xuat20261018.xlsx`.

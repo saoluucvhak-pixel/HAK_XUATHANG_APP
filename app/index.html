@@ -219,6 +219,7 @@
       <div class="card mb-3"><div class="card-body">
         <div id="repSmartFilter"></div>
         <div class="row g-2 align-items-end">
+          <div class="col-6 col-md-3"><label for="repYear" class="form-label">Năm</label><select id="repYear" class="form-select"><option value="">Tất cả năm</option></select></div>
           <div class="col-6 col-md-3 d-none"><label for="repFrom" class="form-label">Từ ngày</label><input type="date" class="form-control" id="repFrom" aria-describedby="repFilterError"></div>
           <div class="col-6 col-md-3 d-none"><label for="repTo" class="form-label">Đến ngày</label><input type="date" class="form-control" id="repTo" aria-describedby="repFilterError"></div>
           <div class="col-12 col-md-6 d-none"><label for="repQuery" class="form-label">Tìm hồ sơ / tàu / bên giao nhận</label><input id="repQuery" type="search" class="form-control" placeholder="Nhập tên có dấu hoặc không dấu"></div>
@@ -238,6 +239,7 @@
           <div class="tbl-wrap"><table class="table"><thead><tr><th>Loại</th><th class="num">Hồ sơ</th><th class="num">Xe</th><th class="num">Qua cân (tấn)</th><th class="num">Xe trả về</th><th class="num">Thực giao (tấn)</th></tr></thead><tbody id="repByType"></tbody></table></div>
           <div class="form-text">Thực giao = qua cân − xe trả về (Xuất khẩu, Ủy thác và Xuất hàng kho gửi có xe trả về). Không cộng chung các loại vì cùng một lô hàng có thể đi qua nhiều loại biên bản.</div></div></div>
         <div class="card mb-3"><div class="card-body"><div class="sec-title">Theo tháng (tấn thực giao)</div>
+          <div class="tbl-wrap mb-3"><table class="table"><thead id="repYearHead"></thead><tbody id="repYearBody"></tbody></table></div>
           <div class="tbl-wrap"><table class="table"><thead id="repMonthHead"></thead><tbody id="repMonthBody"></tbody></table></div></div></div>
         <div class="card mb-3"><div class="card-body"><div class="sec-title">Theo tàu (Xuất khẩu / Ủy thác / Xuất hàng kho gửi)</div>
           <div class="tbl-wrap"><table class="table"><thead><tr><th>Tàu</th><th>Loại</th><th>Thời gian</th><th>Bên</th><th class="num">Xe</th><th class="num">Qua cân</th><th class="num">Xe trả về</th><th class="num">Thực giao</th></tr></thead><tbody id="repShips"></tbody></table></div></div></div>

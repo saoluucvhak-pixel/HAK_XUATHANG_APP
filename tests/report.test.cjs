@@ -61,3 +61,10 @@ test('HAK export stores real calendar dates and numeric quantities with explicit
  assert.equal(ws.getCell('B2').numFmt,'dd/mm/yyyy');assert.ok(ws.getCell('B2').value instanceof Date);assert.equal(ws.getCell('B2').value.toISOString().slice(0,10),'2026-06-04');
  assert.equal(ws.getCell('H2').value,176);assert.equal(ws.getCell('H2').numFmt,'#,##0.00');assert.equal(ws.getCell('I2').value,1234.567);assert.equal(ws.getCell('I2').numFmt,'#,##0.00');delete global.HAK.Config;
 });
+test('yearly totals follow record start date and the Excel has a "Theo năm" sheet', async () => {
+ const m=R.compute([rec('a',{ship:'T1',from:'25/12/2025',to:'28/12/2025'}),rec('b',{ship:'T2',from:'01/01/2026',to:'02/01/2026'}),rec('c',{ship:'T3',from:'05/01/2026',to:'06/01/2026'})],{});
+ assert.deepEqual(m.years.map(([y,v])=>[y,v.xuatkhau]),[['2025',10000],['2026',20000]]);
+ const only=R.compute([rec('a',{from:'25/12/2025',to:'28/12/2025'}),rec('b',{ship:'T2',from:'01/01/2026',to:'02/01/2026'})],{from:'2026-01-01',to:'2026-12-31'});
+ assert.deepEqual(only.years.map(([y])=>y),['2026']);
+ const wb=await R.toExcel(m); assert.ok(wb.worksheets.some(w=>w.name==='Theo năm'));
+});

@@ -87,15 +87,18 @@
     const used = recs.filter((r) => r.inRange && r.include);
     const byType = {};
     TYPES.forEach(([k]) => { byType[k] = { n: 0, trips: 0, kg: 0, retTrips: 0, retKg: 0, delKg: 0 }; });
-    const months = new Map();
+    const months = new Map(), years = new Map();
     used.forEach((r) => {
       const b = byType[r.type] || (byType[r.type] = { n: 0, trips: 0, kg: 0, retTrips: 0, retKg: 0, delKg: 0 });
       b.n++; b.trips += r.trips; b.kg += r.kg; b.retTrips += r.retTrips; b.retKg += r.retKg; b.delKg += r.delKg;
       if (!months.has(r.month)) months.set(r.month, {});
       const mo = months.get(r.month); mo[r.type] = (mo[r.type] || 0) + r.delKg;
+      const yk = r.month.slice(0, 4);
+      if (!years.has(yk)) years.set(yk, {});
+      const yo = years.get(yk); yo[r.type] = (yo[r.type] || 0) + r.delKg;
     });
     const ships = used.filter((r) => HAS_RET[r.type]).sort((a, b) => (a.fromTs || 0) - (b.fromTs || 0));
-    return { filterText: filter.describe(), recs: recs.sort((a, b) => b.updatedAt - a.updatedAt), used, byType, months: Array.from(months.entries()).sort((a, b) => a[0] < b[0] ? -1 : 1), ships };
+    return { filterText: filter.describe(), recs: recs.sort((a, b) => b.updatedAt - a.updatedAt), used, byType, months: Array.from(months.entries()).sort((a, b) => a[0] < b[0] ? -1 : 1), years: Array.from(years.entries()).sort((a, b) => a[0] < b[0] ? -1 : 1), ships };
   }
 
   /* ---------------------------------------------------------------
@@ -153,6 +156,10 @@
     sheet('Tổng hợp', 'BÁO CÁO TỔNG HỢP THEO LOẠI BIÊN BẢN', note,
       [{ h: 'Loại biên bản', w: 30 }, { h: 'Số hồ sơ', w: 10, n: NI }, { h: 'Số xe', w: 10, n: NI }, { h: 'Qua cân (tấn)', w: 16, n: NF }, { h: 'Xe trả về', w: 10, n: NI }, { h: 'Xe trả về (tấn)', w: 16, n: NF }, { h: 'Thực giao (tấn)', w: 16, n: NF }],
       TYPES.map(([k, ic, nm]) => { const b = model.byType[k]; return [nm, b.n, b.trips, T(b.kg), b.retTrips, T(b.retKg), T(b.delKg)]; }));
+    // 1b. Theo năm
+    sheet('Theo năm', 'BÁO CÁO THEO NĂM (TẤN THỰC GIAO)', note + ' Năm tính theo ngày bắt đầu của hồ sơ.',
+      [{ h: 'Năm', w: 12 }].concat(TYPES.map(([k, ic, nm]) => ({ h: nm, w: 20, n: NF }))),
+      (model.years || []).map(([y, v]) => [y].concat(TYPES.map(([k]) => T(v[k] || 0)))), { total: true });
     // 2. Theo tháng
     sheet('Theo tháng', 'BÁO CÁO THEO THÁNG (TẤN THỰC GIAO)', note + ' Tháng tính theo ngày bắt đầu của hồ sơ.',
       [{ h: 'Tháng', w: 12 }].concat(TYPES.map(([k, ic, nm]) => ({ h: nm, w: 20, n: NF }))),
@@ -439,12 +446,25 @@
       fields:[F.multi('type','Loại biên bản',TYPES.map(([value,,label])=>({value,label})),r=>r.type)],
       matchQ:(r,q)=>F.core.hay([r.title,r.ship,r.giao,r.nhan,r.contract]).includes(q),
       matchDate:(r,f,t)=>F.dateMatch(r.from,f,t),onApply:state=>{
-        $('#repQuery').value=state.q;$('#repFrom').value=state.tu;$('#repTo').value=state.den;$('#repType').value='';draw();},
+        $('#repQuery').value=state.q;$('#repFrom').value=state.tu;$('#repTo').value=state.den;$('#repType').value='';$('#repYear').value='';draw();},
       summary:()=>[{label:'Hồ sơ tính vào tổng',value:model?model.used.length:0}]
     });return reportSmart;
   }
   const opts = () => ({ types: reportSmart ? (reportSmart.getState().sel.type || []) : [], q: $('#repQuery').value, type: $('#repType').value, from: $('#repFrom').value, to: $('#repTo').value, manual: manualGet(), scope: HAK.Auth && HAK.Auth.scopeIds ? HAK.Auth.scopeIds('report') : null });
 
+  /** Hậu tố tên file: kỳ báo cáo (Nam2025 / 20250101-20251231 / TatCa) + ngày xuất — để không nhầm file các năm. */
+  function fileTag() {
+    const a = $('#repFrom').value.replace(/-/g, ''), b = $('#repTo').value.replace(/-/g, ''), y = $('#repYear').value;
+    const d = new Date(), p2 = (n) => String(n).padStart(2, '0'), today = d.getFullYear() + p2(d.getMonth() + 1) + p2(d.getDate());
+    const per = y && a === y + '0101' && b === y + '1231' ? 'Nam' + y : (a || b) ? (a || '') + '-' + (b || '') : 'TatCa';
+    return per + '_xuat' + today;
+  }
+  const yearOfMeta = (m) => { const ts = dmyToTs(m.from); return ts === null ? new Date(m.updatedAt || Date.now()).getFullYear() : new Date(ts).getUTCFullYear(); };
+  function drawYearSelect() {
+    const sel = $('#repYear'), cur = sel.value, ys = Array.from(new Set(metas.map((m) => yearOfMeta(m)))).sort((a, b) => b - a);
+    sel.innerHTML = '<option value="">Tất cả năm</option>' + ys.map((y) => '<option value="' + y + '">' + y + '</option>').join('');
+    sel.value = ys.indexOf(+cur) >= 0 ? cur : '';
+  }
   function rangeText() {
     const a = $('#repFrom').value, b = $('#repTo').value, v = (s) => s.split('-').reverse().join('/');
     return a || b ? 'từ ' + (a ? v(a) : '…') + ' đến ' + (b ? v(b) : '…') : 'toàn bộ thời gian';
@@ -480,6 +500,9 @@
     // --- bảng theo loại ---
     $('#repByType').innerHTML = TYPES.map(([k, ic, nm]) => { const b = model.byType[k];
       return '<tr><td>' + ic + ' ' + esc(nm) + '</td><td class="num">' + b.n + '</td><td class="num">' + b.trips.toLocaleString('vi-VN') + '</td><td class="num">' + ton(b.kg) + '</td><td class="num">' + (HAS_RET[k] ? (b.retTrips ? b.retTrips + ' xe · ' + ton(b.retKg) : '—') : '—') + '</td><td class="num fw-semibold">' + ton(b.delKg) + '</td></tr>'; }).join('');
+    // --- theo năm ---
+    $('#repYearHead').innerHTML = '<tr><th>Năm</th>' + TYPES.map(([k, ic, nm]) => '<th class="num">' + esc(nm) + '</th>').join('') + '</tr>';
+    $('#repYearBody').innerHTML = model.years.length ? model.years.map(([y, v]) => '<tr><td class="fw-semibold">' + y + '</td>' + TYPES.map(([k]) => '<td class="num">' + (v[k] ? ton(v[k]) : '—') + '</td>').join('') + '</tr>').join('') : '<tr><td colspan="8" class="muted text-center">Không có số liệu trong khoảng đã chọn.</td></tr>';
     // --- theo tháng ---
     $('#repMonthHead').innerHTML = '<tr><th>Tháng</th>' + TYPES.map(([k, ic, nm]) => '<th class="num">' + esc(nm) + '</th>').join('') + '</tr>';
     const tot = {};
@@ -523,13 +546,14 @@
   async function render() {
     if (!$('#page-report')) return;
     try { metas = await HAK.Archive.ensureStats(await HAK.Archive.list()); } catch (e) { console.error(e); metas = []; }
-    draw();
+    drawYearSelect(); draw();
   }
 
   function init() {
     if (!$('#page-report')) return;
     $('#repType').innerHTML += TYPES.map(([key, , name]) => '<option value="' + key + '">' + esc(name) + '</option>').join('');
     ['#repFrom', '#repTo', '#repType'].forEach((s) => $(s).addEventListener('change', draw));
+    $('#repYear').addEventListener('change', (e) => { const y = e.target.value; $('#repFrom').value = y ? y + '-01-01' : ''; $('#repTo').value = y ? y + '-12-31' : ''; draw(); });
     $('#repQuery').addEventListener('input', HAK.UI.debounce(draw, 150));
     if ($('#repScopeWrap') && HAK.Auth && HAK.Auth.scopeSwitch) $('#repScopeWrap').innerHTML = HAK.Auth.scopeSwitch('report');
     root.addEventListener('hak:scope', (e) => { if (e.detail && e.detail.key === 'report') draw(); });
@@ -537,7 +561,7 @@
       const cb = e.target.closest('input[data-id]'); if (!cb) return;
       const m = manualGet(); m[cb.dataset.id] = cb.checked; HAK.Store.set(OFF_KEY, m); draw();
     });
-    $('#repReset').addEventListener('click', () => { HAK.Store.remove(OFF_KEY); $('#repFrom').value = ''; $('#repTo').value = ''; $('#repQuery').value = ''; $('#repType').value = ''; if(reportSmart)reportSmart.setState(HAK.Filters.core.empty()); draw(); });
+    $('#repReset').addEventListener('click', () => { HAK.Store.remove(OFF_KEY); $('#repFrom').value = ''; $('#repTo').value = ''; $('#repYear').value = ''; $('#repQuery').value = ''; $('#repType').value = ''; if(reportSmart)reportSmart.setState(HAK.Filters.core.empty()); draw(); });
     $('#repCarrierShip').addEventListener('change', (e) => drawCarrier(e.target.value, e.target.selectedOptions[0] ? e.target.selectedOptions[0].textContent : ''));
     $('#repXlsCarrier').addEventListener('click', async () => {
       const { toast, Loading } = HAK.UI;
@@ -559,7 +583,7 @@
         if (!sheetRows.length) { toast('Không có dữ liệu đơn vị vận chuyển trong khoảng đã chọn.', 'warning'); return; }
         const wb = await toExcelCarrier(sheetRows, model.rangeText);
         const buf = await wb.xlsx.writeBuffer();
-        const d = new Date(), p2 = (n) => String(n).padStart(2, '0'), name = 'BaoCaoDVVC_TheoTau_' + d.getFullYear() + p2(d.getMonth() + 1) + p2(d.getDate()) + '.xlsx';
+        const name = 'BaoCaoDVVC_TheoTau_' + fileTag() + '.xlsx';
         if(!await HAK.Word.Files.saveBlob(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), name))return;
         toast('Đã xuất: ' + name, 'success');
       } catch (e) { Loading.hide(); console.error(e); toast(e.message || String(e), 'error'); }
@@ -573,7 +597,7 @@
         const trips = await xhTrips(lots, (i, n) => Loading.set(Math.round(i / n * 90), 'Đang đọc hồ sơ ' + i + ' / ' + n + '…'));
         Loading.set(95, 'Đang ghi file Excel (' + trips.length.toLocaleString('vi-VN') + ' phiếu)…');
         const wb = await toExcelXuatHang(lots, trips, unlinked, model.rangeText), buf = await wb.xlsx.writeBuffer();
-        const d = new Date(), p2 = (n) => String(n).padStart(2, '0'), name = 'XuatHang_' + d.getFullYear() + p2(d.getMonth() + 1) + p2(d.getDate()) + '.xlsx';
+        const name = 'XuatHang_' + fileTag() + '.xlsx';
         if(!await HAK.Word.Files.saveBlob(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), name))return;
         Loading.hide();
         toast('Đã xuất: ' + name + ' — ' + lots.length + ' hợp đồng, ' + trips.length.toLocaleString('vi-VN') + ' phiếu cân' + (unlinked.length ? ' (có ' + unlinked.length + ' hồ sơ chưa gắn hợp đồng)' : '') + '.', unlinked.length ? 'warning' : 'success');
@@ -609,7 +633,7 @@
       try {
         if (!model || !model.used.length) { toast('Chưa có số liệu để xuất.', 'warning'); return; }
         const wb = await toExcel(model), buf = await wb.xlsx.writeBuffer();
-        const d = new Date(), p2 = (n) => String(n).padStart(2, '0'), name = 'BaoCaoTongHop_' + d.getFullYear() + p2(d.getMonth() + 1) + p2(d.getDate()) + '.xlsx';
+        const name = 'BaoCaoTongHop_' + fileTag() + '.xlsx';
         if(!await HAK.Word.Files.saveBlob(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), name))return;
         toast('Đã xuất: ' + name, 'success');
       } catch (e) { console.error(e); toast(e.message || String(e), 'error'); }
