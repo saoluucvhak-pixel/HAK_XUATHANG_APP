@@ -291,6 +291,9 @@ Thủy chốt 28/09/2026: "1. bỏ Trao đổi KHÔNG đồng bộ lên Google S
 - pages.js generateBkls: không chặn khi thiếu Số BKLS / hệ số / tên bên mua — tự điền hoặc để trống + cảnh báo.
 - tests/parse-num.test.cjs, tests/numfmt.test.cjs.
 
+## v2.13.1 — Nút "Xem" ở đợt nhập liệu
+- Bấm "Xem" trên dòng đợt: tự cuộn tới khung "Đợt đang xem" (bảng xem trước), nháy nền vàng và báo số xe · số tấn của đợt.
+
 ## v2.13.0 — OCR chịu lỗi: khối lượng, đơn giá, tàu, hàng, ngày, địa chỉ
 - js/doc-extract.js (HAK.DocExtract): inspectionPeriod, vessel, product (khôi phục dấu "Dăm gỗ keo"), certificateParties + addressAfter/addressLabelled/respace/tidyName, price (ghép số bị tách, nhãn–số 2 dòng, loại phí/phạt), quantityFallback, tidy. Hàm thuần, kiểm thử Node.
 - contract-parser.js: BDMT có lỗi OCR (BDMI, 8DMT), nhãn Quantity ở dòng trước, fallback số trước BDMT, địa chỉ bên, 'c6ng ty', tiêu đề "BEN UY THAC" dính chữ, bỏ "Product :", g6→go.

@@ -182,6 +182,14 @@
   function viewBatch(i) {
     const sl = App.slot(); if (!sl || !sl.batches[i]) return;
     sl.sel = i; renderTypePicker(); renderFile(); renderVehicles();
+    const box = $('#fileResult');
+    if (box && !box.hidden) {
+      box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      box.classList.remove('ocr-filled'); void box.offsetWidth; box.classList.add('ocr-filled');
+      setTimeout(() => box.classList.remove('ocr-filled'), 1600);
+      const st = App.ds && App.ds.ok && App.ds.stats;
+      toast('Đang xem đợt "' + sl.batches[i].fileName + '"' + (st ? ': ' + fmtInt(st.trips) + ' xe · ' + G.fmtTon(st.kg) + ' tấn' : '') + ' — xem bảng chi tiết bên dưới.', 'info');
+    }
   }
   function deleteBatch(i) {
     const sl = App.slot(); if (!sl || !sl.batches[i]) return;
