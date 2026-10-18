@@ -234,13 +234,15 @@
       </div></div>
       <div class="card mb-3" id="repEmpty"><div class="card-body text-center muted py-4">Chưa có hồ sơ nào trong Lưu trữ. Hãy xuất biên bản (Word / PDF / Excel) — app tự lưu và báo cáo sẽ hiện ở đây.</div></div>
       <div class="card mb-3" id="repContracts"><div class="card-body">
-        <div class="sec-title d-flex flex-wrap align-items-center gap-2 mb-2"><span>📑 Tình hình thực hiện hợp đồng</span><select class="form-select form-select-sm w-auto ms-auto" id="repCtStatus" aria-label="Lọc trạng thái hợp đồng"><option value="">Mọi trạng thái</option><option value="running">Đang thực hiện</option><option value="done">Đã hoàn thành</option></select><button class="btn btn-sm btn-success" id="repCtXls" type="button">📊 Xuất Excel</button></div>
-        <div class="form-text mt-0 mb-2">Mỗi hợp đồng: khối lượng thực hiện / hợp đồng, chứng thư, tờ khai hải quan (trạng thái), thuế xuất khẩu phải nộp / đã nộp / còn lại và lệ phí. Dòng nhỏ bên dưới là từng đợt thực hiện. Lọc theo <b>ngày ký hợp đồng</b> cùng bộ lọc năm / ngày ở trên.</div>
+        <div class="sec-title d-flex flex-wrap align-items-center gap-2 mb-2"><span>📑 Tình hình thực hiện hợp đồng</span><span class="ms-auto d-flex gap-2"><button class="btn btn-sm btn-success" id="repCtXls" type="button">📊 Xuất Excel</button><button class="btn btn-sm btn-outline-primary" id="repCtPdf" type="button">🖨️ Tải PDF</button></span></div>
+        <div id="repCtSmart" class="mb-2"></div>
+        <div class="form-text mt-0 mb-2">Mỗi hợp đồng: khối lượng thực hiện / hợp đồng, chứng thư, tờ khai hải quan (trạng thái), thuế xuất khẩu phải nộp / đã nộp / còn lại và lệ phí. Dòng nhỏ bên dưới là từng đợt thực hiện. Dùng bộ lọc ngay bên trên (tìm kiếm, ngày ký hợp đồng, hình thức, bên mua, trạng thái, tàu…); Excel và PDF xuất đúng phần đang lọc.</div>
         <div id="repCtBody"></div>
       </div></div>
       <div class="card mb-3" id="repCustoms"><div class="card-body">
-        <div class="sec-title d-flex flex-wrap align-items-center gap-2 mb-2"><span>🛃 Tình hình khai hải quan và nộp thuế</span><button class="btn btn-sm btn-success ms-auto" id="repCsXls" type="button">📊 Xuất Excel</button></div>
-        <div class="form-text mt-0 mb-2">Lấy từ Danh mục → 🛃 Tờ khai hải quan, lọc theo <b>ngày mở tờ khai</b> (cùng bộ lọc năm / ngày ở trên). Thuế phải nộp theo lần khai bổ sung mới nhất; đã nộp = tổng giấy nộp tiền loại Thuế xuất khẩu.</div>
+        <div class="sec-title d-flex flex-wrap align-items-center gap-2 mb-2"><span>🛃 Tình hình khai hải quan và nộp thuế</span><span class="ms-auto d-flex gap-2"><button class="btn btn-sm btn-success" id="repCsXls" type="button">📊 Xuất Excel</button><button class="btn btn-sm btn-outline-primary" id="repCsPdf" type="button">🖨️ Tải PDF</button></span></div>
+        <div id="repCsSmart" class="mb-2"></div>
+        <div class="form-text mt-0 mb-2">Lấy từ Danh mục → 🛃 Tờ khai hải quan, dùng bộ lọc ngay bên trên (tìm kiếm, ngày mở tờ khai, trạng thái, hợp đồng, tàu…); Excel và PDF xuất đúng phần đang lọc. Thuế phải nộp theo lần khai bổ sung mới nhất; đã nộp = tổng giấy nộp tiền loại Thuế xuất khẩu.</div>
         <div id="repCsBody"></div>
       </div></div>
       <div id="repMain" class="d-none">

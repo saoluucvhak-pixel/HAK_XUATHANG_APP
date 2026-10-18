@@ -291,6 +291,10 @@ Thủy chốt 28/09/2026: "1. bỏ Trao đổi KHÔNG đồng bộ lên Google S
 - pages.js generateBkls: không chặn khi thiếu Số BKLS / hệ số / tên bên mua — tự điền hoặc để trống + cảnh báo.
 - tests/parse-num.test.cjs, tests/numfmt.test.cjs.
 
+## v2.14.8 — Bộ lọc smart và PDF cho tờ khai, báo cáo
+- Tab 🛃 Tờ khai hải quan dùng bộ lọc smart (tìm kiếm, ngày mở, trạng thái, hợp đồng, tàu, loại hình, còn phải nộp, có khai bổ sung).
+- Hai báo cáo mới có bộ lọc smart riêng (hợp đồng: hình thức, bên mua, trạng thái hợp đồng / tờ khai, tàu, còn phải nộp thuế, thiếu chứng thư; tờ khai: như trên) và nút 🖨️ Tải PDF (A4 ngang, đúng phần đang lọc; chọn "Lưu dưới dạng PDF" trong hộp thoại in). Excel cũng xuất đúng phần đang lọc.
+
 ## v2.14.7 — Báo cáo tình hình thực hiện hợp đồng + OCR hợp đồng PO
 - Báo cáo thêm mục 📑 **Tình hình thực hiện hợp đồng**: mỗi hợp đồng có KL thực hiện / hợp đồng (% và còn lại), giá trị, chứng thư, tờ khai (đã thông quan x/y), thuế XK phải nộp / đã nộp / còn lại, lệ phí đã nộp, trạng thái; dòng nhỏ từng đợt thực hiện (tàu, chứng thư, tờ khai, nộp tiền). Lọc theo ngày ký và trạng thái, xuất Excel 2 sheet.
 - OCR hợp đồng dạng Purchase Order: đọc số PO ("PURCHASE ORDER NUMBER"), ngày (2026-6-26), tên hàng (Vietnam Acacia Woodchips), bên bán là HOANG ANH KHOI và bên mua là XIAMEN JIULI (trước đây đọc nhầm vai, bỏ trống số, ngày, hàng).
