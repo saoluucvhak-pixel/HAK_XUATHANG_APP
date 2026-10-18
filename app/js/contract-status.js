@@ -1,5 +1,5 @@
 /**
- * contract-status.js — trang "Tình hình thực hiện hợp đồng" (v2.15.0): hợp đồng · đợt thực hiện · phiếu cân (số chuyến xe, kho xuất, khối lượng)
+ * contract-status.js — trang "Tình hình thực hiện hợp đồng" (v2.15.0): hợp đồng · chi tiết hợp đồng · phiếu cân (số chuyến xe, kho xuất, khối lượng)
  * · chứng thư · tờ khai · thuế. Bấm một dòng → chi tiết xuất hàng từng xe (đọc lại phiếu cân từ 🗄️ Lưu trữ).
  * Dùng lại HAK.Report.compute / xhLots / xhTrips (cùng cách ghép hồ sơ ↔ hợp đồng như báo cáo Xuất hàng) và HAK.Customs (tờ khai, thuế).
  */
@@ -222,8 +222,8 @@
     R.buildSheet(wb, 'Hợp đồng', 'TÌNH HÌNH THỰC HIỆN HỢP ĐỒNG — THEO PHIẾU CÂN', sub,
       [{ h: 'Hình thức', w: 12 }, { h: 'Số hợp đồng', w: 24 }, { h: 'Ngày ký', w: 12 }, { h: 'Bên mua / nhận', w: 30 }, { h: 'Kho xuất', w: 24 }, { h: 'Tàu / chuyến', w: 26 }, { h: 'Số hồ sơ', w: 9, n: NI }, { h: 'Số chuyến xe', w: 11, n: NI }, { h: 'KL qua cân (tấn)', w: 15, n: ND }, { h: 'Xe trả về', w: 9, n: NI }, { h: 'Thực giao (tấn)', w: 15, n: ND }, { h: 'KL hợp đồng (BDMT)', w: 16, n: ND }, { h: 'MT chứng thư − thực giao (tấn)', w: 18, n: ND }, { h: 'Cân từ ngày', w: 12 }, { h: 'Cân đến ngày', w: 12 }, { h: 'Chứng thư', w: 10 }, { h: 'Tờ khai đã thông quan', w: 12 }, { h: 'Thuế phải nộp (đ)', w: 16, n: NI }, { h: 'Còn phải nộp (đ)', w: 16, n: NI }, { h: 'Trạng thái', w: 16 }],
       list.map((g) => { const c = g.c, t = g.tot, cu = g.cust; return [typeLabel(g.f.type), g.f.no, vnDate(g.f.date), g.f.buyer, g.khos.join(', '), g.ships.join(', '), t.recs, t.trips, t.kg / 1000, t.retTrips, t.delKg / 1000, c ? n(c.contractQty) : null, g.gap, g.from, g.to, cu ? cu.tot.certs + '/' + cu.tot.details : '', cu ? cu.tot.cleared + '/' + cu.tot.decls : '', cu ? n(cu.tot.payable) : null, cu ? n(cu.tot.remaining) : null, g.f.statusLabel]; }), { total: true });
-    R.buildSheet(wb, 'Theo đợt', 'THEO ĐỢT THỰC HIỆN', sub,
-      [{ h: 'Số hợp đồng', w: 24 }, { h: 'Đợt thực hiện', w: 40 }, { h: 'Kho xuất', w: 24 }, { h: 'Số hồ sơ', w: 9, n: NI }, { h: 'Số chuyến xe', w: 11, n: NI }, { h: 'KL qua cân (tấn)', w: 15, n: ND }, { h: 'Xe trả về', w: 9, n: NI }, { h: 'Thực giao (tấn)', w: 15, n: ND }, { h: 'MT chứng thư (tấn)', w: 15, n: ND }, { h: 'MT − thực giao (tấn)', w: 15, n: ND }, { h: 'Cân từ ngày', w: 12 }, { h: 'Cân đến ngày', w: 12 }],
+    R.buildSheet(wb, 'Theo chi tiết', 'THEO CHI TIẾT HỢP ĐỒNG (TÀU)', sub,
+      [{ h: 'Số hợp đồng', w: 24 }, { h: 'Chi tiết hợp đồng (tàu)', w: 40 }, { h: 'Kho xuất', w: 24 }, { h: 'Số hồ sơ', w: 9, n: NI }, { h: 'Số chuyến xe', w: 11, n: NI }, { h: 'KL qua cân (tấn)', w: 15, n: ND }, { h: 'Xe trả về', w: 9, n: NI }, { h: 'Thực giao (tấn)', w: 15, n: ND }, { h: 'MT chứng thư (tấn)', w: 15, n: ND }, { h: 'MT − thực giao (tấn)', w: 15, n: ND }, { h: 'Cân từ ngày', w: 12 }, { h: 'Cân đến ngày', w: 12 }],
       list.flatMap((g) => g.lots.map((L) => [g.f.no, lotLabel(L), Array.from(new Set(L.recs.map(khoOf).filter(Boolean))).join(', '), L.recs.length, L.recs.length ? L.trips : null, L.recs.length ? L.kg / 1000 : null, L.recs.length ? L.retTrips : null, L.recs.length ? L.delKg / 1000 : null, L.c ? n(L.c.mt) : null, L.recs.length && L.c && hasNum(L.c.mt) ? L.c.mt - L.delKg / 1000 : null, L.from, L.to])), { total: true });
     await save(wb, 'TinhHinhHopDong_TheoPhieuCan.xlsx');
   }
@@ -252,7 +252,7 @@
     const T = list.map((g) => g.tot);
     rows.push({ cls: 'total', c: ['TỔNG CỘNG (' + list.length + ' hợp đồng)', '', '', '', int(sum(T.map((t) => t.recs))), int(sum(T.map((t) => t.trips))), ton(sum(T.map((t) => t.kg))), int(sum(T.map((t) => t.retTrips))), ton(sum(T.map((t) => t.delKg))), '', '', '', '', '', ''] });
     await HAK.Customs.printReport({ file: 'TinhHinhHopDong_TheoPhieuCan', title: 'TÌNH HÌNH THỰC HIỆN HỢP ĐỒNG — THEO PHIẾU CÂN', sub: 'Số chuyến xe · khối lượng qua cân · kho xuất · chứng thư · tờ khai · thuế' + stamp(),
-      tables: [{ cols: PC(['Hợp đồng / đợt', 'Bên mua', 'Kho xuất', 'Tàu', { h: 'Hồ sơ', n: true }, { h: 'Chuyến xe', n: true }, { h: 'Qua cân (tấn)', n: true }, { h: 'Xe trả về', n: true }, { h: 'Thực giao (tấn)', n: true }, { h: 'KL hợp đồng / MT', n: true }, { h: 'MT − thực giao', n: true }, 'Tờ khai', { h: 'Thuế phải nộp', n: true }, { h: 'Còn phải nộp', n: true }, 'Trạng thái']), rows }] });
+      tables: [{ cols: PC(['Hợp đồng / chi tiết', 'Bên mua', 'Kho xuất', 'Tàu', { h: 'Hồ sơ', n: true }, { h: 'Chuyến xe', n: true }, { h: 'Qua cân (tấn)', n: true }, { h: 'Xe trả về', n: true }, { h: 'Thực giao (tấn)', n: true }, { h: 'KL hợp đồng / MT', n: true }, { h: 'MT − thực giao', n: true }, 'Tờ khai', { h: 'Thuế phải nộp', n: true }, { h: 'Còn phải nộp', n: true }, 'Trạng thái']), rows }] });
   }
   async function pdfTrips() {
     const d = state.detail, rows = visibleTrips(); if (!d || !rows.length) { toast('Chưa có xe để in.', 'warning'); return; }

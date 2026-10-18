@@ -35,7 +35,7 @@
     try { const out = fn(base) || base; core().set(out); await core().persist(); core().changed(); }
     catch (e) { core().set(before); throw e; }
   }
-  /** Gắn tờ khai với đợt thực hiện: 1 đợt ↔ 1 tờ khai; số TKHQ của đợt lấy theo tờ khai. */
+  /** Gắn tờ khai với chi tiết hợp đồng: 1 đợt ↔ 1 tờ khai; số TKHQ của đợt lấy theo tờ khai. */
   function syncDetail(next, rec) {
     (next.customs || []).forEach((x) => { if (x.id !== rec.id && rec.detailId && x.detailId === rec.detailId) delete x.detailId; });
     if (!rec.contractId || !rec.detailId) return;
@@ -44,7 +44,7 @@
   }
   const upsertInto = (next, rec) => { const r = CM().upsert(next, rec); if (r.error) throw Error(r.error); syncDetail(r.data, r.rec); return r; };
 
-  /* ---------------- Gợi ý hợp đồng / đợt thực hiện từ tờ khai ---------------- */
+  /* ---------------- Gợi ý hợp đồng / chi tiết hợp đồng từ tờ khai ---------------- */
   function suggestLink(rec) {
     const key = shipKey(rec.ship);
     for (const c of contracts()) for (const d of (c.details || []).filter((x) => !x.deletedAt)) {
@@ -103,14 +103,14 @@
   /* ---------------- Tờ khai (bảng cha) ---------------- */
   const statusOpts = () => Object.keys(CM().STATUS).map((k) => [k, CM().STATUS[k]]);
   const contractOpts = () => [['', '— Chưa gắn hợp đồng —']].concat(contracts().map((c) => [c.id, contractLabel(c)]));
-  const detailOpts = (cid) => [['', '— Chưa gắn đợt thực hiện —']].concat(((contractOf(cid) || {}).details || []).filter((d) => !d.deletedAt).map((d) => [d.id, [d.ship, d.tkhq && 'TKHQ ' + d.tkhq, d.product].filter(Boolean).join(' · ') || d.id]));
+  const detailOpts = (cid) => [['', '— Chưa gắn chi tiết hợp đồng —']].concat(((contractOf(cid) || {}).details || []).filter((d) => !d.deletedAt).map((d) => [d.id, [d.ship, d.tkhq && 'TKHQ ' + d.tkhq, d.product].filter(Boolean).join(' · ') || d.id]));
   function declFields() {
     return [
       { section: 'Tờ khai' },
       { id: 'no', label: 'Số tờ khai', type: 'text', col: 4, help: 'Dãy số, thường 12 chữ số' }, { id: 'openDate', label: 'Ngày mở tờ khai (ngày đăng ký)', type: 'date', col: 4 }, { id: 'round', label: 'Lần khai', type: 'num', col: 2, help: '1 = tờ khai gốc' }, { id: 'type', label: 'Loại hình', type: 'text', col: 2 },
       { id: 'status', label: 'Trạng thái', type: 'select', options: statusOpts(), col: 4 }, { id: 'statusAt', label: 'Ngày của trạng thái', type: 'date', col: 4 }, { id: 'office', label: 'Chi cục hải quan', type: 'text', col: 4 },
-      { section: 'Hợp đồng và đợt thực hiện' },
-      { id: 'contractId', label: 'Hợp đồng', type: 'select', options: contractOpts(), col: 6 }, { id: 'detailId', label: 'Đợt thực hiện (chứng thư)', type: 'select', options: [['', '—']], col: 6 },
+      { section: 'Hợp đồng và chi tiết hợp đồng' },
+      { id: 'contractId', label: 'Hợp đồng', type: 'select', options: contractOpts(), col: 6 }, { id: 'detailId', label: 'Chi tiết hợp đồng (tàu · chứng thư)', type: 'select', options: [['', '—']], col: 6 },
       { section: 'Hàng hóa' },
       { id: 'ship', label: 'Tàu / chuyến', type: 'text', col: 6 }, { id: 'bill', label: 'Số vận đơn', type: 'text', col: 3 }, { id: 'certNo', label: 'Số chứng thư', type: 'text', col: 3 },
       { id: 'goods', label: 'Mô tả hàng hóa', type: 'text', col: 9 }, { id: 'hs', label: 'Mã HS', type: 'text', col: 3 },
@@ -368,7 +368,7 @@
     const s = CM().contractStatus(customsList(), contractId);
     return '<span class="badge ' + (s.code === 'done' ? 'text-bg-success' : 'text-bg-primary') + '" title="' + (s.total ? s.cleared + '/' + s.total + ' tờ khai đã thông quan' : 'Chưa có tờ khai hải quan') + '">' + s.label + '</span>';
   }
-  /** 4 ô cho bảng "Các đợt thực hiện": ngày mở tờ khai · lần khai · thuế XK phải nộp · trạng thái. */
+  /** 4 ô cho bảng "Bảng chi tiết hợp đồng": ngày mở tờ khai · lần khai · thuế XK phải nộp · trạng thái. */
   function detailCells(c, d) {
     const x = customsList().find((k) => !k.deletedAt && k.detailId === d.id);
     if (!x) return '<td class="muted">—</td><td class="num muted">—</td><td class="num muted">—</td><td class="muted">—</td>';
@@ -444,7 +444,7 @@
     box.innerHTML = '<div class="border rounded p-3"><div class="d-flex flex-wrap gap-2 align-items-center mb-2"><h6 class="mb-0">Tờ khai ' + esc(d.no) + '</h6>' + statusBadge(d.status) + (c ? contractBadge(c.id) : '') +
       '<div class="btn-group btn-group-sm ms-auto" role="group" aria-label="Đổi trạng thái">' + statusOpts().map((o) => '<button type="button" class="btn ' + (d.status === o[0] ? 'btn-primary' : 'btn-outline-primary') + '" data-cs-set="' + o[0] + '"' + (off ? ' disabled' : '') + '>' + o[1] + '</button>').join('') + '</div></div>' +
       (parentCandidate(d) ? '<div class="alert alert-info py-2 small d-flex flex-wrap align-items-center gap-2">Tờ khai này cùng số vận đơn với tờ khai <b>' + esc(parentCandidate(d).no) + '</b> — có thể là <b>khai bổ sung</b> của tờ khai đó.<button type="button" class="btn btn-sm btn-outline-primary ms-auto" data-cs="to-supp">Chuyển thành khai bổ sung của ' + esc(parentCandidate(d).no) + '</button></div>' : '') +
-      '<div class="small mb-2">' + flow + '</div><div class="row g-2 mb-3">' + info('Hợp đồng', c ? contractLabel(c) : '') + info('Đợt thực hiện', det ? [det.ship, det.product].filter(Boolean).join(' · ') : '') + info('Tàu / chuyến', d.ship) + info('Hàng hóa', d.goods) + info('KL (BDMT)', d.qtyBdmt != null ? money(d.qtyBdmt) : '') + info('Trị giá hóa đơn (USD)', d.invoiceUsd != null ? money(d.invoiceUsd) : '') + info('Tỷ giá', d.exchangeRate != null ? money(d.exchangeRate) : '') + info('Thuế suất', d.taxRate != null ? d.taxRate + '%' : '') + info('Số chứng thư', d.certNo) + info('Người nhập khẩu', d.importer) + info('Số vận đơn', d.bill) + info('Ghi chú', d.note) + '</div>' +
+      '<div class="small mb-2">' + flow + '</div><div class="row g-2 mb-3">' + info('Hợp đồng', c ? contractLabel(c) : '') + info('Chi tiết hợp đồng', det ? [det.ship, det.product].filter(Boolean).join(' · ') : '') + info('Tàu / chuyến', d.ship) + info('Hàng hóa', d.goods) + info('KL (BDMT)', d.qtyBdmt != null ? money(d.qtyBdmt) : '') + info('Trị giá hóa đơn (USD)', d.invoiceUsd != null ? money(d.invoiceUsd) : '') + info('Tỷ giá', d.exchangeRate != null ? money(d.exchangeRate) : '') + info('Thuế suất', d.taxRate != null ? d.taxRate + '%' : '') + info('Số chứng thư', d.certNo) + info('Người nhập khẩu', d.importer) + info('Số vận đơn', d.bill) + info('Ghi chú', d.note) + '</div>' +
       '<div class="d-flex flex-wrap gap-2 align-items-center mb-1"><h6 class="mb-0">Khai bổ sung</h6><span class="small muted">(bảng con)</span><span class="ms-auto d-flex gap-2"><label class="btn btn-sm btn-outline-secondary mb-0">⬆ Nhập khai bổ sung từ file<input type="file" id="csImportSupp" accept=".xls,.xlsx,.xlsm" hidden' + (off ? ' disabled' : '') + '></label><button class="btn btn-sm btn-primary" type="button" data-cs="supp-add"' + (off ? ' disabled' : '') + '>＋ Thêm khai bổ sung</button></span></div>' +
       '<div class="tbl-wrap mb-3"><table class="table table-sm align-middle"><thead><tr><th>Số tờ khai bổ sung</th><th>Ngày</th><th class="num">Lần</th><th>Lý do</th><th class="num">KL (BDMT)</th><th class="num">Thuế XK sau bổ sung</th><th class="num">Chênh lệch</th><th></th></tr></thead><tbody>' +
       (supp.length ? supp.map((x) => '<tr><td class="mono">' + esc(x.no || '(trên tờ khai gốc)') + '</td><td>' + esc(vnDate(x.date)) + '</td><td class="num">' + esc(x.round) + '</td><td>' + esc(x.reason) + '</td><td class="num">' + esc(money(x.qtyBdmt)) + '</td><td class="num">' + esc(money(x.taxVnd)) + '</td><td class="num">' + (x.taxVnd != null && d.taxVnd != null ? esc((x.taxVnd - d.taxVnd > 0 ? '+' : '') + money(x.taxVnd - d.taxVnd)) : '') + '</td><td class="text-end text-nowrap"><div class="btn-group btn-group-sm"><button class="btn btn-outline-primary" data-cs-child="supp" data-id="' + esc(x.id) + '" data-act="edit" type="button"' + (off ? ' disabled' : '') + '>Sửa</button><button class="btn btn-outline-danger" data-cs-child="supp" data-id="' + esc(x.id) + '" data-act="del" type="button" aria-label="Xóa"' + (off ? ' disabled' : '') + '>🗑</button></div></td></tr>').join('') : '<tr><td colspan="8" class="muted">Chưa có khai bổ sung.</td></tr>') + '</tbody></table></div>' +
@@ -479,7 +479,7 @@
   }
 
   /* ---------------- Móc vào biểu mẫu "Đợt thực hiện" của hợp đồng ---------------- */
-  /** Ô chọn tờ khai + thông tin tờ khai (ngày mở, lần khai, thuế XK phải nộp) trong form đợt thực hiện. */
+  /** Ô chọn tờ khai + thông tin tờ khai (ngày mở, lần khai, thuế XK phải nộp) trong form chi tiết hợp đồng. */
   function execPicker(c, d) {
     const cur = customsList().find((x) => !x.deletedAt && x.detailId === d.id);
     const opts = decls().filter((x) => x.contractId === c.id || !x.contractId || (cur && x.id === cur.id));
@@ -496,7 +496,7 @@
     const tk = $('#cf-tkhq'); if (tk) { tk.value = x.no; tk.dispatchEvent(new Event('input', { bubbles: true })); }
   }
   function bindExec() { const s = $('#cf-customsId'); if (s) { s.onchange = execInfo; execInfo(); } }
-  /** Sau khi lưu đợt thực hiện: gắn (hoặc gỡ) tờ khai cho đợt đó. */
+  /** Sau khi lưu chi tiết hợp đồng: gắn (hoặc gỡ) tờ khai cho đợt đó. */
   async function link(l) {
     if (!l) return;
     const had = customsList().find((x) => x.detailId === l.detail);
@@ -602,7 +602,7 @@
     if (!model.length) { toast('Chưa có hợp đồng để xuất.', 'warning'); return; }
     if (!root.ExcelJS && HAK.UI.needLib) await HAK.UI.needLib('exceljs');
     const R = HAK.Report, wb = R.newWorkbook(), NI = '#,##0', ND = '#,##0.00', num = (v) => (hasNum(v) ? +v : null);
-    const sub = 'Nguồn: Danh mục (hợp đồng, đợt thực hiện, chứng thư) và tab Tờ khai hải quan (tờ khai, giấy nộp tiền)' + (view ? ' · Bộ lọc: ' + view.describe() : '') + '. Thuế phải nộp theo lần khai bổ sung mới nhất.';
+    const sub = 'Nguồn: Danh mục (hợp đồng, chi tiết hợp đồng, chứng thư) và tab Tờ khai hải quan (tờ khai, giấy nộp tiền)' + (view ? ' · Bộ lọc: ' + view.describe() : '') + '. Thuế phải nộp theo lần khai bổ sung mới nhất.';
     R.buildSheet(wb, 'Hợp đồng', 'TÌNH HÌNH THỰC HIỆN HỢP ĐỒNG', sub,
       [{ h: 'Hình thức', w: 14 }, { h: 'Số hợp đồng', w: 24 }, { h: 'Ngày ký', w: 12 }, { h: 'Bên mua', w: 30 }, { h: 'Hàng hóa', w: 26 }, { h: 'KL hợp đồng (BDMT)', w: 16, n: ND }, { h: 'Đơn giá', w: 12, n: ND }, { h: 'Số đợt', w: 8, n: NI }, { h: 'KL thực hiện (BDMT)', w: 16, n: ND }, { h: '% thực hiện', w: 11, n: '0.0' }, { h: 'KL còn lại (BDMT)', w: 16, n: ND }, { h: 'Giá trị thực hiện (USD)', w: 18, n: ND }, { h: 'Số chứng thư', w: 11, n: NI }, { h: 'Số tờ khai', w: 10, n: NI }, { h: 'Đã thông quan', w: 12, n: NI }, { h: 'Thuế XK phải nộp (đ)', w: 18, n: NI }, { h: 'Đã nộp thuế (đ)', w: 16, n: NI }, { h: 'Lệ phí đã nộp (đ)', w: 16, n: NI }, { h: 'Còn phải nộp (đ)', w: 16, n: NI }, { h: 'Trạng thái hợp đồng', w: 18 }],
       model.map((m) => { const c = m.c, t = m.tot; return [typeLabel(c.type), c.no || '', vnDate(c.date), custName(c.buyerId), c.contractProduct || '', num(c.contractQty), num(c.priceUsd), t.details, t.bdmt, t.pct, t.left, t.usd, t.certs, t.decls, t.cleared, t.payable, t.paidTax, t.paidFee, t.remaining, m.st.label]; }));
@@ -647,7 +647,7 @@
     rows.push({ cls: 'total', c: ['TỔNG CỘNG (' + model.length + ' hợp đồng)', '', m0(sumOf(model.map((m) => m.c.contractQty))), m0(g('bdmt')), '', '', m0(g('usd')), g('certs') + '/' + g('details'), g('cleared') + '/' + g('decls'), m0(g('payable')), m0(g('paidTax')), m0(g('paidFee')), m0(g('remaining')), ''] });
     const N = true;
     return { file: 'TinhHinhThucHienHopDong', title: 'TÌNH HÌNH THỰC HIỆN HỢP ĐỒNG', sub: 'Hợp đồng · chứng thư · tờ khai hải quan · thuế xuất khẩu · lệ phí' + (view ? ' · Bộ lọc: ' + view.describe() : ''),
-      tables: [{ cols: [{ h: 'Hợp đồng / đợt thực hiện' }, { h: 'Bên mua / chứng thư' }, { h: 'KL hợp đồng', n: N }, { h: 'KL thực hiện', n: N }, { h: '%', n: N }, { h: 'Còn lại', n: N }, { h: 'Giá trị USD', n: N }, { h: 'Chứng thư', n: N }, { h: 'Tờ khai' }, { h: 'Thuế phải nộp', n: N }, { h: 'Đã nộp thuế', n: N }, { h: 'Lệ phí đã nộp', n: N }, { h: 'Còn phải nộp', n: N }, { h: 'Trạng thái' }], rows }], count: model.length };
+      tables: [{ cols: [{ h: 'Hợp đồng / chi tiết' }, { h: 'Bên mua / chứng thư' }, { h: 'KL hợp đồng', n: N }, { h: 'KL thực hiện', n: N }, { h: '%', n: N }, { h: 'Còn lại', n: N }, { h: 'Giá trị USD', n: N }, { h: 'Chứng thư', n: N }, { h: 'Tờ khai' }, { h: 'Thuế phải nộp', n: N }, { h: 'Đã nộp thuế', n: N }, { h: 'Lệ phí đã nộp', n: N }, { h: 'Còn phải nộp', n: N }, { h: 'Trạng thái' }], rows }], count: model.length };
   }
   function customsPdfSpec() {
     const rows = reportList(), view = csRepView(), g = sums(rows), N = true;

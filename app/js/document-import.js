@@ -131,7 +131,7 @@ function renderContractSuggestions(pages,rec){
   },!target.value);
   if(matched&&!matched.address&&party.address)offer('Địa chỉ của '+matched.name,party.address,'Khách hàng này chưa có địa chỉ trong Danh mục — bổ sung từ hợp đồng',()=>saveAddress(matched,party.address),true);
  }
- if(result.lots.length)review.append(el('p','KL hợp đồng được cộng từ các lô trên PDF. Chỉ thêm đợt thực hiện khi giao hàng; OCR hợp đồng không tạo dòng thực hiện.','small muted'));
+ if(result.lots.length)review.append(el('p','KL hợp đồng được cộng từ các lô trên PDF. Chỉ thêm chi tiết hợp đồng khi giao hàng; OCR hợp đồng không tạo dòng thực hiện.','small muted'));
  const done=[];selected.filter(x=>x.auto).forEach(x=>{try{x.apply();done.push(x.label);x.check.checked=false;x.check.parentNode.classList.add('text-success');}catch(e){}});
  if(done.length)review.insertBefore(el('p','Đã tự điền '+done.length+' ô trống: '+done.join(', ')+'. Các ô tô vàng là chữ OCR — đối chiếu với PDF gốc rồi mới Lưu.','small text-success mb-1 mt-1'),review.children[1]||null);
  const apply=el('button','Điền các mục đã tick','btn btn-primary mt-2');apply.type='button';apply.onclick=()=>{

@@ -53,7 +53,7 @@
       cua: cid, veViec: op.veViec, lyDo: op.lyDo, xuatKhoTai: khoAddressOf(cid),
       nhapKho: CT(type).op === 0 && port ? port.name : '',
       maHang: 'DG', tenHang: 'Dăm gỗ keo lai PEFC Controlled Sources', dvt: 'Tấn', donViVC: '',
-      idBatDau: '', canCuLenh: '', tenDonVi: ''
+      idBatDau: '', canCuLenh: '', tenDonVi: '', contractId: ''
     };
   }
 
@@ -81,6 +81,7 @@
       comboHtml('nhapKho', 'Nhập kho tại', null, 12) +
       '</div></div></div>' +
       '<div class="card mb-3"><div class="card-body"><div class="sec-title">④ Thông tin đợt</div><div class="row g-3">' +
+      '<div class="col-12"><label class="form-label" for="ct-contractId">Hợp đồng (điền vào cột HopDongSo)</label><select class="form-select" id="ct-contractId"></select><div class="form-text" id="ct-contractHelp"></div></div>' +
       textHtml('idBatDau', 'Số phiếu PXK bắt đầu', 4, { number: true, ph: 'VD: 81900 (tối đa 6 chữ số)' }) +
       textHtml('canCuLenh', 'Căn cứ lệnh (CanCuLenh)', 4, { ph: 'VD: IWC/HAKVT26-1793' }) +
       textHtml('tenDonVi', 'Tên đơn vị (cột TenDonVi)', 4, { list: 'ctDonVi', ph: 'Đơn vị nhận hàng' }) +
@@ -112,6 +113,16 @@
       setCombo(sel.dataset.combo, cur);
     });
   }
+  /** Ô "Hợp đồng": hợp đồng đúng hình thức của trang. Xuất khẩu / Ủy thác chỉ chọn được khi đã có tàu + tờ khai hải quan; trung chuyển thì để trống. */
+  function fillContracts() {
+    const sel = $('#ct-contractId'); if (!sel) return;
+    const cur = sel.value, K = HAK.Catalog, list = K && st.type ? K.contracts(st.type) : [];
+    const decls = HAK.Customs ? HAK.Customs.activeDecls() : [];
+    const gate = (c) => { try { const rd = HAK.CustomsModel.detailReady(K.parent(c.parentId), c, decls); return rd.ok ? '' : ' — chưa có ' + rd.missing.join(' + '); } catch (e) { return ''; } };
+    sel.innerHTML = '<option value="">— Không gắn hợp đồng (trung chuyển / chưa bán) —</option>' + list.map((c) => { const g = gate(c); return '<option value="' + esc(c.id) + '"' + (g && c.id !== cur ? ' disabled' : '') + '>' + esc(K.label(c) + g) + '</option>'; }).join('');
+    if (Array.prototype.some.call(sel.options, (o) => o.value === cur)) sel.value = cur;
+    $('#ct-contractHelp').textContent = st.type === 'xuatkhau' || st.type === 'uythac' ? 'Hợp đồng Xuất khẩu / Ủy thác phải có tàu và tờ khai hải quan (nhập ở Danh mục) mới chọn được. Số hợp đồng được điền vào cột HopDongSo của mọi phiếu.' : 'Số hợp đồng được điền vào cột HopDongSo của mọi phiếu. Để trống nếu là trung chuyển / chưa bán.';
+  }
   function getCombo(id) {
     const s = $('#ct-' + id); if (!s) return '';
     return s.value === CUSTOM ? ($('#ct-' + id + '__txt').value || '').trim() : s.value;
@@ -125,7 +136,7 @@
     else { s.value = ''; t.classList.add('d-none'); t.value = ''; }
   }
 
-  const COMBOS = ['veViec', 'lyDo', 'xuatKhoTai', 'nhapKho'], TEXTS = ['maHang', 'tenHang', 'dvt', 'donViVC', 'idBatDau', 'canCuLenh', 'tenDonVi'];
+  const COMBOS = ['veViec', 'lyDo', 'xuatKhoTai', 'nhapKho'], TEXTS = ['maHang', 'tenHang', 'dvt', 'donViVC', 'idBatDau', 'canCuLenh', 'tenDonVi', 'contractId'];
   function readVals() {
     const v = { cua: $('#ct-cua').value };
     COMBOS.forEach((k) => { v[k] = getCombo(k); });
@@ -171,6 +182,7 @@
     if (!HAK.App || !built) return;
     renderLog();
     fillOptions();
+    fillContracts();
     renderTypes();
     $('#ctNoType').classList.toggle('d-none', !!st.type);
     const noData = !!st.type && !batches().length;
@@ -240,6 +252,7 @@
     const co = cfg().companies.find((c) => c.id === v.cua);
     const cua = co ? C().companyAttr(co, 'cua') : '';
     const start = parseInt(v.idBatDau, 10);
+    const ct = v.contractId && HAK.Catalog ? HAK.Catalog.contract(v.contractId, { history: true }) : null, hopDong = ct ? ct.no || '' : '';
     const idx = (n) => PXK_HEADER.indexOf(n);
     const aoa = [PXK_HEADER.slice()];
     rows.forEach((r, i) => {
@@ -251,7 +264,7 @@
       set('TenDonVi', v.tenDonVi); set('NhapKhoTai', v.nhapKho);
       set('NgayXuatKho', r.dateStr || ''); set('CanCuLenh', v.canCuLenh); set('Ngay', r.dateStr || '');
       set('Cua', cua); set('VeViec', v.veViec); set('LyDoXuatKho', v.lyDo);
-      set('NguoiVanChuyen', r.driver || ''); set('DonViVanChuyen', r.carrier || v.donViVC);
+      set('HopDongSo', hopDong); set('NguoiVanChuyen', r.driver || ''); set('DonViVanChuyen', r.carrier || v.donViVC);
       set('PhuongTienVanChuyen', r.plate); set('XuatKhoTai', v.xuatKhoTai);
       aoa.push(row);
     });
@@ -306,7 +319,7 @@
         '<td class="num">' + G.fmtInt(r.trips) + '</td><td class="num">' + G.fmtTon(r.kg) + '</td><td class="small">' + (r.by ? esc(r.by) : '<span class="muted">(trước v2.6)</span>') + '</td><td><button class="btn btn-sm btn-outline-danger" type="button" data-del-log="' + esc(r.id) + '" title="Xóa dòng nhật ký">✕</button></td></tr>';
     }).join('') : '<tr><td colspan="10" class="muted">Không có chứng từ khớp bộ lọc.</td></tr>';
   }
-  const logBase = (kind, b, v, s) => ({ kind, type: st.type, cid: v.cua, cua: coName(v.cua), batch: b.fileName, from: s.from, to: s.to, trips: s.trips, kg: s.kg, canCuLenh: v.canCuLenh });
+  const logBase = (kind, b, v, s) => ({ kind, type: st.type, cid: v.cua, cua: coName(v.cua), batch: b.fileName, from: s.from, to: s.to, trips: s.trips, kg: s.kg, canCuLenh: v.canCuLenh, contract: v.contractId || '', contractNo: (v.contractId && HAK.Catalog && (HAK.Catalog.contract(v.contractId, { history: true }) || {}).no) || '' });
 
   async function onPxk() {
     const b = curBatch(); if (!b) { toast('Chưa có đợt để lập chứng từ.', 'error'); return; }
@@ -362,6 +375,7 @@
         }
       }
       if (el.id === 'ct-cua') { setCombo('xuatKhoTai', khoAddressOf(el.value)); updateCuaInfo(); }
+      if (el.id === 'ct-contractId' && el.value && !$('#ct-canCuLenh').value.trim()) { const k = HAK.Catalog.contract(el.value, { history: true }); if (k && k.no) $('#ct-canCuLenh').value = k.no; }   // Căn cứ lệnh để trống → gợi ý theo số hợp đồng
       el.classList.remove('is-invalid');
       resetDup(); persistSoon(); updateSummary();
     });

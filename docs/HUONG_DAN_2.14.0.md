@@ -51,3 +51,7 @@ Kiểm tra: 153 kiểm thử tự động (11 kiểm thử mới cho đọc tờ
 - **Gỡ:** mở chi tiết hợp đồng → bảng "Các đợt giao hàng của hợp đồng" → **Gỡ khỏi hợp đồng**.
 - Trung chuyển / điều chuyển (chưa bán) **không gắn hợp đồng**, không tính vào thực giao.
 - Ở trang **Tạo biên bản**, ô "Chọn dòng chi tiết hợp đồng" cũng khóa hợp đồng Xuất khẩu / Ủy thác chưa đủ tàu + tờ khai.
+
+**Phiếu xuất kho có số hợp đồng (2.15.0):** trang **Chứng từ xuất hàng** có ô **Hợp đồng** ở mục ④ "Thông tin đợt". Chọn hợp đồng thì cột **HopDongSo** của file phiếu xuất kho điền số hợp đồng (mọi dòng); "Căn cứ lệnh" nếu đang trống tự gợi ý theo số hợp đồng. Hợp đồng Xuất khẩu / Ủy thác thiếu tàu hoặc tờ khai hải quan hiện mờ, chưa chọn được. Để trống nếu là trung chuyển / chưa bán.
+
+**Đổi tên (2.15.0):** "Đợt thực hiện" ở Danh mục nay là **"Chi tiết hợp đồng (tàu · chứng thư · tờ khai)"**: mỗi hợp đồng một chi tiết (một tàu, một chứng thư, một tờ khai chính). "Đợt giao hàng" chỉ chỉ mỗi lần tải phiếu cân / lập phiếu xuất kho (có thể kéo dài nhiều ngày).
