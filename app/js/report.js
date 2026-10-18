@@ -471,7 +471,7 @@
   }
 
   function draw() {
-    if (HAK.Customs && HAK.Customs.drawReport) { try { HAK.Customs.drawReport(); } catch (e) { console.error(e); } }
+    if (HAK.Customs && HAK.Customs.drawReport) { try { HAK.Customs.drawReport(); if (HAK.Customs.drawContractReport) HAK.Customs.drawContractReport(); } catch (e) { console.error(e); } }
     // v2.6.2: mặc định chỉ hồ sơ của công ty làm việc (công tắc "Xem tất cả công ty") — áp cho mọi bảng / Excel / Google Sheet của trang
     ensureReportSmart();
     const scope = HAK.Auth && HAK.Auth.scopeIds ? HAK.Auth.scopeIds('report') : null;

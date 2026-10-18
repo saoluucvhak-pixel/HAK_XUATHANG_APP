@@ -291,6 +291,10 @@ Thủy chốt 28/09/2026: "1. bỏ Trao đổi KHÔNG đồng bộ lên Google S
 - pages.js generateBkls: không chặn khi thiếu Số BKLS / hệ số / tên bên mua — tự điền hoặc để trống + cảnh báo.
 - tests/parse-num.test.cjs, tests/numfmt.test.cjs.
 
+## v2.14.7 — Báo cáo tình hình thực hiện hợp đồng + OCR hợp đồng PO
+- Báo cáo thêm mục 📑 **Tình hình thực hiện hợp đồng**: mỗi hợp đồng có KL thực hiện / hợp đồng (% và còn lại), giá trị, chứng thư, tờ khai (đã thông quan x/y), thuế XK phải nộp / đã nộp / còn lại, lệ phí đã nộp, trạng thái; dòng nhỏ từng đợt thực hiện (tàu, chứng thư, tờ khai, nộp tiền). Lọc theo ngày ký và trạng thái, xuất Excel 2 sheet.
+- OCR hợp đồng dạng Purchase Order: đọc số PO ("PURCHASE ORDER NUMBER"), ngày (2026-6-26), tên hàng (Vietnam Acacia Woodchips), bên bán là HOANG ANH KHOI và bên mua là XIAMEN JIULI (trước đây đọc nhầm vai, bỏ trống số, ngày, hàng).
+
 ## v2.14.6 — OCR ảnh nhỏ / mờ
 - HAKDocs.exe phóng ảnh nhỏ (vd 579×776 gửi qua Zalo) lên cạnh dài ~2600 px trước khi đọc, và đọc thêm một lượt ở độ phóng khác để bổ sung dòng bị bỏ sót. Giấy nộp tiền: bỏ dòng trùng giữa hai lượt đọc; hiện cảnh báo đỏ khi OCR gần như không đọc được chữ nào (kèm cách chụp lại).
 - Cần cài lại bộ setup để HAKDocs.exe mới có hiệu lực.

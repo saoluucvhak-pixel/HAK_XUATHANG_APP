@@ -521,11 +521,68 @@
     if (!await HAK.Word.Files.saveBlob(new Blob([await wb.xlsx.writeBuffer()], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), name)) return;
     toast('Đã xuất: ' + name, 'success');
   }
+
+  /* ---------------- Báo cáo "Tình hình thực hiện hợp đồng" (hợp đồng · chứng thư · tờ khai · nộp thuế · lệ phí) ---------------- */
+  const sumOf = (arr) => arr.reduce((a, x) => a + (Number(x) || 0), 0);
+  const hasNum = (v) => v !== null && v !== undefined && v !== '' && isFinite(+v);
+  /** Mỗi hợp đồng: các dòng thực hiện (đợt → chứng thư + tờ khai) và cộng dồn. Tờ khai gắn hợp đồng nhưng chưa gắn đợt là dòng riêng. */
+  function contractReportModel(from, to, status) {
+    const M = HAK.ContractModel, scope = HAK.Auth && HAK.Auth.scopeIds ? HAK.Auth.scopeIds('report') : null, all = customsList().filter((d) => !d.deletedAt);
+    const list = contracts().filter((c) => (!from || !c.date || c.date >= from) && (!to || !c.date || c.date <= to) && (!scope || !HAK.Catalog.relatedTo || HAK.Catalog.relatedTo(c, scope)))
+      .filter((c) => !status || CM().contractStatus(all, c.id).code === status)
+      .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')) || String(a.no || '').localeCompare(String(b.no || '')));
+    return list.map((c) => {
+      const details = M.active(c), mine = all.filter((d) => d.contractId === c.id), rows = [];
+      const declRow = (x) => { const t = x ? CM().totals(x) : null; return { decl: x || null, payable: t ? t.payable : null, paidTax: t ? t.paidTax : 0, paidFee: t ? t.paidFee : 0, remaining: t ? t.remaining : null }; };
+      details.forEach((d) => {
+        const ds = mine.filter((x) => x.detailId === d.id), v = M.valuation(c, d);
+        (ds.length ? ds : [null]).forEach((x, i) => rows.push(Object.assign({ detail: d, first: i === 0, mt: i === 0 ? d.mt : null, bdmt: i === 0 ? d.bdmt : null, usd: i === 0 ? v.valueUsd : null, vnd: i === 0 ? v.valueVnd : null }, declRow(x))));
+      });
+      mine.filter((x) => !x.detailId || !details.some((d) => d.id === x.detailId)).forEach((x) => rows.push(Object.assign({ detail: null, first: false, mt: null, bdmt: null, usd: null, vnd: null }, declRow(x))));
+      const st = CM().contractStatus(all, c.id), bd = sumOf(details.map((d) => d.bdmt));
+      return { c, rows, st, tot: {
+        details: details.length, certs: details.filter((d) => d.certNo).length, bdmt: bd, mt: sumOf(details.map((d) => d.mt)), usd: sumOf(details.map((d) => M.valuation(c, d).valueUsd)), vnd: sumOf(details.map((d) => M.valuation(c, d).valueVnd)),
+        decls: mine.length, cleared: st.cleared, payable: sumOf(mine.map((x) => CM().totals(x).payable)), paidTax: sumOf(mine.map((x) => CM().totals(x).paidTax)), paidFee: sumOf(mine.map((x) => CM().totals(x).paidFee)), remaining: sumOf(mine.map((x) => CM().totals(x).remaining)),
+        left: hasNum(c.contractQty) ? Number(c.contractQty) - bd : null, pct: hasNum(c.contractQty) && c.contractQty > 0 ? bd / c.contractQty * 100 : null
+      } };
+    });
+  }
+  const typeLabel = (t) => ((HAK.Catalog.TYPES || {})[t] || {}).label || t || '';
+  function drawContractReport() {
+    const host = $('#repCtBody'); if (!host || !HAK.Catalog || !HAK.Catalog.core) return;
+    const from = ($('#repFrom') || {}).value || '', to = ($('#repTo') || {}).value || '', status = ($('#repCtStatus') || {}).value || '';
+    const model = contractReportModel(from, to, status), g = (k) => sumOf(model.map((m) => m.tot[k]));
+    const run = model.filter((m) => m.st.code === 'running').length, done = model.length - run;
+    host.innerHTML = '<div class="row g-2 mb-2">' + card('Hợp đồng', model.length, run + ' đang thực hiện · ' + done + ' đã hoàn thành') + card('KL thực hiện / hợp đồng (BDMT)', money(g('bdmt')) + ' / ' + money(sumOf(model.map((m) => m.c.contractQty))), 'Giá trị: ' + money(g('usd')) + ' USD') +
+      card('Tờ khai', g('decls'), g('cleared') + ' đã thông quan') + card('Thuế XK phải nộp', money(g('payable')) + ' đ', 'Đã nộp ' + money(g('paidTax')) + ' đ · lệ phí ' + money(g('paidFee')) + ' đ') + '</div>' +
+      '<div class="tbl-wrap"><table class="table table-sm align-middle"><thead><tr><th>Hợp đồng</th><th>Bên mua</th><th class="num">KL hợp đồng</th><th class="num">KL thực hiện</th><th class="num">%</th><th class="num">Còn lại</th><th class="num">Giá trị USD</th><th class="num">Chứng thư</th><th class="num">Tờ khai</th><th class="num">Thuế phải nộp</th><th class="num">Đã nộp thuế</th><th class="num">Lệ phí đã nộp</th><th class="num">Còn phải nộp</th><th>Trạng thái</th></tr></thead><tbody>' +
+      (model.length ? model.map((m) => { const c = m.c, t = m.tot; return '<tr class="table-light fw-semibold"><td>' + esc(c.no || c.id) + '<div class="small muted fw-normal">' + esc(typeLabel(c.type)) + (c.date ? ' · ' + esc(vnDate(c.date)) : '') + '</div></td><td>' + esc(custName(c.buyerId)) + '</td><td class="num">' + esc(money(c.contractQty)) + '</td><td class="num">' + esc(money(t.bdmt)) + '</td><td class="num">' + (t.pct === null ? '' : esc(NF().txt(Math.round(t.pct * 10) / 10, 'dec')) + '%') + '</td><td class="num">' + esc(money(t.left)) + '</td><td class="num">' + esc(money(t.usd)) + '</td><td class="num">' + t.certs + '/' + t.details + '</td><td class="num">' + t.cleared + '/' + t.decls + '</td><td class="num">' + esc(money(t.payable)) + '</td><td class="num">' + esc(money(t.paidTax)) + '</td><td class="num">' + esc(money(t.paidFee)) + '</td><td class="num ' + (t.remaining > 0 ? 'text-danger' : '') + '">' + esc(money(t.remaining)) + '</td><td>' + contractBadge(c.id) + '</td></tr>' +
+        m.rows.map((r) => '<tr class="small"><td class="ps-4">' + esc(r.detail ? [r.detail.ship, r.detail.product].filter(Boolean).join(' · ') || 'Đợt thực hiện' : '(tờ khai chưa gắn đợt)') + '</td><td>' + (r.detail && r.detail.certNo ? 'CT ' + esc(r.detail.certNo) + (r.detail.certDate ? ' · ' + esc(vnDate(r.detail.certDate)) : '') : '<span class="muted">chưa có chứng thư</span>') + '</td><td></td><td class="num">' + esc(money(r.bdmt)) + '</td><td></td><td></td><td class="num">' + esc(money(r.usd)) + '</td><td></td><td>' + (r.decl ? '<span class="mono">' + esc(r.decl.no) + '</span> ' + statusBadge(r.decl.status) : '<span class="muted">chưa có tờ khai</span>') + '</td><td class="num">' + esc(money(r.payable)) + '</td><td class="num">' + esc(money(r.paidTax)) + '</td><td class="num">' + esc(money(r.paidFee)) + '</td><td class="num ' + (r.remaining > 0 ? 'text-danger' : '') + '">' + esc(money(r.remaining)) + '</td><td></td></tr>').join(''); }).join('') : '<tr><td colspan="14" class="muted text-center">Chưa có hợp đồng trong khoảng đã chọn.</td></tr>') + '</tbody></table></div>';
+    const b = $('#repCtXls'); if (b) b.disabled = !model.length;
+  }
+  async function exportContractReport() {
+    const from = ($('#repFrom') || {}).value || '', to = ($('#repTo') || {}).value || '', status = ($('#repCtStatus') || {}).value || '', model = contractReportModel(from, to, status);
+    if (!model.length) { toast('Chưa có hợp đồng để xuất.', 'warning'); return; }
+    if (!root.ExcelJS && HAK.UI.needLib) await HAK.UI.needLib('exceljs');
+    const R = HAK.Report, wb = R.newWorkbook(), NI = '#,##0', ND = '#,##0.00', num = (v) => (hasNum(v) ? +v : null);
+    const sub = 'Nguồn: Danh mục (hợp đồng, đợt thực hiện, chứng thư) và tab Tờ khai hải quan (tờ khai, giấy nộp tiền)' + (from || to ? ' · ngày ký hợp đồng ' + (vnDate(from) || '…') + ' → ' + (vnDate(to) || '…') : '') + '. Thuế phải nộp theo lần khai bổ sung mới nhất.';
+    R.buildSheet(wb, 'Hợp đồng', 'TÌNH HÌNH THỰC HIỆN HỢP ĐỒNG', sub,
+      [{ h: 'Hình thức', w: 14 }, { h: 'Số hợp đồng', w: 24 }, { h: 'Ngày ký', w: 12 }, { h: 'Bên mua', w: 30 }, { h: 'Hàng hóa', w: 26 }, { h: 'KL hợp đồng (BDMT)', w: 16, n: ND }, { h: 'Đơn giá', w: 12, n: ND }, { h: 'Số đợt', w: 8, n: NI }, { h: 'KL thực hiện (BDMT)', w: 16, n: ND }, { h: '% thực hiện', w: 11, n: '0.0' }, { h: 'KL còn lại (BDMT)', w: 16, n: ND }, { h: 'Giá trị thực hiện (USD)', w: 18, n: ND }, { h: 'Số chứng thư', w: 11, n: NI }, { h: 'Số tờ khai', w: 10, n: NI }, { h: 'Đã thông quan', w: 12, n: NI }, { h: 'Thuế XK phải nộp (đ)', w: 18, n: NI }, { h: 'Đã nộp thuế (đ)', w: 16, n: NI }, { h: 'Lệ phí đã nộp (đ)', w: 16, n: NI }, { h: 'Còn phải nộp (đ)', w: 16, n: NI }, { h: 'Trạng thái hợp đồng', w: 18 }],
+      model.map((m) => { const c = m.c, t = m.tot; return [typeLabel(c.type), c.no || '', vnDate(c.date), custName(c.buyerId), c.contractProduct || '', num(c.contractQty), num(c.priceUsd), t.details, t.bdmt, t.pct, t.left, t.usd, t.certs, t.decls, t.cleared, t.payable, t.paidTax, t.paidFee, t.remaining, m.st.label]; }));
+    R.buildSheet(wb, 'Chi tiết thực hiện', 'CHI TIẾT THỰC HIỆN: CHỨNG THƯ · TỜ KHAI · NỘP THUẾ · LỆ PHÍ', sub,
+      [{ h: 'Số hợp đồng', w: 24 }, { h: 'Tàu / chuyến', w: 24 }, { h: 'Hàng hóa', w: 24 }, { h: 'Số chứng thư', w: 20 }, { h: 'Ngày chứng thư', w: 13 }, { h: 'KL tươi (MT)', w: 13, n: ND }, { h: 'KL khô (BDMT)', w: 14, n: ND }, { h: 'Giá trị (USD)', w: 16, n: ND }, { h: 'Giá trị (VNĐ)', w: 18, n: NI }, { h: 'Số tờ khai', w: 16 }, { h: 'Ngày mở tờ khai', w: 13 }, { h: 'Lần khai', w: 8, n: NI }, { h: 'Trạng thái tờ khai', w: 16 }, { h: 'Thuế XK phải nộp (đ)', w: 18, n: NI }, { h: 'Đã nộp thuế (đ)', w: 16, n: NI }, { h: 'Lệ phí đã nộp (đ)', w: 16, n: NI }, { h: 'Còn phải nộp (đ)', w: 16, n: NI }],
+      model.flatMap((m) => m.rows.map((r) => { const d = r.detail, x = r.decl; return [m.c.no || '', d ? d.ship || '' : '', d ? d.product || m.c.contractProduct || '' : '', d ? d.certNo || '' : '', d ? vnDate(d.certDate) : '', num(r.mt), num(r.bdmt), num(r.usd), num(r.vnd), x ? x.no : '', x ? vnDate(x.openDate) : '', x ? x.round || 1 : null, x ? CM().STATUS[x.status] : '', num(r.payable), x ? r.paidTax : null, x ? r.paidFee : null, num(r.remaining)]; })), { total: true });
+    const name = 'TinhHinhThucHienHopDong_' + (from || to ? (from || to).slice(0, 4) : 'TatCa') + '.xlsx';
+    if (!await HAK.Word.Files.saveBlob(new Blob([await wb.xlsx.writeBuffer()], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), name)) return;
+    toast('Đã xuất: ' + name, 'success');
+  }
   function initReport() {
     const b = $('#repCsXls'); if (b && !b.dataset.bound) { b.dataset.bound = '1'; b.addEventListener('click', () => exportReport().catch((e) => toast(e.message || String(e), 'error'))); }
-    root.addEventListener('hak:catalog', () => drawReport());
+    const c2 = $('#repCtXls'); if (c2 && !c2.dataset.bound) { c2.dataset.bound = '1'; c2.addEventListener('click', () => exportContractReport().catch((e) => toast(e.message || String(e), 'error'))); }
+    const s2 = $('#repCtStatus'); if (s2 && !s2.dataset.bound) { s2.dataset.bound = '1'; s2.addEventListener('change', drawContractReport); }
+    root.addEventListener('hak:catalog', () => { drawReport(); drawContractReport(); });
   }
 
   function render() { draw(); }
-  HAK.Customs = { render, draw, contractBadge, detailCells, execPicker, bindExec, link, drawReport, initReport, exportReport, suggestLink, importFiles };
+  HAK.Customs = { render, draw, contractBadge, detailCells, execPicker, bindExec, link, drawReport, drawContractReport, exportContractReport, contractReportModel, initReport, exportReport, suggestLink, importFiles };
 })(window);

@@ -233,6 +233,11 @@
         <div class="form-text">Số liệu lấy từ các hồ sơ trong 🗄️ Lưu trữ; lọc theo <b>ngày bắt đầu</b> của hồ sơ. Bỏ trống ngày = tất cả.</div>
       </div></div>
       <div class="card mb-3" id="repEmpty"><div class="card-body text-center muted py-4">Chưa có hồ sơ nào trong Lưu trữ. Hãy xuất biên bản (Word / PDF / Excel) — app tự lưu và báo cáo sẽ hiện ở đây.</div></div>
+      <div class="card mb-3" id="repContracts"><div class="card-body">
+        <div class="sec-title d-flex flex-wrap align-items-center gap-2 mb-2"><span>📑 Tình hình thực hiện hợp đồng</span><select class="form-select form-select-sm w-auto ms-auto" id="repCtStatus" aria-label="Lọc trạng thái hợp đồng"><option value="">Mọi trạng thái</option><option value="running">Đang thực hiện</option><option value="done">Đã hoàn thành</option></select><button class="btn btn-sm btn-success" id="repCtXls" type="button">📊 Xuất Excel</button></div>
+        <div class="form-text mt-0 mb-2">Mỗi hợp đồng: khối lượng thực hiện / hợp đồng, chứng thư, tờ khai hải quan (trạng thái), thuế xuất khẩu phải nộp / đã nộp / còn lại và lệ phí. Dòng nhỏ bên dưới là từng đợt thực hiện. Lọc theo <b>ngày ký hợp đồng</b> cùng bộ lọc năm / ngày ở trên.</div>
+        <div id="repCtBody"></div>
+      </div></div>
       <div class="card mb-3" id="repCustoms"><div class="card-body">
         <div class="sec-title d-flex flex-wrap align-items-center gap-2 mb-2"><span>🛃 Tình hình khai hải quan và nộp thuế</span><button class="btn btn-sm btn-success ms-auto" id="repCsXls" type="button">📊 Xuất Excel</button></div>
         <div class="form-text mt-0 mb-2">Lấy từ Danh mục → 🛃 Tờ khai hải quan, lọc theo <b>ngày mở tờ khai</b> (cùng bộ lọc năm / ngày ở trên). Thuế phải nộp theo lần khai bổ sung mới nhất; đã nộp = tổng giấy nộp tiền loại Thuế xuất khẩu.</div>
