@@ -11,3 +11,14 @@ test('OCR fills an EMPTY contract number field right away, keeps the proposal ed
 test('OCR preserves an existing contract number until the user explicitly chooses to replace it',async()=>{const {container,target}=await proposal('EXISTING/2026');assert.equal(target.value,'EXISTING/2026');const apply=container.all().find(n=>n.tag==='button'&&n.textContent==='Thay số hợp đồng hiện có');assert.ok(apply);apply.onclick();assert.equal(target.value,'UTXK/DN-AB/0126');});
 
 test('selected OCR price and money proposals fill real form controls only after review',async()=>{const price=new Element('input'),currency=new Element('select');price.value='150';currency.value='VND';price.dispatchEvent=currency.dispatchEvent=()=>{};const {container}=await proposal('','Giå däm gd lå 176,00 USD/BDMT- FOB\nPhi uy thac la 1.40 USD/BDMT',{'cf-priceUsd':price,'cf-currency':currency});assert.equal(price.value,'150');assert.equal(currency.value,'VND');for(const row of container.all().filter(n=>n.tag==='label'&&(/Đơn giá: 176|Tiền tệ: USD/.test(n.textContent))))row.children.find(n=>n.tag==='input').checked=true;const button=container.all().find(n=>n.tag==='button'&&/Điền các mục/.test(n.textContent));assert.ok(button);button.onclick();assert.equal(price.value,176);assert.equal(currency.value,'USD');});
+
+test('purchase order (PO): số PO, ngày ISO, tên hàng, người bán là HOANG ANH KHOI (không phải END USER / không nhầm vai)',()=>{
+  global.window=global;global.HAK=global.HAK||{};
+  const CP=require('../app/js/contract-parser.js'),D=require('../app/js/document-import.js');
+  const text=['                                PURCHASE         ORDER','DATE   BM: 2026-6-26','','PURCHASE ORDER NUMBER *!i[iji,J Jti%:0626LH-HAK2607004','BASE AGREEMENT NUMBER t}}i$l%: LSV-2629-2','','BUYER~1.f:','XIAMEN JIULI PAPER IMP. & EXP. CO., LTD .','Unit 2102-2103,Ganghang Building No.29 Donggang North Road','','END USER li~-ff!Jfl 1J:','Liansheng Pulp & Paper (Zhangzhou) Co., Ltd','No.288 Xiating, Tingli village','','SELLER ~1i:                                          ,\'     ~/','HOANG ANH KHOI COMPANY LIMITED                          "\'1','LAND LOT N0.1182, MAP N0.38, THACH NHAM TAY VILLAGE','PRODUCTS ~rf/i:','VIETNAM ACACIA WOODCHIPS ~1¥Jffl,W.*J-r','QUANTITY ~:ti1: 20,000.00BDMT+/-10%','UNIT PRICE .t)iift:USD 173.00/BDMT FOB DA NANG Port, Vietnam'].join('\n');
+  const r=CP.extract([{page:1,text}]);
+  assert.equal(r.parties.exporter.name,'HOANG ANH KHOI COMPANY LIMITED');assert.equal(r.parties.buyer.name,'XIAMEN JIULI PAPER IMP. & EXP. CO., LTD');
+  assert.equal(r.product,'Vietnam Acacia Woodchips');assert.equal(r.lots[0].qty,20000);
+  assert.equal(D.contractNumber(text).value,'0626LH-HAK2607004');
+  const date=D.parse(text,'contract').find(s=>s.key==='date');assert.equal(date&&date.value,'2026-06-26');
+});
