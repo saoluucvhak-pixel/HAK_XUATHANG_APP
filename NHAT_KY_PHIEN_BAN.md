@@ -291,6 +291,9 @@ Thủy chốt 28/09/2026: "1. bỏ Trao đổi KHÔNG đồng bộ lên Google S
 - pages.js generateBkls: không chặn khi thiếu Số BKLS / hệ số / tên bên mua — tự điền hoặc để trống + cảnh báo.
 - tests/parse-num.test.cjs, tests/numfmt.test.cjs.
 
+## v2.13.2 — Gỡ tab trùng trong Danh mục
+- Tab "Chi tiết thực hiện" hiển thị y hệt tab "Hợp đồng" nên đã gỡ; tab còn lại đổi tên "Hợp đồng & thực hiện" (bảng hợp đồng + các đợt thực hiện bên dưới).
+
 ## v2.13.1 — Nút "Xem" ở đợt nhập liệu
 - Bấm "Xem" trên dòng đợt: tự cuộn tới khung "Đợt đang xem" (bảng xem trước), nháy nền vàng và báo số xe · số tấn của đợt.
 

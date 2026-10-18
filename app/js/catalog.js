@@ -279,8 +279,7 @@
       '<div class="card mb-3"><div class="card-body">' +
       '<div class="d-flex flex-wrap align-items-center gap-2 mb-3">' +
       '<div class="btn-group flex-wrap" role="group">' +
-      '<button class="btn btn-outline-primary active" data-ctab="contracts" type="button">🚢 Hợp đồng <span class="badge text-bg-secondary ms-1" id="catNContracts"></span></button>' +
-      '<button class="btn btn-outline-primary" data-ctab="exec" type="button">🧪 Chi tiết thực hiện</button>' +
+      '<button class="btn btn-outline-primary active" data-ctab="contracts" type="button">🚢 Hợp đồng &amp; thực hiện <span class="badge text-bg-secondary ms-1" id="catNContracts"></span></button>' +
       '<button class="btn btn-outline-primary" data-ctab="customers" type="button">👤 Khách hàng <span class="badge text-bg-secondary ms-1" id="catNCustomers"></span></button></div>' +
       '<div class="ms-auto d-flex flex-wrap gap-2"><button type="button" class="btn btn-outline-primary" data-goods-open>Danh mục hàng hóa</button>' +
       '<button class="btn btn-outline-secondary" type="button" data-archive-view>Đã lưu trữ</button>' +
