@@ -1,5 +1,7 @@
 # HAK Quản lý xuất hàng
 
+- [Bản 2.11.2 — báo cáo theo năm, bộ cài dựng trên GitHub](docs/HUONG_DAN_2.11.2.md)
+
 - [Bản 2.9.4 — sửa OCR số hợp đồng](docs/HUONG_DAN_2.9.4.md)
 
 - [Bản 2.9.3 — danh mục hàng hóa, tỷ giá và giá trị chứng thư](docs/HUONG_DAN_2.9.3.md)
