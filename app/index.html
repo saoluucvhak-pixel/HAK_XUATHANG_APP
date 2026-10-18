@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="vi" data-bs-theme="light">
+<html lang="vi" data-bs-theme="light" data-hak-theme="luxe">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,11 +8,17 @@
   <link rel="stylesheet" href="libs/bootstrap.min.css">
   <link rel="stylesheet" href="css/fonts.css">
   <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/hak-enterprise-components.css">
+  <link rel="stylesheet" href="css/hak-accessibility.css">
+  <link rel="stylesheet" href="css/hak-enterprise-theme.css">
+  <link rel="stylesheet" href="css/hak-smart-filter.css">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230e7c86'/%3E%3Ctext x='32' y='42' font-size='28' font-weight='800' text-anchor='middle' fill='white' font-family='Arial'%3EHAK%3C/text%3E%3C/svg%3E">
   <script>
     /* Áp dụng giao diện sáng/tối ngay khi tải để tránh nháy màn hình */
     (function () {
       try {
+        var design = JSON.parse(localStorage.getItem('hak.design.theme') || '"luxe"');
+        document.documentElement.setAttribute('data-hak-theme', ['luxe','classic','neutral','champagne'].includes(design) ? design : 'luxe');
         var t = JSON.parse(localStorage.getItem('hak.theme') || 'null');
         if (!t) t = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
         document.documentElement.setAttribute('data-bs-theme', t);
@@ -20,7 +26,7 @@
     })();
   </script>
 </head>
-<body>
+<body class="hak-ui">
 
 <!-- Thanh tiến độ mỏng trên cùng + màn hình Loading -->
 <div id="topProgress"><div class="bar"></div></div>
@@ -74,8 +80,10 @@
       <button class="btn btn-outline-secondary d-lg-none" id="btnMenu" type="button" aria-label="Mở menu">☰</button>
       <h1 id="pageTitle">Tổng quan</h1>
       <button class="btn btn-sm btn-outline-secondary ms-auto" id="btnSearch" type="button" title="Tìm kiếm chung (Ctrl+K)">🔍 <span class="d-none d-md-inline">Tìm kiếm</span> <kbd class="d-none d-md-inline">Ctrl K</kbd></button>
+      <button class="btn btn-sm btn-outline-secondary" id="btnDownloads" type="button">📂 File đã tải</button>
       <span class="badge badge-soft rounded-pill d-none d-sm-inline" id="topFileChip"></span>
       <span class="d-flex align-items-center gap-1" id="topUser"></span>
+      <select id="hakDesignTheme" class="form-select form-select-sm hak-theme-select" aria-label="Phong cách HAK"><option value="luxe">HAK Luxe</option><option value="classic">HAK Classic</option><option value="neutral">HAK Neutral</option><option value="champagne">HAK Champagne</option></select>
       <button class="btn btn-sm btn-outline-secondary" id="btnTheme" type="button" title="Sáng / tối">🌓</button>
     </header>
 
@@ -161,6 +169,7 @@
           <div class="col-md-3 d-grid"><button class="btn btn-outline-primary" id="btnReparse" type="button">↻ Đọc lại sheet</button></div>
         </div>
         <div id="fileAlerts" class="mb-3"></div>
+        <div id="fileSmartFilter"></div><div class="form-text mb-3">Bộ lọc xem trước áp dụng cho các bảng và thống kê bên dưới. Khi lập biên bản, chọn bộ lọc tại trang biên bản.</div>
         <div class="row g-3 mb-3" id="statTiles"></div>
         <div class="row g-3">
           <div class="col-xl-7">
@@ -179,7 +188,7 @@
           <div class="col-xl-5">
             <div class="card h-100">
               <div class="card-header">🚛 Số chuyến từng xe
-                <input class="form-control form-control-sm ms-auto" style="max-width:150px" id="plateSearch" placeholder="Tìm biển số…"></div>
+                <input class="form-control form-control-sm ms-auto d-none" style="max-width:150px" id="plateSearch" placeholder="Tìm biển số…"></div>
               <div class="card-body"><div class="tbl-wrap" style="max-height:380px"><table class="table"><thead><tr><th>Biển số</th><th class="num">Số chuyến</th><th class="num">Tấn</th></tr></thead><tbody id="plateBody"></tbody></table></div></div>
             </div>
           </div>
@@ -208,11 +217,15 @@
     <!-- ---------- BÁO CÁO TỔNG HỢP ---------- -->
     <section class="page" id="page-report" hidden>
       <div class="card mb-3"><div class="card-body">
+        <div id="repSmartFilter"></div>
         <div class="row g-2 align-items-end">
-          <div class="col-12 col-md-3"><label class="form-label">Năm</label><select class="form-select" id="repYear"><option value="">Tất cả năm</option></select></div>
-          <div class="col-6 col-md-3"><label class="form-label">Từ ngày</label><input type="date" class="form-control" id="repFrom"></div>
-          <div class="col-6 col-md-3"><label class="form-label">Đến ngày</label><input type="date" class="form-control" id="repTo"></div>
-          <div class="col-6 col-md-3 d-grid"><button class="btn btn-outline-secondary" id="repReset" type="button">Đặt lại</button></div>
+          <div class="col-6 col-md-3 d-none"><label for="repFrom" class="form-label">Từ ngày</label><input type="date" class="form-control" id="repFrom" aria-describedby="repFilterError"></div>
+          <div class="col-6 col-md-3 d-none"><label for="repTo" class="form-label">Đến ngày</label><input type="date" class="form-control" id="repTo" aria-describedby="repFilterError"></div>
+          <div class="col-12 col-md-6 d-none"><label for="repQuery" class="form-label">Tìm hồ sơ / tàu / bên giao nhận</label><input id="repQuery" type="search" class="form-control" placeholder="Nhập tên có dấu hoặc không dấu"></div>
+          <div class="col-6 col-md-3 d-none"><label for="repType" class="form-label">Loại biên bản</label><select id="repType" class="form-select"><option value="">Tất cả loại</option></select></div>
+          <div class="col-12 text-danger small" id="repFilterError" role="alert" hidden></div>
+          <div class="col-12 small muted" id="repFilterSummary" role="status" aria-live="polite"></div>
+          <div class="col-6 col-md-3 d-grid"><button class="btn btn-outline-secondary" id="repReset" type="button">Đặt lại chọn hồ sơ</button></div>
           <div class="col-12 d-flex align-items-center gap-2" id="repScopeWrap"></div>
           <div class="col-6 col-md-3 d-grid"><button class="btn btn-success" id="repXls" type="button">📊 Xuất Excel</button></div>
         </div>
@@ -223,9 +236,8 @@
         <div class="row g-2 mb-3" id="repCards"></div>
         <div class="card mb-3"><div class="card-body"><div class="sec-title">Tổng hợp theo loại biên bản</div>
           <div class="tbl-wrap"><table class="table"><thead><tr><th>Loại</th><th class="num">Hồ sơ</th><th class="num">Xe</th><th class="num">Qua cân (tấn)</th><th class="num">Xe trả về</th><th class="num">Thực giao (tấn)</th></tr></thead><tbody id="repByType"></tbody></table></div>
-          <div class="form-text">Thực giao = qua cân − xe trả về (chỉ Ủy thác và Xuất hàng kho gửi có xe trả về). Không cộng chung các loại vì cùng một lô hàng có thể đi qua nhiều loại biên bản.</div></div></div>
+          <div class="form-text">Thực giao = qua cân − xe trả về (Xuất khẩu, Ủy thác và Xuất hàng kho gửi có xe trả về). Không cộng chung các loại vì cùng một lô hàng có thể đi qua nhiều loại biên bản.</div></div></div>
         <div class="card mb-3"><div class="card-body"><div class="sec-title">Theo tháng (tấn thực giao)</div>
-          <div class="tbl-wrap mb-3"><table class="table"><thead id="repYearHead"></thead><tbody id="repYearBody"></tbody></table></div>
           <div class="tbl-wrap"><table class="table"><thead id="repMonthHead"></thead><tbody id="repMonthBody"></tbody></table></div></div></div>
         <div class="card mb-3"><div class="card-body"><div class="sec-title">Theo tàu (Xuất khẩu / Ủy thác / Xuất hàng kho gửi)</div>
           <div class="tbl-wrap"><table class="table"><thead><tr><th>Tàu</th><th>Loại</th><th>Thời gian</th><th>Bên</th><th class="num">Xe</th><th class="num">Qua cân</th><th class="num">Xe trả về</th><th class="num">Thực giao</th></tr></thead><tbody id="repShips"></tbody></table></div></div></div>
@@ -285,7 +297,7 @@
         <div class="form-text text-center mt-2" id="ctHint"></div>
       </div></div></div></div>
       <div class="card mt-3" id="ctLogCard"><div class="card-header">🕘 Chứng từ đã lập <span class="muted small fw-normal" id="ctLogCount"></span></div>
-        <div class="card-body p-0"><div class="tbl-wrap" style="max-height:none"><table class="table mb-0"><thead><tr><th>Thời gian</th><th>Chứng từ</th><th>Hình thức</th><th>Của</th><th>Đợt</th><th>Số</th><th class="num">Xe</th><th class="num">Tấn</th><th>Người lập</th><th></th></tr></thead><tbody id="ctLogBody"></tbody></table></div>
+        <div id="ctLogFilter" class="p-3"></div><div class="card-body p-0"><div class="tbl-wrap" style="max-height:none"><table class="table mb-0"><thead><tr><th>Thời gian</th><th>Chứng từ</th><th>Hình thức</th><th>Của</th><th>Đợt</th><th>Số</th><th class="num">Xe</th><th class="num">Tấn</th><th>Người lập</th><th></th></tr></thead><tbody id="ctLogBody"></tbody></table></div>
         <div class="form-text px-3 py-2 mb-0">Nhật ký dùng để cảnh báo trùng số PXK / BKLS và gợi ý số kế tiếp. Xóa dòng chỉ xóa nhật ký, không ảnh hưởng file đã tải.</div></div></div>
     </section>
 
@@ -302,8 +314,9 @@
           </div>
         </div>
         <div class="row g-2 mb-2">
-          <div class="col-12 col-md-6"><input class="form-control" id="archSearch" placeholder="Tìm theo tên tàu, tháng, tên file…"></div>
-          <div class="col-12 col-md-4"><select class="form-select" id="archType"><option value="">Tất cả loại</option></select></div>
+          <div class="col-12" id="archSmartFilter"></div>
+          <div class="col-12 col-md-6 d-none"><input class="form-control" id="archSearch" placeholder="Tìm theo tên tàu, tháng, tên file…"></div>
+          <div class="col-12 col-md-4 d-none"><select class="form-select" id="archType"><option value="">Tất cả loại</option></select></div>
           <div class="col-12 col-md-2 d-flex align-items-center" id="archScopeWrap"></div>
         </div>
         <div class="card border-primary-subtle mb-2 d-none admin-only" id="archPrunePanel"><div class="card-body py-2" id="archPruneBody"></div></div>
@@ -406,8 +419,16 @@
 <script src="js/config.js"></script>
 <script src="js/excel.js"></script>
 <script src="js/vehicles.js"></script>
+<script src="libs/hak-smart-filter/core.js"></script>
+<script src="libs/hak-smart-filter/browser.js"></script>
+<script src="libs/hak-smart-filter/filter-popover.js"></script>
+<script src="libs/hak-smart-filter/smart-filter.js"></script>
+<script src="js/hak-filters.js"></script>
+<script src="js/hak-theme.js"></script>
 <script src="js/generator.js"></script>
 <script src="js/templates-data.js"></script>
+<script src="js/docx-worker-source.js"></script>
+<script src="js/docx-worker.js"></script>
 <script src="js/word.js"></script>
 <script src="js/exporter.js"></script>
 <script src="js/archive.js"></script>
@@ -417,7 +438,13 @@
 <script src="js/pages.js"></script>
 <script src="js/settings.js"></script>
 <script src="js/bkls.js"></script>
+<script src="js/bkls-form01.js"></script>
+<script src="js/bkls-builder.js"></script>
+<script src="js/bkls-templates.js"></script>
 <script src="js/records.js"></script>
+<script src="js/contract-model.js"></script>
+<script src="js/contract-parser.js"></script>
+<script src="js/document-import.js"></script>
 <script src="js/catalog.js"></script>
 <script src="js/backup.js"></script>
 <script src="js/gsync.js"></script>
@@ -426,6 +453,9 @@
 <script src="js/search.js"></script>
 <script src="js/dashboard.js"></script>
 <script src="js/help.js"></script>
+<script src="js/download-folders.js"></script>
+<script src="js/yearbook.js"></script>
+<script src="js/year-close.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

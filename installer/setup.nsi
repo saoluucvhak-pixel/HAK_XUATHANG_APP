@@ -47,7 +47,8 @@ RequestExecutionLevel user
 Section "Ung dung Quan ly xuat hang" SecApp
   SectionIn RO
   SetOutPath "$INSTDIR"
-  File /r "app\*.*"
+  ; Recovery/reset utilities must never ship to end users.
+  File /r /x "MoKhoa_1Lan*.html" /x "XoaSach_DuLieu*.html" "app\*.*"
 
   WriteRegStr HKCU "Software\HAK\QuanLyXuatHang" "InstallDir" "$INSTDIR"
 

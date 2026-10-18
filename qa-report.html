@@ -1,0 +1,51 @@
+<!doctype html><html lang="vi" data-bs-theme="light" data-hak-theme="luxe"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>HAK · Kiểm thử báo cáo bằng dữ liệu giả</title><link rel="stylesheet" href="app/css/../libs/bootstrap.min.css"><link rel="stylesheet" href="app/css/style.css"><link rel="stylesheet" href="app/css/hak-enterprise-components.css"><link rel="stylesheet" href="app/css/hak-accessibility.css"><link rel="stylesheet" href="app/css/hak-enterprise-theme.css"><link rel="stylesheet" href="app/css/hak-smart-filter.css"><body class="hak-ui"><main class="container-fluid p-3"><h1 class="h4">Báo cáo · Dữ liệu kiểm thử</h1>    <section class="page" id="page-report">
+      <div class="card mb-3"><div class="card-body">
+        <div id="repSmartFilter"></div>
+        <div class="row g-2 align-items-end">
+          <div class="col-6 col-md-3 d-none"><label for="repFrom" class="form-label">Từ ngày</label><input type="date" class="form-control" id="repFrom" aria-describedby="repFilterError"></div>
+          <div class="col-6 col-md-3 d-none"><label for="repTo" class="form-label">Đến ngày</label><input type="date" class="form-control" id="repTo" aria-describedby="repFilterError"></div>
+          <div class="col-12 col-md-6 d-none"><label for="repQuery" class="form-label">Tìm hồ sơ / tàu / bên giao nhận</label><input id="repQuery" type="search" class="form-control" placeholder="Nhập tên có dấu hoặc không dấu"></div>
+          <div class="col-6 col-md-3 d-none"><label for="repType" class="form-label">Loại biên bản</label><select id="repType" class="form-select"><option value="">Tất cả loại</option></select></div>
+          <div class="col-12 text-danger small" id="repFilterError" role="alert" hidden></div>
+          <div class="col-12 small muted" id="repFilterSummary" role="status" aria-live="polite"></div>
+          <div class="col-6 col-md-3 d-grid"><button class="btn btn-outline-secondary" id="repReset" type="button">Đặt lại chọn hồ sơ</button></div>
+          <div class="col-12 d-flex align-items-center gap-2" id="repScopeWrap"></div>
+          <div class="col-6 col-md-3 d-grid"><button class="btn btn-success" id="repXls" type="button">📊 Xuất Excel</button></div>
+        </div>
+        <div class="form-text">Số liệu lấy từ các hồ sơ trong 🗄️ Lưu trữ; lọc theo <b>ngày bắt đầu</b> của hồ sơ. Bỏ trống ngày = tất cả.</div>
+      </div></div>
+      <div class="card mb-3" id="repEmpty"><div class="card-body text-center muted py-4">Chưa có hồ sơ nào trong Lưu trữ. Hãy xuất biên bản (Word / PDF / Excel) — app tự lưu và báo cáo sẽ hiện ở đây.</div></div>
+      <div id="repMain" class="d-none">
+        <div class="row g-2 mb-3" id="repCards"></div>
+        <div class="card mb-3"><div class="card-body"><div class="sec-title">Tổng hợp theo loại biên bản</div>
+          <div class="tbl-wrap"><table class="table"><thead><tr><th>Loại</th><th class="num">Hồ sơ</th><th class="num">Xe</th><th class="num">Qua cân (tấn)</th><th class="num">Xe trả về</th><th class="num">Thực giao (tấn)</th></tr></thead><tbody id="repByType"></tbody></table></div>
+          <div class="form-text">Thực giao = qua cân − xe trả về (Xuất khẩu, Ủy thác và Xuất hàng kho gửi có xe trả về). Không cộng chung các loại vì cùng một lô hàng có thể đi qua nhiều loại biên bản.</div></div></div>
+        <div class="card mb-3"><div class="card-body"><div class="sec-title">Theo tháng (tấn thực giao)</div>
+          <div class="tbl-wrap"><table class="table"><thead id="repMonthHead"></thead><tbody id="repMonthBody"></tbody></table></div></div></div>
+        <div class="card mb-3"><div class="card-body"><div class="sec-title">Theo tàu (Xuất khẩu / Ủy thác / Xuất hàng kho gửi)</div>
+          <div class="tbl-wrap"><table class="table"><thead><tr><th>Tàu</th><th>Loại</th><th>Thời gian</th><th>Bên</th><th class="num">Xe</th><th class="num">Qua cân</th><th class="num">Xe trả về</th><th class="num">Thực giao</th></tr></thead><tbody id="repShips"></tbody></table></div></div></div>
+        <div class="card mb-3"><div class="card-body">
+          <div class="sec-title d-flex flex-wrap align-items-center gap-2 mb-2">
+            <span>Theo đơn vị vận chuyển (theo tàu / theo đợt, chi tiết theo ngày)</span>
+            <select class="form-select form-select-sm w-auto ms-auto" id="repCarrierShip" style="min-width:260px"><option value="">— Chọn tàu hoặc đợt —</option></select>
+            <button class="btn btn-sm btn-outline-success" id="repXlsCarrier" type="button">📊 Xuất Excel (tất cả tàu / đợt)</button>
+          </div>
+          <div class="form-text mt-0 mb-2">Đọc lại các dòng phiếu cân từ 🗄️ Lưu trữ khi chọn (có thể mất vài giây với tàu/đợt nhiều xe). Xuất khẩu / Ủy thác / Xuất hàng kho gửi chọn theo <b>tàu</b> (gộp mọi hồ sơ cùng tên); Trung chuyển gửi kho / Điều chuyển nội bộ / Trao đổi hàng hóa / Xuất bán không có tàu nên chọn theo <b>đợt</b> (mỗi hồ sơ là 1 đợt). Đơn vị vận chuyển lấy từ cột ĐVVC / nhà xe / chủ xe trong Excel cân.</div>
+          <div id="repCarrierBody"><div class="muted small">Chọn tàu hoặc đợt ở trên để xem chi tiết theo đơn vị vận chuyển.</div></div>
+        </div></div>
+        <div class="card mb-3"><div class="card-body">
+          <div class="sec-title d-flex flex-wrap align-items-center gap-2 mb-2">
+            <span>📑 Xuất hàng theo hợp đồng (mẫu XUATHANG — 2 sheet NL_DH_XB · NL_PC_XH)</span>
+            <button class="btn btn-sm btn-success ms-auto" id="repXlsXH" type="button">📊 Xuất Excel Xuất hàng</button>
+            <button class="btn btn-sm btn-outline-primary" id="repGsXH" type="button" title="Đẩy các lô có hồ sơ cân (trong khoảng lọc) lên Google Sheet — thay toàn bộ phiếu của lô đó">☁ Đồng bộ Google Sheet</button>
+          </div>
+          <div class="form-text mt-0 mb-2">Xuất khẩu / Ủy thác / Xuất bán / Trao đổi, gộp theo hợp đồng trong 📇 Danh mục. Sheet phiếu cân: Ngày xuất = ngày cân, Số BKLS = số đã cấp khi tạo BKLS (hồ sơ chưa tạo BKLS để trống), Khối lượng (M3) = tấn ÷ 0,7. Cột nền xám là cột bổ sung ngoài mẫu gốc.</div>
+          <div class="small muted mb-2" id="repGsStatus"></div>
+          <div class="alert alert-warning py-2 mb-2 small d-none" id="repXHWarn"></div>
+          <div class="tbl-wrap"><table class="table table-sm"><thead><tr><th>Hình thức</th><th>Tàu</th><th>Số TKHQ / HĐ</th><th>Khách hàng</th><th class="num">Hồ sơ</th><th class="num">Xe</th><th class="num">Thực giao (tấn)</th><th class="num">KL_MT (tấn)</th><th class="num">Chênh lệch</th></tr></thead><tbody id="repXHBody"></tbody></table></div>
+        </div></div>
+        <div class="card mb-3"><div class="card-body"><div class="sec-title">Hồ sơ được tính <span class="muted text-lowercase" id="repRecCount"></span></div>
+          <div class="alert alert-warning py-2 mb-2 d-none" id="repDupNote">⚠ Có hồ sơ <b>trùng kỳ</b> (cùng loại, cùng tàu / bên giao-nhận và khoảng ngày chồng nhau). Mặc định chỉ tính bản mới nhất; bạn có thể tick lại nếu thật sự là lô khác.</div>
+          <div class="tbl-wrap"><table class="table"><thead><tr><th></th><th>Hồ sơ</th><th>Loại</th><th>Thời gian</th><th class="num">Xe</th><th class="num">Tấn</th><th></th></tr></thead><tbody id="repRecBody"></tbody></table></div></div></div>
+      </div>
+    </section></main><script>window.HAK={UI:{esc:s=>String(s==null?'':s).replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';'),debounce:(f)=>f,toast:console.log},Generator:{fmtDec:(v,n)=>v.toLocaleString('vi-VN',{minimumFractionDigits:n,maximumFractionDigits:n})},Archive:{list:async()=>[{id:'demo1',type:'xuatkhau',title:'Đợt xuất khẩu 01',ship:'ĐẠI DƯƠNG',giao:'HAK',nhan:'Đà Nẵng',from:'01/10/2026',to:'02/10/2026',kg:12500,trips:2,retKg:2500,retTrips:1,updatedAt:1}],ensureStats:async a=>a},Store:{get:()=>({}),set:()=>{},remove:()=>{}}};</script><script src="app/libs/hak-smart-filter/core.js"></script><script src="app/libs/hak-smart-filter/browser.js"></script><script src="app/libs/hak-smart-filter/filter-popover.js"></script><script src="app/libs/hak-smart-filter/smart-filter.js"></script><script src="app/js/hak-filters.js"></script><script src="app/js/generator.js"></script><script src="app/js/report.js"></script><script>HAK.Report.init();HAK.Report.render();</script></body></html>

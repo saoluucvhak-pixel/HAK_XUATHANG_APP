@@ -208,11 +208,18 @@
    * 4. Sao lưu / khôi phục (.json)
    * ------------------------------------------------------------- */
   /** Toàn bộ hồ sơ dạng [{meta, data}] (dùng cho sao lưu riêng Lưu trữ và sao lưu toàn bộ). */
-  async function collectItems() {
-    const metas = await list();
+  async function collectItems(ids) {
+    const metas = (await list()).filter(m=>!ids||ids.includes(m.id));
     const items = [];
     for (const m of metas) { const data = await getOne('data', m.id); if (data !== undefined) items.push({ meta: m, data }); }
     return items;
+  }
+  async function closeVerified(items){
+    const db=await openDb();if(!db)throw Error('Không dọn kho lưu trữ trong chế độ RAM.');
+    return new Promise((ok,no)=>{const tx=db.transaction(['meta','data'],'readwrite');let error,left=items.length*2;const matches=()=>{if(error)return;if(--left===0)for(const item of items){tx.objectStore('meta').delete(item.meta.id);tx.objectStore('data').delete(item.meta.id);}};
+      for(const item of items){const m=tx.objectStore('meta').get(item.meta.id),d=tx.objectStore('data').get(item.meta.id);m.onsuccess=()=>{if(error)return;if(JSON.stringify(m.result)!==JSON.stringify(item.meta)){error=Error('Hồ sơ cũ đã thay đổi; chưa dọn năm.');tx.abort();}else matches();};d.onsuccess=()=>{if(error)return;if(d.result!==item.data){error=Error('Dữ liệu lưu trữ đã thay đổi; chưa dọn năm.');tx.abort();}else matches();};}
+      tx.oncomplete=()=>{updateBadge();ok();};tx.onabort=tx.onerror=()=>no(error||tx.error||Error('Chưa dọn được kho cũ.'));
+    });
   }
   async function exportAll() {
     const items = await collectItems();
@@ -221,7 +228,7 @@
     const name = 'HAK_LuuTru_' + d.getFullYear() + p2(d.getMonth() + 1) + p2(d.getDate()) + '.json';
     // Dùng chung thư mục sao lưu mặc định đã chọn ở Cài đặt → Chung (nếu có) — xem backup.js
     if (HAK.Backup && HAK.Backup.saveBackupBlob) await HAK.Backup.saveBackupBlob(blob, name);
-    else HAK.Word.Files.saveBlob(blob, name);
+    else await HAK.Word.Files.saveBlob(blob, name);
     return { name, count: items.length };
   }
   async function importFile(file) {
@@ -266,11 +273,23 @@
     const scope = HAK.Auth && HAK.Auth.scopeIds ? HAK.Auth.scopeIds('archive') : null;
     return (m) => !scope || scope.indexOf(HAK.Auth.companyOfMeta(m)) >= 0;
   }
+  let archiveSmart;
+  const archiveSource=()=>cache.filter(scopeFilter());
+  function ensureArchiveSmart(){
+    if(archiveSmart)return archiveSmart;
+    const F=HAK.Filters;
+    archiveSmart=F.mount('#archSmartFilter',{screenId:'archive',source:archiveSource,
+      fields:[F.multi('type','Loại biên bản',()=>Array.from(new Set(cache.map(m=>m.type))).map(value=>({value,label:typeLabel(value)})),m=>m.type),
+       F.multi('by','Người lập',()=>Array.from(new Set(cache.map(m=>m.by).filter(Boolean))),m=>m.by)],
+      matchQ:(m,q)=>F.core.hay([m.title,m.ship,m.type,m.by,...Object.values(m.summary||{})]).includes(q),
+      matchDate:(m,f,t)=>F.dateMatch(m.from||m.updatedAt,f,t),onApply:()=>{shown=PAGE;renderRows();},
+      summary:r=>[{label:'Khối lượng',value:HAK.Generator.fmtTon(r.rows.reduce((a,m)=>a+(+m.kg||0),0))+' tấn'}]
+    });return archiveSmart;
+  }
   function renderRows() {
     const { esc } = UI();
-    const q = (document.getElementById('archSearch').value || '').trim().toLowerCase(), ty = document.getElementById('archType').value;
-    const inScope = scopeFilter();   // v2.6.2: mặc định chỉ hồ sơ của công ty đang làm
-    const rows = cache.filter((m) => inScope(m) && (!ty || m.type === ty) && (!q || (m.title + ' ' + m.type + ' ' + Object.values(m.summary || {}).join(' ')).toLowerCase().indexOf(q) >= 0));
+    const view=ensureArchiveSmart();
+    const rows=view.filter(archiveSource()).rows; view.refresh();
     const body = document.getElementById('archBody'), more = document.getElementById('archMore');
     if (more) { const left = rows.length - shown; more.classList.toggle('d-none', left <= 0); more.textContent = 'Hiện thêm ' + Math.min(PAGE, left).toLocaleString('vi-VN') + ' hồ sơ (còn ' + Math.max(0, left).toLocaleString('vi-VN') + ')'; }
     body.innerHTML = rows.slice(0, shown).map((m) => {
@@ -311,38 +330,33 @@
    *    nhập lại được) → ② tick "đã kiểm tra file" → xóa đúng các hồ sơ đó khỏi máy. Không xuất được file thì không cho xóa.
    * ------------------------------------------------------------- */
   const isoDay = (t) => { const d = new Date(t), p = (n) => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); };
-  /** v2.8.0: năm của hồ sơ = năm của NGÀY BẮT ĐẦU (m.from dd/mm/yyyy — cùng tiêu chí với Báo cáo); thiếu thì lấy năm cập nhật. */
-  const yearOf = (m) => { const x = String((m && m.from) || '').match(/^\d{1,2}\/\d{1,2}\/(\d{4})/); return x ? +x[1] : new Date((m && m.updatedAt) || Date.now()).getFullYear(); };
   let pruneIds = null;
   function renderPrune() {
     const { esc } = UI(), box = document.getElementById('archPruneBody');
-    const inScope0 = scopeFilter(), years = Array.from(new Set(cache.filter(inScope0).map(yearOf))).sort((a, b) => a - b);
-    const prevY = (document.getElementById('archPruneYear') || {}).value;
+    const def = new Date(); def.setFullYear(def.getFullYear() - 1); def.setDate(1);
     const old = cache.length ? cache[cache.length - 1].updatedAt : Date.now();
-    box.innerHTML = '<div class="fw-semibold mb-1">📦 Sao lưu &amp; dọn hồ sơ theo năm</div>' +
-      '<div class="small muted mb-2">Hồ sơ của 1 năm (tính theo <b>ngày bắt đầu hồ sơ</b>, giống Báo cáo) được xuất ra 1 file (giữ được mãi, cần thì <b>⬆ Khôi phục</b> nhập lại). Có thể chỉ sao lưu, hoặc sao lưu rồi xóa khỏi máy cho nhẹ. Hồ sơ cũ nhất: <b>' + esc(fmtDT(old)) + '</b>. Chỉ tính hồ sơ trong phạm vi công ty đang xem — bật <b>Xem tất cả công ty</b> để lấy đủ.</div>' +
-      '<div class="alert alert-warning py-1 px-2 small mb-2">Chỉ hồ sơ Lưu trữ nằm trong file này. Đợt Excel, nhật ký số PXK / BKLS và cài đặt <b>không bị xóa</b> khi dọn và không nằm trong file — dùng <b>Sao lưu toàn bộ</b> (Cài đặt → Chung) để giữ đủ. Báo cáo chỉ tính hồ sơ còn trên máy: dọn năm nào thì Báo cáo năm đó trống cho tới khi khôi phục.</div>' +
-      '<div class="d-flex flex-wrap align-items-end gap-2"><div><label class="form-label mb-1" for="archPruneYear">Năm</label><select class="form-select form-select-sm" id="archPruneYear">' + years.map((y) => '<option value="' + y + '">' + y + '</option>').join('') + '</select></div>' +
-      '<div class="small" id="archPruneCount"></div><button class="btn btn-sm btn-primary" id="archPruneExport" type="button">① Xuất file hồ sơ năm</button></div>' +
+    box.innerHTML = '<div class="fw-semibold mb-1">📦 Xuất &amp; dọn hồ sơ cũ</div>' +
+      '<div class="small muted mb-2">Hồ sơ cũ được xuất ra 1 file (giữ được mãi, cần thì <b>⬆ Khôi phục</b> nhập lại) rồi mới xóa khỏi máy cho nhẹ. Hồ sơ cũ nhất: <b>' + esc(fmtDT(old)) + '</b>. Chỉ tính hồ sơ trong phạm vi công ty đang xem.</div>' +
+      '<div class="d-flex flex-wrap align-items-end gap-2"><div><label class="form-label mb-1" for="archPruneDate">Hồ sơ cập nhật trước ngày</label><input type="date" class="form-control form-control-sm" id="archPruneDate" value="' + isoDay(def) + '"></div>' +
+      '<div class="small" id="archPruneCount"></div><button class="btn btn-sm btn-primary" id="archPruneExport" type="button">① Xuất file hồ sơ cũ</button></div>' +
       '<div class="mt-2 d-none" id="archPruneStep2"><div class="form-check"><input class="form-check-input" type="checkbox" id="archPruneOk"><label class="form-check-label small" for="archPruneOk">Tôi đã kiểm tra: file vừa xuất <b>đã lưu xong</b> (thấy trong thư mục / Downloads) và đã chép ra nơi an toàn.</label></div>' +
-      '<button class="btn btn-sm btn-danger mt-1" id="archPruneDel" type="button" disabled>② Xóa các hồ sơ này khỏi máy (không bắt buộc)</button></div>';
-    const ysel = document.getElementById('archPruneYear');
-    if (prevY && years.indexOf(+prevY) >= 0) ysel.value = prevY; else if (years.length) ysel.value = String(years[years.length - 1]);
-    const pick = () => { const y = +ysel.value, inScope = scopeFilter(); return y ? cache.filter((m) => yearOf(m) === y && inScope(m)) : []; };
+      '<button class="btn btn-sm btn-danger mt-1" id="archPruneDel" type="button" disabled>② Xóa các hồ sơ này khỏi máy</button></div>';
+    const pick = () => { const v = document.getElementById('archPruneDate').value, t = v ? new Date(v + 'T00:00:00').getTime() : 0; const inScope = scopeFilter(); return cache.filter((m) => m.updatedAt < t && inScope(m)); };
     const upd = () => { const n = pick().length; document.getElementById('archPruneCount').innerHTML = '<b>' + n.toLocaleString('vi-VN') + '</b> hồ sơ'; document.getElementById('archPruneExport').disabled = !n; document.getElementById('archPruneStep2').classList.add('d-none'); pruneIds = null; };
-    ysel.addEventListener('change', upd); upd();
+    document.getElementById('archPruneDate').addEventListener('change', upd); upd();
     document.getElementById('archPruneExport').addEventListener('click', async (e) => {
       const { toast, Loading } = UI(), sel = pick(), btn = e.currentTarget; if (!sel.length) return;
       btn.disabled = true; Loading.show('Đang xuất ' + sel.length + ' hồ sơ…');
       try {
         const items = [];
         for (const m of sel) { const data = await getOne('data', m.id); if (data !== undefined) items.push({ meta: m, data }); }
-        const y = ysel.value, name = 'HAK_LuuTru_Nam' + y + '.json';
-        const blob = new Blob([JSON.stringify({ app: 'hak-bienban-archive', v: 1, exportedAt: new Date().toISOString(), year: +y, pruned: true, items })], { type: 'application/json' });
-        if (HAK.Backup && HAK.Backup.saveBackupBlob) await HAK.Backup.saveBackupBlob(blob, name); else HAK.Word.Files.saveBlob(blob, name);
+        const from = isoDay(sel[sel.length - 1].updatedAt).replace(/-/g, ''), to = isoDay(sel[0].updatedAt).replace(/-/g, '');
+        const name = 'HAK_LuuTru_HoSoCu_' + from + '-' + to + '.json';
+        const blob = new Blob([JSON.stringify({ app: 'hak-bienban-archive', v: 1, exportedAt: new Date().toISOString(), pruned: true, items })], { type: 'application/json' });
+        if (HAK.Backup && HAK.Backup.saveBackupBlob) await HAK.Backup.saveBackupBlob(blob, name); else await HAK.Word.Files.saveBlob(blob, name);
         pruneIds = items.map((x) => x.meta.id);
         document.getElementById('archPruneStep2').classList.remove('d-none');
-        toast('Đã xuất ' + items.length + ' hồ sơ năm ' + y + ': ' + name + '. Muốn dọn khỏi máy thì kiểm tra file rồi tick xác nhận.', 'success');
+        toast('Đã xuất ' + items.length + ' hồ sơ: ' + name + '. Kiểm tra file rồi tick xác nhận để xóa khỏi máy.', 'success');
       } catch (x) { if (!(x && x.name === 'AbortError')) { console.error(x); toast('Không xuất được: ' + (x.message || x), 'error'); } }
       finally { Loading.hide(); btn.disabled = false; }
     });
@@ -352,8 +366,8 @@
       UI().Loading.show('Đang dọn ' + ids.length + ' hồ sơ…');
       try { for (const id of ids) await delOne(id); } finally { UI().Loading.hide(); }
       pruneIds = null; await render();
-      UI().toast('Đã dọn ' + ids.length + ' hồ sơ khỏi máy (đã có trong file vừa xuất).', 'success');
-    }, 'Bấm lần nữa để xóa hồ sơ năm ' + ysel.value));
+      UI().toast('Đã dọn ' + ids.length + ' hồ sơ cũ khỏi máy (đã có trong file vừa xuất).', 'success');
+    }, 'Bấm lần nữa để xóa ' + (pruneIds || []).length + ' hồ sơ'));
   }
 
   function init() {
@@ -387,5 +401,5 @@
     updateBadge();
   }
 
-  HAK.Archive = { yearOf, SOFT_WARN, save, list, load, ensureStats, regenerate, exportAll, importFile, collectItems, importItems, render, init, updateBadge, get state() { return state; } };
+  HAK.Archive = { closeVerified,decode:unpack,SOFT_WARN, save, list, load, ensureStats, regenerate, exportAll, importFile, collectItems, importItems, render, init, updateBadge, get state() { return state; } };
 })(typeof window !== 'undefined' ? window : globalThis);

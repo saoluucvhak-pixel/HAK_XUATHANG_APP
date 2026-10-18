@@ -1,3 +1,5 @@
+> Bản tích hợp HAK Design + Smart Filter ngày 17/10/2026 (Setup 2.7.9). Chi tiết: `docs/HAK_DESIGN_SMART_FILTER.md`. Nội dung dưới đây mô tả nền mã nguồn gốc.
+
 # HAK — Quản lý xuất hàng · Mã nguồn v2.7.7 (11/10/2026)
 
 App chạy **offline trong trình duyệt** (Chrome / Edge), không cần máy chủ. Mở `app/index.html` là chạy.

@@ -72,7 +72,7 @@
   const CONV_FROM = { xuatkhogui: ['xuatkhau', 'uythac', 'xuatban'] };
 
   /** v2.5 Phase 2 — ô "Chọn hợp đồng" (📇 Danh mục) cho các trang có hợp đồng theo tàu; key trang = key hình thức trong HAK.Catalog.TYPES. */
-  const contractGroup = () => ({ title: 'Hợp đồng (từ Danh mục)', zone: 'party', fields: [{ id: 'contractId', label: 'Chọn hợp đồng — tự điền tàu, các bên, số liệu hợp đồng / chứng thư, hệ số BKLS', type: 'contract', col: 12 }] });
+  const contractGroup = () => ({ title: 'Hợp đồng (từ Danh mục)', zone: 'party', fields: [{ id: 'contractId', label: 'Chọn dòng chi tiết hợp đồng — tàu, hàng hóa / TKHQ, số liệu thực hiện', type: 'contract', col: 12 }] });
 
   /* ===============================================================
    * Khai báo form từng loại biên bản
@@ -241,7 +241,7 @@
 
   const cfg = () => HAK.Config.data;
   /** Dữ liệu Excel của đúng loại biên bản `type` (mỗi loại có file riêng — xem HAK.App.slots). */
-  const getDs = (type) => { const s = HAK.App && HAK.App.slots[type]; return (s && s.ds && s.ds.ok) ? s.ds : null; };
+  const getDs = (type) => { if(ST[type]&&ST[type].savedDs)return ST[type].savedDs;const s = HAK.App && HAK.App.slots[type]; return (s && s.ds && s.ds.ok) ? s.ds : null; };
   const fid = (type, id) => 'f-' + type + '-' + id;
 
   /* ===============================================================
@@ -348,8 +348,9 @@
     // ---- bộ lọc ----
     const filterHtml =
       '<div class="card mb-3"><div class="card-body"><div class="sec-title">Phạm vi dữ liệu lấy từ Excel</div>' +
+      '<div id="smart-' + type + '"></div>' +
       '<div id="chips-' + type + '" class="d-none"></div>' +
-      '<div class="row g-2 align-items-end"><div class="col-6 col-md-4"><label class="form-label">Từ ngày</label><input type="date" class="form-control" id="from-' + type + '"></div>' +
+      '<div class="row g-2 align-items-end d-none"><div class="col-6 col-md-4"><label class="form-label">Từ ngày</label><input type="date" class="form-control" id="from-' + type + '"></div>' +
       '<div class="col-6 col-md-4"><label class="form-label">Đến ngày</label><input type="date" class="form-control" id="to-' + type + '"></div>' +
       '<div class="col-12 col-md-4 d-grid"><button class="btn btn-outline-secondary" id="resetFlt-' + type + '" type="button">Đặt lại bộ lọc</button></div></div>' +
       '<div class="form-text">Bỏ trống ngày = lấy toàn bộ dữ liệu trong file Excel.</div><div id="convNote-' + type + '"></div></div></div>';
@@ -375,6 +376,7 @@
       '<div class="col-6"><div class="sum-big" id="sumTons-' + type + '">0</div><div class="muted small">tấn</div></div></div>' +
       '<ul class="sum-list" id="sumList-' + type + '"></ul></div></div>' +
       '<div id="msgs-' + type + '" class="mb-3"></div>' +
+      '<div class="d-flex gap-2 mb-2"><button type="button" class="btn btn-outline-primary" data-year-save>Lưu hồ sơ</button><button type="button" class="btn btn-outline-secondary" data-year-new>Thêm mới</button><button type="button" class="btn btn-outline-secondary" data-year-list>Xem năm cũ</button></div><div class="small muted mb-2" id="year-note-'+type+'"></div>'+
       '<div class="d-grid gap-2"><button class="btn btn-primary btn-lg" id="gen-' + type + '" type="button">' + ico('word', '⚡') + 'Tạo biên bản (Word)</button>' +
       '<div class="row g-2"><div class="col-6 d-grid"><button class="btn btn-outline-primary" id="pdf-' + type + '" type="button">' + ico('printer', '🖨️') + 'Tải PDF</button></div>' +
       '<div class="col-6 d-grid"><button class="btn btn-outline-success" id="xls-' + type + '" type="button" title="Bảng cân chi tiết (Excel) để lưu trữ">' + ico('sheet', '📊') + 'Xuất Excel</button></div></div>' +
@@ -448,6 +450,7 @@
     window.addEventListener('hak:flush', () => saveForm(type));
     const upd = debounce(() => updateSummary(type), 120);
     sec.addEventListener('input', (e) => { if (e.target.closest('.card-body') && e.target.id && e.target.id.indexOf('f-') === 0) { save(); upd(); } });
+    sec.addEventListener('click',async(e)=>{try{if(e.target.hasAttribute('data-year-save')){e.target.disabled=true;await HAK.Yearbook.save(type);$('#year-note-'+type).textContent='Đã lưu năm '+HAK.Yearbook.year;}if(e.target.hasAttribute('data-year-list'))await HAK.Yearbook.show();if(e.target.hasAttribute('data-year-new')){if(!confirm('Tạo hồ sơ mới? Thông tin chưa lưu trên biểu mẫu sẽ bỏ qua.'))return;HAK.Pages.readOnly(type,false);HAK.Yearbook.clear(type);const contractSelect=$('#'+fid(type,'contractId'));if(contractSelect)contractSelect.disabled=false;delete ST[type].savedDs;delete ST[type].snapshotParams;DOCS[type].groups.forEach(g=>g.fields.forEach(f=>{if(f.type!=='company'&&f.type!=='warehouse')setField(type,f,f.type==='check'?false:f.def||'');}));ST[type].filter={groups:null,from:'',to:''};ST[type].returned.clear();$('#year-note-'+type).textContent='Hồ sơ mới — năm '+HAK.Yearbook.year;renderFilter(type);updateSummary(type);}}catch(err){toast(err.message,'error');}finally{if(e.target.hasAttribute('data-year-save'))e.target.disabled=false;}});
     sec.addEventListener('change', (e) => {
       if (e.target.id === fid(type, 'direction')) applyDirection(type);
       if (e.target.dataset && e.target.dataset.kind === 'warehouse') toggleCustomWh(e.target);
@@ -522,7 +525,7 @@
     saveForm(dst);
     // ---- phạm vi: đúng các đợt đã chuyển + lọc ngày / nhãn; xe trả về ----
     const hasRet = DOCS[dst].extra === 'returned', ret = p.returned || [];
-    ST[dst].filter = { groups: p.filter.groups ? new Set(p.filter.groups) : null, from: p.filter.from || '', to: p.filter.to || '', files, exclude: hasRet ? null : ret.slice(), fromType: src, fromShip: p.ship || '' };
+    ST[dst].filter = { smart: p.filter.smart ? JSON.parse(JSON.stringify(p.filter.smart)) : undefined, groups: p.filter.groups ? new Set(p.filter.groups) : null, from: p.filter.from || '', to: p.filter.to || '', files, exclude: hasRet ? null : ret.slice(), fromType: src, fromShip: p.ship || '' };
     ST[dst].returned = new Set(hasRet ? ret : []);
     renderConv(src);
     showZone(dst, 'party');                                   // bước tiếp theo ở trang đích: chọn hợp đồng
@@ -647,7 +650,7 @@
   }
   function setField(type, f, val) {
     const el = $('#' + fid(type, f.id)); if (!el) return;
-    if (f.type === 'whopt') {
+    if(f.type==='check'){el.checked=!!val;} else if (f.type === 'whopt') {
       const t = document.getElementById(el.id + '__txt'), inList = !val || whAttrList(f.attr).indexOf(val) >= 0;
       el.value = inList ? val : WH_CUSTOM;
       if (t) { t.value = inList ? '' : val; t.classList.toggle('d-none', inList); }
@@ -739,6 +742,7 @@
     const allLabels = ds ? ds.stats.groups.map((g) => g.label) : [];
     const sel = stt.filter.groups;
     p.filter = { groups: sel && sel.size < allLabels.length ? Array.from(sel) : null, from: stt.filter.from, to: stt.filter.to };
+    if (stt.filter.smart) p.filter.smart = Object.assign(JSON.parse(JSON.stringify(stt.filter.smart)), {tu: stt.filter.from || "", den: stt.filter.to || ""});
     if (stt.filter.files && stt.filter.files.length) p.filter.files = stt.filter.files.slice();          // v2.6.7: phạm vi chuyển từ kho gửi
     if (stt.filter.exclude && stt.filter.exclude.length) p.filter.exclude = stt.filter.exclude.slice();
     if (D.extra === 'returned') p.returned = Array.from(stt.returned);
@@ -749,7 +753,9 @@
       p.nhanId = p.direction === 'cn2ct' ? hak.id : cnn.id;
       p.docDate = p.qdDate;
     }
-    return p;
+    const linked = ST[type].snapshotParams?null:selectedContract(type);
+    if (linked) { p.product = linked.product || '';p.contractNo=p.contractNo||linked.no||''; p.tkhq = linked.tkhq || ''; p.parentContractId = linked.parentId; p.contractDetailId = linked.detailId; }
+    return ST[type].snapshotParams?Object.assign({},ST[type].snapshotParams,p):p;
   }
   function saveForm(type) {
     const o = {};
@@ -765,9 +771,27 @@
   /* ===============================================================
    * Bộ lọc + tóm tắt trực tiếp
    * ============================================================= */
+  const smartViews = {};
+  function documentSmart(type) {
+    const F=HAK.Filters, st=ST[type];
+    const options=key=>Array.from(new Set(((getDs(type)||{}).rows||[]).map(r=>r[key]).filter(Boolean))).sort((a,b)=>a.localeCompare(b,'vi'));
+    if(!smartViews[type]) {
+      const c=F.tripConfig(options);
+      smartViews[type]=F.mount('#smart-'+type,Object.assign({},c,{
+        screenId:'document-'+type,source:()=>G().filterRows(((getDs(type)||{}).rows||[]),{files:st.filter.files,exclude:st.filter.exclude,groups:st.filter.groups}),quickFields:['q','plate','carrier'],
+        onApply:state=>{st.filter.smart=state;st.filter.from=state.tu;st.filter.to=state.den;
+          $('#from-'+type).value=state.tu;$('#to-'+type).value=state.den;updateSummary(type);},
+        onReset:()=>{st.filter.from='';st.filter.to='';},
+        summary:r=>[{label:'Khối lượng',value:G().fmtTon(r.rows.reduce((a,x)=>a+(+x.net||0),0))+' tấn'}]
+      }));
+    }
+    const state=Object.assign({},st.filter.smart||F.core.empty(),{tu:st.filter.from||'',den:st.filter.to||''});
+    smartViews[type].setState(state);return smartViews[type];
+  }
   function renderFilter(type) {
     const ds = getDs(type), box = $('#chips-' + type);
     renderConv(type);
+    documentSmart(type);
     $('#noData-' + type).classList.toggle('d-none', !!ds);
     $('#gen-' + type).disabled = !ds; $('#pdf-' + type).disabled = !ds; $('#xls-' + type).disabled = !ds;
     if (pageBkls(type)) $('#bkls-' + type).disabled = !ds;
@@ -795,6 +819,7 @@
     const ds = getDs(type);
     const list = $('#sumList-' + type);
     if (!ds) { $('#sumTrips-' + type).textContent = '0'; $('#sumTons-' + type).textContent = '0'; list.innerHTML = ''; renderZones(type, null); return; }
+    if(smartViews[type]) documentSmart(type);
     const rows = currentRows(type), sum = G().summarize(rows);
     $('#sumTrips-' + type).textContent = fmtInt(sum.trips);
     $('#sumTons-' + type).textContent = G().fmtTon(sum.kg);
@@ -831,7 +856,8 @@
 
   /** Lưu hồ sơ vào 🗄️ Lưu trữ (không bao giờ làm hỏng việc xuất file). */
   async function archive(type, params, res, ds, mode) {
-    try { return !!(HAK.Archive && await HAK.Archive.save(type, params, res, ds, mode)); } catch (e) { console.warn(e); return false; }
+    if(HAK.Yearbook&&HAK.Yearbook.active(type)&&HAK.Yearbook.active(type).readonly)return false;
+    try { const ok=!!(HAK.Archive && await HAK.Archive.save(type, params, res, ds, mode));if(HAK.Yearbook&&ds===getDs(type))await HAK.Yearbook.save(type,true);return ok; } catch (e) { console.warn(e); return false; }
   }
   const SAVED = ' · đã lưu vào Lưu trữ';
 
@@ -841,7 +867,7 @@
     if (!ds) { toast('Chưa có dữ liệu Excel.', 'error'); return; }
     const params = src ? src.params : collect(type);
     let res;
-    try { res = G().build(type, ds, params); }
+    try { res = HAK.Yearbook?HAK.Yearbook.underContext(src?null:HAK.Yearbook.active(type),()=>G().build(type, ds, params)):G().build(type, ds, params); }
     catch (e) { console.error(e); toast('Lỗi khi tính dữ liệu: ' + e.message, 'error'); return; }
     showMessages(type, res);
     if (res.errors.length) { toast(res.errors[0], 'error'); if (!src) focusError(type, res.errors[0]); return; }
@@ -863,7 +889,7 @@
       try {
         if (!res.excel) throw new Error('Loại biên bản này chưa có dữ liệu xuất Excel.');
         await new Promise((ok) => setTimeout(ok, 30));      // cho vòng quay "Đang xuất…" kịp hiện trước khi dựng file
-        const out = await HAK.Exporter.download(res.excel);
+        const out = await HAK.Exporter.download(res.excel);if(!out)return;
         const sv = await archive(type, params, res, ds, 'xlsx');
         toast('Đã xuất: ' + out.name + ' (' + out.rows.toLocaleString('vi-VN') + ' phiếu' + (out.sheets > 1 ? ', ' + out.sheets + ' sheet' : '') + ')' + (sv ? SAVED : ''), 'success');
       } catch (e) { console.error(e); toast(e.message || String(e), 'error'); }
@@ -875,7 +901,7 @@
       const zipName = res.files.length > 1 ? res.files[res.files.length - 1].name.replace(/\.docx$/, '') + '.zip' : '';
       const done = await HAK.Word.Files.generateAndSave(res.files, { zip: !!params.zip, zipName, onProgress: Loading.set });
       const names = params.zip && done.length > 1 ? zipName : done.map((d) => d.name).join(', ');
-      const sv = await archive(type, params, res, ds, 'word');
+      if(!done.length)return;const sv = await archive(type, params, res, ds, 'word');
       toast('Đã sinh: ' + names + (res.warnings.length ? ' (có ' + res.warnings.length + ' lưu ý)' : '') + (sv ? SAVED : ''), 'success');
     } catch (e) {
       console.error(e); toast(e.message || String(e), 'error');
@@ -917,7 +943,13 @@
     const p = src ? src.params : collect(type);
     const rowsAll = G().filterRows(ds.rows, p.filter);
     if (!rowsAll.length) { toast('Không có phiếu cân nào trong phạm vi đã chọn. Hãy kiểm tra bộ lọc ngày.', 'error'); return; }
-    const want = { totalDocx: p.bklsTotalDocx, totalPdf: p.bklsTotalPdf, tripDocx: p.bklsTripDocx, tripPdf: p.bklsTripPdf };
+    let want = { totalDocx: p.bklsTotalDocx, totalPdf: p.bklsTotalPdf, tripDocx: p.bklsTripDocx, tripPdf: p.bklsTripPdf };
+    if (!src) {
+      const chosen = await HAK.BklsTemplates.choose(p); if (!chosen) return;
+      p.bklsTemplate = chosen.template; want = chosen.want;
+      p.bklsTotalDocx = want.totalDocx; p.bklsTotalPdf = want.totalPdf; p.bklsTripDocx = want.tripDocx; p.bklsTripPdf = want.tripPdf;
+    }
+    if(want.tripPdf&&rowsAll.length>100){toast('PDF từng xe giới hạn 100 xe mỗi lần để tránh treo trình duyệt. Lọc ít ngày hơn hoặc chọn Word từng xe.','warning');return;}
     if (!Object.keys(want).some((k) => want[k])) { toast('Chọn ít nhất một bản BKLS cần tạo (Tổng / Từng xe).', 'warning'); return; }
 
     // Xe trả về (chỉ những loại có "Chọn xe trả về") → tách riêng, KHÔNG tính vào BKLS chính.
@@ -926,7 +958,7 @@
     const rowsMain = rowsAll.filter((r) => !retSet.has(G().retKey(r)));
     const rowsReturned = rowsAll.filter((r) => retSet.has(G().retKey(r)));
 
-    const chk = bklsMissing(type, p, rowsMain.length > 0), nhan = chk.nhan, autoBuyer = chk.autoBuyer, benMuaTen = chk.benMuaTen;
+    const chk = HAK.Yearbook?HAK.Yearbook.underContext(src?null:HAK.Yearbook.active(type),()=>bklsMissing(type,p,rowsMain.length>0)):bklsMissing(type,p,rowsMain.length>0), nhan = chk.nhan, autoBuyer = chk.autoBuyer, benMuaTen = chk.benMuaTen;
     // v2.7.1 đơn vị vận chuyển cho mục 5 BKLS tổng — cùng thứ tự ưu tiên với phụ lục biên bản (generator.detailRows): Excel / danh sách xe → ĐVVC mặc định của trang → Cài đặt chung
     const dvvcOf = (r) => r.carrier || p.defaultCarrier || (HAK.Config.data.general || {}).defaultCarrier || '';
     if (chk.m.length) { toast('Chưa thể tạo BKLS — cần bổ sung: ' + chk.m.map((x) => x.label).join('; ') + '.', 'warning'); if (!src) focusField(type, chk.m[0].id); return; }
@@ -945,7 +977,7 @@
 
     // Các điều cần người dùng xác nhận (gộp vào MỘT lần bấm lại): trùng số BKLS, phạm vi quá nhiều xe cho bản từng xe.
     const confirmMsgs = [];
-    if (HAK.Issued && !src) {                   // tạo lại từ Lưu trữ = in lại bản đã lập → không cảnh báo trùng với chính nó
+    if (HAK.Issued && !src && !(HAK.Yearbook&&HAK.Yearbook.active(type)&&HAK.Yearbook.active(type).readonly)) {                   // tạo lại từ Lưu trữ = in lại bản đã lập → không cảnh báo trùng với chính nó
       const conflicts = HAK.Issued.checkBkls({ cid: p.giaoId, so: p.bklsSoBkls, type, batch: batchLabelName });
       if (conflicts.length) confirmMsgs.push('Số BKLS ' + p.bklsSoBkls + ' có thể đã dùng cho đợt khác: ' + conflicts.slice(0, 3).map((c) => '"' + c.rec.batch + '"').join(', ') + '.');
     }
@@ -962,15 +994,16 @@
     }
     ST[type].bklsDupKey = '';
 
-    const giao = HAK.Config.company(p.giaoId);
-    const kg = p.khoGiaoId ? HAK.Config.warehouse(p.khoGiaoId) : null;
-    const kn = p.khoNhanId ? HAK.Config.warehouse(p.khoNhanId) : null;
+    const savedConfig=(fn)=>HAK.Yearbook?HAK.Yearbook.underContext(src?null:HAK.Yearbook.active(type),fn):fn();
+    const giao = savedConfig(()=>HAK.Config.company(p.giaoId));
+    const kg = p.khoGiaoId ? savedConfig(()=>HAK.Config.warehouse(p.khoGiaoId)) : null;
+    const kn = p.khoNhanId ? savedConfig(()=>HAK.Config.warehouse(p.khoNhanId)) : null;
     const xuatKhoTai = kg ? (kg.address || kg.name) : '';
     const noiDen = kn ? (kn.address || kn.name) : '';
     const gCommon = {
       tenChu: HAK.Config.companyAttr(giao, 'cua'), mstChu: (giao.tax || '').trim(), diaChiChu: (giao.address || '').trim(),
       dienThoaiChu: (giao.phone || '').trim(), email: (giao.email || '').trim(), nguonGoc: p.bklsNguonGoc || NGUON_GOC_DEF,
-      maHs: maHsOf(type, p)   // v2.7.6
+      contractNo:p.contractNo||'', product: p.product || '', maHs: maHsOf(type, p)   // v2.7.6
     };
     const btn = $('#bkls-' + type) || {}; btn.disabled = true;
     Loading.show('Đang tạo BKLS…');
@@ -980,7 +1013,7 @@
 
       // ---- BKLS chính (không tính xe trả về) ----
       if (rowsMain.length) {
-        ctxMain = { g: Object.assign({}, gCommon, { xuatKhoTai, noiDen }) };
+        ctxMain = { template: p.bklsTemplate, g: Object.assign({}, gCommon, { xuatKhoTai, noiDen }) };
         const lotMain = {
           soBkls: p.bklsSoBkls, heSoBdmt: parseFloat(p.bklsHeSo), ngayLap: p.bklsNgayLap, ngayLapTheoXe: p.bklsNgayLapXe, listTrips: p.bklsListTrips !== false,
           benMuaTen, benMuaMst, benMuaDiaChi: benMuaDc, benMuaDt: p.bklsBenMuaDt, benMuaEmail: p.bklsBenMuaEmail,
@@ -998,7 +1031,7 @@
         const soBklsTv = p.bklsSoBkls + '-TV';
         const noiDenTv = (p.bklsTvNoiDen || '').trim() || (p.returnWh || '').trim() || xuatKhoTai || '';   // Ủy thác: "Kho nhận xe trả về"; loại khác: đảo ngược điểm xuất kho ban đầu
         const xuatKhoTaiTv = noiDen || '';                                                    // điểm xuất phát của lượt trả về = điểm đến của biên bản chính
-        const ctxTv = { g: Object.assign({}, gCommon, { xuatKhoTai: xuatKhoTaiTv, noiDen: noiDenTv }) };
+        const ctxTv = { template: p.bklsTemplate, g: Object.assign({}, gCommon, { xuatKhoTai: xuatKhoTaiTv, noiDen: noiDenTv }) };
         if (ctxMain && ctxMain.snapshot) ctxTv.snapshot = ctxMain.snapshot;   // dùng lại snapshot đã đọc, đỡ đọc lại file mẫu lần 2
         const lotTv = {
           soBkls: soBklsTv, heSoBdmt: parseFloat(p.bklsHeSo), ngayLap: p.bklsNgayLap, ngayLapTheoXe: p.bklsNgayLapXe, listTrips: p.bklsListTrips !== false,
@@ -1012,15 +1045,21 @@
       }
 
       // Nhiều file (bản từng xe bị chia phần) → gói 1 ZIP để trình duyệt không hỏi tải hàng chục file; ít file → tải từng file như cũ.
-      if (out.length > 4) {
+      const printable = out.filter(o => o.needsPrint);
+      const downloadable = out.filter(o => !o.needsPrint);
+      if (downloadable.length > 4) {
         Loading.set(99, 'Đang gói ZIP ' + out.length + ' file…');
         const z = new JSZip();
-        out.forEach((o) => z.file(o.name, o.blob, { binary: true }));
+        downloadable.forEach((o) => z.file(o.name, o.blob, { binary: true }));
         const zipName = 'BKLS_' + G().slug(DOCS[type].title) + '_' + String(p.bklsSoBkls).replace(/[\\/:*?"<>|\s]+/g, '-') + '.zip';
-        HAK.Word.Files.saveBlob(await z.generateAsync({ type: 'blob', compression: 'STORE' }), zipName);
-      } else out.forEach((o) => HAK.Word.Files.saveBlob(o.blob, o.name));
+        if(!await HAK.Word.Files.saveBlob(await z.generateAsync({ type: 'blob', compression: 'STORE' }), zipName))return;
+      } else for(const o of downloadable){if(!await HAK.Word.Files.saveBlob(o.blob,o.name))return;}
+      if (printable.length) {
+        const files = await Promise.all(printable.map(async o => ({name:o.name, bytes:new Uint8Array(await o.blob.arrayBuffer())})));
+        Loading.hide(); await HAK.Word.Pdf.print(files);
+      }
 
-      if (HAK.Issued) {
+      if (HAK.Issued && !(HAK.Yearbook&&HAK.Yearbook.active(type)&&HAK.Yearbook.active(type).readonly)) {
         for (const { b, sub } of perBatchMain) {
           const sumB = G().summarize(sub);
           const old = HAK.Issued.list.find((r) => r.kind === 'bkls' && r.cid === p.giaoId && r.type === type && r.batch === b.fileName && r.soBkls === p.bklsSoBkls);
@@ -1140,7 +1179,7 @@
     onData(only) {
       Object.keys(DOCS).forEach((t) => {
         if ((!only || only === t) && ST[t].built) {
-          ST[t].filter = { groups: null, from: '', to: '' }; ST[t].returned.clear(); renderFilter(t);
+          const select=$('#'+fid(t,'contractId'));if(select)select.disabled=false;delete ST[t].savedDs;delete ST[t].snapshotParams;if(HAK.Yearbook)HAK.Yearbook.clear(t);ST[t].filter = { groups: null, from: '', to: '' }; ST[t].returned.clear(); renderFilter(t);
           const c = selectedContract(t);                   // hợp đồng đang chọn có "lọc theo khoảng ngày cân" → giữ khoảng ngày đó cho dữ liệu mới
           if (c) applyContractFilter(t, contractValues(t, c).filter);
           updateSummary(t);
@@ -1148,10 +1187,15 @@
       });
     },
     show(type) { if (ST[type].built) { refreshContracts(type); renderFilter(type); updateSummary(type); } },
+    unloadSnapshot(type){delete ST[type].savedDs;delete ST[type].snapshotParams;ST[type].filter={groups:null,from:'',to:''};ST[type].returned.clear();HAK.Pages.readOnly(type,false);renderFilter(type);updateSummary(type);},
+    readOnly(type,on){$$('#page-'+type+' input,#page-'+type+' select,#page-'+type+' textarea').forEach(n=>n.disabled=on);if(on)$('#year-note-'+type).textContent='Chỉ xem năm đã đóng · Không ghi vào kho làm việc. Dùng Khôi phục năm nếu cần sửa.';},
+    snapshot(type){const ds=getDs(type);if(!ds)throw Error('Chưa có dữ liệu cân.');const params=collect(type);return {params,rows:JSON.parse(JSON.stringify(G().filterRows(ds.rows,params.filter)))};},
+    openSnapshot(record){const type=record.type;if(!DOCS[type])throw Error('Loại hồ sơ không hỗ trợ.');const rows=JSON.parse(JSON.stringify(record.rows));ST[type].savedDs={ok:true,rows,stats:HAK.Excel.computeStats(rows)};ST[type].snapshotParams=JSON.parse(JSON.stringify(record.params));ST[type].filter=Object.assign({groups:null,from:'',to:''},record.params.filter||{});if(ST[type].filter.groups)ST[type].filter.groups=new Set(ST[type].filter.groups);ST[type].returned=new Set(record.params.returned||[]);Object.assign(HAK.Config.custom,record.context&&record.context.custom||{});DOCS[type].groups.forEach(g=>g.fields.forEach(f=>{const node=$('#'+fid(type,f.id)),value=record.params[f.id];if(!node)return;if(node.tagName==='SELECT'&&value!=null&&!Array.from(node.options).some(o=>o.value===value)){const option=document.createElement('option');option.value=value;option.textContent=value+' (đã lưu)';node.append(option);}if(f.type!=='contract'&&value!=null)setField(type,f,value);}));const contract=$('#'+fid(type,'contractId'));if(contract){contract.value='';contract.disabled=true;contract.title='Hồ sơ dùng thông tin hợp đồng đã lưu; chọn Thêm mới để dùng hợp đồng khác.';}renderFilter(type);updateSummary(type);$('#year-note-'+type).textContent='Đang sửa hồ sơ năm '+record.year+' · phiên bản '+record.revision+' · Lưu hồ sơ để ghi thay đổi';},
     refreshSelects, generate, generateBkls,
     /** Loại biên bản có lập BKLS hay không (dùng ở Lưu trữ). */
     hasBkls: (t) => pageBkls(t),
     /** Dùng cho kiểm thử tự động */
+    _contractValues: contractValues,
     _collect: collect
   };
 })(window);

@@ -12,6 +12,7 @@
    * 1. Lưu trữ an toàn (localStorage có thể bị chặn khi mở file://)
    * ------------------------------------------------------------- */
   const mem = {};
+  const memOnly = new Set();
   /**
    * Ghi: localStorage (đồng bộ) + bản sao ngầm sang IndexedDB (HAK.DB kho "kv") → localStorage đầy / bị xóa vẫn khôi phục được ở lần mở sau
    * (HAK.Backup.boot). set() trả false CHỈ KHI cả hai đều không lưu được; khi đó gọi HAK.Store.onError(key) để giao diện báo người dùng.
@@ -21,24 +22,26 @@
     lastError: null,
     _fail(key) { this.lastError = { key, at: Date.now() }; if (typeof this.onError === 'function') { try { this.onError(key); } catch (e) { /* noop */ } } },
     get(key, def) {
+      if (memOnly.has(key)) return key in mem ? mem[key] : def;
       try {
         const v = root.localStorage.getItem(key);
         if (v !== null) return JSON.parse(v);
       } catch (e) { /* bỏ qua, dùng RAM */ }
       return key in mem ? mem[key] : def;
     },
-    set(key, val) {
+    set(key, val, opts) {
       mem[key] = val;
       let ls = false;
       try { root.localStorage.setItem(key, JSON.stringify(val)); ls = true; }
       catch (e) { /* đầy / bị chặn */ }
+      if (ls) memOnly.delete(key); else memOnly.add(key);
       const db = HAK.DB && HAK.DB.usable() ? HAK.DB : null;
-      if (db) db.kvPut(key, val, ls).catch(() => { if (!ls) this._fail(key); });
+      if (db && !(opts && opts.dbCommitted)) db.kvPut(key, val, ls).catch(() => { if (!ls) this._fail(key); });
       if (!ls && !db) { this._fail(key); return false; }
       return true;
     },
     remove(key) {
-      delete mem[key];
+      delete mem[key]; memOnly.delete(key);
       try { root.localStorage.removeItem(key); } catch (e) { /* noop */ }
       if (HAK.DB && HAK.DB.usable()) HAK.DB.kvDel(key).catch(() => { /* bỏ qua */ });
     },

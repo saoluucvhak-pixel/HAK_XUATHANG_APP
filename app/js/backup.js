@@ -51,7 +51,7 @@
         if (dir) { await setSavedDir(null); toast('Thư mục sao lưu mặc định không còn dùng được — đã bỏ chọn, đang lưu theo cách tải xuống thường.', 'warning'); }
       }
     }
-    HAK.Word.Files.saveBlob(blob, name);
+    if(!await HAK.Word.Files.saveBlob(blob, name)){const e=new Error('Chưa lưu bản sao lưu.');e.name='AbortError';throw e;}
   }
 
   /* ---------------- Khởi động: khôi phục từ bản sao ngầm ---------------- */
@@ -60,7 +60,7 @@
     try {
       const recs = await withTimeout(HAK.DB.kvAll(), 2500);
       for (const r of recs) {
-        if (!r || !r.key) continue;
+        if (!r || !r.key || r.key==='hak.yearbook.v1') continue;
         let inLs = null;
         try { inLs = root.localStorage.getItem(r.key); } catch (e) { /* bị chặn */ }
         if (inLs === null || r.ls === false) {          // thiếu ở localStorage, hoặc lần ghi gần nhất không vào được localStorage (bản trong LS đã cũ)
@@ -86,16 +86,16 @@
     const items = HAK.Archive ? await HAK.Archive.collectItems() : [];
     const batches = HAK.Batches ? await HAK.Batches.exportAll() : [];
     const issued = HAK.Issued ? await HAK.DB.getAll('issued') : [];
-    return { keys, items, batches, issued };
+    return { yearbook:HAK.Yearbook?await HAK.Yearbook.read():null,keys, items, batches, issued, attachments: await HAK.DB.getAll('attachments'), bklsTemplates: await HAK.DB.getAll('bklsTemplates') };
   }
   /** Dựng nội dung sao lưu toàn bộ (mảng chuỗi JSON — không nối thành 1 chuỗi lớn) + số đếm. */
   async function buildFull() {
-    const { keys, items, batches, issued } = await collect();
+    const { yearbook,keys, items, batches, issued, attachments, bklsTemplates } = await collect();
     const parts = ['{"app":"' + APP + '","v":1,"exportedAt":"' + new Date().toISOString() + '","keys":', JSON.stringify(keys), ',"archive":['];
     items.forEach((it, i) => { parts.push((i ? ',' : '') + JSON.stringify(it)); });
     parts.push('],"batches":[');
     batches.forEach((it, i) => { parts.push((i ? ',' : '') + JSON.stringify(it)); });
-    parts.push('],"issued":', JSON.stringify(issued), '}');
+    parts.push('],"issued":', JSON.stringify(issued), ',"attachments":', JSON.stringify(attachments), ',"bklsTemplates":', JSON.stringify(bklsTemplates), ',"yearbook":',JSON.stringify(yearbook), '}');
     return { parts, keys: Object.keys(keys).length, archive: items.length, batches: batches.length, issued: issued.length };
   }
   /** v2.7.5: nén thành .zip (1 file HAK_SaoLuuToanBo.json bên trong — Windows mở được). Không có JSZip → null (lưu .json như cũ). */
@@ -138,12 +138,30 @@
       return { legacy: true, keys: 0, added: r.added, updated: r.updated, skipped: r.skipped };
     }
     if (!j || j.app !== APP || typeof j.keys !== 'object' || !Array.isArray(j.archive)) throw new Error('Đây không phải file sao lưu toàn bộ của app.');
+    for (const store of ['attachments','bklsTemplates']) {
+      if (j[store] !== undefined && !Array.isArray(j[store])) throw new Error('Kho tệp sao lưu không hợp lệ');
+      for (const item of j[store] || []) {
+        if (!item || typeof item.id !== 'string' || typeof item.base64 !== 'string' || !/^[A-Za-z0-9+/]*={0,2}$/.test(item.base64)) throw new Error('Tệp đính kèm hoặc mẫu không hợp lệ');
+      }
+    }
+    if (HAK.ContractModel && j.keys['hak.catalog.v1'] && j.keys['hak.catalog.v1'].v === 3) {
+      const catalog = HAK.ContractModel.migrate(j.keys['hak.catalog.v1']).data;
+      for (const c of catalog.contracts) { const error = HAK.ContractModel.validate(c,catalog); if (error) throw new Error('Danh mục trong bản sao lưu không hợp lệ: '+error); }
+    }
+    if(j.yearbook&&HAK.Yearbook)HAK.Yearbook.validateBundle(j.yearbook.records);
     let keys = 0;
     Object.keys(j.keys).forEach((k) => {
       if (keepAuth && AUTH_KEYS.indexOf(k) >= 0) return;                // giữ tài khoản / mật khẩu / khóa khôi phục / loại máy hiện tại
       if (k.indexOf('hak.') === 0 && k !== LAST_KEY && k !== AUTO_KEY && j.keys[k] !== null) { HAK.Store.set(k, j.keys[k]); keys++; }
     });
+    if(j.yearbook&&HAK.Yearbook)await HAK.Yearbook.importState(j.yearbook.records);
     const r = await HAK.Archive.importItems(j.archive);
+    for (const store of ['attachments','bklsTemplates']) {
+      if (Array.isArray(j[store])) for (const item of j[store]) {
+        if (!item || typeof item.id !== 'string' || typeof item.base64 !== 'string') throw new Error('Tệp đính kèm hoặc mẫu không hợp lệ');
+        await HAK.DB.put(store, item);
+      }
+    }
     const nb = HAK.Batches && Array.isArray(j.batches) ? await HAK.Batches.importAll(j.batches) : 0;
     const ni = HAK.Issued && Array.isArray(j.issued) ? await HAK.Issued.importAll(j.issued) : 0;
     return { legacy: false, keys, added: r.added, updated: r.updated, skipped: r.skipped, batches: nb, issued: ni, keepAuth };
@@ -170,6 +188,7 @@
     if (ids && catalog && Array.isArray(catalog.contracts) && HAK.Catalog && HAK.Catalog.relatedTo) {
       catalog = Object.assign({}, catalog, { contracts: catalog.contracts.filter((c) => HAK.Catalog.relatedTo(c, ids)) });   // chỉ HĐ liên quan công ty của gói (+ HĐ chưa gán)
     }
+    if (catalog) catalog = Object.assign({}, catalog, { contracts: (catalog.contracts || []).map(c => { const copy = Object.assign({}, c); delete copy.contractFiles; delete copy.certificateFiles; if (Array.isArray(copy.details)) copy.details=copy.details.map(d=>{const child=Object.assign({},d);delete child.certificateFiles;delete child.sourcePdfId;return child;}); return copy; }) });
     return { app: PACK, v: 1, exportedAt: new Date().toISOString(), by: HAK.Auth ? HAK.Auth.who() : '',
       config: HAK.Config ? HAK.Config.data : HAK.Store.get(CFG_KEY, null), tpl, catalog, gsync: gs,
       auth: HAK.Auth ? HAK.Auth.packOut(ids) : { users: [], groupPub: null, station: null } };
@@ -213,22 +232,12 @@
   }
   function packApply(j) {
     const r = { tpl: 0, cat: 0, gs: 0 };
+    const mergedCatalog = j.catalog && HAK.ContractModel ? HAK.ContractModel.mergeCatalog(HAK.Store.get(CAT_KEY, null), j.catalog) : null;
     HAK.Store.set(CFG_KEY, j.config);
     Object.keys(j.tpl || {}).forEach((k) => { if (k.indexOf('hak.tpl.') === 0 && j.tpl[k]) { HAK.Store.set(k, j.tpl[k]); r.tpl++; } });
     if (j.catalog && Array.isArray(j.catalog.customers) && Array.isArray(j.catalog.contracts)) {
-      const loc = HAK.Store.get(CAT_KEY, null) || {};
-      const merge = (a, b) => {
-        const out = (Array.isArray(a) ? a : []).map((x) => Object.assign({}, x));
-        b.forEach((x) => {
-          if (!x || !x.id) return;
-          const i = out.findIndex((y) => y.id === x.id), clean = {};
-          Object.keys(x).forEach((k) => { if (x[k] !== '' && x[k] !== null && x[k] !== undefined) clean[k] = x[k]; });
-          if (i < 0) out.push(Object.assign({}, x)); else Object.assign(out[i], clean);
-          r.cat++;
-        });
-        return out;
-      };
-      HAK.Store.set(CAT_KEY, Object.assign({}, j.catalog, loc, { customers: merge(loc.customers, j.catalog.customers), contracts: merge(loc.contracts, j.catalog.contracts) }));
+      if (mergedCatalog) { HAK.Store.set(CAT_KEY, mergedCatalog); r.cat=(j.catalog.customers||[]).length+(j.catalog.contracts||[]).length; }
+      else throw new Error('Thiếu mô hình dữ liệu hợp đồng.');
     }
     const gsIn = j.gsync || {}, gs = HAK.Store.get(GS_KEY, null) || { cos: {} };
     if (!gs.cos) gs.cos = {};

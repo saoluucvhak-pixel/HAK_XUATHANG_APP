@@ -1,0 +1,10 @@
+{
+  "name": "hak-xuathang-app",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/*.test.cjs",
+    "check": "node tools/check.cjs",
+    "quality": "node tools/hak-quality/bin/hak-quality.js app --out reports/quality",
+    "release": "node tools/build-release.cjs"
+  }
+}

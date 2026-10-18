@@ -10,8 +10,8 @@
 (function (root) {
   'use strict';
   const HAK = (root.HAK = root.HAK || {});
-  const NAME = 'hak-app', VER = 3;
-  const STORES = { kv: { keyPath: 'key' }, batches: { keyPath: 'id' }, batchdata: {}, issued: { keyPath: 'id' }, handles: {} };
+  const NAME = 'hak-app', VER = 4;
+  const STORES = { kv: { keyPath: 'key' }, batches: { keyPath: 'id' }, batchdata: {}, issued: { keyPath: 'id' }, handles: {}, attachments: { keyPath: 'id' }, bklsTemplates: { keyPath: 'id' } };
   const memStores = {};                                  // dự phòng khi không có IndexedDB
   const state = { backend: root.indexedDB ? 'idb' : 'mem', error: null };
   let dbp = null;
@@ -30,6 +30,7 @@
           if (ev.oldVersion < 1) d.createObjectStore('kv', { keyPath: 'key' });
           if (ev.oldVersion < 2) { d.createObjectStore('batches', { keyPath: 'id' }); d.createObjectStore('batchdata'); d.createObjectStore('issued', { keyPath: 'id' }); }
           if (ev.oldVersion < 3) d.createObjectStore('handles');
+          if (ev.oldVersion < 4) { d.createObjectStore('attachments', { keyPath: 'id' }); d.createObjectStore('bklsTemplates', { keyPath: 'id' }); }
         };
         rq.onsuccess = () => { const d = rq.result; d.onversionchange = () => { d.close(); dbp = null; }; fin(d); };
         rq.onerror = () => { state.backend = 'mem'; state.error = String(rq.error || 'error'); fin(null); };

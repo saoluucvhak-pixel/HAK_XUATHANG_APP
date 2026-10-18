@@ -68,7 +68,7 @@
     const files = filter.files && filter.files.length ? new Set(filter.files) : null;
     const excl = filter.exclude && filter.exclude.length ? new Set(filter.exclude) : null;
     const fileOf = (r) => { const u = r.uid === undefined ? '' : String(r.uid), i = u.lastIndexOf('#'); return i < 0 ? '' : u.slice(0, i); };
-    return rows.filter((r) => {
+    const selected = rows.filter((r) => {
       if (files && r.uid !== undefined && !files.has(fileOf(r))) return false;
       if (excl && excl.has(r.uid !== undefined ? r.uid : r.idx)) return false;
       if (groups && !groups.has(r.note || '')) return false;
@@ -76,6 +76,11 @@
       if (to !== null && (r.ts1 === null || r.ts1 > to)) return false;
       return true;
     });
+    if (filter.smart) {
+      if (!HAK.Filters) throw new Error("Chưa nạp bộ lọc thông minh HAK.");
+      return HAK.Filters.trips(selected, filter.smart);
+    }
+    return selected;
   }
   function summarize(rows) {
     const st = HAK.Excel.computeStats(rows);
@@ -589,7 +594,14 @@
     filterRows, summarize, plateRows, detailRows, retKey,
     build(type, ds, params) {
       if (!ds || !ds.ok) return { files: [], summary: {}, warnings: [], errors: ['Chưa có dữ liệu Excel hợp lệ. Hãy thêm file ở mục "Nhập liệu".'] };
-      return BUILDERS[type](ds, params);
+      const res = BUILDERS[type](ds, params);
+      if (params.filter && params.filter.smart && HAK.Filters && res.excel) {
+        const scope = 'Phạm vi: ' + HAK.Filters.core.scopeText(HAK.Filters.tripConfig(), params.filter.smart);
+        if(res.excel.kind === 'A') res.excel.lines = (res.excel.lines || []).concat(scope);
+        else res.excel.note = (res.excel.note ? res.excel.note + ' · ' : '') + scope;
+        res.summary['Phạm vi lọc'] = scope;
+      }
+      return res;
     }
   };
 })(typeof window !== 'undefined' ? window : globalThis);
