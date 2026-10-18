@@ -26,6 +26,7 @@ jobs:
           Copy-Item installer/icon/app.ico installer/app/app.ico
           Remove-Item installer/app/MoKhoa_1Lan*.html, installer/app/XoaSach_DuLieu*.html -ErrorAction SilentlyContinue
           $ver = (Select-String -Path installer/setup.nsi -Pattern '!define VERSION "([^"]+)"').Matches[0].Groups[1].Value
+          "VERSION=$ver" | Out-File -FilePath $env:GITHUB_ENV -Append
           & "${env:ProgramFiles(x86)}\NSIS\makensis.exe" /DVERSION=$ver installer/setup.nsi
           if ($LASTEXITCODE -ne 0) { throw 'makensis failed' }
           Move-Item installer/HAK_QuanLyXuatHang_Setup.exe "HAK_QuanLyXuatHang_Setup_v$ver.exe"
@@ -36,7 +37,15 @@ jobs:
           name: HAK_QuanLyXuatHang_Setup
           path: HAK_QuanLyXuatHang_Setup_v*.exe
       - name: Publish release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ env.VERSION }}
+          target_commitish: ${{ github.sha }}
+          name: HAK Quản lý xuất hàng v${{ env.VERSION }}
+          body: |
+            Bộ cài Windows **v${{ env.VERSION }}** — dựng tự động từ commit ${{ github.sha }}.
+            Tải file `HAK_QuanLyXuatHang_Setup_v${{ env.VERSION }}.exe`, chạy để cài / cập nhật (giữ nguyên đường dẫn cài mặc định để không mất dữ liệu).
+            Bộ cài chưa ký số: Windows có thể hiện cảnh báo SmartScreen. Chi tiết thay đổi: NHAT_KY_PHIEN_BAN.md.
           files: HAK_QuanLyXuatHang_Setup_v*.exe
+          fail_on_unmatched_files: true
