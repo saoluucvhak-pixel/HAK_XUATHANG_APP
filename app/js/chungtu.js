@@ -359,12 +359,13 @@
       const d = DOCS()[r.type];
       return '<tr><td>' + fmtDT(r.at) + '</td><td>' + (r.kind === 'pxk' ? 'PXKKVCNB' : 'BKLS') + '</td><td>' + (d ? esc(d.title) : esc(r.type)) + '</td><td>' + esc(coName(r.cid)) + '</td><td class="text-break">' + esc(r.batch) + '</td>' +
         '<td class="mono">' + (r.kind === 'pxk' ? pad6(r.pxkFrom) + ' → ' + pad6(r.pxkTo) : esc(r.soBkls) + (r.benMua ? '<div class="muted small">' + esc(r.benMua) + '</div>' : '')) + '</td>' +
-        '<td class="num">' + G.fmtInt(r.trips) + '</td><td class="num">' + G.fmtTon(r.kg) + '</td><td class="small">' + (r.by ? esc(r.by) : '<span class="muted">(trước v2.6)</span>') + '</td><td><button class="btn btn-sm btn-outline-danger" type="button" data-del-log="' + esc(r.id) + '" title="Xóa dòng nhật ký">✕</button></td></tr>';
+        '<td class="num">' + G.fmtInt(r.trips) + '</td><td class="num">' + G.fmtTon(r.kg) + '</td><td class="small">' + (r.by ? esc(r.by) : '<span class="muted">(trước v2.6)</span>') + '</td><td class="text-nowrap">' + (r.kind === 'pxk' ? '<button class="btn btn-sm btn-outline-primary me-1" type="button" data-redo-log="' + esc(r.id) + '" title="Nạp lại đợt, số phiếu bắt đầu và hợp đồng vào form để tạo lại">↻ Tạo lại</button><button class="btn btn-sm btn-outline-success me-1" type="button" data-save-log="' + esc(r.id) + '" title="Tạo lại file với đúng thông số lần trước và lưu ngay">💾 Lưu</button>' : '') + '<button class="btn btn-sm btn-outline-danger" type="button" data-del-log="' + esc(r.id) + '" title="Xóa dòng nhật ký">✕</button></td></tr>';
     }).join('') : '<tr><td colspan="10" class="muted">Không có chứng từ khớp bộ lọc.</td></tr>';
   }
   const logBase = (kind, b, v, s) => ({ kind, type: st.type, cid: v.cua, cua: coName(v.cua), batch: b.fileName, from: s.from, to: s.to, trips: s.trips, kg: s.kg, canCuLenh: v.canCuLenh, contract: v.contractId || '', contractNo: (v.contractId && HAK.Catalog && (HAK.Catalog.contract(v.contractId, { history: true }) || {}).no) || '' });
 
-  async function onPxk() {
+  async function onPxk(ev, opt) {
+    opt = opt || {};
     const b = curBatch(); if (!b) { toast('Chưa có đợt để lập chứng từ.', 'error'); return; }
     const rows = b.ds.rows, v = readVals();
     const problems = validate(v, rows.length, 'pxk');
@@ -374,19 +375,41 @@
       return;
     }
     const start0 = parseInt(v.idBatDau, 10);
-    if (HAK.Issued && confirmDup('pxk|' + v.cua + '|' + start0 + '|' + b.fileName, 'ctPxk', HAK.Issued.checkPxk({ cid: v.cua, from: start0, to: start0 + rows.length - 1, type: st.type, batch: b.fileName }))) return;
+    if (!opt.resave && HAK.Issued && confirmDup('pxk|' + v.cua + '|' + start0 + '|' + b.fileName, 'ctPxk', HAK.Issued.checkPxk({ cid: v.cua, from: start0, to: start0 + rows.length - 1, type: st.type, batch: b.fileName }))) return;
     let res;
     try { res = buildPxk(rows, v); } catch (e) { console.error(e); toast('Lỗi khi tạo PXKKVCNB: ' + e.message, 'error'); return; }
     const s = b.ds.stats;
-    const name = 'PXKKVCNB_' + slug(DOCS()[st.type].title) + '_' + String(s.from).replace(/\//g, '') + (s.to && s.to !== s.from ? '-' + String(s.to).replace(/\//g, '') : '') + '.xlsx';
+    let name = 'PXKKVCNB_' + slug(DOCS()[st.type].title) + '_' + String(s.from).replace(/\//g, '') + (s.to && s.to !== s.from ? '-' + String(s.to).replace(/\//g, '') : '') + '.xlsx';
+    if (opt.fileName) name = opt.fileName;
     if(!await HAK.Word.Files.saveBlob(res.blob, name))return;
+    if (opt.resave) { toast('Đã lưu lại ' + name + ' (' + G.fmtInt(res.count) + ' phiếu, ' + pad6(res.from) + ' → ' + pad6(res.to) + ').', 'success'); return; }   // lưu lại: không thêm dòng nhật ký mới
     st.last = { from: res.from, to: res.to };
-    if (HAK.Issued) HAK.Issued.add(Object.assign(logBase('pxk', b, v, s), { pxkFrom: res.from, pxkTo: res.to, tenDonVi: v.tenDonVi, fileName: name })).then(renderLog);
+    if (HAK.Issued) HAK.Issued.add(Object.assign(logBase('pxk', b, v, s), { pxkFrom: res.from, pxkTo: res.to, tenDonVi: v.tenDonVi, fileName: name, vals: v })).then(renderLog);
     persist(); updateSummary();
     toast('Đã tạo ' + name + ' (' + G.fmtInt(res.count) + ' phiếu, ' + pad6(res.from) + ' → ' + pad6(res.to) + ').', 'success');
   }
 
   /* ---------------- Sự kiện ---------------- */
+
+  /** Nạp lại thông số một lần lập PXK trong nhật ký (đợt cân, số phiếu bắt đầu, hợp đồng, …) vào form. */
+  function loadRec(rec) {
+    if (!CT(rec.type)) { toast('Hình thức "' + rec.type + '" không còn.', 'warning'); return false; }
+    switchType(rec.type);
+    const b = batches().find((x) => x.fileName === rec.batch);
+    if (!b) { toast('Đợt "' + rec.batch + '" không còn trong mục Nhập liệu — nhập lại file cân của đợt đó rồi thử lại.', 'warning'); return false; }
+    st.batchName = b.fileName; render();
+    const vals = rec.vals ? Object.assign({}, rec.vals) : { cua: rec.cid, canCuLenh: rec.canCuLenh || '', tenDonVi: rec.tenDonVi || '', idBatDau: String(rec.pxkFrom == null ? '' : rec.pxkFrom), contractId: rec.contract || '' };
+    applyVals(Object.assign(defaultsFor(rec.type), st.vals[rec.type] || {}, vals));
+    resetDup(); updateSummary(); persist();
+    return true;
+  }
+  async function redoLog(id, save) {
+    const rec = HAK.Issued.list.find((x) => x.id === id); if (!rec) return;
+    if (!loadRec(rec)) return;
+    if (save && rec.vals) { await onPxk(null, { resave: true, fileName: rec.fileName }); return; }
+    $('#ctForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    toast(save ? 'Nhật ký cũ chưa lưu đủ thông số nên chưa lưu thẳng được — đã nạp lại đợt, số phiếu bắt đầu và hợp đồng, kiểm tra rồi bấm "Tạo PXKKVCNB".' : 'Đã nạp lại thông số lần lập ' + fmtDT(rec.at) + ' — kiểm tra rồi bấm "Tạo PXKKVCNB" (bấm thêm lần nữa khi có cảnh báo trùng).', 'info');
+  }
   function switchType(t) {
     if (!CT(t)) return;
     if (st.type && built) st.vals[st.type] = readVals();
@@ -425,6 +448,8 @@
     });
     form.addEventListener('input', (e) => { e.target.classList.remove('is-invalid'); resetDup(); persistSoon(); updateSummary(); });
     $('#ctLogBody').addEventListener('click', (e) => {
+      const rd = e.target.closest('[data-redo-log],[data-save-log]');
+      if (rd) { redoLog(rd.dataset.redoLog || rd.dataset.saveLog, !!rd.dataset.saveLog).catch((x) => toast(x.message || String(x), 'error')); return; }
       const d = e.target.closest('[data-del-log]'); if (!d) return;
       HAK.UI.confirmClick(d, () => HAK.Issued.remove(d.dataset.delLog).then(() => { renderLog(); updateSummary(); }), 'Xóa?');
     });
