@@ -28,6 +28,10 @@
   /** Tên hiển thị nguồn dữ liệu của 1 loại: tên file (1 đợt) hoặc "N đợt". */
   const slotLabel = (sl) => (sl.batches.length === 1 ? sl.batches[0].fileName : sl.batches.length + ' đợt');
 
+  /** Khóa phiếu mà người dùng chọn "dùng số của đợt sau" (lưu theo loại biên bản). */
+  const PREFER_KEY = (t) => 'hak.dupprefer.' + t;
+  const preferNewKeys = (t) => (t ? (HAK.Store.get(PREFER_KEY(t), []) || []) : []);
+  function setPreferNew(t, keys) { if (keys.length) HAK.Store.set(PREFER_KEY(t), keys); else HAK.Store.remove(PREFER_KEY(t)); }
   /** Gộp các đợt của 1 loại thành sl.ds. 1 đợt → dùng thẳng ds của đợt đó. ≥ 2 đợt → nối dòng, khử phiếu trùng, tính lại thống kê. */
   function mergeSlot(sl) {
     const ok = sl.batches.filter((b) => b.ds && b.ds.ok);
@@ -36,20 +40,35 @@
     ok.forEach((b) => b.ds.rows.forEach((r) => { r.uid = b.fileName + '#' + r.idx; }));
     if (!ok.length) { sl.ds = (sl.batches[sl.sel] || sl.batches[0]).ds; return; }
     if (ok.length === 1) { sl.ds = ok[0].ds; return; }
-    const seen = new Set(), rows = [], warnings = [];
-    let dup = 0;
+    // v2.12.1: gom các dòng cùng khóa (số phiếu|biển số|giờ cân vào) từ mọi đợt. Mặc định giữ dòng của đợt NẠP TRƯỚC (như cũ);
+    // phiếu trùng giữa các file mà KHÁC khối lượng → ghi vào conflicts để người dùng chọn dùng số của đợt sau (lưu theo loại, bền qua lần mở app).
+    const type = Object.keys(App.slots).find((t) => App.slots[t] === sl) || '', useNew = new Set(preferNewKeys(type));
+    const groups = new Map(), warnings = [];
+    let total = 0;
     ok.forEach((b) => {
       b.ds.rows.forEach((r) => {
-        const k = (r.ticket || '') + '|' + r.plate + '|' + (r.ts1 !== null && r.ts1 !== undefined ? r.ts1 : r.time1) + (r.ticket ? '' : '|' + r.net);
-        if (seen.has(k)) { dup++; return; }
-        seen.add(k); rows.push(r);
+        const k = G.omitKey(r); total++;
+        if (!groups.has(k)) groups.set(k, []);
+        groups.get(k).push({ r, file: b.fileName });
       });
       (b.ds.warnings || []).forEach((w) => warnings.push('[' + b.fileName + '] ' + w));
     });
+    const rows = [], conflicts = [], sig = (r) => [r.net, r.gross, r.tare].join('/');
+    groups.forEach((g, k) => {
+      const files = new Set(g.map((x) => x.file));
+      if (files.size > 1 && g.some((x) => sig(x.r) !== sig(g[0].r))) {
+        const pickNew = useNew.has(k), chosen = pickNew ? g[g.length - 1] : g[0];
+        rows.push(chosen.r);
+        conflicts.push({ key: k, ticket: g[0].r.ticket || '', plate: g[0].r.plate, time: g[0].r.time1, useNew: pickNew,
+          items: g.map((x) => ({ file: x.file, net: x.r.net, gross: x.r.gross, tare: x.r.tare })) });
+      } else rows.push(g[0].r);
+    });
+    const dup = total - rows.length;
+    if (dup) warnings.unshift('ℹ Đã bỏ ' + dup + ' phiếu trùng giữa các đợt (cùng số phiếu, biển số, ngày giờ cân).');
+    if (conflicts.length) warnings.unshift('⚠ ' + conflicts.length + ' phiếu trùng giữa các đợt nhưng KHÁC khối lượng — kiểm tra ở mục Nhập liệu → "Xem & chọn" để dùng đúng số.');
     const t = (r) => (r.ts1 !== null && r.ts1 !== undefined ? r.ts1 : Infinity);
     rows.sort((a, b) => (t(a) === t(b) ? 0 : t(a) < t(b) ? -1 : 1));
-    if (dup) warnings.unshift('ℹ Đã bỏ ' + dup + ' phiếu trùng giữa các đợt (cùng số phiếu, biển số, ngày giờ cân).');
-    sl.ds = { ok: true, merged: true, batchCount: ok.length, dup, rows, stats: X.computeStats(rows), warnings, errors: [], meta: {}, columns: [], mapping: {}, autoMapping: {}, missing: [], missingOptional: [], skipped: 0, reconciled: false };
+    sl.ds = { ok: true, merged: true, batchCount: ok.length, dup, conflicts, rows, stats: X.computeStats(rows), warnings, errors: [], meta: {}, columns: [], mapping: {}, autoMapping: {}, missing: [], missingOptional: [], skipped: 0, reconciled: false };
   }
   const PAGE_SIZE = 25;
 
@@ -149,7 +168,8 @@
     }).join('');
     const ds = sl.ds;
     $('#batchSummary').innerHTML = ds && ds.ok
-      ? '<b>Dữ liệu gộp cho trang biên bản:</b> ' + sl.batches.length + ' đợt · ' + fmtInt(ds.stats.trips) + ' xe · ' + G.fmtTon(ds.stats.kg) + ' tấn' + (ds.stats.from ? ' · ' + esc(ds.stats.from) + ' → ' + esc(ds.stats.to) : '') + (ds.dup ? ' <span class="text-warning">· đã bỏ ' + ds.dup + ' phiếu trùng giữa các đợt</span>' : '')
+      ? '<b>Dữ liệu gộp cho trang biên bản:</b> ' + sl.batches.length + ' đợt · ' + fmtInt(ds.stats.trips) + ' xe · ' + G.fmtTon(ds.stats.kg) + ' tấn' + (ds.stats.from ? ' · ' + esc(ds.stats.from) + ' → ' + esc(ds.stats.to) : '') + (ds.dup ? ' <span class="text-warning">· đã bỏ ' + ds.dup + ' phiếu trùng giữa các đợt</span>' : '') +
+        (ds.conflicts && ds.conflicts.length ? '<div class="alert alert-warning py-2 mt-2 mb-0">⚠ <b>' + ds.conflicts.length + ' phiếu trùng giữa các đợt nhưng khác khối lượng.</b> App đang dùng số theo lựa chọn của bạn (mặc định: đợt nạp trước). <button class="btn btn-sm btn-warning ms-2" id="btnConflicts" type="button">Xem &amp; chọn</button></div>' : '')
       : '<span class="text-danger">Chưa có đợt nào đọc được.</span>';
   }
   /** v2.7.2 ô "DS xe" của 1 đợt: số xe + khớp biển số, hoặc cảnh báo chưa có. */
@@ -176,6 +196,40 @@
     if (location.hash === '#/home' || !location.hash) renderHome();
     toast('Đã xóa đợt khỏi dữ liệu của loại này.', 'info');
   }
+  /* ---- v2.12.1: phiếu trùng giữa các đợt nhưng khác khối lượng → chọn đợt trước / đợt sau ---- */
+  function ensureConflictModal() {
+    if ($('#conflictModal')) return;
+    const m = document.createElement('div');
+    m.className = 'modal fade'; m.id = 'conflictModal'; m.tabIndex = -1;
+    m.innerHTML = '<div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Phiếu trùng giữa các đợt, khác khối lượng</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button></div>' +
+      '<div class="modal-body"><p class="small muted">Cùng số phiếu, biển số và giờ cân vào nhưng khối lượng khác nhau ở các file Excel. Chọn số nào sẽ được dùng cho biên bản. Mặc định là <b>đợt nạp trước</b>; nếu file sau là bản đã sửa thì chọn <b>đợt sau</b>. Lựa chọn được nhớ cho loại biên bản này.</p>' +
+      '<div class="d-flex flex-wrap gap-2 mb-2"><button class="btn btn-sm btn-outline-primary" id="cfAllNew" type="button">Dùng đợt sau cho tất cả</button><button class="btn btn-sm btn-outline-secondary" id="cfAllOld" type="button">Giữ đợt trước cho tất cả</button><span class="ms-auto small" id="cfCount"></span></div>' +
+      '<div class="tbl-wrap"><table class="table table-sm"><thead><tr><th>Số phiếu</th><th>Giờ cân 1</th><th>Biển số</th><th>Đợt trước</th><th>Đợt sau</th><th>Dùng</th></tr></thead><tbody id="cfBody"></tbody></table></div></div>' +
+      '<div class="modal-footer"><button class="btn btn-primary" data-bs-dismiss="modal" type="button">Xong</button></div></div></div>';
+    document.body.appendChild(m);
+    const apply = (keys) => { setPreferNew(App.type, keys); const sl = App.slot(); mergeSlot(sl); renderConflicts(); renderTypePicker(); renderBatches(); updateChips(); HAK.Pages.onData(App.type); };
+    $('#cfBody').addEventListener('change', (e) => {
+      const r = e.target.closest('input[data-key]'); if (!r) return;
+      const cur = new Set(preferNewKeys(App.type)); if (r.value === 'new') cur.add(r.dataset.key); else cur.delete(r.dataset.key);
+      apply(Array.from(cur));
+    });
+    $('#cfAllNew').addEventListener('click', () => apply(Array.from(new Set((App.slot().ds.conflicts || []).map((c) => c.key).concat(preferNewKeys(App.type))))));
+    $('#cfAllOld').addEventListener('click', () => apply([]));
+  }
+  function renderConflicts() {
+    const sl = App.slot(), list = (sl && sl.ds && sl.ds.conflicts) || [];
+    const kg = (x) => fmtInt(x.net) + ' kg · ' + esc(x.file);
+    $('#cfBody').innerHTML = list.map((c) => {
+      const first = c.items[0], last = c.items[c.items.length - 1], name = 'cf' + esc(c.key);
+      return '<tr><td class="mono">' + esc(c.ticket || '—') + '</td><td>' + esc(c.time) + '</td><td>' + esc(c.plate) + '</td>' +
+        '<td' + (c.useNew ? ' class="opacity-50"' : ' class="fw-semibold"') + '>' + kg(first) + '</td><td' + (c.useNew ? ' class="fw-semibold"' : ' class="opacity-50"') + '>' + kg(last) + '</td>' +
+        '<td class="text-nowrap"><label class="me-2"><input type="radio" name="' + name + '" data-key="' + esc(c.key) + '" value="old"' + (c.useNew ? '' : ' checked') + '> trước</label>' +
+        '<label><input type="radio" name="' + name + '" data-key="' + esc(c.key) + '" value="new"' + (c.useNew ? ' checked' : '') + '> sau</label></td></tr>';
+    }).join('');
+    const used = list.filter((c) => c.useNew).length;
+    $('#cfCount').textContent = list.length ? list.length + ' phiếu khác khối lượng · dùng đợt sau: ' + used + ' · đợt trước: ' + (list.length - used) : 'Không còn phiếu khác khối lượng.';
+  }
+  function openConflicts() { ensureConflictModal(); renderConflicts(); bootstrap.Modal.getOrCreateInstance($('#conflictModal')).show(); }
   function setFileType(t) {
     if (t && !HAK.Pages.DOCS[t]) return;
     App.type = t || '';
@@ -219,6 +273,8 @@
       if (App.ds.ok) toast((replaced ? 'Đã thay đợt "' + file.name + '": ' : 'Đã thêm đợt: ') + fmtInt(App.ds.stats.trips) + ' phiếu cân — ' + G.fmtTon(App.ds.stats.kg) + ' tấn.' +
         (fv ? ' Danh sách xe của đợt: ' + fv.count + ' xe (sheet "' + fv.sheet + '").' : App.cur().veh ? ' Giữ danh sách xe đã gắn cho đợt.' : ' Đợt chưa có danh sách xe — bấm 🚚 ở dòng đợt để gắn.'), fv || App.cur().veh ? 'success' : 'warning');
       else toast(App.ds.errors[0] || 'Không đọc được dữ liệu.', 'error');
+      const cf = App.slot() && App.slot().ds && App.slot().ds.conflicts;
+      if (cf && cf.length) toast('⚠ ' + cf.length + ' phiếu trùng giữa các đợt nhưng KHÁC khối lượng — bấm "Xem & chọn" ở khung Dữ liệu gộp để chọn số đúng.', 'warning');
     } catch (e) {
       console.error(e); toast(e.message || String(e), 'error');
     } finally { Loading.hide(); }
@@ -530,6 +586,7 @@
     // Upload
     const dz = $('#dropzone');
     $('#fileInput').addEventListener('change', (e) => { const fl = Array.from(e.target.files); e.target.value = ''; handleFiles(fl); });
+    $('#batchSummary').addEventListener('click', (e) => { if (e.target.closest('#btnConflicts')) openConflicts(); });
     $('#batchBody').addEventListener('click', (e) => {
       const d = e.target.closest('[data-del-batch]');
       if (d) { confirmClick(d, () => deleteBatch(+d.dataset.delBatch), 'Bấm lần nữa để xóa'); return; }

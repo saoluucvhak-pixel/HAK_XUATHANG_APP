@@ -260,4 +260,8 @@ Thủy chốt 28/09/2026: "1. bỏ Trao đổi KHÔNG đồng bộ lên Google S
 ## v2.12.0 — Bỏ phiếu cân
 - generator.js: filterRows nhận filter.omit (khóa G.omitKey = số phiếu|biển số|giờ cân vào) — phiếu bỏ coi như không có ở mọi đầu ra (biên bản, BKLS, Lưu trữ, Báo cáo).
 - pages.js: nút 🚫 Bỏ phiếu cân… + hộp thoại (tìm, tick, lý do, khôi phục tất cả); p.filter.omit / omitLog lưu kèm hồ sơ; mở hồ sơ đã lưu nạp lại omitLog; dòng "Đã bỏ N phiếu · −X tấn".
-- tests/omit-tickets.test.cjs (3 kiểm thử). Còn lại: cảnh báo phiếu trùng khác khối lượng khi nạp file khác tên.
+- tests/omit-tickets.test.cjs (3 kiểm thử). 
+
+## v2.12.1 — Cảnh báo phiếu trùng khác khối lượng
+- main.js mergeSlot: gom dòng theo G.omitKey; phiếu trùng giữa các file mà khác net/gross/tare → ds.conflicts; mặc định giữ đợt trước, lựa chọn "dùng đợt sau" lưu ở HAK.Store 'hak.dupprefer.<loại>'.
+- Khung vàng + nút "Xem & chọn" (hộp thoại từng phiếu, chọn tất cả), toast sau khi nạp, thêm vào ds.warnings.
