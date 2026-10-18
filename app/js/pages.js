@@ -52,11 +52,7 @@
     );
     fields.push(
       // v2.7.1 (Thủy chốt phương án A): bản tổng liệt kê từng BKLS con theo ngày ở mục 5 "Hồ sơ kèm theo" → bản tổng nhiều tờ
-      { id: 'bklsListTrips', label: 'Bản tổng: liệt kê BKLS từng xe theo ngày ở mục 5 "Hồ sơ kèm theo" (bỏ tick = bản tổng gọn 1 trang)', type: 'check', def: true, col: 12 },
-      { id: 'bklsTotalDocx', label: 'BKLS Tổng — Word', type: 'check', def: true, col: 3 },
-      { id: 'bklsTotalPdf', label: 'BKLS Tổng — PDF', type: 'check', def: true, col: 3 },
-      { id: 'bklsTripDocx', label: 'BKLS Từng xe — Word', type: 'check', def: true, col: 3 },
-      { id: 'bklsTripPdf', label: 'BKLS Từng xe — PDF', type: 'check', def: true, col: 3 }
+      { id: 'bklsListTrips', label: 'Bản tổng: liệt kê BKLS từng xe theo ngày ở mục 5 "Hồ sơ kèm theo" (bỏ tick = bản tổng gọn 1 trang)', type: 'check', def: true, col: 12 }
     );
     return { title: 'Bảng kê lâm sản (BKLS)', zone: 'bkls', fields };
   }
@@ -382,7 +378,7 @@
       '<div class="d-grid gap-2"><button class="btn btn-primary btn-lg" id="gen-' + type + '" type="button">' + ico('word', '⚡') + 'Tạo biên bản (Word)</button>' +
       '<div class="row g-2"><div class="col-6 d-grid"><button class="btn btn-outline-primary" id="pdf-' + type + '" type="button">' + ico('printer', '🖨️') + 'Tải PDF</button></div>' +
       '<div class="col-6 d-grid"><button class="btn btn-outline-success" id="xls-' + type + '" type="button" title="Bảng cân chi tiết (Excel) để lưu trữ">' + ico('sheet', '📊') + 'Xuất Excel</button></div></div>' +
-      (pageBkls(type) ? '<button class="btn btn-outline-dark" id="bkls-' + type + '" type="button">' + ico('bkls', '🧾') + 'Tạo BKLS (Tổng + Từng xe)</button>' : '') +
+      (pageBkls(type) ? '<button class="btn btn-outline-dark" id="bkls-' + type + '" type="button">' + ico('bkls', '🧾') + 'Tạo BKLS…</button>' : '') +
       '</div>' +
       '<div class="form-text text-center mt-2" id="genHint-' + type + '"></div>' +
       (CONV_FROM[type] ? '<div class="border-top mt-3 pt-3"><div class="fw-semibold mb-1">' + ico('convert', '➡') + 'Chuyển sang hình thức khác</div>' +
@@ -951,12 +947,11 @@
     const p = src ? src.params : collect(type);
     const rowsAll = G().filterRows(ds.rows, p.filter);
     if (!rowsAll.length) { toast('Không có phiếu cân nào trong phạm vi đã chọn. Hãy kiểm tra bộ lọc ngày.', 'error'); return; }
-    let want = { totalDocx: p.bklsTotalDocx, totalPdf: p.bklsTotalPdf, tripDocx: p.bklsTripDocx, tripPdf: p.bklsTripPdf };
-    if (!src) {
-      const chosen = await HAK.BklsTemplates.choose(p); if (!chosen) return;
-      p.bklsTemplate = chosen.template; want = chosen.want;
-      p.bklsTotalDocx = want.totalDocx; p.bklsTotalPdf = want.totalPdf; p.bklsTripDocx = want.tripDocx; p.bklsTripPdf = want.tripPdf;
-    }
+    // v2.12.4: LUÔN hỏi phạm vi / định dạng (mặc định "BKLS tổng · Word"), kể cả khi tạo lại từ Lưu trữ — trước đây Lưu trữ dùng 4 ô đã lưu
+    // (mặc định đều tick) nên luôn tạo cả bản từng xe Word + PDF rất lâu dù chỉ cần bản tổng.
+    const chosen = await HAK.BklsTemplates.choose(p); if (!chosen) return;
+    p.bklsTemplate = chosen.template;
+    const want = chosen.want;
     if(want.tripPdf&&rowsAll.length>100){toast('PDF từng xe giới hạn 100 xe mỗi lần để tránh treo trình duyệt. Lọc ít ngày hơn hoặc chọn Word từng xe.','warning');return;}
     if (!Object.keys(want).some((k) => want[k])) { toast('Chọn ít nhất một bản BKLS cần tạo (Tổng / Từng xe).', 'warning'); return; }
 

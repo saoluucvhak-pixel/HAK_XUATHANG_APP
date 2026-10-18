@@ -272,3 +272,7 @@ Thủy chốt 28/09/2026: "1. bỏ Trao đổi KHÔNG đồng bộ lên Google S
 ## v2.12.3 — Chữ vỡ font khi tạo Word, lỗi lưu tệp
 - docx-worker.js: Blob(atob(...)) mã hóa UTF-8 hai lần → chữ tiếng Việt trong worker thành "Ä ang…"; đổi sang Uint8Array.from(atob(...)). tests/docx-worker.test.cjs thêm kiểm thử (thất bại trước khi sửa).
 - word.js saveBlob: thử lại khi HAKDocs trả 409 "OCR is processing another document" (≤ 40 lần × 1,5 giây); lỗi mạng và tệp > ~26 MB báo rõ bằng tiếng Việt. Giữ nguyên nguyên tắc không tự chuyển sang tải của trình duyệt (tests/download-save.test.cjs).
+
+## v2.12.4 — BKLS nhanh hơn, gợi ý hộp Lưu
+- pages.js generateBkls: luôn gọi HAK.BklsTemplates.choose (mặc định BKLS tổng · Word) kể cả khi tạo lại từ Lưu trữ (src) — trước đó src dùng 4 ô p.bklsTotal*/Trip* đã lưu (mặc định true) → luôn tạo cả từng xe Word + PDF. Bỏ 4 ô tick; nút "Tạo BKLS…".
+- word.js saveBlob: toast gợi ý "Đang mở hộp Lưu của Windows… tìm biểu tượng nhấp nháy ở taskbar"; tests/download-save.test.cjs cập nhật (chỉ đếm toast lỗi / cảnh báo).

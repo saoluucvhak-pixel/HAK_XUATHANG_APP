@@ -1,5 +1,7 @@
 # HAK Quản lý xuất hàng
 
+- [Bản 2.12.4 — tạo BKLS nhanh hơn, hướng dẫn khi hộp Lưu mở](docs/HUONG_DAN_2.12.4.md)
+
 - [Bản 2.12.3 — sửa chữ vỡ font khi tạo Word, lỗi "Chưa lưu tệp"](docs/HUONG_DAN_2.12.3.md)
 
 - [Bản 2.12.2 — sửa lỗi cài đè khi app đang chạy ngầm](docs/HUONG_DAN_2.12.2.md)

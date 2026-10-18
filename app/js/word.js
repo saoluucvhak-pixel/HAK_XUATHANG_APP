@@ -133,6 +133,7 @@
         // Trình hỗ trợ (HAKDocs) từ chối gói > 36 MB mà không đọc hết → trình duyệt chỉ báo "Failed to fetch": báo rõ nguyên nhân trước khi gửi.
         if(encoded.length>36*1024*1024-4096)throw Error('tệp quá lớn ('+Math.round(raw.length/1048576)+' MB), vượt giới hạn ~26 MB của trình hỗ trợ lưu tệp. Thu hẹp phạm vi (ngày / số phiếu / biển số) rồi tạo lại');
         const send=async()=>{const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),180000);try{return await fetch('http://127.0.0.1:31879/save-download',{method:'POST',headers:{'Content-Type':'application/json','X-HAK-Client':'documents-v1'},body:JSON.stringify({name,base64:encoded}),signal:controller.signal});}finally{clearTimeout(timer);}};
+        if(HAK.UI&&HAK.UI.toast)HAK.UI.toast('Đang mở hộp Lưu của Windows cho "'+name+'". Nếu chưa thấy, tìm biểu tượng nhấp nháy ở thanh taskbar (hộp có thể nằm sau cửa sổ trình duyệt).','info');
         let response;
         for(let attempt=0;;attempt++){
           try{response=await send();}catch(err){if(err&&err.name==='AbortError')throw err;throw Error('không kết nối được trình hỗ trợ lưu tệp (HAKDocs) — có thể nó đã tắt khi cài bản mới hoặc sau thời gian dài không dùng');}
