@@ -284,3 +284,9 @@ Thủy chốt 28/09/2026: "1. bỏ Trao đổi KHÔNG đồng bộ lên Google S
 ## v2.12.6 — Sửa gốc HAKDocs.exe
 - installer/native/HAKDocs.cs: FileBusy riêng cho /save-download, /download-files, /verify-download, /downloads (hàng đợi ≤ 10 phút) — Busy chỉ còn cho /ocr (409 như cũ); ForceForeground (ALT + SetForegroundWindow) cho hộp Lưu; yêu cầu > 36 MB được đọc bỏ rồi trả 413 (trước: ngắt kết nối → "Failed to fetch"); tự tắt sau 24 giờ thay vì 4.
 - build-setup.yml: biên dịch HAKDocs.exe bằng installer/native/build.ps1 trước khi đóng bộ cài + smoke test (/status, download-files list, 40 MB → 413).
+
+## v2.12.7 — Ô số có dấu phân cách, BKLS không bị chặn (gồm sửa gốc HAKDocs của 2.12.6)
+- numfmt.js (HAK.NumFmt: parse / txt / format / attach): ô data-numfmt="num" (kg, tấn, tiền) và "dec" (độ ẩm, độ khô); pages.js (contractQty, certWet, certDry, unitPrice, moisture) và catalog.js (inp type number → ô chữ + fv trả số máy đọc, báo lỗi nếu không phải số).
+- excel.js parseNum: "0,123" → 0.123 (trước 123).
+- pages.js generateBkls: không chặn khi thiếu Số BKLS / hệ số / tên bên mua — tự điền hoặc để trống + cảnh báo.
+- tests/parse-num.test.cjs, tests/numfmt.test.cjs.

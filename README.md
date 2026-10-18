@@ -1,5 +1,7 @@
 # HAK Quản lý xuất hàng
 
+- [Bản 2.12.7 — ô số có dấu phân cách, tạo BKLS không bị chặn](docs/HUONG_DAN_2.12.7.md)
+
 - [Bản 2.12.6 — sửa nguyên nhân gốc trong HAKDocs.exe](docs/HUONG_DAN_2.12.6.md)
 
 - [Bản 2.12.5 — tự tải qua trình duyệt khi trình hỗ trợ lưu tệp lỗi](docs/HUONG_DAN_2.12.5.md)

@@ -363,11 +363,16 @@
   }
 
   /* ---------- Biểu mẫu thêm / sửa ---------- */
+  // v2.12.7: ô số hiện dạng Việt (6.500 · 25.400 · 0,48); giá trị lưu vẫn là số (xem fv). Độ khô / độ ẩm là số thập phân thuần.
+  const DEC_IDS = ['dryFactory', 'moisture'];
   const inp = (id, label, col, val, opt) => {
     opt = opt || {};
+    const isNum = opt.type === 'number' && !opt.ro, mode = DEC_IDS.indexOf(id) >= 0 ? 'dec' : 'num';
+    const raw = val === null || val === undefined ? '' : val;
+    const shown = isNum && raw !== '' && HAK.NumFmt && HAK.NumFmt.parse(raw, mode) !== null ? HAK.NumFmt.txt(HAK.NumFmt.parse(raw, mode), mode) : raw;
     return '<div class="col-md-' + col + '"><label class="form-label" for="cf-' + id + '" id="cf-' + id + '-lbl">' + label + '</label>' +
-      '<input class="form-control" id="cf-' + id + '" type="' + (opt.type || 'text') + '"' + (opt.step ? ' step="' + opt.step + '" inputmode="decimal"' : '') + (opt.list ? ' list="' + opt.list + '"' : '') +
-      (opt.ro ? ' readonly' : '') + ' value="' + esc(val === null || val === undefined ? '' : val) + '" placeholder="' + esc(opt.ph || '') + '" autocomplete="off">' +
+      '<input class="form-control" id="cf-' + id + '" type="' + (isNum ? 'text' : (opt.type || 'text')) + '"' + (isNum ? ' data-numfmt="' + (DEC_IDS.indexOf(id) >= 0 ? 'dec' : 'num') + '" inputmode="decimal"' : (opt.step ? ' step="' + opt.step + '" inputmode="decimal"' : '')) + (opt.list ? ' list="' + opt.list + '"' : '') +
+      (opt.ro ? ' readonly' : '') + ' value="' + esc(shown) + '" placeholder="' + esc(opt.ph || '') + '" autocomplete="off">' +
       (opt.help !== undefined ? '<div class="form-text" id="cf-' + id + '-help">' + opt.help + '</div>' : '') + '</div>';
   };
   const custSelect = (id, label, col, val, allowNew) => {
@@ -442,7 +447,9 @@
       if(e&&e.target.id==='cf-type')$('#cf-currency').value=(TYPES[$('#cf-type').value]||TYPES.xuatkhau).cur;
     }if(ed.kind==='exec'){const mt=num($('#cf-mt').value),bd=num($('#cf-bdmt').value),help=$('#cf-bdmt-help');if(help)help.textContent=mt>0&&bd>0?'Độ khô thực tế: '+G().fmtDec(bd/mt,4):'';const values=M.valuation(ed.draft,{bdmt:bd,exchangeRate:num($('#cf-exchangeRate').value)});$('#cf-valueUsd').value=values.valueUsd==null?'':fmtNum(values.valueUsd,2);$('#cf-valueVnd').value=values.valueVnd==null?'':fmtNum(values.valueVnd,0);}
   }
-  const fv=id=>{const node=$('#cf-'+id);if(node&&['contractProduct','product'].includes(id)&&node.value==='__new'){const name=String($('#cf-'+id+'-newName').value).trim();if(!name)throw Error('Chưa nhập tên hàng hóa mới');return name;}return node?(node.type==='checkbox'?node.checked:node.value):'';};
+  const fv=id=>{const node=$('#cf-'+id);if(node&&['contractProduct','product'].includes(id)&&node.value==='__new'){const name=String($('#cf-'+id+'-newName').value).trim();if(!name)throw Error('Chưa nhập tên hàng hóa mới');return name;}if(!node)return '';if(node.type==='checkbox')return node.checked;
+    if(node.dataset&&node.dataset.numfmt){const text=String(node.value).trim();if(text==='')return '';const n=HAK.NumFmt.parse(text,node.dataset.numfmt);if(n===null)throw Error('Ô "'+(($('#cf-'+id+'-lbl')||{}).textContent||id)+'": "'+text+'" không phải là số');return String(n);}
+    return node.value;};
   async function onSave() {
     const ed=state.editing;if(!ed)return;
     const before=M.copy(state.data);$('#catSave').disabled=true;
@@ -523,7 +530,7 @@
   const changed = () => { try { window.dispatchEvent(new CustomEvent('hak:catalog')); } catch (e) { /* bỏ qua */ } };
 
   function render() { syncCompanies(); build(); renderRows(); }
-  function init() { load(); syncCompanies(); build(); }
+  function init() { load(); syncCompanies(); build(); if (HAK.NumFmt && $('#catForm')) HAK.NumFmt.attach($('#catForm')); }
 
   load();   // có dữ liệu ngay khi các module khác cần (trước cả init)
   HAK.Catalog = {

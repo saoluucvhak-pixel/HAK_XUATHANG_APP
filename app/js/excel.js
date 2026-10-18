@@ -83,9 +83,9 @@
     } else if (commas > 1 || dots > 1) {
       s = s.replace(/[.,]/g, '');
     } else if (commas === 1) {
-      s = /,\d{3}$/.test(s) ? s.replace(',', '') : s.replace(',', '.');
+      s = /,\d{3}$/.test(s) && !/^-?0,/.test(s) ? s.replace(',', '') : s.replace(',', '.');   // "0,123" = số thập phân (không bao giờ là dấu nghìn)
     } else if (dots === 1) {
-      if (/\.\d{3}$/.test(s) && !/^0\./.test(s)) s = s.replace('.', '');
+      if (/\.\d{3}$/.test(s) && !/^-?0\./.test(s)) s = s.replace('.', '');
     }
     const n = parseFloat(s);
     return isFinite(n) ? n : null;

@@ -153,13 +153,13 @@
         { title: 'Hợp đồng ủy thác', zone: 'party', fields: [
           { id: 'contractNo', label: 'Số hợp đồng', type: 'text', ph: 'UTXK/ĐN-ĐH/0626', col: 5 },
           { id: 'contractDate', label: 'Ngày ký', type: 'date', col: 3 },
-          { id: 'contractQty', label: 'KL tạm tính (BDMT)', type: 'text', ph: '6500', col: 4 } ] },
+          { id: 'contractQty', label: 'KL tạm tính (BDMT)', type: 'text', ph: '6.500', col: 4, num: 'num' } ] },
         { title: 'Chứng thư giám định', zone: 'party', fields: [
           { id: 'certNo', label: 'Số chứng thư', type: 'text', ph: '26E04GPT00232-07', col: 6 },
           { id: 'certDate', label: 'Ngày chứng thư', type: 'date', col: 6 },
-          { id: 'certWet', label: 'KL giám định — tấn tươi', type: 'text', ph: '13.010,81', col: 4 },
-          { id: 'certDry', label: 'KL giám định — tấn khô', type: 'text', ph: 'Để trống = tự tính', col: 4 },
-          { id: 'moisture', label: 'Độ ẩm (%)', type: 'text', ph: '49,9818', col: 4 } ] },
+          { id: 'certWet', label: 'KL giám định — tấn tươi', type: 'text', ph: '13.010,81', col: 4, num: 'num' },
+          { id: 'certDry', label: 'KL giám định — tấn khô', type: 'text', ph: 'Để trống = tự tính', col: 4, num: 'num' },
+          { id: 'moisture', label: 'Độ ẩm (%)', type: 'text', ph: '49,9818', col: 4, num: 'dec' } ] },
         { title: 'Thông tin biên bản', zone: 'doc', fields: [
           { id: 'returnWh', label: 'Kho nhận xe trả về', type: 'text', def: 'Kho Hoàng Anh Khôi Đà Nẵng', col: 6 },
           { id: 'period', label: 'Đợt tháng (MM/YYYY)', type: 'text', ph: 'Tự động', col: 3 },
@@ -222,7 +222,7 @@
           { id: 'contractNo', label: 'Hợp đồng mua bán số', type: 'text', ph: '01.26/HĐMB-HAK-ĐH', col: 6 },
           { id: 'period', label: 'Tháng (MM/YYYY)', type: 'text', ph: 'Tự động', col: 3 },
           { id: 'docDate', label: 'Ngày lập', type: 'date', col: 3, today: true },
-          { id: 'unitPrice', label: 'Đơn giá (đồng/tấn)', type: 'text', ph: 'VD: 1.250.000 — để trống = không in giá', col: 6 },
+          { id: 'unitPrice', label: 'Đơn giá (đồng/tấn)', type: 'text', ph: 'VD: 1.250.000 — để trống = không in giá', col: 6, num: 'num' },
           { id: 'priceNote', label: 'Ghi chú giá', type: 'text', ph: 'VD: chưa bao gồm thuế GTGT', col: 6 },
           { id: 'defaultCarrier', label: 'Đơn vị vận chuyển mặc định (khi Excel không có cột này)', type: 'text', col: 12 } ] },
         bklsGroup(BKLS_TYPES.xuatban, BKLS_HAS_RETURNED.xuatban)
@@ -308,7 +308,7 @@
     else if (f.type === 'select') ctl = '<select class="form-select" id="' + id + '">' + f.options.map((o) => '<option value="' + esc(o[0]) + '"' + (o[0] === val ? ' selected' : '') + '>' + esc(o[1]) + '</option>').join('') + '</select>';
     else if (f.type === 'date') ctl = '<input type="date" class="form-control" id="' + id + '" value="' + esc(f.today ? todayISO() : '') + '">';
     else if (f.type === 'check') return '<div class="col-md-' + f.col + '"><div class="form-check mt-2"><input class="form-check-input" type="checkbox" id="' + id + '"' + (val ? ' checked' : '') + '><label class="form-check-label" for="' + id + '">' + esc(f.label) + '</label></div></div>';
-    else ctl = '<input type="text" class="form-control" id="' + id + '" value="' + esc(val) + '" placeholder="' + esc(f.ph || '') + '" autocomplete="off">';
+    else ctl = '<input type="text" class="form-control" id="' + id + '"' + (f.num ? ' data-numfmt="' + f.num + '" inputmode="decimal"' : '') + ' value="' + esc(f.num && HAK.NumFmt && HAK.NumFmt.parse(val, f.num) !== null ? HAK.NumFmt.txt(HAK.NumFmt.parse(val, f.num), f.num) : val) + '" placeholder="' + esc(f.ph || '') + '" autocomplete="off">';
     if (f.help) ctl += '<div class="form-text" id="' + id + '-help"></div>';   // chỗ hiển thị gợi ý động (vd. số BKLS kế tiếp)
     return '<div class="col-md-' + f.col + '">' + lbl + ctl + '</div>';
   }
@@ -444,6 +444,7 @@
    * ============================================================= */
   function bind(type) {
     const sec = $('#page-' + type);
+    if (HAK.NumFmt) HAK.NumFmt.attach(sec);   // ô số: tự thêm dấu . hàng nghìn khi rời ô
     const save = debounce(() => saveForm(type), 300);
     window.addEventListener('hak:flush', () => saveForm(type));
     const upd = debounce(() => updateSummary(type), 120);
@@ -964,7 +965,21 @@
     const chk = HAK.Yearbook?HAK.Yearbook.underContext(src?null:HAK.Yearbook.active(type),()=>bklsMissing(type,p,rowsMain.length>0)):bklsMissing(type,p,rowsMain.length>0), nhan = chk.nhan, autoBuyer = chk.autoBuyer, benMuaTen = chk.benMuaTen;
     // v2.7.1 đơn vị vận chuyển cho mục 5 BKLS tổng — cùng thứ tự ưu tiên với phụ lục biên bản (generator.detailRows): Excel / danh sách xe → ĐVVC mặc định của trang → Cài đặt chung
     const dvvcOf = (r) => r.carrier || p.defaultCarrier || (HAK.Config.data.general || {}).defaultCarrier || '';
-    if (chk.m.length) { toast('Chưa thể tạo BKLS — cần bổ sung: ' + chk.m.map((x) => x.label).join('; ') + '.', 'warning'); if (!src) focusField(type, chk.m[0].id); return; }
+    // v2.12.7: KHÔNG chặn nữa — tự điền chỗ thiếu rồi vẫn tạo, nói rõ ở thông báo cuối: Số BKLS = số kế tiếp đã lập (hoặc 001/<năm>/BKLS),
+    // hệ số = mặc định của ô, tên bên mua để trống (in "………" trên BKLS để điền tay).
+    const preWarn = [];
+    chk.m.forEach((x) => {
+      if (x.id === 'bklsSoBkls') {
+        const last = HAK.Issued && p.giaoId ? HAK.Issued.list.find((r) => r.kind === 'bkls' && r.cid === p.giaoId && !/-TV$/.test(r.soBkls || '')) : null;
+        const so = (last && HAK.Issued.nextBklsNo(last.soBkls)) || ('001/' + new Date().getFullYear() + '/BKLS');
+        p.bklsSoBkls = so; const f = fieldDef(type, 'bklsSoBkls'); if (!src && f) setField(type, f, so);
+        preWarn.push('Số BKLS chưa nhập → tự đặt ' + so + '.');
+      } else if (x.id === 'bklsHeSo') {
+        const f = fieldDef(type, 'bklsHeSo'), def = f && f.def !== undefined ? String(f.def) : '0.468';
+        p.bklsHeSo = def; if (!src && f) setField(type, f, def);
+        preWarn.push('Hệ số RMT → BDMT chưa hợp lệ → dùng mặc định ' + def + '.');
+      } else if (x.id === 'bklsBenMuaTen') preWarn.push('Chưa có tên bên mua / nhận — để trống trên BKLS.');
+    });
     const benMuaMst = p.bklsBenMuaMst || (autoBuyer ? (nhan.tax || '') : '');
     const benMuaDc = p.bklsBenMuaDc || (autoBuyer ? (nhan.address || '') : '');
 
@@ -1080,7 +1095,7 @@
         }
       }
 
-      const warn = [];
+      const warn = preWarn.slice();
       const thieu = [['MST', gCommon.mstChu], ['địa chỉ', gCommon.diaChiChu], ['số điện thoại', gCommon.dienThoaiChu], ['email', gCommon.email]].filter((x) => !x[1]).map((x) => x[0]);
       if (thieu.length) warn.push('Bên xuất chưa có ' + thieu.join(', ') + ' (Cài đặt → Công ty): dòng tương ứng trên BKLS giữ nguyên như file mẫu.');
       if (rowsMain.length && !benMuaMst) warn.push('Chưa có MST bên mua.');
