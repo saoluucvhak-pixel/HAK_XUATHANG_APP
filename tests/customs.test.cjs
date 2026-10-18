@@ -114,3 +114,15 @@ test('giấy nộp tiền: số tờ khai ghi dạng nhãn, bị tách khoảng 
   }
   const same=P.parseReceiptText('13/08/2026 : Thue xuat khau 308847091251 : 815.572.800 : 815.572.800 : 754');assert.equal(same.lines[0].no,'308847091251');
 });
+test('giấy nộp tiền thuế (mẫu cũ, ảnh chụp): số DN0106/26, tờ khai + ngày + loại hình, số tiền, NDKT, chương',()=>{
+  const t='GIẤY NỘP TIỀN VÀO NGÂN SÁCH NHÀ NƯỚC : Mã hiệu: ........ : Số: DN0106/26\nNgười nộp thuế: CÔNG TY TNHH HOÀNG ANH KHÔI\nMã số thuế: 0401447476\nNgười nộp thay: ......\nTên cơ quan quản lý thu: HẢI QUAN CỬA KHẨU CẢNG ĐÀ NẴNG\nTờ khai HQ số(1): 308629604751 ngày: 11/06/2026 Loại hình XNK(1): B11 : Phần dành cho NH ủy nhiệm\nSTT : Nội dung các khoản nộp NS (4) : Số tiền : Mã NDKT : Mã chương\nThuế xuất khẩu dăm gỗ : 1.103.393.280 đ : 1851 : 754\nTỔNG CỘNG : 1.103.393.280 đ\nTổng số tiền ghi bằng chữ: Một tỷ, một trăm lẻ ba triệu\nĐỐI TƯỢNG NỘP TIỀN\nNgày 12 tháng 06 năm 2026';
+  const r=P.parseReceiptText(t);
+  assert.equal(r.receiptNo,'DN0106/26');assert.equal(r.formCode,'');assert.equal(r.date,'2026-06-12');assert.equal(r.payerTax,'0401447476');assert.equal(r.payer,'CÔNG TY TNHH HOÀNG ANH KHÔI');
+  assert.equal(r.lines.length,1);const l=r.lines[0];
+  assert.deepEqual([l.no,l.declDate,l.declType,l.amount,l.kind,l.ndkt,l.chapter],['308629604751','2026-06-11','B11',1103393280,'tax','1851','754']);assert.equal(r.total,1103393280);assert.deepEqual(r.warnings,[]);
+});
+test('giấy nộp tiền thuế bổ sung: người nộp thay, số QC0206/26, 11.806.308 cho tờ khai …722',()=>{
+  const t='Số: QC0206/26\nNgười nộp thuế: CÔNG TY TNHH HOÀNG ANH KHÔI\nNgười nộp thay: CÔNG TY TNHH HOÀNG ANH KHÔI QUẢNG NAM\nMã số thuế: 4000956057\nĐề nghị NH (KBNN): Đầu tư & Phát triển Việt Nam trích TK số: 5626999999\nTờ khai HQ số(1): 308629701722 ngày: 21/06/2026 Loại hình XNK(1): B11\nThuế xuất khẩu dăm gỗ : 11.806.308 đ : 1851 : 754\nTỔNG CỘNG : 11.806.308 đ\nNgày 22 tháng 06 năm 2026';
+  const r=P.parseReceiptText(t);
+  assert.equal(r.receiptNo,'QC0206/26');assert.equal(r.date,'2026-06-22');assert.equal(r.lines.length,1);assert.deepEqual([r.lines[0].no,r.lines[0].amount,r.lines[0].declDate],['308629701722',11806308,'2026-06-21']);
+});

@@ -311,7 +311,7 @@
           if (!$('#cs-ln-on-' + i).checked) return;
           const t = $('#cs-ln-t-' + i).value; if (!t) throw Error('Dòng ' + (i + 1) + ': chưa chọn tờ khai để gắn.');
           const amount = NF().parse($('#cs-ln-a-' + i).value, 'num'); if (amount === null) throw Error('Dòng ' + (i + 1) + ': số tiền không hợp lệ.');
-          picked.push({ no: ln.no, target: t, amount, kind: $('#cs-ln-k-' + i).value, content: $('#cs-ln-c-' + i).value.trim(), periodDate: $('#cs-ln-d-' + i).value, chapter: $('#cs-ln-h-' + i).value.trim(), ndkt: $('#cs-ln-n-' + i).value.trim(), dbhc: $('#cs-ln-b-' + i).value.trim() });
+          picked.push({ no: ln.no, declDate: ln.declDate, declType: ln.declType, target: t, amount, kind: $('#cs-ln-k-' + i).value, content: $('#cs-ln-c-' + i).value.trim(), periodDate: $('#cs-ln-d-' + i).value, chapter: $('#cs-ln-h-' + i).value.trim(), ndkt: $('#cs-ln-n-' + i).value.trim(), dbhc: $('#cs-ln-b-' + i).value.trim() });
         });
         if (!picked.length) throw Error('Chưa tick dòng nào để lưu.');
         let n = 0;
@@ -319,7 +319,7 @@
           next.customs = next.customs || [];
           picked.forEach((x) => {
             let d = x.target === '__new' ? null : next.customs.find((y) => y.id === x.target);
-            if (!d) { d = CM().newDecl({ no: x.no, status: 'opened', note: 'Tạo từ giấy nộp tiền ' + (v.receiptNo || ''), supplements: [], payments: [] }); next.customs.push(d); }
+            if (!d) { d = CM().newDecl({ no: x.no, openDate: x.declDate || '', type: x.declType || '', status: 'opened', note: 'Tạo từ giấy nộp tiền ' + (v.receiptNo || ''), supplements: [], payments: [] }); next.customs.push(d); }
             const same = (y) => !y.deletedAt && ((y.refNo && v.refNo && y.refNo === CM().digits(v.refNo) && y.amount === x.amount) || (y.receiptNo && y.receiptNo === v.receiptNo && y.amount === x.amount && y.kind === x.kind));
             if ((d.payments || []).some(same)) return;   // nhập lại cùng giấy → không nhân đôi
             (d.payments = d.payments || []).push(CM().newPay({ receiptNo: v.receiptNo, formCode: v.formCode, refNo: v.refNo, date: v.date, payer: v.payer, kind: x.kind, content: x.content, amount: x.amount, periodDate: x.periodDate, chapter: x.chapter, ndkt: x.ndkt, dbhc: x.dbhc }));

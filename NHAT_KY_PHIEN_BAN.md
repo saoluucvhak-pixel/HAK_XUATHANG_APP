@@ -291,6 +291,9 @@ Thủy chốt 28/09/2026: "1. bỏ Trao đổi KHÔNG đồng bộ lên Google S
 - pages.js generateBkls: không chặn khi thiếu Số BKLS / hệ số / tên bên mua — tự điền hoặc để trống + cảnh báo.
 - tests/parse-num.test.cjs, tests/numfmt.test.cjs.
 
+## v2.14.3 — Giấy nộp tiền thuế (mẫu cũ có dòng "Tờ khai HQ số")
+- Đọc ngày và loại hình của tờ khai ghi trên giấy ("Tờ khai HQ số(1): … ngày: 11/06/2026 Loại hình XNK(1): B11"); khi tạo tờ khai mới từ giấy nộp tiền thì điền sẵn ngày mở và loại hình. Kiểm thử thêm 2 mẫu thật (DN0106/26, QC0206/26).
+
 ## v2.14.2 — Số tờ khai trên giấy nộp tiền
 - Đọc số tờ khai ghi theo nhãn ("Tờ khai số: …", "theo TK …"), bị OCR tách khoảng trắng / dấu chấm, hoặc nằm ở dòng nội dung; trước đây chỉ đọc dãy 12 số liền.
 

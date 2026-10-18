@@ -158,17 +158,18 @@
     if (tl) out.total = tl.amount;
     const kind = (s) => (/le\s*phi/.test(fold(s)) ? 'fee' : 'tax');
     // Số tờ khai duy nhất xuất hiện trong giấy (bỏ dòng "Số tham chiếu") → dùng cho dòng nộp không ghi số tờ khai
-    const nos = []; lines.forEach((l) => { if (/tham\s*chieu/.test(fold(l))) return; declNumbers(l).forEach((d) => { if (nos.indexOf(d.no) < 0) nos.push(d.no); }); });
+    const nos = [], info = {}; lines.forEach((l) => { if (/tham\s*chieu/.test(fold(l))) return; declNumbers(l).forEach((d) => { if (nos.indexOf(d.no) < 0) nos.push(d.no); const f = fold(l), t = /loai\s*hinh[^:：]*[:：]\s*([a-z]\d{2})\b/.exec(f); if (/to\s*khai/.test(f) && dmy(l)) info[d.no] = { date: dmy(l), type: t ? t[1].toUpperCase() : '' }; }); });   // "Tờ khai HQ số(1): N ngày: 11/06/2026 Loại hình XNK(1): B11"
     lines.forEach((l) => {
       const f = fold(l); if (/tong\s*cong|tham\s*chieu|ma\s*so\s*thue|so\s*tien\s*ghi\s*bang/.test(f)) return;
       if (!/(thue|le\s*phi|phi\b)/.test(f)) return;
       const t = tableLine(l); if (!t || t.amount === null) return;
       const ds = declNumbers(l), content = t.content.replace(/^\d+\s+/, '') || (kind(l) === 'fee' ? 'Lệ phí' : 'Thuế xuất khẩu');
-      out.lines.push({ no: ds.length ? ds[0].no : '', amount: t.amount, kind: kind(l), content, periodDate: t.date, chapter: t.chapter, ndkt: t.ndkt, dbhc: t.dbhc });
+      out.lines.push({ no: ds.length ? ds[0].no : '', declDate: '', declType: '', amount: t.amount, kind: kind(l), content, periodDate: t.date, chapter: t.chapter, ndkt: t.ndkt, dbhc: t.dbhc });
     });
     // Dạng "Tờ khai HQ số(1): 308629701720 …" + dòng "Thuế xuất khẩu … 551.696.640 đ" (không có số tờ khai trên dòng nộp) → gán số tờ khai duy nhất
     out.lines.forEach((x) => { if (!x.no && nos.length === 1) x.no = nos[0]; });
-    if (!out.lines.length && out.total !== null) out.lines.push({ no: nos.length === 1 ? nos[0] : '', amount: out.total, kind: 'tax', content: 'Thuế xuất khẩu', periodDate: '', chapter: '', ndkt: '', dbhc: '' });
+    out.lines.forEach((x) => { const i = info[x.no]; if (i) { x.declDate = i.date; x.declType = i.type; } });
+    if (!out.lines.length && out.total !== null) out.lines.push({ no: nos.length === 1 ? nos[0] : '', declDate: '', declType: '', amount: out.total, kind: 'tax', content: 'Thuế xuất khẩu', periodDate: '', chapter: '', ndkt: '', dbhc: '' });
     if (out.total === null && out.lines.length) out.total = out.lines.reduce((a, x) => a + x.amount, 0);
     if (!out.receiptNo) out.warnings.push('Chưa đọc được SỐ giấy nộp tiền (góc trên bên phải, ô "Số:"). Nhập tay theo giấy gốc.');
     if (!out.date) out.warnings.push('Chưa đọc được ngày nộp tiền.');
