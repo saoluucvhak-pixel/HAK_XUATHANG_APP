@@ -471,6 +471,7 @@
   }
 
   function draw() {
+    if (HAK.Customs && HAK.Customs.drawReport) { try { HAK.Customs.drawReport(); } catch (e) { console.error(e); } }
     // v2.6.2: mặc định chỉ hồ sơ của công ty làm việc (công tắc "Xem tất cả công ty") — áp cho mọi bảng / Excel / Google Sheet của trang
     ensureReportSmart();
     const scope = HAK.Auth && HAK.Auth.scopeIds ? HAK.Auth.scopeIds('report') : null;
@@ -551,6 +552,7 @@
 
   function init() {
     if (!$('#page-report')) return;
+    if (HAK.Customs && HAK.Customs.initReport) HAK.Customs.initReport();
     $('#repType').innerHTML += TYPES.map(([key, , name]) => '<option value="' + key + '">' + esc(name) + '</option>').join('');
     ['#repFrom', '#repTo', '#repType'].forEach((s) => $(s).addEventListener('change', draw));
     $('#repYear').addEventListener('change', (e) => { const y = e.target.value; $('#repFrom').value = y ? y + '-01-01' : ''; $('#repTo').value = y ? y + '-12-31' : ''; draw(); });
@@ -640,6 +642,6 @@
     });
   }
 
-  HAK.Report = { compute, toExcel, toExcelCarrier, aggCarrierDaily, render, init, TYPES, xhLots, xhTrips, xhSheetRows, toExcelXuatHang };
+  HAK.Report = { newWorkbook, buildSheet, compute, toExcel, toExcelCarrier, aggCarrierDaily, render, init, TYPES, xhLots, xhTrips, xhSheetRows, toExcelXuatHang };
   if (typeof module !== 'undefined' && module.exports) module.exports = HAK.Report;
 })(typeof window !== 'undefined' ? window : globalThis);

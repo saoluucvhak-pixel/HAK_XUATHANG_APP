@@ -42,11 +42,30 @@ class HAKDocs {
  static T Win<T>(IAsyncOperation<T> op){var until=DateTime.UtcNow.AddMinutes(2);while(op.Status==AsyncStatus.Started){if(DateTime.UtcNow>until){op.Cancel();throw new TimeoutException("Windows OCR operation timed out.");}Thread.Sleep(15);}return op.GetResults();}
  static void Win(IAsyncAction op){var until=DateTime.UtcNow.AddMinutes(2);while(op.Status==AsyncStatus.Started){if(DateTime.UtcNow>until){op.Cancel();throw new TimeoutException("Windows PDF operation timed out.");}Thread.Sleep(15);}op.GetResults();}
  static Task<object> Read(byte[] bytes,int from,int to,string language,string kind="document"){return Task.Run(()=>ReadSync(bytes,from,to,language,kind));}
+ static object ReadImage(byte[] bytes,OcrEngine engine,string tag){
+  using(var input=new InMemoryRandomAccessStream()){
+   using(var writer=new DataWriter(input)){writer.WriteBytes(bytes);Win<uint>(writer.StoreAsync());writer.DetachStream();} input.Seek(0);
+   var decoder=Win(BitmapDecoder.CreateAsync(input));
+   double scale=Math.Min(1.0,(double)OcrEngine.MaxImageDimension/Math.Max(decoder.PixelWidth,decoder.PixelHeight));
+   var transform=new BitmapTransform{ScaledWidth=(uint)Math.Max(1.0,decoder.PixelWidth*scale),ScaledHeight=(uint)Math.Max(1.0,decoder.PixelHeight*scale)};
+   using(var bitmap=Win(decoder.GetSoftwareBitmapAsync(BitmapPixelFormat.Bgra8,BitmapAlphaMode.Premultiplied,transform,ExifOrientationMode.RespectExifOrientation,ColorManagementMode.DoNotColorManage))){
+    var result=Win(engine.RecognizeAsync(bitmap));
+    var positioned=result.Lines.Select(l=>new {text=l.Text,x=l.Words.Min(w=>w.BoundingRect.X),y=l.Words.Min(w=>w.BoundingRect.Y),width=l.Words.Max(w=>w.BoundingRect.Right)-l.Words.Min(w=>w.BoundingRect.X),height=l.Words.Max(w=>w.BoundingRect.Bottom)-l.Words.Min(w=>w.BoundingRect.Y)}).OrderBy(l=>l.y).ToArray();
+    var rows=new List<List<int>>();for(int i=0;i<positioned.Length;i++){var l=positioned[i];var row=rows.LastOrDefault(r=>Math.Abs(positioned[r[0]].y-l.y)<Math.Min(positioned[r[0]].height,l.height)*0.6);if(row==null){row=new List<int>();rows.Add(row);}row.Add(i);}
+    var rowText=String.Join("\n",rows.Select(r=>String.Join(" : ",r.OrderBy(i=>positioned[i].x).Select(i=>positioned[i].text))));
+    var pages=new List<object>();pages.Add(new{page=1,text=String.Join("\n",result.Lines.Select(l=>l.Text)),rowsText=rowText,lines=positioned,supplementalText=""});
+    return new {app="hak-windows-ocr",backend="Windows.Media.Ocr",language=tag,totalPages=1,from=1,to=1,pages,warnings=tag.StartsWith("vi")?new string[0]:new[]{"Windows OCR language is "+tag+". Verify Vietnamese text against the original image."}};
+   }
+  }
+ }
  static object ReadSync(byte[] bytes,int from,int to,string language,string kind){
-  if(bytes.Length>MaxBytes||bytes.Length<5||Encoding.ASCII.GetString(bytes,0,5)!="%PDF-")throw new Exception("Invalid PDF or size exceeds 26 MB.");
+  bool isPdf=bytes.Length>=5&&Encoding.ASCII.GetString(bytes,0,5)=="%PDF-";
+  bool isImage=bytes.Length>16&&((bytes[0]==0xFF&&bytes[1]==0xD8)||(bytes[0]==0x89&&bytes[1]==0x50&&bytes[2]==0x4E&&bytes[3]==0x47)||(bytes[0]==0x42&&bytes[1]==0x4D));
+  if(bytes.Length>MaxBytes||!(isPdf||isImage))throw new Exception("Invalid PDF/image or size exceeds 26 MB.");
   var langs=OcrEngine.AvailableRecognizerLanguages;if(langs.Count==0)throw new Exception("Windows has no OCR language installed. Add a supported language in Windows Settings.");
   var lang=langs.FirstOrDefault(l=>l.LanguageTag==language)??langs.FirstOrDefault(l=>l.LanguageTag.StartsWith("vi"))??langs.FirstOrDefault(l=>l.LanguageTag=="en-US")??langs[0];
   var engine=OcrEngine.TryCreateFromLanguage(lang);if(engine==null)throw new Exception("Cannot create Windows OCR engine.");
+  if(isImage)return ReadImage(bytes,engine,lang.LanguageTag);
   var pages=new List<object>();
   using(var input=new InMemoryRandomAccessStream()){
    using(var writer=new DataWriter(input)){writer.WriteBytes(bytes);Win<uint>(writer.StoreAsync());writer.DetachStream();} input.Seek(0);

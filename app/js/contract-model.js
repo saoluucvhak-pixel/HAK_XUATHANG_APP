@@ -36,6 +36,7 @@ function mergeCatalog(local,incoming){
   for(const d of value.details||[]){const at=combined.details.findIndex(x=>x.id===d.id);if(at<0)combined.details.push(copy(d));else{const previous=combined.details[at];combined.details[at]=nonempty(previous,d);combined.details[at].certificateFiles=Array.from(new Set([...(previous.certificateFiles||[]),...(d.certificateFiles||[])]));}}
   const before=copy(old),after=copy(combined);delete before.revision;delete after.revision;combined.revision=JSON.stringify(before)===JSON.stringify(after)?old.revision:Math.max(old.revision||0,value.revision||0)+1;a.contracts[index]=combined;
  }
+ if(HAK.CustomsModel&&(a.customs||b.customs))a.customs=HAK.CustomsModel.merge(a.customs||[],b.customs||[]);
  for(const c of a.contracts){const error=validate(c,a);if(error)throw Error(error);}return a;
 }
 HAK.ContractModel={valuation,ensureGoods,upsertGoods,goodsKey,childFields,child,parent,migrate,active,sum,roles,projection,choices,resolve,validate,upsert,archiveChild,mergeCatalog,copy};

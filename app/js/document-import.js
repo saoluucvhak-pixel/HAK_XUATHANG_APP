@@ -199,6 +199,6 @@ function renderCertificateReview(pages,text){
 }
 async function mount(container,type,ids,opts){options=opts||{};const token=++epoch;kind=type;draft=[];busy=true;loadError='';panel=el('div',null,'col-12');container.append(panel);panel.textContent='Đang mở tệp đính kèm…';try{const files=await Promise.all(ids.map(id=>HAK.DB.get('attachments',id)));if(token!==epoch)return;if(files.some(x=>!x))throw Error('Thiếu PDF đã đính kèm. Hãy khôi phục từ Sao lưu toàn bộ để giữ tệp gốc.');draft=files;busy=false;render();}catch(e){if(token===epoch){busy=false;loadError=e.message;panel.textContent=loadError;panel.classList.add('text-danger');}}}
 async function commit(){if(loadError)throw Error(loadError);if(busy)throw Error('Đợi đọc / tải PDF xong rồi lưu.');if(draft.length&&!HAK.DB.usable())throw Error('Bộ nhớ trình duyệt chưa sẵn sàng để lưu PDF bền vững.');for(const rec of draft){const saved=Object.assign({},rec);delete saved.fresh;await HAK.DB.put('attachments',saved);}return draft.map(x=>x.id);}
-HAK.Documents={mount,commit,parse,number,contractNumber,contractNumberFromPages,readerVersion:READER_VERSION,certificateParties};
+HAK.Documents={ocr:(base64,kind)=>api('ocr',{base64,kind:kind||'document'}),mount,commit,parse,number,contractNumber,contractNumberFromPages,readerVersion:READER_VERSION,certificateParties};
 if(typeof module==='object'&&module.exports)module.exports={parse,number,contractNumber,contractNumberFromPages,readerVersion:READER_VERSION,certificateParties};
 })(typeof window!=='undefined'?window:globalThis);

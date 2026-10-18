@@ -1,5 +1,6 @@
 # HAK Quản lý xuất hàng
 
+- [Bản 2.14.0 — Tờ khai hải quan, khai bổ sung, giấy nộp tiền, trạng thái hợp đồng](docs/HUONG_DAN_2.14.0.md)
 - [Bản 2.13.0 — OCR đọc khối lượng, đơn giá, tàu, hàng, ngày, địa chỉ](docs/HUONG_DAN_2.13.0.md)
 
 - [Bản 2.12.7 — ô số có dấu phân cách, tạo BKLS không bị chặn](docs/HUONG_DAN_2.12.7.md)

@@ -233,6 +233,11 @@
         <div class="form-text">Số liệu lấy từ các hồ sơ trong 🗄️ Lưu trữ; lọc theo <b>ngày bắt đầu</b> của hồ sơ. Bỏ trống ngày = tất cả.</div>
       </div></div>
       <div class="card mb-3" id="repEmpty"><div class="card-body text-center muted py-4">Chưa có hồ sơ nào trong Lưu trữ. Hãy xuất biên bản (Word / PDF / Excel) — app tự lưu và báo cáo sẽ hiện ở đây.</div></div>
+      <div class="card mb-3" id="repCustoms"><div class="card-body">
+        <div class="sec-title d-flex flex-wrap align-items-center gap-2 mb-2"><span>🛃 Tình hình khai hải quan và nộp thuế</span><button class="btn btn-sm btn-success ms-auto" id="repCsXls" type="button">📊 Xuất Excel</button></div>
+        <div class="form-text mt-0 mb-2">Lấy từ Danh mục → 🛃 Tờ khai hải quan, lọc theo <b>ngày mở tờ khai</b> (cùng bộ lọc năm / ngày ở trên). Thuế phải nộp theo lần khai bổ sung mới nhất; đã nộp = tổng giấy nộp tiền loại Thuế xuất khẩu.</div>
+        <div id="repCsBody"></div>
+      </div></div>
       <div id="repMain" class="d-none">
         <div class="row g-2 mb-3" id="repCards"></div>
         <div class="card mb-3"><div class="card-body"><div class="sec-title">Tổng hợp theo loại biên bản</div>
@@ -448,9 +453,12 @@
 <script src="js/records.js"></script>
 <script src="js/contract-model.js"></script>
 <script src="js/contract-parser.js"></script>
+<script src="js/customs-model.js"></script>
+<script src="js/customs-parser.js"></script>
 <script src="js/doc-extract.js"></script>
 <script src="js/document-import.js"></script>
 <script src="js/catalog.js"></script>
+<script src="js/customs.js"></script>
 <script src="js/backup.js"></script>
 <script src="js/gsync.js"></script>
 <script src="js/auth.js"></script>

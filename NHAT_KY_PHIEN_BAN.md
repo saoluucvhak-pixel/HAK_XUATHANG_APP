@@ -291,6 +291,12 @@ Thủy chốt 28/09/2026: "1. bỏ Trao đổi KHÔNG đồng bộ lên Google S
 - pages.js generateBkls: không chặn khi thiếu Số BKLS / hệ số / tên bên mua — tự điền hoặc để trống + cảnh báo.
 - tests/parse-num.test.cjs, tests/numfmt.test.cjs.
 
+## v2.14.0 — Tờ khai hải quan
+- Danh mục có tab 🛃 Tờ khai hải quan: tờ khai là bảng cha; khai bổ sung và giấy nộp tiền là bảng con. Trạng thái Đã mở tờ khai → Chờ thông quan → Đã thông quan.
+- Hợp đồng tự chuyển Đang thực hiện → Đã hoàn thành khi mọi tờ khai đã thông quan.
+- Nhập tờ khai từ file .xls, OCR tờ khai và giấy nộp tiền (HAKDocs.exe đọc thêm ảnh JPG/PNG/BMP). Đợt thực hiện có ô chọn tờ khai (ngày mở, lần khai, thuế XK phải nộp).
+- Báo cáo thêm "Tình hình khai hải quan và nộp thuế" (có xuất Excel).
+
 ## v2.13.2 — Gỡ tab trùng trong Danh mục
 - Tab "Chi tiết thực hiện" hiển thị y hệt tab "Hợp đồng" nên đã gỡ; tab còn lại đổi tên "Hợp đồng & thực hiện" (bảng hợp đồng + các đợt thực hiện bên dưới).
 
