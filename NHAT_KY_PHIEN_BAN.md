@@ -251,6 +251,8 @@ Thủy chốt 28/09/2026: "1. bỏ Trao đổi KHÔNG đồng bộ lên Google S
 - Gom mã nguồn (hiện nhiều file JS) thành 1 bản dựng để cài nhanh hơn; kiểm thử tự động đóng gói kèm app.
 - Hiện số phiên bản trong app (để biết máy đang chạy bản nào).
 
-## v2.8.0 — Sao lưu / báo cáo theo năm
-- Lưu trữ: 📦 dọn hồ sơ cũ đổi sang chọn **Năm** (theo ngày bắt đầu hồ sơ, khớp Báo cáo), xóa khỏi máy là tùy chọn; file `HAK_LuuTru_Nam<năm>.json`; cảnh báo phần dữ liệu không nằm trong file (đợt Excel, nhật ký PXK/BKLS).
+## v2.11.2 — Báo cáo theo năm, hiện số phiên bản, sửa hướng dẫn
 - Báo cáo: ô chọn Năm, bảng + sheet Excel "Theo năm", tên file xuất có kỳ báo cáo.
+- Hiện số phiên bản (js/version.js → sidebar "v2.11.2" và đầu trang Hướng dẫn); tests/version.test.cjs bắt buộc khớp installer/setup.nsi.
+- Hướng dẫn (HUONG_DAN.md, trang Hướng dẫn trong app) cập nhật theo Sổ hồ sơ năm / Đóng năm của v2.10–2.11; bỏ mô tả "dọn theo năm v2.8.0" không có trong bản phát hành.
+- Bộ cài NSIS dựng tự động trên GitHub Actions (.github/workflows/build-setup.yml).

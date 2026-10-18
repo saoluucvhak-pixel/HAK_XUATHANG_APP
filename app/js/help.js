@@ -122,14 +122,16 @@
       '<li>Nút <b>⬇ Sao lưu toàn bộ</b> giờ ra file <b>.zip</b> (nhẹ hơn ~3 lần). <b>⬆ Khôi phục toàn bộ</b> nhận cả .zip lẫn file .json của bản cũ. Khôi phục từ bản tự sao lưu: chọn file HAK_TuDong_….zip trong thư mục.</li>' +
       '<li><b>🩺 Sức khỏe dữ liệu</b> ở Tổng quan: 5 ô xanh / vàng / đỏ — bộ nhớ trình duyệt, cài đặt (localStorage), số hồ sơ Lưu trữ, sao lưu gần nhất, tự sao lưu. Ô vàng / đỏ: rê chuột xem cách xử lý.</li></ul>'],
 
-    ['help-arch', 'Lưu trữ nhiều hồ sơ — Xuất & dọn hồ sơ cũ (v2.7.4)', false,
-      '<p><b>App không còn tự xóa hồ sơ</b> (bản cũ: quá 500 hồ sơ tự xóa hồ sơ cũ nhất). Lưu trữ giữ tất cả; trang Lưu trữ hiện 200 dòng mỗi lần, bấm <b>Hiện thêm</b> để xem tiếp (tìm kiếm / lọc vẫn tìm trong toàn bộ).</p>' +
-      '<p>Quá 1.500 hồ sơ: app nhắc 1 lần và hiện nhãn <b class="text-warning">nhiều — nên dọn</b>. Quản trị dọn như sau:</p><ol>' +
-      '<li>🗄️ Lưu trữ → <b>📦 Xuất &amp; dọn hồ sơ cũ</b> → chọn <b>Hồ sơ cập nhật trước ngày</b> (mặc định: 1 năm trước). Chỉ tính hồ sơ trong phạm vi công ty đang xem (bật <b>Xem tất cả công ty</b> để dọn mọi công ty).</li>' +
-      '<li>Bấm <b>① Xuất file hồ sơ cũ</b> → lưu file <span class="mono">HAK_LuuTru_HoSoCu_&lt;từ&gt;-&lt;đến&gt;.json</span> rồi chép ra USB / Google Drive.</li>' +
-      '<li>Tick <b>"Tôi đã kiểm tra…"</b> → <b>② Xóa các hồ sơ này khỏi máy</b> (bấm 2 lần). Không xuất được file thì không có bước ②.</li></ol>' +
-      '<ul><li>Cần lại hồ sơ cũ: Lưu trữ → <b>⬆ Khôi phục</b> → chọn file đó (chỉ thêm lại, không ghi đè hồ sơ mới hơn).</li>' +
-      '<li>Báo cáo tổng hợp chỉ tính hồ sơ đang có trên máy — dọn xong thì các tháng đã dọn không còn trong báo cáo cho tới khi khôi phục lại.</li></ul>'],
+    ['help-arch', 'Lưu trữ theo năm — Sổ hồ sơ năm, sao lưu, Đóng năm (v2.10 – 2.11)', false,
+      '<p><b>App không tự xóa hồ sơ.</b> Hồ sơ lập ra tự vào 🗄️ Lưu trữ; trang Lưu trữ hiện 200 dòng mỗi lần, bấm <b>Hiện thêm</b> để xem tiếp (tìm kiếm / lọc vẫn tìm trong toàn bộ).</p>' +
+      '<p><b>Sổ hồ sơ theo năm</b> (nút trên thanh đầu): chọn <b>Năm</b> làm việc, bấm <b>Lưu hồ sơ</b> trên biểu mẫu để lưu dù chưa xuất file. Trong sổ có thể <b>Mở / Sửa</b>, <b>Lưu trữ / Khôi phục</b> (ẩn / hiện lại, không xóa), tải <b>PDF kèm theo</b>. Năm tính theo <b>ngày bắt đầu</b> của hồ sơ.</p><ol>' +
+      '<li><b>Sao lưu năm</b>: ghi 1 file ZIP của năm đang chọn (hồ sơ, các phiên bản, dữ liệu cân, hợp đồng / PDF đã chụp). Dữ liệu vẫn nằm trên máy.</li>' +
+      '<li><b>Khôi phục năm</b>: chọn file ZIP / JSON → app kiểm tra rồi gộp, giữ bản mới hơn. <b>Đưa bản sao hồ sơ cũ vào năm này</b>: chép hồ sơ Lưu trữ cũ vào sổ năm (không sửa bản gốc).</li>' +
+      '<li><b>Đóng năm ra file và dọn kho</b> (chỉ Quản trị, bật <b>Xem tất cả công ty</b>): app ghi ZIP <span class="mono">HAK_NamDaDong_&lt;năm&gt;.zip</span>, <b>đọc lại file trên đĩa</b> để so mã kiểm tra, rồi mới hỏi xác nhận gỡ hồ sơ khỏi máy. Hủy hoặc kiểm tra sai thì không dọn. Xong app tự tải lại.</li>' +
+      '<li><b>Mở file năm cũ (chỉ xem)</b>: xem / xuất lại Word, Excel, PDF, BKLS từ file đã đóng mà không nhập lại vào máy. <b>Về kho đang làm việc</b> để thoát chế độ xem.</li></ol>' +
+      '<ul><li>Hồ sơ Lưu trữ cũ vẫn có nút <b>📦 Xuất &amp; dọn hồ sơ cũ</b> (theo <b>ngày cập nhật</b>, không theo năm) — nên dùng Đóng năm cho gọn.</li>' +
+      '<li>Giữ file ZIP năm ở nơi an toàn: <b>Sao lưu toàn bộ không tự chép các ZIP năm</b>. Mất ZIP = mất dữ liệu năm đã dọn.</li>' +
+      '<li>Báo cáo tổng hợp chỉ tính hồ sơ đang có trên máy — đóng năm nào thì báo cáo năm đó trống cho tới khi khôi phục. Báo cáo có ô <b>Năm</b> và bảng / sheet <b>Theo năm</b>.</li></ul>'],
 
     ['help-tabs', 'Trang biên bản: nhập theo 5 tab (v2.7.0)', false,
       '<p>Mỗi trang biên bản chia ô nhập thành các tab, cùng thứ tự ở mọi hình thức (trang nào không có vùng đó thì bỏ tab):</p><ol>' +
@@ -195,7 +197,7 @@
     if (!built) {
       box.innerHTML =
         '<div class="card mb-3"><div class="card-body d-flex flex-wrap align-items-start gap-3">' +
-        '<div class="flex-grow-1" style="min-width:240px"><h5 class="mb-1">📘 Hướng dẫn cài đặt, phân quyền &amp; khôi phục</h5><div class="small muted">Cập nhật bản v2.7.7. In ra hoặc lưu PDF để đưa cho người cài máy.</div>' +
+        '<div class="flex-grow-1" style="min-width:240px"><h5 class="mb-1">📘 Hướng dẫn cài đặt, phân quyền &amp; khôi phục</h5><div class="small muted">Bản đang chạy: <b>v' + esc(HAK.VERSION || '?') + '</b>. In ra hoặc lưu PDF để đưa cho người cài máy.</div>' +
         '<div class="help-toc no-print mt-2">' + SECTIONS.map((s) => '<button type="button" class="btn btn-sm btn-outline-primary' + (s[2] ? ' admin-only' : '') + '" data-help-go="' + s[0] + '">' + esc(s[1].replace(/^[A-F]\. /, '')) + '</button>').join('') + '</div></div>' +
         '<div style="min-width:260px;flex:1 1 280px" id="helpInfo"></div>' +
         '<button type="button" class="btn btn-primary no-print" id="helpPrint">🖨 In / lưu PDF</button></div></div>' +
