@@ -63,6 +63,7 @@
       <div class="sb-label">Hệ thống</div>
       <a class="sb-link" href="#/catalog" data-nav="catalog"><span class="ico">📇</span> Danh mục HĐ &amp; khách hàng</a>
       <a class="sb-link" href="#/report" data-nav="report"><span class="ico">📊</span> Báo cáo tổng hợp</a>
+      <a class="sb-link" href="#/contractstatus" data-nav="contractstatus"><span class="ico">📑</span> Tình hình hợp đồng</a>
       <a class="sb-link" href="#/archive" data-nav="archive"><span class="ico">🗄️</span> Lưu trữ <span class="cnt d-none" id="archCount"></span></a>
       <a class="sb-link" href="#/settings" data-nav="settings"><span class="ico">⚙️</span> Cài đặt</a>
       <a class="sb-link" href="#/help" data-nav="help"><span class="ico">📘</span> Hướng dẫn</a>
@@ -215,6 +216,17 @@
     <section class="page" id="page-xuatban" hidden></section>
 
     <!-- ---------- BÁO CÁO TỔNG HỢP ---------- -->
+    <section class="page" id="page-contractstatus" hidden>
+      <div class="card mb-3"><div class="card-body">
+        <div class="sec-title d-flex flex-wrap align-items-center gap-2 mb-2"><span>📑 Tình hình thực hiện hợp đồng — theo phiếu cân</span><span class="ms-auto d-flex gap-2"><button class="btn btn-sm btn-outline-secondary" id="csrReload" type="button">↻ Làm mới</button><button class="btn btn-sm btn-success" id="csrXls" type="button">📊 Xuất Excel</button><button class="btn btn-sm btn-outline-primary" id="csrPdf" type="button">🖨️ Tải PDF</button></span></div>
+        <div id="csrSmart" class="mb-2"></div>
+        <div class="form-text mt-0 mb-2">Mỗi hợp đồng: số chuyến xe, khối lượng qua cân / thực giao, kho xuất, tàu, chứng thư, tờ khai và thuế. Dòng nhỏ bên dưới là từng đợt thực hiện. <b>Bấm vào một dòng</b> để xem chi tiết xuất hàng từng xe (số phiếu, biển số, tài xế, đơn vị vận chuyển, kho xuất, khối lượng). Phiếu cân lấy từ các hồ sơ đã xuất trong 🗄️ Lưu trữ (có gắn hợp đồng).</div>
+        <div id="csrCards" class="row g-2 mb-2"></div>
+        <div class="alert alert-warning py-2 small d-none" id="csrWarn"></div>
+        <div class="tbl-wrap"><table class="table table-hover align-middle"><thead><tr><th>Hợp đồng / đợt thực hiện</th><th>Bên mua / nhận</th><th>Kho xuất</th><th>Tàu</th><th class="num">Hồ sơ</th><th class="num">Chuyến xe</th><th class="num">Qua cân (tấn)</th><th class="num">Xe trả về</th><th class="num">Thực giao (tấn)</th><th class="num">KL hợp đồng / MT</th><th class="num">MT − thực giao</th><th>Thời gian cân</th><th class="num">Chứng thư</th><th class="num">Tờ khai</th><th class="num">Thuế phải nộp</th><th class="num">Còn phải nộp</th><th>Trạng thái</th></tr></thead><tbody id="csrBody"></tbody></table></div>
+      </div></div>
+    </section>
+
     <section class="page" id="page-report" hidden>
       <div class="card mb-3"><div class="card-body">
         <div id="repSmartFilter"></div>
@@ -466,6 +478,7 @@
 <script src="js/document-import.js"></script>
 <script src="js/catalog.js"></script>
 <script src="js/customs.js"></script>
+<script src="js/contract-status.js"></script>
 <script src="js/backup.js"></script>
 <script src="js/gsync.js"></script>
 <script src="js/auth.js"></script>
