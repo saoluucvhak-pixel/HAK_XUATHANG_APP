@@ -110,6 +110,7 @@
     /** Trả về Uint8Array của file DOCX đã điền dữ liệu. */
     async render(key, data) {
       const t = await Templates.get(key);
+      if(HAK.DocxWorker)return HAK.DocxWorker.render(t.bytes,data);
       let doc;
       try {
         doc = new (DT())(new PizZip(t.bytes), OPTIONS);
@@ -123,13 +124,16 @@
 
   /* ---------- Lưu file ---------- */
   const Files = {
-    saveBlob(blob, name) {
-      if (typeof saveAs === 'function') saveAs(blob, name);
-      else {                                   // dự phòng nếu FileSaver không nạp được
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob); a.download = name;
-        document.body.appendChild(a); a.click();
-        setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+    async saveBlob(blob, name) {
+      try {
+        // Native Save As does not depend on browser user-activation surviving document generation.
+        const raw=new Uint8Array(await blob.arrayBuffer());let binary='';for(let i=0;i<raw.length;i+=16384)binary+=String.fromCharCode.apply(null,raw.subarray(i,i+16384));
+        if(HAK.UI&&HAK.UI.Loading)HAK.UI.Loading.hide();
+        const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),180000);let response;try{response=await fetch('http://127.0.0.1:31879/save-download',{method:'POST',headers:{'Content-Type':'application/json','X-HAK-Client':'documents-v1'},body:JSON.stringify({name,base64:btoa(binary)}),signal:controller.signal});}finally{clearTimeout(timer);}
+        const result=await response.json();if(!response.ok)throw Error(result.error||'Không lưu được tệp.');if(result.canceled)return false;if(HAK.Downloads)HAK.Downloads.saved(result.path,result.warning);return result.path;
+      } catch(e) {
+        if(HAK.UI)HAK.UI.toast(e.name==='AbortError'?'Chờ chọn nơi lưu quá 3 phút. Đóng hộp Lưu thành còn mở rồi thử lại.':'Chưa lưu tệp: '+e.message+'. Mở app bằng lối tắt của bản cài mới rồi thử lại.','error');
+        return false;
       }
     },
     /**
@@ -153,10 +157,10 @@
         const z = new PizZip();
         files.forEach((f) => z.file(f.name, f.bytes));
         const blob = new Blob([z.generate({ type: 'uint8array', compression: 'DEFLATE' })], { type: 'application/zip' });
-        Files.saveBlob(blob, opts.zipName || 'BienBan.zip');
+        if(!await Files.saveBlob(blob, opts.zipName || 'BienBan.zip'))return [];
       } else {
         for (let i = 0; i < files.length; i++) {
-          Files.saveBlob(new Blob([files[i].bytes], { type: DOCX_MIME }), files[i].name);
+          if(!await Files.saveBlob(new Blob([files[i].bytes], { type: DOCX_MIME }), files[i].name))return [];
           if (i < files.length - 1) await new Promise((r) => setTimeout(r, 500)); // tránh trình duyệt chặn tải nhiều file
         }
       }
@@ -201,6 +205,7 @@
           renderHeaders: false, renderFooters: false, renderFootnotes: false, useBase64URL: true
         });
       }
+      if (document.fonts && document.fonts.ready) await document.fonts.ready;
       prog(60, 'Đang dàn trang…');
       await tick();
       // ---- khổ giấy / lề theo từng section ----

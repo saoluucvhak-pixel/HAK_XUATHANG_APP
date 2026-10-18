@@ -288,20 +288,27 @@
     toast('⚠ Có thể trùng chứng từ đã lập: ' + conflictText(cs) + '. Bấm nút lần nữa nếu vẫn muốn tạo.', 'warning');
     return true;
   }
+  let logSmart;
   function renderLog() {
     if (!HAK.Issued) return;
-    const all = HAK.Issued.list, rows = all.slice(0, 30);
-    $('#ctLogCount').textContent = all.length ? '· ' + all.length + ' lần lập' + (all.length > rows.length ? ' (hiện ' + rows.length + ' gần nhất)' : '') : '';
+    const all = HAK.Issued.list,F=HAK.Filters;
+    if(!logSmart)logSmart=F.mount('#ctLogFilter',{screenId:'document-log',source:()=>HAK.Issued.list,
+      fields:[F.multi('kind','Chứng từ',[{value:'pxk',label:'PXKKVCNB'},{value:'bkls',label:'BKLS'}],r=>r.kind),
+       F.multi('type','Hình thức',()=>Object.keys(DOCS()).map(value=>({value,label:DOCS()[value].title})),r=>r.type)],
+      matchQ:(r,q)=>F.core.hay([r.batch,r.by,r.soBkls,r.benMua,r.tenDonVi,r.fileName,pad6(r.pxkFrom),pad6(r.pxkTo)]).includes(q),
+      matchDate:(r,f,t)=>F.dateMatch(r.at,f,t),onApply:renderLog});
+    const filtered=logSmart.filter(all).rows;logSmart.refresh();const rows=filtered.slice(0,200);
+    $('#ctLogCount').textContent = all.length ? '· ' + filtered.length + ' / ' + all.length + ' lần lập' + (filtered.length > rows.length ? ' (hiện ' + rows.length + ' gần nhất)' : '') : '';
     $('#ctLogBody').innerHTML = rows.length ? rows.map((r) => {
       const d = DOCS()[r.type];
       return '<tr><td>' + fmtDT(r.at) + '</td><td>' + (r.kind === 'pxk' ? 'PXKKVCNB' : 'BKLS') + '</td><td>' + (d ? esc(d.title) : esc(r.type)) + '</td><td>' + esc(coName(r.cid)) + '</td><td class="text-break">' + esc(r.batch) + '</td>' +
         '<td class="mono">' + (r.kind === 'pxk' ? pad6(r.pxkFrom) + ' → ' + pad6(r.pxkTo) : esc(r.soBkls) + (r.benMua ? '<div class="muted small">' + esc(r.benMua) + '</div>' : '')) + '</td>' +
         '<td class="num">' + G.fmtInt(r.trips) + '</td><td class="num">' + G.fmtTon(r.kg) + '</td><td class="small">' + (r.by ? esc(r.by) : '<span class="muted">(trước v2.6)</span>') + '</td><td><button class="btn btn-sm btn-outline-danger" type="button" data-del-log="' + esc(r.id) + '" title="Xóa dòng nhật ký">✕</button></td></tr>';
-    }).join('') : '<tr><td colspan="10" class="muted">Chưa lập chứng từ nào.</td></tr>';
+    }).join('') : '<tr><td colspan="10" class="muted">Không có chứng từ khớp bộ lọc.</td></tr>';
   }
   const logBase = (kind, b, v, s) => ({ kind, type: st.type, cid: v.cua, cua: coName(v.cua), batch: b.fileName, from: s.from, to: s.to, trips: s.trips, kg: s.kg, canCuLenh: v.canCuLenh });
 
-  function onPxk() {
+  async function onPxk() {
     const b = curBatch(); if (!b) { toast('Chưa có đợt để lập chứng từ.', 'error'); return; }
     const rows = b.ds.rows, v = readVals();
     const problems = validate(v, rows.length, 'pxk');
@@ -316,7 +323,7 @@
     try { res = buildPxk(rows, v); } catch (e) { console.error(e); toast('Lỗi khi tạo PXKKVCNB: ' + e.message, 'error'); return; }
     const s = b.ds.stats;
     const name = 'PXKKVCNB_' + slug(DOCS()[st.type].title) + '_' + String(s.from).replace(/\//g, '') + (s.to && s.to !== s.from ? '-' + String(s.to).replace(/\//g, '') : '') + '.xlsx';
-    HAK.Word.Files.saveBlob(res.blob, name);
+    if(!await HAK.Word.Files.saveBlob(res.blob, name))return;
     st.last = { from: res.from, to: res.to };
     if (HAK.Issued) HAK.Issued.add(Object.assign(logBase('pxk', b, v, s), { pxkFrom: res.from, pxkTo: res.to, tenDonVi: v.tenDonVi, fileName: name })).then(renderLog);
     persist(); updateSummary();

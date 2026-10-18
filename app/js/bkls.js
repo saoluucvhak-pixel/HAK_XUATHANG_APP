@@ -10,7 +10,7 @@
  *           trips: [{ ngayCanDate:Date, bienSoRaw, tenTaiXe, klHangKg }] }
  *
  * Word: thay chữ trực tiếp trên XML của BKLS_mau.docx (giữ nguyên định dạng mẫu). Từng xe: ghép chuỗi XML, mỗi xe 1 trang.
- * PDF: jsPDF + font Roboto (hỗ trợ tiếng Việt), bám bố cục file Word mẫu. jsPDF/tài sản được nạp khi cần (ensureAssets).
+ * PDF/In: dùng cùng DOCX với bản Word để giữ font và lề; pages.js mở hộp thoại In để lưu PDF.
  */
 (function (root) {
   'use strict';
@@ -125,6 +125,7 @@
       tenChuLamSanLine: g.tenChu ? 'Tên chủ lâm sản(4): ' + g.tenChu : null,
       mstChuLamSanLine: g.mstChu ? 'Số GCN/MSDN/GPTL/ĐKHĐ/CCCD/CMND/HC(5): ' + g.mstChu : null,
       diaChiChuLamSanLine: g.diaChiChu ? 'Địa chỉ(6): ' + g.diaChiChu : null,
+      tenLoaiLine: g.product ? 'Tên loài (tên khoa học, tên tiếng Việt hoặc tên thương mại): ' + g.product : null,
       nguonGocLine: g.nguonGoc ? 'Nguồn gốc(7): ' + g.nguonGoc : null,
       maHsLine: g.maHs === undefined ? null : MA_HS_LABEL + (g.maHs || '……………………'),
       tenMuaLine: 'Tên tổ chức, cá nhân(4): ' + lot.benMuaTen,
@@ -276,6 +277,7 @@
         diaChiOcc++;
         if (diaChiOcc === 1) { if (values.diaChiChuLamSanLine) setText(values.diaChiChuLamSanLine); } else if (diaChiOcc === 2) setText(values.diaChiLine);
       }
+      else if (trimmed.startsWith('Tên loài')) { if (values.tenLoaiLine) setText(values.tenLoaiLine); }
       else if (trimmed.startsWith('Nguồn gốc(7):')) { if (values.nguonGocLine) setText(values.nguonGocLine); }
       else if (trimmed.startsWith('Mã HS')) { if (values.maHsLine) setText(values.maHsLine); }
       else if (trimmed.startsWith('Khối lượng/trọng lượng')) setText(values.khoiLuongLine);
@@ -438,6 +440,7 @@
       else if (trimmed.startsWith('Tên tổ chức, cá nhân(4):')) register('tenMuaLine', span);
       else if (trimmed.startsWith('Số GCN/MSDN/GPTL/ĐKHĐ/CCCD/CMND/HC(5):')) { mstOcc++; if (mstOcc === 1) register('mstChuLamSanLine', span); else if (mstOcc === 2) register('mstLine', span); }
       else if (trimmed.startsWith('Địa chỉ(6):')) { diaChiOcc++; if (diaChiOcc === 1) register('diaChiChuLamSanLine', span); else if (diaChiOcc === 2) register('diaChiLine', span); }
+      else if (trimmed.startsWith('Tên loài')) register('tenLoaiLine', span);
       else if (trimmed.startsWith('Nguồn gốc(7):')) register('nguonGocLine', span);
       else if (trimmed.startsWith('Mã HS')) register('maHsLine', span);
       else if (trimmed.startsWith('Khối lượng/trọng lượng')) register('khoiLuongLine', span);
@@ -460,7 +463,7 @@
     const missing = required.filter((k) => !spliceMap[k]);
     if (missing.length) throw new Error('Không dò được cấu trúc đoạn văn trong file mẫu BKLS cho: ' + missing.join(', '));
     const count = (k) => recordXml.split(spliceMap[k].originalXml).length - 1;
-    const optional = ['congTyLine1', 'congTyLine2', 'tenChuLamSanLine', 'mstChuLamSanLine', 'diaChiChuLamSanLine', 'nguonGocLine', 'maHsLine', 'lienHeLine', 'lienHeMuaLine', 'kyNgayText']
+    const optional = ['congTyLine1', 'congTyLine2', 'tenChuLamSanLine', 'mstChuLamSanLine', 'diaChiChuLamSanLine', 'tenLoaiLine', 'nguonGocLine', 'maHsLine', 'lienHeLine', 'lienHeMuaLine', 'kyNgayText']
       .filter((k) => spliceMap[k] && count(k) === 1);
     const allKeys = required.concat(optional);
     for (const k of allKeys) { const c = count(k); if (c !== 1) throw new Error('Đoạn văn "' + k + '" xuất hiện ' + c + ' lần trong file mẫu (cần đúng 1 lần) — không thể ghép an toàn.'); }
@@ -510,7 +513,7 @@
       if (i > a && sep) parts.push(sep);
       parts.push(rec);
       if (onProgress && ((i - a) % 200 === 0 || i === b - 1)) onProgress(i - a + 1, total);
-      if ((i - a) % 300 === 0) await tick();
+      if ((i - a) % 10 === 0) await tick();
     }
     let s = header + parts.join('') + END_P + sectPrXml + footer;
     parts.length = 0;
@@ -609,7 +612,7 @@
       addBullet(v.tenMuaLine); addBullet(v.mstLine); addBullet(v.diaChiLine);
       const lhm = v.lienHeMuaLine || snap.lienHeMua; if (lhm) addBullet(lhm);
       addSection('Thông tin về lâm sản:');
-      addBullet(snap.tenLoai); addBullet(snap.nhomLoai);
+      addBullet(v.tenLoaiLine || snap.tenLoai); addBullet(snap.nhomLoai);
       addBullet(v.nguonGocLine || snap.nguonGoc);
       addBullet(v.maHsLine || snap.maHS);
       if (snap.giaTri) addBullet(snap.giaTri);
@@ -670,34 +673,37 @@
    * onProgress(msg, pct)
    */
   async function generate(ctx, lot, want, baseName, onProgress) {
-    await ensureAssets(!!(want.totalPdf || want.tripPdf));
+    if (ctx.template && ctx.template.id !== 'legacy') return HAK.BklsTemplates.generate(ctx.template, ctx, lot, want, baseName,onProgress);
+    await ensureAssets(false);
     const tpl = templateBuffer(), out = [], step = onProgress || function () {};
     const n = lot.trips.length;
     const jobs = ['totalDocx', 'totalPdf', 'tripDocx', 'tripPdf'].filter((k) => want[k]);
     let done = 0;
     const pct = (frac) => ((done + frac) / jobs.length) * 100;
     if (!ctx.snapshot) ctx.snapshot = await readSnapshot(tpl);
-    const tripPages = (a, b) => lot.trips.slice(a, b).map((t, j) => ({ values: tripValues(ctx, lot, t, soRiengOf(lot, a + j)) }));
-    const add = (key, label, name, blob) => out.push({ key, label, name, blob });
+    const add = (key, label, name, blob) => out.push({ key, label, name, blob, needsPrint:key.endsWith('Pdf') });
+    let totalDocument; const tripDocuments = new Map();
+    const getTotal = () => totalDocument || (totalDocument = docxTotal(tpl,ctx,lot));
+    const getTrip = (pi,a,b) => { if(!tripDocuments.has(pi))tripDocuments.set(pi,docxPerVehicle(tpl,ctx,lot,(d,t)=>step('BKLS từng xe '+(a+d)+'/'+n+'…',pct((pi+d/t)/Math.max(1,tripRanges(n).length))),a,b));return tripDocuments.get(pi); };
     const ranges = tripRanges(n), split = ranges.length > 1;
     const pad = (i) => String(i + 1).padStart(Math.max(2, String(ranges.length).length), '0');
     const partLabel = (pi, a, b) => split ? ' — phần ' + (pi + 1) + '/' + ranges.length + ': xe ' + (a + 1) + '–' + b : ' — ' + n + ' trang';
     const partName = (pi, ext) => baseName + '_tung_xe' + (split ? '_phan' + pad(pi) : '') + ext;
-    if (want.totalDocx) { step('BKLS tổng (Word)…', pct(0)); add('totalDocx', 'BKLS TỔNG (Word)', baseName + '_tong.docx', await docxTotal(tpl, ctx, lot)); done++; }
-    if (want.totalPdf) { step('BKLS tổng (PDF)…', pct(0)); add('totalPdf', 'BKLS TỔNG (PDF)', baseName + '_tong.pdf', await buildPdf(ctx.snapshot, [{ values: aggregateValues(ctx, lot) }])); done++; }
+    if (want.totalDocx) { step('BKLS tổng (Word)…', pct(0)); add('totalDocx', 'BKLS TỔNG (Word)', baseName + '_tong.docx', await getTotal()); done++; }
+    if (want.totalPdf) { step('BKLS tổng (PDF)…', pct(0)); add('totalPdf', 'BKLS TỔNG (PDF)', baseName + '_tong.docx', await getTotal()); done++; }
     if (want.tripDocx) {
       for (let pi = 0; pi < ranges.length; pi++) {
         const [a, b] = ranges[pi], tag = split ? ' phần ' + (pi + 1) + '/' + ranges.length : '';
         add('tripDocx', 'BKLS TỪNG XE' + partLabel(pi, a, b) + ' (Word)', partName(pi, '.docx'),
-          await docxPerVehicle(tpl, ctx, lot, (d, t) => step('BKLS từng xe (Word)' + tag + ' ' + (a + d) + '/' + n + '…', pct((pi + d / t) / ranges.length)), a, b));
+          await getTrip(pi,a,b));
       }
       done++;
     }
     if (want.tripPdf) {
       for (let pi = 0; pi < ranges.length; pi++) {
         const [a, b] = ranges[pi], tag = split ? ' phần ' + (pi + 1) + '/' + ranges.length : '';
-        add('tripPdf', 'BKLS TỪNG XE' + partLabel(pi, a, b) + ' (PDF)', partName(pi, '.pdf'),
-          await buildPdf(ctx.snapshot, tripPages(a, b), (d, t) => step('BKLS từng xe (PDF)' + tag + ' ' + (a + d) + '/' + n + '…', pct((pi + d / t) / ranges.length))));
+        add('tripPdf', 'BKLS TỪNG XE' + partLabel(pi, a, b) + ' (PDF)', partName(pi, '.docx'),
+          await getTrip(pi,a,b));
       }
       done++;
     }

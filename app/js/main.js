@@ -406,6 +406,15 @@
   /* ===============================================================
    * Trang "Chọn File Excel"
    * ============================================================= */
+  let dataSmart, dataSmartKey='';
+  function fileSmart(){
+    const F=HAK.Filters;
+    if(!dataSmart){const options=k=>Array.from(new Set(((App.ds||{}).rows||[]).map(r=>r[k]).filter(Boolean)));
+      dataSmart=F.mount('#fileSmartFilter',Object.assign({},F.tripConfig(options),{screenId:'file-preview',source:()=>((App.ds||{}).rows||[]),quickFields:['q','plate','carrier'],onApply:()=>{App.previewPage=0;renderFile();},summary:r=>[{label:'Khối lượng',value:G.fmtTon(r.rows.reduce((a,r)=>a+(+r.net||0),0))+' tấn'}]}));
+    }
+    const key=App.type+'|'+App.fileName;if(key!==dataSmartKey){dataSmartKey=key;dataSmart.setState(F.core.empty());}dataSmart.refresh();return dataSmart;
+  }
+  const previewRows=()=>dataSmart?dataSmart.filter(App.ds.rows).rows:App.ds.rows;
   function renderFile() {
     const ds = App.ds;
     $('#fileResult').hidden = !App.wb;
@@ -428,9 +437,10 @@
       $('#statTiles').innerHTML = ''; $('#groupBody').innerHTML = ''; $('#plateBody').innerHTML = ''; $('#previewBody').innerHTML = ''; $('#previewInfo').textContent = '';
       return;
     }
-    const st = ds.stats;
+    fileSmart();
+    const selectedRows=previewRows(), st = X.computeStats(selectedRows);
     $('#statTiles').innerHTML =
-      statTile(fmtInt(ds.rows.length), 'Số dòng dữ liệu', ds.skipped ? 'bỏ qua ' + ds.skipped + ' dòng tiêu đề/chữ ký' : '') +
+      statTile(fmtInt(selectedRows.length), 'Số dòng dữ liệu', ds.skipped ? 'bỏ qua ' + ds.skipped + ' dòng tiêu đề/chữ ký' : '') +
       statTile(fmtInt(st.trips), 'Tổng xe (lượt cân)') + statTile(G.fmtTon(st.kg), 'Tổng tấn', fmtInt(st.kg) + ' kg') +
       statTile(fmtInt(st.tickets), 'Tổng phiếu', 'số phiếu khác nhau') + statTile(fmtInt(st.plates), 'Số xe (biển số)', 'khác nhau') +
       statTile(st.from, 'Ngày bắt đầu') + statTile(st.to, 'Ngày kết thúc');
@@ -472,19 +482,19 @@
 
   function renderPlates() {
     const q = $('#plateSearch').value.trim().toLowerCase();
-    const list = App.ds.stats.byPlate.filter((p) => !q || p.plate.toLowerCase().includes(q));
+    const list = X.computeStats(previewRows()).byPlate.filter((p) => !q || p.plate.toLowerCase().includes(q));
     $('#plateBody').innerHTML = list.slice(0, 500).map((p) => '<tr><td class="mono">' + esc(p.plate) + '</td><td class="num">' + fmtInt(p.trips) + '</td><td class="num">' + G.fmtTon(p.kg) + '</td></tr>').join('') +
       (list.length > 500 ? '<tr><td colspan="3" class="muted">… còn ' + (list.length - 500) + ' xe — gõ để lọc</td></tr>' : '');
   }
   function renderPreview() {
-    const rows = App.ds.rows, pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+    const rows = previewRows(), pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
     App.previewPage = Math.min(Math.max(0, App.previewPage), pages - 1);
     const from = App.previewPage * PAGE_SIZE, slice = rows.slice(from, from + PAGE_SIZE);
     $('#previewBody').innerHTML = slice.map((r) =>
       '<tr class="' + (r.warn.length ? 'row-warn' : '') + '" ' + (r.warn.length ? 'title="' + esc(r.warn.join('; ')) + '"' : '') + '><td>' + r.idx + '</td><td class="mono">' + esc(r.ticket) + '</td><td>' + esc(r.time1) + '</td><td>' + esc(r.time2) + '</td><td>' + esc(r.plate) + '</td><td>' + esc(r.driver) + '</td><td>' + esc(r.carrier) + '</td>' +
       '<td class="num">' + fmtInt(r.tare) + '</td><td class="num">' + fmtInt(r.gross) + '</td><td class="num">' + fmtInt(r.net) + '</td><td>' + esc(r.note) + '</td></tr>').join('');
     $('#prevPage').textContent = 'Trang ' + (App.previewPage + 1) + ' / ' + pages;
-    $('#previewInfo').textContent = '· ' + fmtInt(from + 1) + '–' + fmtInt(from + slice.length) + ' / ' + fmtInt(rows.length) + ' dòng (dòng tô vàng có cảnh báo — rê chuột để xem)';
+    $('#previewInfo').textContent = '· ' + fmtInt(rows.length ? from + 1 : 0) + '–' + fmtInt(from + slice.length) + ' / ' + fmtInt(rows.length) + ' dòng (dòng tô vàng có cảnh báo — rê chuột để xem)';
   }
 
   /* ===============================================================

@@ -71,7 +71,7 @@
     if (!loaded[src]) {
       loaded[src] = new Promise((res, rej) => {
         const s = document.createElement('script');
-        s.src = src; s.onload = () => res(); s.onerror = () => { delete loaded[src]; rej(new Error('Không nạp được ' + src)); };
+        const timer=setTimeout(()=>{s.remove();delete loaded[src];rej(new Error('Nạp thư viện quá 15 giây: '+src+'. Mở lại app bằng lối tắt bản cài.'));},15000);s.src = src; s.onload = () => {clearTimeout(timer);res();}; s.onerror = () => {clearTimeout(timer);s.remove();delete loaded[src];rej(new Error('Không nạp được ' + src));};
         document.head.appendChild(s);
       });
     }

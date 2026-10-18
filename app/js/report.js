@@ -17,9 +17,30 @@
   const HAS_RET = { xuatkhau: true, uythac: true, xuatkhogui: true };
   const G = () => HAK.Generator;
 
-  const dmyToTs = (s) => { const m = String(s || '').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/); return m ? Date.UTC(+m[3], +m[2] - 1, +m[1]) : null; };
-  const monthOf = (s) => { const m = String(s || '').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/); return m ? m[3] + '-' + m[2].padStart(2, '0') : '(không rõ)'; };
-  const isoToTs = (s) => { const m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? Date.UTC(+m[1], +m[2] - 1, +m[3]) : null; };
+  // Validate calendar dates instead of letting Date.UTC roll 31/02 into March.
+  const dayTs = (s, iso) => {
+    const m = String(s || '').match(iso ? /^(\d{4})-(\d{2})-(\d{2})$/ : /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (!m) return null;
+    const y = +(iso ? m[1] : m[3]), mo = +m[2], d = +(iso ? m[3] : m[1]);
+    const dt = new Date(0); dt.setUTCFullYear(y, mo - 1, d); dt.setUTCHours(0, 0, 0, 0);
+    return dt.getUTCFullYear() === y && dt.getUTCMonth() === mo - 1 && dt.getUTCDate() === d ? +dt : null;
+  };
+  const dmyToTs = (s) => dayTs(s, false);
+  const isoToTs = (s) => dayTs(s, true);
+  const monthOf = (s) => { const ts = dmyToTs(s); return ts === null ? '(không rõ)' : new Date(ts).toISOString().slice(0, 7); };
+  function validateRange(opt) {
+    if ((opt.from && isoToTs(opt.from) === null) || (opt.to && isoToTs(opt.to) === null)) throw new RangeError('Ngày lọc không hợp lệ.');
+    if (opt.from && opt.to && opt.from > opt.to) throw new RangeError('Từ ngày phải nhỏ hơn hoặc bằng đến ngày.');
+  }
+  function recordFilter(opt) {
+    const sf = root.HAKSmartFilter;
+    if (!sf) throw new Error('Chưa nạp bộ lọc HAK Smart Filter.');
+    return sf.createFilter({ screenId: 'xuat-hang-report', fields: [
+      { key: 'type', type: 'multi', label: 'Loại biên bản', options: TYPES.map(([value, , label]) => ({ value, label })), match: (r, values) => sf.core.inSet(values, r.type) }
+    ], matchQ: (r, q) => sf.core.hay([r.title, r.ship, r.giao, r.nhan, r.contract]).includes(q),
+    matchDate: (r, from, to) => r.fromTs !== null && (!from || r.fromTs >= isoToTs(from)) && (!to || r.fromTs <= isoToTs(to))
+    }, { initialState: { q: opt.q || '', tu: opt.from || '', den: opt.to || '', sel: opt.types && opt.types.length ? { type: opt.types } : opt.type ? { type: [opt.type] } : {} } });
+  }
   const typeName = (t) => { const x = TYPES.find((a) => a[0] === t); return x ? x[1] + ' ' + x[2] : t; };
 
   /* ---------------------------------------------------------------
@@ -49,11 +70,14 @@
    */
   function compute(metas, opt) {
     opt = opt || {};
-    const manual = opt.manual || {}, f = isoToTs(opt.from), t = isoToTs(opt.to);
+    validateRange(opt);
+    const filter = recordFilter(opt);
+    const manual = opt.manual || {};
     const recs = metas.map((m) => Object.assign({}, m, { fromTs: dmyToTs(m.from), toTs: dmyToTs(m.to) || dmyToTs(m.from), month: monthOf(m.from) }));
     recs.forEach((r) => { if (r.toTs === null) r.toTs = r.fromTs; });
     markDuplicates(recs);
-    const inRange = (r) => (f === null || (r.fromTs !== null && r.fromTs >= f)) && (t === null || (r.fromTs !== null && r.fromTs <= t));
+    const matching = new Set(filter.filter(recs).rows);
+    const inRange = (r) => matching.has(r);
     recs.forEach((r) => {
       r.inRange = inRange(r);
       r.include = manual[r.id] !== undefined ? !!manual[r.id] : !r.dup;
@@ -71,7 +95,7 @@
       const mo = months.get(r.month); mo[r.type] = (mo[r.type] || 0) + r.delKg;
     });
     const ships = used.filter((r) => HAS_RET[r.type]).sort((a, b) => (a.fromTs || 0) - (b.fromTs || 0));
-    return { recs: recs.sort((a, b) => b.updatedAt - a.updatedAt), used, byType, months: Array.from(months.entries()).sort((a, b) => a[0] < b[0] ? -1 : 1), ships };
+    return { filterText: filter.describe(), recs: recs.sort((a, b) => b.updatedAt - a.updatedAt), used, byType, months: Array.from(months.entries()).sort((a, b) => a[0] < b[0] ? -1 : 1), ships };
   }
 
   /* ---------------------------------------------------------------
@@ -85,8 +109,8 @@
     const ws = wb.addWorksheet(name);
     ws.columns = cols.map((c) => ({ width: c.w }));
     ws.mergeCells(1, 1, 1, cols.length); Object.assign(ws.getCell(1, 1), { value: title, font: { name: XF, size: 13, bold: true } });
-    ws.mergeCells(2, 1, 2, cols.length); Object.assign(ws.getCell(2, 1), { value: sub, font: { name: XF, size: 9, italic: true, color: { argb: 'FF555555' } }, alignment: { wrapText: true, vertical: 'top' } });
-    ws.getRow(2).height = 26;
+    ws.mergeCells(2, 1, 2, cols.length); Object.assign(ws.getCell(2, 1), { value: sub + ' · Ngày xuất: ' + new Date().toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }), font: { name: XF, size: 9, italic: true, color: { argb: 'FF555555' } }, alignment: { wrapText: true, vertical: 'top' } });
+    ws.getRow(2).height = 42;
     cols.forEach((c, i) => Object.assign(ws.getCell(4, i + 1), { value: c.h, font: { name: XF, size: 10, bold: true, color: { argb: 'FFFFFFFF' } }, fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F4E78' } }, border: B, alignment: { horizontal: 'center', vertical: 'middle', wrapText: true } }));
     ws.getRow(4).height = 28;
     rows.forEach((r, ri) => cols.forEach((c, i) => {
@@ -108,6 +132,7 @@
         }
       });
     }
+    ws.headerFooter.oddFooter = 'HAK · &D · Trang &P / &N';
     ws.views = [{ state: 'frozen', ySplit: 4 }];
     ws.pageSetup = { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, printTitlesRow: '4:4' };
     return ws;
@@ -115,7 +140,7 @@
   function newWorkbook() {
     const E = root.ExcelJS || (typeof require === 'function' ? require('exceljs') : null);
     if (!E) throw new Error('Thư viện ExcelJS chưa được nạp.');
-    const wb = new E.Workbook(); wb.creator = 'QUẢN LÝ XUẤT HÀNG'; wb.created = new Date();
+    const wb = new E.Workbook(); wb.creator = 'QUẢN LÝ XUẤT HÀNG'; wb.created = new Date(); wb.subject = 'Báo cáo nghiệp vụ xuất hàng';
     return wb;
   }
   async function toExcel(model) {
@@ -168,7 +193,7 @@
   };
   function contractFor(r) {
     const K = HAK.Catalog; if (!K) return null;
-    if (r.contract) { const c = K.contract(r.contract); if (c) return c; }
+    if (r.contract) return K.contract(r.contract, {history:true}) || null;
     const sk = shipKey(r.ship); if (!sk) return null;
     const hit = K.contracts(r.type).filter((c) => shipKey(c.ship) === sk);
     return hit.length === 1 ? hit[0] : null;
@@ -176,6 +201,7 @@
   /** Gộp hồ sơ đang tính theo hợp đồng. Hợp đồng chưa có hồ sơ vẫn có dòng nếu ngày ký trong khoảng lọc (bỏ trống = tất cả). */
   function xhLots(used, opt) {
     opt = opt || {};
+    validateRange(opt);
     const K = HAK.Catalog, lots = new Map(), unlinked = [];
     const blank = (c, type, ship) => ({ key: '', c, type, ship, recs: [], trips: 0, kg: 0, retTrips: 0, retKg: 0, delKg: 0, fromTs: null, toTs: null, from: '', to: '', bklsFirst: '', bklsLast: '' });
     used.filter((r) => XH_TYPES.indexOf(r.type) >= 0).forEach((r) => {
@@ -190,7 +216,7 @@
     });
     if (K) {
       const f = isoToTs(opt.from), t = isoToTs(opt.to);
-      K.contracts().filter((c) => XH_TYPES.indexOf(c.type) >= 0 && !lots.has(c.id) && (!opt.scope || !K.relatedTo || K.relatedTo(c, opt.scope))).forEach((c) => {
+      K.contracts().filter((c) => XH_TYPES.indexOf(c.type) >= 0 && (!opt.type || c.type === opt.type) && (!opt.types || !opt.types.length || opt.types.includes(c.type)) && (!opt.q || recordFilter({ q: opt.q }).filter([{ title: c.no, ship: c.ship, contract: c.tkhq }]).rows.length) && !lots.has(c.id) && (!opt.scope || !K.relatedTo || K.relatedTo(c, opt.scope))).forEach((c) => {
         const ts = isoToTs(c.date);
         if ((f !== null || t !== null) && (ts === null || (f !== null && ts < f) || (t !== null && ts > t))) return;
         const L = blank(c, c.type, c.ship); L.key = c.id; lots.set(c.id, L);
@@ -245,7 +271,7 @@
     const K = HAK.Catalog, C = HAK.Config, out = [];
     const D = (iso) => { const ts = isoToTs(iso); return ts === null ? null : new Date(ts); };
     const Ddmy = (s) => { const ts = dmyToTs(s); return ts === null ? null : new Date(ts); };
-    const tk = (s) => (/^\d{1,15}$/.test(s || '') ? +s : (s || null));
+    const tk = (s) => (s === null || s === undefined || s === '' ? null : String(s));
     const nz = (v) => (v === null || v === undefined || v === '' ? null : v);
     const cust = (id) => (K && id ? K.customer(id) : null) || {};
     const whName = (id) => { const w = id ? (C.data.warehouses || []).find((x) => x.id === id) : null; return w ? w.name : ''; };
@@ -261,7 +287,7 @@
       { h: 'Số xe qua cân', w: 10, n: KG, x: 1 }, { h: 'KL qua cân (tấn)', w: 14, n: T2, x: 1 }, { h: 'Xe trả về', w: 9, n: KG, x: 1 }, { h: 'KL trả về (tấn)', w: 13, n: T2, x: 1 },
       { h: 'Thực giao (tấn)', w: 14, n: T2, x: 1 }, { h: 'KL_MT − thực giao (tấn)', w: 14, n: T2, x: 1 }, { h: 'Số BKLS từ', w: 22, x: 1 }, { h: 'Số BKLS đến', w: 22, x: 1 }, { h: 'Ghi chú', w: 34, x: 1 }, { h: 'Mã lô (app)', w: 18, x: 1 }
     ], rows: lots.map((L, i) => {
-      const c = L.c || {}, b = cust(c.customerId), dry = K && L.c ? K.dryActual(c) : null, hasRec = L.recs.length > 0;
+      const c = L.c || {}, b = cust(c.buyerId || c.customerId), dry = K && L.c ? K.dryActual(c) : null, hasRec = L.recs.length > 0;
       return [i + 1, D(c.date), tk(c.tkhq), L.ship || null, b.name || null, b.address || null, c.product || null, c.currency === 'VND' ? null : nz(c.priceUsd),
         nz(c.mt), nz(c.bdmt), dry, nz(c.dryFactory), D(c.fromDate), D(c.toDate), c.filterTrips ? 'x' : null, whName(c.whId) || null,
         tl(L.type), c.no || null, cust(c.sellerId).name || null, c.currency === 'VND' ? nz(c.priceUsd) : null, c.certNo || null, D(c.certDate), L.recs.length,
@@ -288,6 +314,7 @@
     if (!root.ExcelJS && HAK.UI && HAK.UI.needLib) await HAK.UI.needLib('exceljs');
     const wb = newWorkbook();
     xhSheetRows(lots, trips, unlinked).forEach((sh) => buildTable(wb, sh.name, sh.cols, sh.rows));
+    buildSheet(wb, 'Phạm vi báo cáo', 'THÔNG TIN LẬP BÁO CÁO XUẤT HÀNG', rangeText || 'Toàn bộ thời gian', [{ h: 'Nội dung', w: 30 }, { h: 'Giá trị', w: 90 }], [['Nguồn', 'Hồ sơ Lưu trữ và Danh mục hợp đồng'], ['Phạm vi', rangeText || 'Toàn bộ thời gian'], ['Số lô', lots.length], ['Số phiếu cân', trips.length], ['Hồ sơ chưa gắn hợp đồng', unlinked.length]]);
     wb.title = 'Báo cáo Xuất hàng — ' + (rangeText || 'toàn bộ thời gian');
     return wb;
   }
@@ -404,7 +431,19 @@
     drawCarrier(hit ? prev : '', hit ? hit.label : '');
   }
   const manualGet = () => HAK.Store.get(OFF_KEY, {}) || {};
-  const opts = () => ({ from: $('#repFrom').value, to: $('#repTo').value, manual: manualGet(), scope: HAK.Auth && HAK.Auth.scopeIds ? HAK.Auth.scopeIds('report') : null });
+  let reportSmart;
+  function ensureReportSmart(){
+    if(reportSmart)return reportSmart;const F=HAK.Filters;
+    reportSmart=F.mount('#repSmartFilter',{screenId:'report',
+      source:()=>{const scope=HAK.Auth&&HAK.Auth.scopeIds?HAK.Auth.scopeIds('report'):null;return scope?metas.filter(m=>scope.includes(HAK.Auth.companyOfMeta(m))):metas;},
+      fields:[F.multi('type','Loại biên bản',TYPES.map(([value,,label])=>({value,label})),r=>r.type)],
+      matchQ:(r,q)=>F.core.hay([r.title,r.ship,r.giao,r.nhan,r.contract]).includes(q),
+      matchDate:(r,f,t)=>F.dateMatch(r.from,f,t),onApply:state=>{
+        $('#repQuery').value=state.q;$('#repFrom').value=state.tu;$('#repTo').value=state.den;$('#repType').value='';draw();},
+      summary:()=>[{label:'Hồ sơ tính vào tổng',value:model?model.used.length:0}]
+    });return reportSmart;
+  }
+  const opts = () => ({ types: reportSmart ? (reportSmart.getState().sel.type || []) : [], q: $('#repQuery').value, type: $('#repType').value, from: $('#repFrom').value, to: $('#repTo').value, manual: manualGet(), scope: HAK.Auth && HAK.Auth.scopeIds ? HAK.Auth.scopeIds('report') : null });
 
   function rangeText() {
     const a = $('#repFrom').value, b = $('#repTo').value, v = (s) => s.split('-').reverse().join('/');
@@ -413,8 +452,21 @@
 
   function draw() {
     // v2.6.2: mặc định chỉ hồ sơ của công ty làm việc (công tắc "Xem tất cả công ty") — áp cho mọi bảng / Excel / Google Sheet của trang
+    ensureReportSmart();
     const scope = HAK.Auth && HAK.Auth.scopeIds ? HAK.Auth.scopeIds('report') : null;
-    model = compute(scope ? metas.filter((m) => scope.indexOf(HAK.Auth.companyOfMeta(m)) >= 0) : metas, opts()); model.rangeText = rangeText();
+    try { validateRange(opts()); } catch (e) {
+      $('#repFilterError').hidden = false; $('#repFilterError').textContent = e.message;
+      ['#repFrom', '#repTo'].forEach((id) => $(id).setAttribute('aria-invalid', 'true'));
+      ['#repXls', '#repXlsCarrier', '#repXlsXH', '#repGsXH'].forEach((id) => { if ($(id)) $(id).disabled = true; });
+      $('#repMain').classList.add('d-none'); $('#repFilterSummary').textContent = 'Chưa áp dụng: khoảng ngày không hợp lệ.';
+      model = null; return;
+    }
+    $('#repFilterError').hidden = true;
+    ['#repFrom', '#repTo'].forEach((id) => $(id).removeAttribute('aria-invalid'));
+    ['#repXls', '#repXlsCarrier', '#repXlsXH', '#repGsXH'].forEach((id) => { if ($(id)) $(id).disabled = false; });
+    model = compute(scope ? metas.filter((m) => scope.indexOf(HAK.Auth.companyOfMeta(m)) >= 0) : metas, opts()); model.rangeText = rangeText() + ' · ' + model.filterText + ' · Công ty: ' + (scope ? scope.join(', ') : 'tất cả công ty được phép');
+    $('#repFilterSummary').textContent = model.used.length + ' hồ sơ đang tính · ' + model.rangeText;
+    if(reportSmart) reportSmart.refresh();
     const empty = !metas.length;
     $('#repEmpty').classList.toggle('d-none', !empty); $('#repMain').classList.toggle('d-none', empty);
     if (empty) return;
@@ -432,14 +484,14 @@
     $('#repMonthHead').innerHTML = '<tr><th>Tháng</th>' + TYPES.map(([k, ic, nm]) => '<th class="num">' + esc(nm) + '</th>').join('') + '</tr>';
     const tot = {};
     $('#repMonthBody').innerHTML = model.months.map(([mo, v]) => '<tr><td class="fw-semibold">' + mo.split('-').reverse().join('/') + '</td>' + TYPES.map(([k]) => { tot[k] = (tot[k] || 0) + (v[k] || 0); return '<td class="num">' + (v[k] ? ton(v[k]) : '—') + '</td>'; }).join('') + '</tr>').join('') +
-      (model.months.length ? '<tr class="fw-bold"><td>Tổng</td>' + TYPES.map(([k]) => '<td class="num">' + ton(tot[k] || 0) + '</td>').join('') + '</tr>' : '<tr><td colspan="6" class="muted text-center">Không có số liệu trong khoảng đã chọn.</td></tr>');
+      (model.months.length ? '<tr class="fw-bold"><td>Tổng</td>' + TYPES.map(([k]) => '<td class="num">' + ton(tot[k] || 0) + '</td>').join('') + '</tr>' : '<tr><td colspan="8" class="muted text-center">Không có số liệu trong khoảng đã chọn.</td></tr>');
     // --- theo tàu ---
     $('#repShips').innerHTML = model.ships.length ? model.ships.map((r) => '<tr><td class="fw-semibold">' + esc(r.ship || r.title) + '</td><td>' + esc(typeName(r.type)) + '</td><td class="text-nowrap">' + esc(r.from) + (r.to && r.to !== r.from ? ' → ' + esc(r.to) : '') + '</td><td>' + esc(r.giao) + (r.nhan ? ' → ' + esc(r.nhan) : '') + '</td><td class="num">' + r.trips.toLocaleString('vi-VN') + '</td><td class="num">' + ton(r.kg) + '</td><td class="num">' + (r.retTrips ? r.retTrips + ' xe · ' + ton(r.retKg) : '—') + '</td><td class="num fw-semibold">' + ton(r.delKg) + '</td></tr>').join('')
       : '<tr><td colspan="8" class="muted text-center">Chưa có hồ sơ Ủy thác / Xuất hàng kho gửi trong khoảng đã chọn.</td></tr>';
     // --- danh sách hồ sơ (tick chọn) ---
     const visible = model.recs.filter((r) => r.inRange);
     $('#repRecCount').textContent = model.used.length + ' / ' + visible.length + ' hồ sơ đang được tính';
-    $('#repRecBody').innerHTML = visible.map((r) => '<tr' + (r.include ? '' : ' class="opacity-50"') + '><td><input class="form-check-input" type="checkbox" data-id="' + r.id + '"' + (r.include ? ' checked' : '') + '></td>' +
+    $('#repRecBody').innerHTML = visible.map((r) => '<tr' + (r.include ? '' : ' class="opacity-50"') + '><td><input class="form-check-input" type="checkbox" data-id="' + esc(r.id) + '" aria-label="Tính hồ sơ ' + esc(r.title) + '"' + (r.include ? ' checked' : '') + '></td>' +
       '<td class="mono">' + esc(r.title) + '</td><td>' + esc(typeName(r.type)) + '</td><td class="text-nowrap">' + esc(r.from) + (r.to && r.to !== r.from ? ' → ' + esc(r.to) : '') + '</td><td class="num">' + r.trips.toLocaleString('vi-VN') + '</td><td class="num">' + ton(r.kg) + '</td>' +
       '<td class="small">' + (r.dup ? '<span class="text-warning">⚠ trùng kỳ với ' + esc(r.dupOf) + '</span>' : '') + '</td></tr>').join('');
     $('#repDupNote').classList.toggle('d-none', !model.recs.some((r) => r.inRange && r.dup));
@@ -457,7 +509,7 @@
     body.innerHTML = lots.length ? lots.map((L) => {
       const c = L.c || {}, has = L.recs.length > 0, diff = has && c.mt ? c.mt - L.delKg / 1000 : null;
       return '<tr' + (has ? '' : ' class="opacity-50"') + '><td><span class="badge badge-soft">' + esc(tl(L.type)) + '</span></td><td class="fw-semibold">' + esc(L.ship || '—') + '</td>' +
-        '<td class="mono small">' + esc(c.tkhq || c.no || (L.c ? '' : '⚠ chưa gắn HĐ')) + '</td><td class="small">' + esc(cu(c.customerId)) + '</td>' +
+        '<td class="mono small">' + esc(c.tkhq || c.no || (L.c ? '' : '⚠ chưa gắn HĐ')) + '</td><td class="small">' + esc(cu(c.buyerId || c.customerId)) + '</td>' +
         '<td class="num">' + L.recs.length + '</td><td class="num">' + (has ? L.trips.toLocaleString('vi-VN') : '—') + '</td><td class="num fw-semibold">' + (has ? ton(L.delKg) : '—') + '</td>' +
         '<td class="num">' + (c.mt ? G().fmtDec(c.mt, 2) : '—') + '</td><td class="num">' + (diff !== null ? G().fmtDec(diff, 2) : '—') + '</td></tr>';
     }).join('') : '<tr><td colspan="9" class="muted text-center">Chưa có hợp đồng / hồ sơ Xuất khẩu, Ủy thác, Xuất bán, Trao đổi trong khoảng đã chọn.</td></tr>';
@@ -476,14 +528,16 @@
 
   function init() {
     if (!$('#page-report')) return;
-    ['#repFrom', '#repTo'].forEach((s) => $(s).addEventListener('change', draw));
+    $('#repType').innerHTML += TYPES.map(([key, , name]) => '<option value="' + key + '">' + esc(name) + '</option>').join('');
+    ['#repFrom', '#repTo', '#repType'].forEach((s) => $(s).addEventListener('change', draw));
+    $('#repQuery').addEventListener('input', HAK.UI.debounce(draw, 150));
     if ($('#repScopeWrap') && HAK.Auth && HAK.Auth.scopeSwitch) $('#repScopeWrap').innerHTML = HAK.Auth.scopeSwitch('report');
     root.addEventListener('hak:scope', (e) => { if (e.detail && e.detail.key === 'report') draw(); });
     $('#repRecBody').addEventListener('change', (e) => {
       const cb = e.target.closest('input[data-id]'); if (!cb) return;
       const m = manualGet(); m[cb.dataset.id] = cb.checked; HAK.Store.set(OFF_KEY, m); draw();
     });
-    $('#repReset').addEventListener('click', () => { HAK.Store.remove(OFF_KEY); $('#repFrom').value = ''; $('#repTo').value = ''; draw(); });
+    $('#repReset').addEventListener('click', () => { HAK.Store.remove(OFF_KEY); $('#repFrom').value = ''; $('#repTo').value = ''; $('#repQuery').value = ''; $('#repType').value = ''; if(reportSmart)reportSmart.setState(HAK.Filters.core.empty()); draw(); });
     $('#repCarrierShip').addEventListener('change', (e) => drawCarrier(e.target.value, e.target.selectedOptions[0] ? e.target.selectedOptions[0].textContent : ''));
     $('#repXlsCarrier').addEventListener('click', async () => {
       const { toast, Loading } = HAK.UI;
@@ -506,7 +560,7 @@
         const wb = await toExcelCarrier(sheetRows, model.rangeText);
         const buf = await wb.xlsx.writeBuffer();
         const d = new Date(), p2 = (n) => String(n).padStart(2, '0'), name = 'BaoCaoDVVC_TheoTau_' + d.getFullYear() + p2(d.getMonth() + 1) + p2(d.getDate()) + '.xlsx';
-        HAK.Word.Files.saveBlob(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), name);
+        if(!await HAK.Word.Files.saveBlob(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), name))return;
         toast('Đã xuất: ' + name, 'success');
       } catch (e) { Loading.hide(); console.error(e); toast(e.message || String(e), 'error'); }
     });
@@ -520,7 +574,7 @@
         Loading.set(95, 'Đang ghi file Excel (' + trips.length.toLocaleString('vi-VN') + ' phiếu)…');
         const wb = await toExcelXuatHang(lots, trips, unlinked, model.rangeText), buf = await wb.xlsx.writeBuffer();
         const d = new Date(), p2 = (n) => String(n).padStart(2, '0'), name = 'XuatHang_' + d.getFullYear() + p2(d.getMonth() + 1) + p2(d.getDate()) + '.xlsx';
-        HAK.Word.Files.saveBlob(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), name);
+        if(!await HAK.Word.Files.saveBlob(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), name))return;
         Loading.hide();
         toast('Đã xuất: ' + name + ' — ' + lots.length + ' hợp đồng, ' + trips.length.toLocaleString('vi-VN') + ' phiếu cân' + (unlinked.length ? ' (có ' + unlinked.length + ' hồ sơ chưa gắn hợp đồng)' : '') + '.', unlinked.length ? 'warning' : 'success');
       } catch (e) { Loading.hide(); console.error(e); toast(e.message || String(e), 'error'); }
@@ -556,7 +610,7 @@
         if (!model || !model.used.length) { toast('Chưa có số liệu để xuất.', 'warning'); return; }
         const wb = await toExcel(model), buf = await wb.xlsx.writeBuffer();
         const d = new Date(), p2 = (n) => String(n).padStart(2, '0'), name = 'BaoCaoTongHop_' + d.getFullYear() + p2(d.getMonth() + 1) + p2(d.getDate()) + '.xlsx';
-        HAK.Word.Files.saveBlob(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), name);
+        if(!await HAK.Word.Files.saveBlob(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), name))return;
         toast('Đã xuất: ' + name, 'success');
       } catch (e) { console.error(e); toast(e.message || String(e), 'error'); }
     });

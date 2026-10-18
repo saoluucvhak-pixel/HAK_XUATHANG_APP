@@ -208,11 +208,18 @@
    * 4. Sao lưu / khôi phục (.json)
    * ------------------------------------------------------------- */
   /** Toàn bộ hồ sơ dạng [{meta, data}] (dùng cho sao lưu riêng Lưu trữ và sao lưu toàn bộ). */
-  async function collectItems() {
-    const metas = await list();
+  async function collectItems(ids) {
+    const metas = (await list()).filter(m=>!ids||ids.includes(m.id));
     const items = [];
     for (const m of metas) { const data = await getOne('data', m.id); if (data !== undefined) items.push({ meta: m, data }); }
     return items;
+  }
+  async function closeVerified(items){
+    const db=await openDb();if(!db)throw Error('Không dọn kho lưu trữ trong chế độ RAM.');
+    return new Promise((ok,no)=>{const tx=db.transaction(['meta','data'],'readwrite');let error,left=items.length*2;const matches=()=>{if(error)return;if(--left===0)for(const item of items){tx.objectStore('meta').delete(item.meta.id);tx.objectStore('data').delete(item.meta.id);}};
+      for(const item of items){const m=tx.objectStore('meta').get(item.meta.id),d=tx.objectStore('data').get(item.meta.id);m.onsuccess=()=>{if(error)return;if(JSON.stringify(m.result)!==JSON.stringify(item.meta)){error=Error('Hồ sơ cũ đã thay đổi; chưa dọn năm.');tx.abort();}else matches();};d.onsuccess=()=>{if(error)return;if(d.result!==item.data){error=Error('Dữ liệu lưu trữ đã thay đổi; chưa dọn năm.');tx.abort();}else matches();};}
+      tx.oncomplete=()=>{updateBadge();ok();};tx.onabort=tx.onerror=()=>no(error||tx.error||Error('Chưa dọn được kho cũ.'));
+    });
   }
   async function exportAll() {
     const items = await collectItems();
@@ -221,7 +228,7 @@
     const name = 'HAK_LuuTru_' + d.getFullYear() + p2(d.getMonth() + 1) + p2(d.getDate()) + '.json';
     // Dùng chung thư mục sao lưu mặc định đã chọn ở Cài đặt → Chung (nếu có) — xem backup.js
     if (HAK.Backup && HAK.Backup.saveBackupBlob) await HAK.Backup.saveBackupBlob(blob, name);
-    else HAK.Word.Files.saveBlob(blob, name);
+    else await HAK.Word.Files.saveBlob(blob, name);
     return { name, count: items.length };
   }
   async function importFile(file) {
@@ -266,11 +273,23 @@
     const scope = HAK.Auth && HAK.Auth.scopeIds ? HAK.Auth.scopeIds('archive') : null;
     return (m) => !scope || scope.indexOf(HAK.Auth.companyOfMeta(m)) >= 0;
   }
+  let archiveSmart;
+  const archiveSource=()=>cache.filter(scopeFilter());
+  function ensureArchiveSmart(){
+    if(archiveSmart)return archiveSmart;
+    const F=HAK.Filters;
+    archiveSmart=F.mount('#archSmartFilter',{screenId:'archive',source:archiveSource,
+      fields:[F.multi('type','Loại biên bản',()=>Array.from(new Set(cache.map(m=>m.type))).map(value=>({value,label:typeLabel(value)})),m=>m.type),
+       F.multi('by','Người lập',()=>Array.from(new Set(cache.map(m=>m.by).filter(Boolean))),m=>m.by)],
+      matchQ:(m,q)=>F.core.hay([m.title,m.ship,m.type,m.by,...Object.values(m.summary||{})]).includes(q),
+      matchDate:(m,f,t)=>F.dateMatch(m.from||m.updatedAt,f,t),onApply:()=>{shown=PAGE;renderRows();},
+      summary:r=>[{label:'Khối lượng',value:HAK.Generator.fmtTon(r.rows.reduce((a,m)=>a+(+m.kg||0),0))+' tấn'}]
+    });return archiveSmart;
+  }
   function renderRows() {
     const { esc } = UI();
-    const q = (document.getElementById('archSearch').value || '').trim().toLowerCase(), ty = document.getElementById('archType').value;
-    const inScope = scopeFilter();   // v2.6.2: mặc định chỉ hồ sơ của công ty đang làm
-    const rows = cache.filter((m) => inScope(m) && (!ty || m.type === ty) && (!q || (m.title + ' ' + m.type + ' ' + Object.values(m.summary || {}).join(' ')).toLowerCase().indexOf(q) >= 0));
+    const view=ensureArchiveSmart();
+    const rows=view.filter(archiveSource()).rows; view.refresh();
     const body = document.getElementById('archBody'), more = document.getElementById('archMore');
     if (more) { const left = rows.length - shown; more.classList.toggle('d-none', left <= 0); more.textContent = 'Hiện thêm ' + Math.min(PAGE, left).toLocaleString('vi-VN') + ' hồ sơ (còn ' + Math.max(0, left).toLocaleString('vi-VN') + ')'; }
     body.innerHTML = rows.slice(0, shown).map((m) => {
@@ -334,7 +353,7 @@
         const from = isoDay(sel[sel.length - 1].updatedAt).replace(/-/g, ''), to = isoDay(sel[0].updatedAt).replace(/-/g, '');
         const name = 'HAK_LuuTru_HoSoCu_' + from + '-' + to + '.json';
         const blob = new Blob([JSON.stringify({ app: 'hak-bienban-archive', v: 1, exportedAt: new Date().toISOString(), pruned: true, items })], { type: 'application/json' });
-        if (HAK.Backup && HAK.Backup.saveBackupBlob) await HAK.Backup.saveBackupBlob(blob, name); else HAK.Word.Files.saveBlob(blob, name);
+        if (HAK.Backup && HAK.Backup.saveBackupBlob) await HAK.Backup.saveBackupBlob(blob, name); else await HAK.Word.Files.saveBlob(blob, name);
         pruneIds = items.map((x) => x.meta.id);
         document.getElementById('archPruneStep2').classList.remove('d-none');
         toast('Đã xuất ' + items.length + ' hồ sơ: ' + name + '. Kiểm tra file rồi tick xác nhận để xóa khỏi máy.', 'success');
@@ -382,5 +401,5 @@
     updateBadge();
   }
 
-  HAK.Archive = { SOFT_WARN, save, list, load, ensureStats, regenerate, exportAll, importFile, collectItems, importItems, render, init, updateBadge, get state() { return state; } };
+  HAK.Archive = { closeVerified,decode:unpack,SOFT_WARN, save, list, load, ensureStats, regenerate, exportAll, importFile, collectItems, importItems, render, init, updateBadge, get state() { return state; } };
 })(typeof window !== 'undefined' ? window : globalThis);

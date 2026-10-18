@@ -219,7 +219,7 @@
   async function download(spec) {
     const out = await toBuffer(spec);
     const blob = new Blob([out.buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    HAK.Word.Files.saveBlob(blob, spec.fileName);
+    if(!await HAK.Word.Files.saveBlob(blob, spec.fileName))return null;
     return { name: spec.fileName, sheets: out.sheets, rows: spec.rows.length };
   }
 
