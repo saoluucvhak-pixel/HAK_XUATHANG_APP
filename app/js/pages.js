@@ -237,7 +237,7 @@
 
   /* Trạng thái riêng từng trang */
   const ST = {};
-  Object.keys(DOCS).forEach((k) => { ST[k] = { filter: { groups: null, from: '', to: '' }, returned: new Set(), built: false, bklsDupKey: '' }; });
+  Object.keys(DOCS).forEach((k) => { ST[k] = { filter: { groups: null, from: '', to: '' }, returned: new Set(), omit: new Map(), built: false, bklsDupKey: '' }; });
 
   const cfg = () => HAK.Config.data;
   /** Dữ liệu Excel của đúng loại biên bản `type` (mỗi loại có file riêng — xem HAK.App.slots). */
@@ -353,7 +353,9 @@
       '<div class="row g-2 align-items-end d-none"><div class="col-6 col-md-4"><label class="form-label">Từ ngày</label><input type="date" class="form-control" id="from-' + type + '"></div>' +
       '<div class="col-6 col-md-4"><label class="form-label">Đến ngày</label><input type="date" class="form-control" id="to-' + type + '"></div>' +
       '<div class="col-12 col-md-4 d-grid"><button class="btn btn-outline-secondary" id="resetFlt-' + type + '" type="button">Đặt lại bộ lọc</button></div></div>' +
-      '<div class="form-text">Bỏ trống ngày = lấy toàn bộ dữ liệu trong file Excel.</div><div id="convNote-' + type + '"></div></div></div>';
+      '<div class="form-text">Bỏ trống ngày = lấy toàn bộ dữ liệu trong file Excel.</div>' +
+      '<div class="d-flex flex-wrap align-items-center gap-2 mt-2"><button class="btn btn-outline-danger btn-sm" id="btnOmit-' + type + '" type="button">🚫 Bỏ phiếu cân…</button><span id="omitSummary-' + type + '" class="muted small">Chưa bỏ phiếu nào.</span></div>' +
+      '<div class="form-text">Phiếu bị bỏ coi như không có: không tính vào tổng, biên bản, BKLS, báo cáo. Có thể khôi phục bất cứ lúc nào trước khi lưu hồ sơ.</div><div id="convNote-' + type + '"></div></div></div>';
     // ---- v2.7.0: chia vùng nhập liệu thành tab (vùng không có nhóm nào thì bỏ tab) ----
     const zones = ZONES.map(([z, lb]) => ({ z, lb: (D.zoneLabels || {})[z] || lb,
       html: z === 'data' ? filterHtml + extra : D.groups.filter((g) => g.zone === z).map(groupHtml).join('') })).filter((x) => x.html);
@@ -480,6 +482,7 @@
       });
     }
     if (DOCS[type].extra === 'returned') $('#btnReturn-' + type).addEventListener('click', () => openReturnModal(type));
+    $('#btnOmit-' + type).addEventListener('click', () => openOmitModal(type));
     if (CONV_FROM[type]) sec.addEventListener('click', (e) => { const b = e.target.closest('[data-conv]'); if (b) convertTo(type, b.dataset.conv); });
     sec.addEventListener('click', (e) => {                  // v2.7.0 tab vùng nhập liệu + nút Quay lại / Tiếp
       const b = e.target.closest('.zone-tab, [data-zone-go]'); if (!b) return;
@@ -745,6 +748,7 @@
     if (stt.filter.smart) p.filter.smart = Object.assign(JSON.parse(JSON.stringify(stt.filter.smart)), {tu: stt.filter.from || "", den: stt.filter.to || ""});
     if (stt.filter.files && stt.filter.files.length) p.filter.files = stt.filter.files.slice();          // v2.6.7: phạm vi chuyển từ kho gửi
     if (stt.filter.exclude && stt.filter.exclude.length) p.filter.exclude = stt.filter.exclude.slice();
+    if (stt.omit && stt.omit.size) { p.filter.omit = Array.from(stt.omit.keys()); p.filter.omitLog = Array.from(stt.omit.values()); }   // phiếu bỏ tay + lý do
     if (D.extra === 'returned') p.returned = Array.from(stt.returned);
     if (type === 'dieuchuyen') {
       const ct = pickCompany('Công ty'), cn = pickCompany('Chi nhánh');
@@ -778,7 +782,7 @@
     if(!smartViews[type]) {
       const c=F.tripConfig(options);
       smartViews[type]=F.mount('#smart-'+type,Object.assign({},c,{
-        screenId:'document-'+type,source:()=>G().filterRows(((getDs(type)||{}).rows||[]),{files:st.filter.files,exclude:st.filter.exclude,groups:st.filter.groups}),quickFields:['q','plate','carrier'],
+        screenId:'document-'+type,source:()=>G().filterRows(((getDs(type)||{}).rows||[]),{files:st.filter.files,exclude:st.filter.exclude,groups:st.filter.groups,omit:Array.from(st.omit.keys())}),quickFields:['q','plate','carrier'],
         onApply:state=>{st.filter.smart=state;st.filter.from=state.tu;st.filter.to=state.den;
           $('#from-'+type).value=state.tu;$('#to-'+type).value=state.den;updateSummary(type);},
         onReset:()=>{st.filter.from='';st.filter.to='';},
@@ -833,6 +837,10 @@
       el.textContent = ST[type].returned.size ? 'Đã chọn ' + ST[type].returned.size + ' xe' + (ret.length !== ST[type].returned.size ? ' (' + ret.length + ' xe nằm trong phạm vi hiện tại)' : '') : 'Chưa chọn — mặc định "Không có xe trả về".';
     }
     if (type === 'dieuchuyen') html += li('Khối lượng làm tròn', G().fmtTonRound(sum.kg) + ' tấn');
+    const om = omittedInfo(type);
+    if (om.n) html += li('Đã bỏ', om.n + ' phiếu · −' + G().fmtTon(om.kg) + ' tấn');
+    const os = $('#omitSummary-' + type);
+    if (os) os.textContent = om.n ? 'Đã bỏ ' + om.n + ' phiếu (−' + G().fmtTon(om.kg) + ' tấn) — coi như không có.' : 'Chưa bỏ phiếu nào.';
     const warnRows = rows.filter((r) => r.warn && r.warn.length).length;
     if (warnRows) html += li('Dòng có cảnh báo', warnRows + ' dòng');
     list.innerHTML = html;
@@ -1100,6 +1108,68 @@
   }
 
   /* ===============================================================
+   * Bỏ phiếu cân (v2.12): phiếu bị bỏ coi như không có. Khóa = G.omitKey (số phiếu|biển số|giờ cân vào);
+   * lưu kèm lý do + người + giờ trong p.filter.omitLog để truy vết.
+   * ============================================================= */
+  /** Các dòng của phạm vi hiện tại NHƯNG chưa trừ phiếu đã bỏ (để hiện lại cho khôi phục). */
+  function rowsWithOmitted(type) {
+    const ds = getDs(type); if (!ds) return [];
+    const p = collect(type), f = Object.assign({}, p.filter); delete f.omit; delete f.omitLog;
+    return G().filterRows(ds.rows, f);
+  }
+  function omittedInfo(type) {
+    const om = ST[type].omit; if (!om.size) return { n: 0, kg: 0 };
+    if (ST[type].savedDs) { const v = Array.from(om.values()); return { n: v.length, kg: v.reduce((x, e) => x + (+e.kg || 0), 0) }; }   // hồ sơ đã lưu: dòng bỏ không còn trong dữ liệu → đếm theo nhật ký
+    const hit = rowsWithOmitted(type).filter((r) => om.has(G().omitKey(r)));
+    return { n: hit.length, kg: hit.reduce((a, r) => a + (+r.net || 0), 0) };
+  }
+  let omitType = null;
+  function ensureOmitModal() {
+    if ($('#omitModal')) return;
+    const m = document.createElement('div');
+    m.className = 'modal fade'; m.id = 'omitModal'; m.tabIndex = -1;
+    m.innerHTML = '<div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Bỏ phiếu cân</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button></div>' +
+      '<div class="modal-body"><p class="small muted">Tick phiếu muốn <b>bỏ</b>: phiếu đó coi như không có (không tính vào tổng, biên bản, BKLS, báo cáo). Bỏ tick để khôi phục.</p>' +
+      '<div class="row g-2 mb-2"><div class="col-md-6"><input id="omitSearch" class="form-control form-control-sm" placeholder="Tìm số phiếu / biển số…" autocomplete="off"></div>' +
+      '<div class="col-md-6"><input id="omitReason" class="form-control form-control-sm" placeholder="Lý do bỏ (nhập nhầm / cân thử / hủy…) — áp cho phiếu tick mới" autocomplete="off"></div></div>' +
+      '<div class="tbl-wrap"><table class="table table-sm"><thead><tr><th>Bỏ</th><th>Số phiếu</th><th>Giờ cân 1</th><th>Biển số</th><th class="num">KL (kg)</th><th>Lý do</th></tr></thead><tbody id="omitBody"></tbody></table></div>' +
+      '<div class="small muted" id="omitInfo"></div></div>' +
+      '<div class="modal-footer"><span class="me-auto small" id="omitCount"></span><button class="btn btn-outline-secondary" id="omitClear" type="button">Khôi phục tất cả</button><button class="btn btn-primary" data-bs-dismiss="modal" type="button">Xong</button></div></div></div>';
+    document.body.appendChild(m);
+    $('#omitSearch').addEventListener('input', debounce(renderOmitList, 150));
+    $('#omitBody').addEventListener('change', (e) => {
+      const cb = e.target.closest('input[data-key]'); if (!cb) return;
+      const st = ST[omitType], row = rowsWithOmitted(omitType).find((r) => G().omitKey(r) === cb.dataset.key);
+      if (cb.checked && row) st.omit.set(cb.dataset.key, { key: cb.dataset.key, ticket: row.ticket || '', plate: row.plate, kg: row.net, reason: $('#omitReason').value.trim(), at: Date.now(), by: HAK.Auth && HAK.Auth.who ? HAK.Auth.who() : '' });
+      else st.omit.delete(cb.dataset.key);
+      renderOmitList(); updateSummary(omitType);
+    });
+    $('#omitClear').addEventListener('click', () => { ST[omitType].omit.clear(); renderOmitList(); updateSummary(omitType); });
+  }
+  function renderOmitList() {
+    const rows = rowsWithOmitted(omitType), q = $('#omitSearch').value.trim().toLowerCase(), om = ST[omitType].omit, K = G().omitKey;
+    let shown = rows.filter((r) => !q || String(r.ticket || '').toLowerCase().includes(q) || String(r.plate || '').toLowerCase().includes(q));
+    const total = shown.length;
+    shown = shown.slice(0, 300);   // giữ thứ tự gốc: tick không làm dòng nhảy chỗ
+    $('#omitBody').innerHTML = shown.map((r) => {
+      const k = K(r), on = om.has(k);
+      return '<tr' + (on ? ' class="opacity-50"' : '') + '><td><input class="form-check-input" type="checkbox" data-key="' + esc(k) + '"' + (on ? ' checked' : '') + '></td>' +
+        '<td class="mono">' + (on ? '<s>' : '') + esc(r.ticket || '(dòng ' + r.idx + ')') + (on ? '</s>' : '') + '</td><td>' + esc(r.time1) + '</td><td>' + esc(r.plate) + '</td><td class="num">' + fmtInt(r.net) + '</td><td class="small">' + esc(on ? om.get(k).reason || '' : '') + '</td></tr>';
+    }).join('');
+    $('#omitInfo').textContent = 'Hiển thị ' + shown.length + ' / ' + total + ' phiếu' + (total > 300 ? ' — gõ tìm kiếm để thu hẹp.' : '.');
+    const info = omittedInfo(omitType);
+    $('#omitCount').textContent = info.n ? 'Đã bỏ ' + info.n + ' phiếu · −' + G().fmtTon(info.kg) + ' tấn' : 'Chưa bỏ phiếu nào';
+  }
+  function openOmitModal(type) {
+    if (!getDs(type)) { toast('Chưa có dữ liệu Excel.', 'error'); return; }
+    if (ST[type].ro) { toast('Hồ sơ đang ở chế độ chỉ xem, không bỏ phiếu được.', 'warning'); return; }
+    ensureOmitModal(); omitType = type;
+    $('#omitSearch').value = ''; $('#omitReason').value = '';
+    renderOmitList();
+    bootstrap.Modal.getOrCreateInstance($('#omitModal')).show();
+  }
+
+  /* ===============================================================
    * Modal chọn xe trả về (Ủy thác)
    * ============================================================= */
   let retType = 'uythac';
@@ -1187,10 +1257,10 @@
       });
     },
     show(type) { if (ST[type].built) { refreshContracts(type); renderFilter(type); updateSummary(type); } },
-    unloadSnapshot(type){delete ST[type].savedDs;delete ST[type].snapshotParams;ST[type].filter={groups:null,from:'',to:''};ST[type].returned.clear();HAK.Pages.readOnly(type,false);renderFilter(type);updateSummary(type);},
-    readOnly(type,on){$$('#page-'+type+' input,#page-'+type+' select,#page-'+type+' textarea').forEach(n=>n.disabled=on);if(on)$('#year-note-'+type).textContent='Chỉ xem năm đã đóng · Không ghi vào kho làm việc. Dùng Khôi phục năm nếu cần sửa.';},
+    unloadSnapshot(type){delete ST[type].savedDs;delete ST[type].snapshotParams;ST[type].filter={groups:null,from:'',to:''};ST[type].returned.clear();ST[type].omit.clear();HAK.Pages.readOnly(type,false);renderFilter(type);updateSummary(type);},
+    readOnly(type,on){ST[type].ro=!!on;$$('#page-'+type+' input,#page-'+type+' select,#page-'+type+' textarea').forEach(n=>n.disabled=on);if(on)$('#year-note-'+type).textContent='Chỉ xem năm đã đóng · Không ghi vào kho làm việc. Dùng Khôi phục năm nếu cần sửa.';},
     snapshot(type){const ds=getDs(type);if(!ds)throw Error('Chưa có dữ liệu cân.');const params=collect(type);return {params,rows:JSON.parse(JSON.stringify(G().filterRows(ds.rows,params.filter)))};},
-    openSnapshot(record){const type=record.type;if(!DOCS[type])throw Error('Loại hồ sơ không hỗ trợ.');const rows=JSON.parse(JSON.stringify(record.rows));ST[type].savedDs={ok:true,rows,stats:HAK.Excel.computeStats(rows)};ST[type].snapshotParams=JSON.parse(JSON.stringify(record.params));ST[type].filter=Object.assign({groups:null,from:'',to:''},record.params.filter||{});if(ST[type].filter.groups)ST[type].filter.groups=new Set(ST[type].filter.groups);ST[type].returned=new Set(record.params.returned||[]);Object.assign(HAK.Config.custom,record.context&&record.context.custom||{});DOCS[type].groups.forEach(g=>g.fields.forEach(f=>{const node=$('#'+fid(type,f.id)),value=record.params[f.id];if(!node)return;if(node.tagName==='SELECT'&&value!=null&&!Array.from(node.options).some(o=>o.value===value)){const option=document.createElement('option');option.value=value;option.textContent=value+' (đã lưu)';node.append(option);}if(f.type!=='contract'&&value!=null)setField(type,f,value);}));const contract=$('#'+fid(type,'contractId'));if(contract){contract.value='';contract.disabled=true;contract.title='Hồ sơ dùng thông tin hợp đồng đã lưu; chọn Thêm mới để dùng hợp đồng khác.';}renderFilter(type);updateSummary(type);$('#year-note-'+type).textContent='Đang sửa hồ sơ năm '+record.year+' · phiên bản '+record.revision+' · Lưu hồ sơ để ghi thay đổi';},
+    openSnapshot(record){const type=record.type;if(!DOCS[type])throw Error('Loại hồ sơ không hỗ trợ.');const rows=JSON.parse(JSON.stringify(record.rows));ST[type].savedDs={ok:true,rows,stats:HAK.Excel.computeStats(rows)};ST[type].snapshotParams=JSON.parse(JSON.stringify(record.params));ST[type].filter=Object.assign({groups:null,from:'',to:''},record.params.filter||{});if(ST[type].filter.groups)ST[type].filter.groups=new Set(ST[type].filter.groups);ST[type].returned=new Set(record.params.returned||[]);ST[type].omit=new Map(((record.params.filter||{}).omitLog||[]).map(e=>[e.key,e]));Object.assign(HAK.Config.custom,record.context&&record.context.custom||{});DOCS[type].groups.forEach(g=>g.fields.forEach(f=>{const node=$('#'+fid(type,f.id)),value=record.params[f.id];if(!node)return;if(node.tagName==='SELECT'&&value!=null&&!Array.from(node.options).some(o=>o.value===value)){const option=document.createElement('option');option.value=value;option.textContent=value+' (đã lưu)';node.append(option);}if(f.type!=='contract'&&value!=null)setField(type,f,value);}));const contract=$('#'+fid(type,'contractId'));if(contract){contract.value='';contract.disabled=true;contract.title='Hồ sơ dùng thông tin hợp đồng đã lưu; chọn Thêm mới để dùng hợp đồng khác.';}renderFilter(type);updateSummary(type);$('#year-note-'+type).textContent='Đang sửa hồ sơ năm '+record.year+' · phiên bản '+record.revision+' · Lưu hồ sơ để ghi thay đổi';},
     refreshSelects, generate, generateBkls,
     /** Loại biên bản có lập BKLS hay không (dùng ở Lưu trữ). */
     hasBkls: (t) => pageBkls(t),

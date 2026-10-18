@@ -60,6 +60,8 @@
     if (!p || !p.hasDate) return null;
     return Date.UTC(p.y, p.m - 1, p.d, endOfDay ? 23 : 0, endOfDay ? 59 : 0, endOfDay ? 59 : 0);
   }
+  /** Khóa nhận diện 1 phiếu để bỏ tay: số phiếu | biển số | giờ cân vào (cùng khóa khử trùng đợt) — bền khi nạp lại file đổi thứ tự dòng. */
+  const omitKey = (r) => (r.ticket || '') + '|' + r.plate + '|' + (r.ts1 !== null && r.ts1 !== undefined ? r.ts1 : r.time1) + (r.ticket ? '' : '|' + r.net);
   function filterRows(rows, filter) {
     filter = filter || {};
     const groups = filter.groups ? new Set(filter.groups) : null;
@@ -67,10 +69,12 @@
     // v2.6.7: phạm vi "chuyển từ Xuất hàng kho gửi" — chỉ các đợt (tên file) đã chuyển + loại xe trả về (hình thức đích không có "xe trả về")
     const files = filter.files && filter.files.length ? new Set(filter.files) : null;
     const excl = filter.exclude && filter.exclude.length ? new Set(filter.exclude) : null;
+    const omit = filter.omit && filter.omit.length ? new Set(filter.omit) : null;   // phiếu bị bỏ tay → coi như không có
     const fileOf = (r) => { const u = r.uid === undefined ? '' : String(r.uid), i = u.lastIndexOf('#'); return i < 0 ? '' : u.slice(0, i); };
     const selected = rows.filter((r) => {
       if (files && r.uid !== undefined && !files.has(fileOf(r))) return false;
       if (excl && excl.has(r.uid !== undefined ? r.uid : r.idx)) return false;
+      if (omit && omit.has(omitKey(r))) return false;
       if (groups && !groups.has(r.note || '')) return false;
       if (from !== null && (r.ts1 === null || r.ts1 < from)) return false;
       if (to !== null && (r.ts1 === null || r.ts1 > to)) return false;
@@ -591,7 +595,7 @@
 
   HAK.Generator = {
     fmtInt, fmtDec, fmtTon, fmtTonRound, isoToVN, slug, vnMoneyWords,
-    filterRows, summarize, plateRows, detailRows, retKey,
+    filterRows, summarize, plateRows, detailRows, retKey, omitKey,
     build(type, ds, params) {
       if (!ds || !ds.ok) return { files: [], summary: {}, warnings: [], errors: ['Chưa có dữ liệu Excel hợp lệ. Hãy thêm file ở mục "Nhập liệu".'] };
       const res = BUILDERS[type](ds, params);

@@ -256,3 +256,8 @@ Thủy chốt 28/09/2026: "1. bỏ Trao đổi KHÔNG đồng bộ lên Google S
 - Hiện số phiên bản (js/version.js → sidebar "v2.11.2" và đầu trang Hướng dẫn); tests/version.test.cjs bắt buộc khớp installer/setup.nsi.
 - Hướng dẫn (HUONG_DAN.md, trang Hướng dẫn trong app) cập nhật theo Sổ hồ sơ năm / Đóng năm của v2.10–2.11; bỏ mô tả "dọn theo năm v2.8.0" không có trong bản phát hành.
 - Bộ cài NSIS dựng tự động trên GitHub Actions (.github/workflows/build-setup.yml).
+
+## v2.12.0 — Bỏ phiếu cân
+- generator.js: filterRows nhận filter.omit (khóa G.omitKey = số phiếu|biển số|giờ cân vào) — phiếu bỏ coi như không có ở mọi đầu ra (biên bản, BKLS, Lưu trữ, Báo cáo).
+- pages.js: nút 🚫 Bỏ phiếu cân… + hộp thoại (tìm, tick, lý do, khôi phục tất cả); p.filter.omit / omitLog lưu kèm hồ sơ; mở hồ sơ đã lưu nạp lại omitLog; dòng "Đã bỏ N phiếu · −X tấn".
+- tests/omit-tickets.test.cjs (3 kiểm thử). Còn lại: cảnh báo phiếu trùng khác khối lượng khi nạp file khác tên.
