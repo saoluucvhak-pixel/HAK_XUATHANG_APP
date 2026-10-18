@@ -71,7 +71,7 @@
   }
   function smart() {
     const host = $('#csrSmart'); if (!host) return null;
-    if (!state.view) state.view = F().mount(host, { screenId: 'contract-status', source: () => state.groups.map((g) => g.f), fields: fields(), searchPlaceholder: 'Tìm số hợp đồng, bên mua, tàu, kho, chứng thư…',
+    if (!state.view) state.view = F().mount(host, { screenId: 'contract-status', source: () => state.groups.map((g) => g.f), fields: fields(), searchPlaceholder: 'Tìm số hợp đồng, bên mua, tàu, kho, chứng thư…', quickFields: ['q', 'kho', 'type', 'buyerId'],
       matchQ: (r, q) => F().core.hay([r.no, r.buyer, r.ships.join(' '), r.khos.join(' '), r.certNos.join(' '), r.statusLabel]).includes(q), matchDate: (r, f, t) => F().dateMatch(r.date, f, t), onApply: () => draw() });
     else if (!host.contains(state.view.el)) host.replaceChildren(state.view.el);
     return state.view;
@@ -126,7 +126,7 @@
       f.multi('kho', 'Kho xuất', opt((x) => x.kho), (x) => x.kho), f.multi('rec', 'Hồ sơ / biên bản', opt((x) => x.rec), (x) => x.rec), { key: 'ret', label: 'Chỉ xe trả về', type: 'bool', match: (x) => x.ret }];
   }
   function mountTripFilter() {
-    const d = state.detail; d.view = F().mount('#csrDSmart', { screenId: 'contract-trips', source: () => d.rows, fields: tripFields(d.rows), searchPlaceholder: 'Tìm số phiếu, biển số, tài xế, đơn vị vận chuyển, hồ sơ…',
+    const d = state.detail; d.view = F().mount('#csrDSmart', { screenId: 'contract-trips', source: () => d.rows, fields: tripFields(d.rows), searchPlaceholder: 'Tìm số phiếu, biển số, tài xế, đơn vị vận chuyển, hồ sơ…', quickFields: ['q', 'kho', 'plate', 'carrier'],
       matchQ: (x, q) => F().core.hay([x.ticket, x.plate, x.driver, x.carrier, x.rec, x.bkls, x.date, x.kho]).includes(q), matchDate: (x, fr, to) => F().dateMatch(x.date, fr, to), onApply: () => drawTrips(),
       summary: (r) => [{ label: 'Xe', value: r.rows.length }, { label: 'Khối lượng', value: ton(sum(r.rows.map((x) => x.kg))) + ' tấn' }] });
   }
