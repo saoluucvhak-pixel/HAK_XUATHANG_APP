@@ -276,3 +276,7 @@ Thủy chốt 28/09/2026: "1. bỏ Trao đổi KHÔNG đồng bộ lên Google S
 ## v2.12.4 — BKLS nhanh hơn, gợi ý hộp Lưu
 - pages.js generateBkls: luôn gọi HAK.BklsTemplates.choose (mặc định BKLS tổng · Word) kể cả khi tạo lại từ Lưu trữ (src) — trước đó src dùng 4 ô p.bklsTotal*/Trip* đã lưu (mặc định true) → luôn tạo cả từng xe Word + PDF. Bỏ 4 ô tick; nút "Tạo BKLS…".
 - word.js saveBlob: toast gợi ý "Đang mở hộp Lưu của Windows… tìm biểu tượng nhấp nháy ở taskbar"; tests/download-save.test.cjs cập nhật (chỉ đếm toast lỗi / cảnh báo).
+
+## v2.12.5 — Không còn báo lỗi chặn khi lưu tệp
+- word.js saveBlob: lỗi mạng / 409 sau thử lại / tệp > ~26 MB / lỗi helper → browserDownload (FileSaver hoặc thẻ <a download>) + toast thông tin, thay cho toast lỗi. AbortError (3 phút) và Hủy hộp Lưu giữ nguyên. Gợi ý "hộp Lưu của Windows" chỉ hiện khi chờ > 1,2 giây. Đảo quyết định cũ "không tự dùng tải của trình duyệt" (người dùng: báo lỗi mỗi lần bấm là rườm rà).
+- tests/download-save.test.cjs: 10 kiểm thử (fallback, bận, quá lớn, hủy, gợi ý chậm).

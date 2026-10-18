@@ -123,8 +123,22 @@
   };
 
   /* ---------- Lưu file ---------- */
+  /** Tải về bằng trình duyệt (thư mục Tải xuống). Trả về nhãn đường dẫn, hoặc null nếu không làm được. */
+  function browserDownload(blob, name) {
+    try {
+      if (typeof root.saveAs === 'function') { root.saveAs(blob, name); return 'Downloads/' + name; }
+      if (root.document && root.URL && root.URL.createObjectURL) {
+        const a = root.document.createElement('a'); a.href = root.URL.createObjectURL(blob); a.download = name; a.style.display = 'none';
+        root.document.body.appendChild(a); a.click();
+        setTimeout(() => { a.remove(); root.URL.revokeObjectURL(a.href); }, 4000);
+        return 'Downloads/' + name;
+      }
+    } catch (err) { /* không tải được → báo lỗi như cũ */ }
+    return null;
+  }
   const Files = {
     async saveBlob(blob, name) {
+      let hintTimer = null;
       try {
         // Native Save As does not depend on browser user-activation surviving document generation.
         const raw=new Uint8Array(await blob.arrayBuffer());let binary='';for(let i=0;i<raw.length;i+=16384)binary+=String.fromCharCode.apply(null,raw.subarray(i,i+16384));
@@ -133,7 +147,8 @@
         // Trình hỗ trợ (HAKDocs) từ chối gói > 36 MB mà không đọc hết → trình duyệt chỉ báo "Failed to fetch": báo rõ nguyên nhân trước khi gửi.
         if(encoded.length>36*1024*1024-4096)throw Error('tệp quá lớn ('+Math.round(raw.length/1048576)+' MB), vượt giới hạn ~26 MB của trình hỗ trợ lưu tệp. Thu hẹp phạm vi (ngày / số phiếu / biển số) rồi tạo lại');
         const send=async()=>{const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),180000);try{return await fetch('http://127.0.0.1:31879/save-download',{method:'POST',headers:{'Content-Type':'application/json','X-HAK-Client':'documents-v1'},body:JSON.stringify({name,base64:encoded}),signal:controller.signal});}finally{clearTimeout(timer);}};
-        if(HAK.UI&&HAK.UI.toast)HAK.UI.toast('Đang mở hộp Lưu của Windows cho "'+name+'". Nếu chưa thấy, tìm biểu tượng nhấp nháy ở thanh taskbar (hộp có thể nằm sau cửa sổ trình duyệt).','info');
+        // Chỉ nhắc khi phải chờ > 1,2 giây (tức hộp Lưu của Windows đang mở, có thể nằm sau cửa sổ trình duyệt).
+        hintTimer=setTimeout(()=>{if(HAK.UI&&HAK.UI.toast)HAK.UI.toast('Đang mở hộp Lưu của Windows cho "'+name+'". Nếu chưa thấy, tìm biểu tượng nhấp nháy ở thanh taskbar (hộp có thể nằm sau cửa sổ trình duyệt).','info');},1200);
         let response;
         for(let attempt=0;;attempt++){
           try{response=await send();}catch(err){if(err&&err.name==='AbortError')throw err;throw Error('không kết nối được trình hỗ trợ lưu tệp (HAKDocs) — có thể nó đã tắt khi cài bản mới hoặc sau thời gian dài không dùng');}
@@ -141,8 +156,16 @@
           if(attempt===2&&HAK.UI&&HAK.UI.toast)HAK.UI.toast('Trình hỗ trợ lưu tệp đang bận — đang đợi để lưu tiếp…','info');
           await new Promise(ok=>setTimeout(ok,1500));
         }
+        clearTimeout(hintTimer);
         const result=await response.json();if(!response.ok)throw Error(response.status===409?'trình hỗ trợ lưu tệp vẫn đang bận — đóng hộp Lưu còn mở (nếu có) rồi bấm lại':result.error||'Không lưu được tệp.');if(result.canceled)return false;if(HAK.Downloads)HAK.Downloads.saved(result.path,result.warning);return result.path;
       } catch(e) {
+        clearTimeout(hintTimer);
+        // v2.12.5: trình hỗ trợ (HAKDocs) không dùng được / bận / tệp quá lớn → TỰ tải qua trình duyệt thay vì báo lỗi chặn người dùng.
+        // Chờ hộp Lưu quá 3 phút (AbortError) thì không tự tải — hộp Lưu có thể còn mở.
+        if(!(e&&e.name==='AbortError')){
+          const done=browserDownload(blob,name);
+          if(done){if(HAK.UI)HAK.UI.toast('Đã tải "'+name+'" về thư mục Tải xuống của trình duyệt (trình hỗ trợ lưu tệp không dùng được: '+(e&&e.message||e)+').','info');return done;}
+        }
         if(HAK.UI)HAK.UI.toast(e.name==='AbortError'?'Chờ chọn nơi lưu quá 3 phút. Đóng hộp Lưu thành còn mở rồi thử lại.':'Chưa lưu tệp: '+e.message+'. Mở app bằng lối tắt của bản cài mới rồi thử lại.','error');
         return false;
       }
