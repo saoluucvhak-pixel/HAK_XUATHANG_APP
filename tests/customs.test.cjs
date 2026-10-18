@@ -126,3 +126,23 @@ test('giấy nộp tiền thuế bổ sung: người nộp thay, số QC0206/26,
   const r=P.parseReceiptText(t);
   assert.equal(r.receiptNo,'QC0206/26');assert.equal(r.date,'2026-06-22');assert.equal(r.lines.length,1);assert.deepEqual([r.lines[0].no,r.lines[0].amount,r.lines[0].declDate],['308629701722',11806308,'2026-06-21']);
 });
+test('giấy nộp tiền: số tờ khai bị OCR nhầm chữ/số hoặc thiếu chữ số vẫn được đề xuất (kèm cờ nghi ngờ); chữ thuần dùng bù khi chữ ghép cột không có số',()=>{
+  const row='13/08/2026 : Thuế xuất khẩu : 815.572.800 : 815.572.800 : 754 : 1851';
+  let r=P.parseReceiptText('Tờ khai HQ số(1): 3O8629604751 ngày: 11/06/2026\n'+row);
+  assert.equal(r.lines[0].no,'308629604751');assert.equal(r.lines[0].noFuzzy,true);
+  r=P.parseReceiptText('Tờ khai số: 30862960475\n'+row);assert.equal(r.lines[0].no,'30862960475');assert.equal(r.lines[0].noFuzzy,true);
+  r=P.parseReceiptText(row,'To khai HQ so(1): 308629604751 ngay: 11/06/2026 Loai hinh XNK(1): B11');
+  assert.equal(r.lines[0].no,'308629604751');assert.equal(r.lines[0].noFuzzy,false);assert.equal(r.lines[0].declDate,'2026-06-11');
+  r=P.parseReceiptText('Mã số thuế: 0401447476\nSố tham chiếu: 20202026100713485801\n'+row);assert.equal(r.lines[0].no,'','không nhầm MST / số tham chiếu thành số tờ khai');
+});
+test('giấy nộp tiền: đọc người nộp thuế khi thiếu dấu ":", tên ở dòng kế, nhãn sai chính tả; có người nộp thay',()=>{
+  const row='\n13/08/2026 : Thuế xuất khẩu : 815.572.800 : 815.572.800 : 754 : 1851';
+  assert.equal(P.parseReceiptText('Người nộp thuế CÔNG TY TNHH HOÀNG ANH KHÔI\nMã số thuế: 0401447476'+row).payer,'CÔNG TY TNHH HOÀNG ANH KHÔI');
+  assert.equal(P.parseReceiptText('Người nộp thuế:\nCÔNG TY TNHH HOÀNG ANH KHÔI\nMã số thuế: 0401447476'+row).payer,'CÔNG TY TNHH HOÀNG ANH KHÔI');
+  assert.equal(P.parseReceiptText('Nguời nộp thuê : CÔNG TY TNHH HOÀNG ANH KHÔI : Mã số thuế : 0401447476'+row).payer,'CÔNG TY TNHH HOÀNG ANH KHÔI');
+  assert.equal(P.parseReceiptText('Người nộp thuế: CÔNG TY TNHH HOÀNG ANH KHÔI Mã số thuế: 0401447476'+row).payer,'CÔNG TY TNHH HOÀNG ANH KHÔI');
+  const two=P.parseReceiptText('Người nộp thuế: CÔNG TY TNHH HOÀNG ANH KHÔI\nMã số thuế: 0401447476\nNgười nộp thay: CÔNG TY TNHH HOÀNG ANH KHÔI QUẢNG NAM\nMã số thuế: 4000956057'+row);
+  assert.equal(two.payer,'CÔNG TY TNHH HOÀNG ANH KHÔI');assert.equal(two.agent,'CÔNG TY TNHH HOÀNG ANH KHÔI QUẢNG NAM');assert.equal(two.payerTax,'0401447476');
+  assert.equal(P.parseReceiptText('Hải quan cửa khẩu\nNSNN: Công Ty TNHH Hoàng Anh Khôi : Mã số thuế: 0401447476'+row).payer,'Công Ty TNHH Hoàng Anh Khôi');
+  assert.equal(P.parseReceiptText('Người nộp thay: ........\nCÔNG TY TNHH HOÀNG ANH KHÔI\nMã số thuế: 0401447476'+row).payer,'CÔNG TY TNHH HOÀNG ANH KHÔI','không có nhãn rõ → lấy dòng tên công ty đầu tiên');
+});

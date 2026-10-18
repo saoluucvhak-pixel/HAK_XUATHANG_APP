@@ -282,9 +282,11 @@
     } catch (e) { toast(e.message || String(e), 'error'); } finally { Loading.hide(); }
   }
   const toBase64 = (file) => new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(String(r.result).split(',')[1] || ''); r.onerror = () => reject(Error('Không đọc được file.')); r.readAsDataURL(file); });
+  let lastPlain = '';
   async function ocrFile(file) {
     if (file.size > 26 * 1024 * 1024) throw Error('File quá lớn (tối đa 26 MB). Chụp lại ở độ phân giải thấp hơn.');
     const out = await HAK.Documents.ocr(await toBase64(file), 'document');
+    lastPlain = out.pages.map((p) => p.text || '').join('\n');
     return out.pages.map((p) => (p.rowsText || p.text) + '\n' + (p.supplementalText || '')).join('\n');
   }
   const ocrHelp = (e) => (/fetch|network|load failed/i.test(e.message || '') ? 'Chưa kết nối OCR Windows. Mở app bằng lối tắt native\\HAKDocs.exe (bản setup có sẵn) rồi thử lại.' : e.message || String(e));
@@ -301,7 +303,7 @@
   async function ocrReceipt(files) {
     if (!files.length) return; const { Loading } = HAK.UI; Loading.show('Đang đọc giấy nộp tiền bằng Windows OCR…');
     try {
-      const text = await ocrFile(files[0]), p = CP().parseReceiptText(text);
+      const text = await ocrFile(files[0]), p = CP().parseReceiptText(text, lastPlain);
       Loading.hide(); openReceiptReview(p, text);
     } catch (e) { toast(ocrHelp(e), 'error'); } finally { Loading.hide(); }
   }
@@ -312,26 +314,32 @@
       const exact = ln.no && list.find((d) => d.no === ln.no), near = !exact && ln.no && list.find((d) => diff(d.no, ln.no) <= 2);
       ln.target = exact ? exact.id : near ? near.id : (!ln.no && cur ? cur.id : ''); ln.near = !!near; ln.guess = !ln.no && !!cur;
     });
-    const opt = (ln, sel) => '<option value="">— chọn tờ khai —</option>' + list.map((d) => '<option value="' + esc(d.id) + '"' + (d.id === sel ? ' selected' : '') + '>' + esc(d.no + (d.ship ? ' · ' + d.ship : '')) + '</option>').join('') + (ln.no ? '<option value="__new">＋ Tạo tờ khai ' + esc(ln.no) + '</option>' : '');
+    const opt = (ln, sel) => '<option value="">— chọn tờ khai —</option>' + list.map((d) => '<option value="' + esc(d.id) + '"' + (d.id === sel ? ' selected' : '') + '>' + esc(d.no + (d.ship ? ' · ' + d.ship : '')) + '</option>').join('') + '<option value="__new">＋ Tạo tờ khai mới theo số đã nhập</option>';
     const inp = (id, v, w, cls) => '<input class="form-control form-control-sm ' + (cls || '') + '" id="' + id + '" style="min-width:' + w + '" value="' + esc(v || '') + '">';
     const table = '<div class="col-12"><div class="sec-title mt-2 mb-1">Các dòng nộp đọc được</div><div class="tbl-wrap"><table class="table table-sm align-middle"><thead><tr><th></th><th>Số tờ khai trên giấy</th><th>Gắn vào tờ khai</th><th>Loại</th><th>Nội dung</th><th>Kỳ thuế</th><th>Chương</th><th>NDKT</th><th>ĐBHC</th><th class="num">Số tiền VND</th></tr></thead><tbody>' +
-      lines.map((ln, i) => '<tr><td><input class="form-check-input" type="checkbox" id="cs-ln-on-' + i + '"' + (ln.target && ln.amount !== null ? ' checked' : '') + '></td><td class="mono">' + esc(ln.no || '—') + (ln.near ? '<div class="small text-warning">gần khớp — kiểm tra</div>' : '') + (ln.guess ? '<div class="small text-warning" style="font-family:inherit;min-width:9rem">giấy không ghi số tờ khai — tự chọn tờ khai đang mở</div>' : '') + '</td><td><select class="form-select form-select-sm" id="cs-ln-t-' + i + '" style="min-width:12rem">' + opt(ln, ln.target) + '</select></td>' +
+      lines.map((ln, i) => '<tr><td><input class="form-check-input" type="checkbox" id="cs-ln-on-' + i + '"' + (ln.target && ln.amount !== null ? ' checked' : '') + '></td><td><input class="form-control form-control-sm mono' + (ln.no ? ' ocr-filled' : '') + '" id="cs-ln-no-' + i + '" style="min-width:9.5rem" inputmode="numeric" placeholder="gõ số tờ khai" value="' + esc(ln.no || '') + '">' + (ln.noFuzzy ? '<div class="small text-warning" style="font-family:inherit">số đọc được thiếu/thừa chữ số — kiểm tra</div>' : '') + (ln.near ? '<div class="small text-warning">gần khớp — kiểm tra</div>' : '') + (ln.guess ? '<div class="small text-warning" style="font-family:inherit;min-width:9rem">giấy không ghi số tờ khai — tự chọn tờ khai đang mở</div>' : '') + '</td><td><select class="form-select form-select-sm" id="cs-ln-t-' + i + '" style="min-width:12rem">' + opt(ln, ln.target) + '</select></td>' +
         '<td><select class="form-select form-select-sm" style="min-width:8.5rem" id="cs-ln-k-' + i + '"><option value="tax"' + (ln.kind === 'tax' ? ' selected' : '') + '>Thuế XK</option><option value="fee"' + (ln.kind === 'fee' ? ' selected' : '') + '>Lệ phí / khác</option></select></td>' +
         '<td>' + inp('cs-ln-c-' + i, ln.content, '9rem') + '</td><td><input type="date" class="form-control form-control-sm" id="cs-ln-d-' + i + '" value="' + esc(ln.periodDate || '') + '"></td><td>' + inp('cs-ln-h-' + i, ln.chapter, '4rem') + '</td><td>' + inp('cs-ln-n-' + i, ln.ndkt, '4.5rem') + '</td><td>' + inp('cs-ln-b-' + i, ln.dbhc, '5rem') + '</td>' +
         '<td><input class="form-control form-control-sm text-end" id="cs-ln-a-' + i + '" data-numfmt="num" style="min-width:8rem" value="' + esc(money(ln.amount)) + '"></td></tr>').join('') + '</tbody></table></div></div>';
     openModal({
       title: 'Giấy nộp tiền vào NSNN — kiểm tra kết quả OCR', saveLabel: 'Lưu các dòng đã tick',
       fields: [{ id: 'receiptNo', label: 'Số giấy nộp tiền', col: 3 }, { id: 'formCode', label: 'Mã hiệu', col: 3 }, { id: 'refNo', label: 'Số tham chiếu', col: 6 }, { id: 'date', label: 'Ngày nộp', type: 'date', col: 3 }, { id: 'payer', label: 'Người nộp thuế', col: 9 }],
-      values: { receiptNo: p.receiptNo, formCode: p.formCode, refNo: p.refNo, date: p.date, payer: p.payer }, extraHtml: table,
+      values: { receiptNo: p.receiptNo, formCode: p.formCode, refNo: p.refNo, date: p.date, payer: p.payer + (p.agent ? ' — nộp thay: ' + p.agent : '') }, extraHtml: table,
       notice: (p.warnings.length ? '<div class="alert alert-warning py-2 small">' + p.warnings.map((w) => '⚠ ' + esc(w)).join('<br>') + '</div>' : '') + '<details class="mb-2"><summary class="small">Xem chữ OCR</summary><pre class="small text-wrap">' + esc(text) + '</pre></details><div class="small text-muted mb-1">Ảnh chụp nghiêng, mờ hoặc có dấu mộc đè dễ bị đọc sai số — đối chiếu với giấy gốc trước khi lưu. Ô nào OCR không đọc được thì để trống, nhập tay theo giấy gốc. App chỉ lưu số liệu, không lưu ảnh.</div>',
-      onOpen() { ['receiptNo', 'formCode', 'refNo', 'date', 'payer'].forEach((k) => { const el = $('#cs-f-' + k); if (el && el.value) el.classList.add('ocr-filled'); }); },
+      onOpen() {
+        ['receiptNo', 'formCode', 'refNo', 'date', 'payer'].forEach((k) => { const el = $('#cs-f-' + k); if (el && el.value) el.classList.add('ocr-filled'); });
+        lines.forEach((ln, i) => {   // gõ / sửa số tờ khai → tự chọn tờ khai trùng số
+          $('#cs-ln-no-' + i).addEventListener('input', (e) => { const no = CM().digits(e.target.value), hit = no && list.find((d) => d.no === no); if (hit) { $('#cs-ln-t-' + i).value = hit.id; $('#cs-ln-on-' + i).checked = true; } });
+        });
+      },
       async onSave(v) {
         const picked = [];
         lines.forEach((ln, i) => {
           if (!$('#cs-ln-on-' + i).checked) return;
           const t = $('#cs-ln-t-' + i).value; if (!t) throw Error('Dòng ' + (i + 1) + ': chưa chọn tờ khai để gắn.');
+          if (t === '__new' && CM().digits($('#cs-ln-no-' + i).value).length < 8) throw Error('Dòng ' + (i + 1) + ': gõ số tờ khai để tạo tờ khai mới.');
           const amount = NF().parse($('#cs-ln-a-' + i).value, 'num'); if (amount === null) throw Error('Dòng ' + (i + 1) + ': số tiền không hợp lệ.');
-          picked.push({ no: ln.no, declDate: ln.declDate, declType: ln.declType, target: t, amount, kind: $('#cs-ln-k-' + i).value, content: $('#cs-ln-c-' + i).value.trim(), periodDate: $('#cs-ln-d-' + i).value, chapter: $('#cs-ln-h-' + i).value.trim(), ndkt: $('#cs-ln-n-' + i).value.trim(), dbhc: $('#cs-ln-b-' + i).value.trim() });
+          picked.push({ no: CM().digits($('#cs-ln-no-' + i).value) || ln.no, declDate: ln.declDate, declType: ln.declType, target: t, amount, kind: $('#cs-ln-k-' + i).value, content: $('#cs-ln-c-' + i).value.trim(), periodDate: $('#cs-ln-d-' + i).value, chapter: $('#cs-ln-h-' + i).value.trim(), ndkt: $('#cs-ln-n-' + i).value.trim(), dbhc: $('#cs-ln-b-' + i).value.trim() });
         });
         if (!picked.length) throw Error('Chưa tick dòng nào để lưu.');
         let n = 0;

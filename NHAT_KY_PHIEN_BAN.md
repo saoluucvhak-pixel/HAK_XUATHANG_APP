@@ -291,6 +291,10 @@ Thủy chốt 28/09/2026: "1. bỏ Trao đổi KHÔNG đồng bộ lên Google S
 - pages.js generateBkls: không chặn khi thiếu Số BKLS / hệ số / tên bên mua — tự điền hoặc để trống + cảnh báo.
 - tests/parse-num.test.cjs, tests/numfmt.test.cjs.
 
+## v2.14.5 — OCR giấy nộp tiền chịu lỗi hơn
+- Số tờ khai: nhận cả khi OCR nhầm chữ/số (3O86…), thiếu hoặc thừa 1 chữ số (kèm cảnh báo), dùng thêm chữ OCR thuần để tìm số; ô số tờ khai trong hộp thoại gõ sửa được và tự chọn tờ khai trùng số.
+- Người nộp thuế: nhận khi thiếu dấu ":", tên ở dòng kế, nhãn sai chính tả; có "Người nộp thay" thì ghi kèm.
+
 ## v2.14.4 — Gợi ý khai bổ sung
 - Tờ khai cùng số vận đơn với một tờ khai có số nhỏ hơn: hiện gợi ý và nút "Chuyển thành khai bổ sung của …". Chuyển xong, tờ khai thành dòng khai bổ sung (thuế sau bổ sung, KL, ngày), giấy nộp tiền đã gắn chuyển sang tờ khai gốc, tờ khai độc lập bị xóa (khôi phục được).
 
