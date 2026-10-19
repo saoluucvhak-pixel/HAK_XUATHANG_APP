@@ -280,5 +280,5 @@
     document.addEventListener('click', (e) => { const u = e.target.closest('[data-csr-un]'); if (u) HAK.UI.confirmClick(u, () => unassign(u.dataset.csrUn).catch((x) => toast(x.message || String(x), 'error')), 'Gỡ?'); });
     root.addEventListener('hak:catalog', () => { if (!host.hidden) render(); });
   }
-  HAK.ContractStatus = { render, init, load, state };
+  HAK.ContractStatus = { render, init, load, state, khoOf };
 })(window);

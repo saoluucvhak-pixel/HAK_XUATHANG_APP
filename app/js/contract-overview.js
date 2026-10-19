@@ -16,14 +16,14 @@
   const state = { items: [], view: null, loading: false };
 
   /* Các cột theo trình tự quy trình. band = nhóm; n = cột số. */
-  const BANDS = [['① HỢP ĐỒNG + PHỤ LỤC', 4, 'primary'], ['② CHỨNG THƯ', 3, 'success'], ['③ TỜ KHAI HẢI QUAN', 3, 'info'], ['④ KHAI BỔ SUNG', 2, 'warning'], ['⑤ NỘP THUẾ', 3, 'danger'], ['⑥ XUẤT HÀNG', 3, 'secondary'], ['⑦ ĐỐI CHIẾU', 3, 'dark']];
+  const BANDS = [['① HỢP ĐỒNG + PHỤ LỤC', 4, 'primary'], ['② CHỨNG THƯ', 3, 'success'], ['③ TỜ KHAI HẢI QUAN', 3, 'info'], ['④ KHAI BỔ SUNG', 2, 'warning'], ['⑤ NỘP THUẾ', 3, 'danger'], ['⑥ XUẤT HÀNG', 4, 'secondary'], ['⑦ ĐỐI CHIẾU', 3, 'dark']];
   const COLS = [
     { h: 'Hợp đồng / chi tiết (tàu)', w: 40 }, { h: 'KL gốc (BDMT)', n: 1, w: 14 }, { h: 'Phụ lục', w: 26 }, { h: 'KL hiện hành (BDMT)', n: 1, w: 16 },
     { h: 'Số chứng thư', w: 24 }, { h: 'KL khô thực hiện (BDMT)', n: 1, w: 16 }, { h: '% / còn lại so với HĐ', w: 22 },
     { h: 'Số tờ khai', w: 18 }, { h: 'Ngày mở', w: 11 }, { h: 'Trạng thái', w: 22 },
     { h: 'Số lần', w: 10 }, { h: 'Thuế tăng / giảm (đ)', n: 1, w: 16 },
     { h: 'Thuế phải nộp (đ)', n: 1, w: 16 }, { h: 'Đã nộp (đ)', n: 1, w: 16 }, { h: 'CÒN NỢ (đ)', n: 1, w: 16 },
-    { h: 'Chuyến xe', n: 1, w: 9 }, { h: 'Thực giao (tấn)', n: 1, w: 13 }, { h: 'Thời gian cân', w: 22 },
+    { h: 'Kho xuất', w: 22 }, { h: 'Chuyến xe', n: 1, w: 9 }, { h: 'Thực giao (tấn)', n: 1, w: 13 }, { h: 'Thời gian cân', w: 22 },
     { h: 'Tờ khai ↔ chứng thư', w: 30 }, { h: 'Chứng thư ↔ hợp đồng', w: 34 }, { h: 'Chứng thư ↔ thực giao', w: 20 }
   ];
   const NUM = new Set(COLS.map((c, i) => (c.n ? i : -1)).filter((i) => i >= 0));
@@ -48,17 +48,17 @@
       m.withCert + '/' + m.rows.length + ' chứng thư', nf(m.certBdmt), pct == null ? '' : nf(pct) + '% · ' + (over ? 'VƯỢT ' + nf(m.certBdmt - m.qty) : 'còn ' + nf(m.qty - m.certBdmt)),
       (m.T.length || 'chưa có') + ' tờ khai', '', m.cleared + '/' + m.T.length + ' thông quan',
       m.supps + ' lần', nf(sum(m.T.map((x) => x.t.extra))), nf(m.tax.payable), nf(m.tax.paid), nf(m.tax.remaining),
-      m.trips ? String(m.trips) : '', m.trips ? nf(m.delKg / 1000) : '', g.from ? g.from + (g.to && g.to !== g.from ? ' → ' + g.to : '') : '',
+      g.khos.join(', '), m.trips ? String(m.trips) : '', m.trips ? nf(m.delKg / 1000) : '', g.from ? g.from + (g.to && g.to !== g.from ? ' → ' + g.to : '') : '',
       !m.rows.length ? '' : nBad ? '⚠ ' + nBad + '/' + m.rows.length + ' chi tiết lệch' : '✔ Khớp', m.hd ? (m.hd.ok ? '✔ ' : '⚠ ') + m.hd.note : '', !lots.length ? '—' : nLot ? '⚠ ' + nLot + ' lệch' : '✔ Khớp'] });
     const declCells = (x) => { if (!x) return ['(chưa có tờ khai)', '', '', '', '', '', '', '']; const t = CMm.totals(x), clr = CMm.statusDate(x, 'cleared'); return [x.no + (x.round > 1 ? ' (lần ' + x.round + ')' : ''), vn(x.openDate), CMm.STATUS[x.status] + (x.status === 'cleared' && clr ? ' ' + vn(clr) : ''), String(CMm.active(x.supplements).length), t.extra != null ? nf(t.extra) : '', nf(t.payable), nf(t.paidTax), nf(t.remaining)]; };
     m.rows.forEach((r) => {
       const d = r.d, dc = declCells(r.decl), L = r.lot;
-      out.push({ cls: 'sub', c: ['   ' + (d.ship || '(chưa có tàu)'), '', '', '', d.certNo || '(chưa có chứng thư)', nf(d.bdmt), ''].concat(dc, [L && L.trips ? String(L.trips) : '', L && L.trips ? nf(L.delKg / 1000) : '', L && L.from ? L.from + (L.to && L.to !== L.from ? ' → ' + L.to : '') : '', r.tkct.t, '', r.cttt.t]) });
+      out.push({ cls: 'sub', c: ['   ' + (d.ship || '(chưa có tàu)'), '', '', '', d.certNo || '(chưa có chứng thư)', nf(d.bdmt), ''].concat(dc, [L && L.recs.length ? Array.from(new Set(L.recs.map(HAK.ContractStatus.khoOf).filter(Boolean))).join(', ') : '', L && L.trips ? String(L.trips) : '', L && L.trips ? nf(L.delKg / 1000) : '', L && L.from ? L.from + (L.to && L.to !== L.from ? ' → ' + L.to : '') : '', r.tkct.t, '', r.cttt.t]) });
     });
-    m.loose.forEach((x) => out.push({ cls: 'sub', c: ['   (tờ khai chưa gắn chi tiết hợp đồng)', '', '', '', '', '', ''].concat(declCells(x), ['', '', '', '⚠ Chưa gắn chi tiết', '', '']) }));
+    m.loose.forEach((x) => out.push({ cls: 'sub', c: ['   (tờ khai chưa gắn chi tiết hợp đồng)', '', '', '', '', '', ''].concat(declCells(x), ['', '', '', '', '⚠ Chưa gắn chi tiết', '', '']) }));
     return out;
   }
-  const tone = (v, i) => { v = String(v); if (i === 14 && v && v !== '0') return 'text-danger fw-semibold'; if (i >= 18) return v.charAt(0) === '⚠' ? 'text-danger' : v.charAt(0) === '✔' ? 'text-success' : ''; return ''; };
+  const tone = (v, i) => { v = String(v); if (i === 14 && v && v !== '0') return 'text-danger fw-semibold'; if (i >= 19) return v.charAt(0) === '⚠' ? 'text-danger' : v.charAt(0) === '✔' ? 'text-success' : ''; return ''; };
 
   /* ---------- Bộ lọc smart ---------- */
   function fields() {
@@ -137,7 +137,7 @@
         const t = tone(v, i), red = /danger/.test(t), grn = /success/.test(t);
         cell.font = { name: XF, size: 9, bold: isMain || /fw-semibold/.test(t), color: { argb: red ? 'FFC00000' : grn ? 'FF2E7D32' : 'FF000000' } };
         if (isMain) cell.fill = fill('FFEAF1FB');
-        if (COLS[i].n) { cell.numFmt = i === 15 ? '#,##0' : i === 16 || i === 5 || i === 1 || i === 3 ? '#,##0.00' : '#,##0'; cell.alignment = { horizontal: 'right', vertical: 'top' }; }
+        if (COLS[i].n) { cell.numFmt = i === 16 ? '#,##0' : i === 17 || i === 5 || i === 1 || i === 3 ? '#,##0.00' : '#,##0'; cell.alignment = { horizontal: 'right', vertical: 'top' }; }
         else cell.alignment = { wrapText: true, vertical: 'top', indent: i === 0 && !isMain ? 2 : 0 };
       });
       rr++;
@@ -145,9 +145,9 @@
     const tot = rr; ws.getCell(tot, 1).value = 'TỔNG CỘNG (' + list.length + ' hợp đồng)';
     COLS.forEach((c, i) => {
       const cell = ws.getCell(tot, i + 1); cell.fill = fill('FFD9E2F3'); cell.font = { name: XF, size: 9, bold: true }; cell.border = { top: { style: 'double', color: { argb: 'FF808080' } }, bottom: { style: 'double', color: { argb: 'FF808080' } }, left: thin, right: thin };
-      if (c.n && [1, 3, 5, 11, 12, 13, 14, 15, 16].indexOf(i) >= 0) {       // chỉ cộng dòng hợp đồng (dòng chi tiết không cộng lại)
+      if (c.n && [1, 3, 5, 11, 12, 13, 14, 16, 17].indexOf(i) >= 0) {       // chỉ cộng dòng hợp đồng (dòng chi tiết không cộng lại)
         const L = String.fromCharCode(65 + i); cell.value = { formula: mains.map((m) => L + m).join('+'), result: mains.reduce((a, m) => a + (+ws.getCell(m, i + 1).value || 0), 0) };
-        cell.numFmt = i === 15 ? '#,##0' : i === 16 || i === 5 || i === 1 || i === 3 ? '#,##0.00' : '#,##0'; cell.alignment = { horizontal: 'right' };
+        cell.numFmt = i === 16 ? '#,##0' : i === 17 || i === 5 || i === 1 || i === 3 ? '#,##0.00' : '#,##0'; cell.alignment = { horizontal: 'right' };
       }
     });
     ws.views = [{ state: 'frozen', xSplit: 1, ySplit: 5 }];
@@ -159,7 +159,7 @@
   }
   const BANDS_OF = BANDS.flatMap((b) => Array(b[1]).fill(b[0].replace(/^[^\s]+\s/, '')));
   /** PDF chia 2 phần (A4 ngang không đủ chỗ cho 21 cột): phần 1 = ①–④ (đến khai bổ sung), phần 2 = ⑤–⑦ (nộp thuế, xuất hàng, đối chiếu); cột đầu lặp lại để đối chiếu dòng. */
-  const PART1 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], PART2 = [0, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+  const PART1 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], PART2 = [0, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21];
   async function exportPdf() {
     const list = filtered(); if (!list.length) return;
     const all = list.flatMap((it) => rowsOf(it)), pick = (idx) => ({ cols: idx.map((i) => ({ h: COLS[i].h, n: !!COLS[i].n })), rows: all.map((r) => ({ cls: r.cls, c: idx.map((i) => r.c[i]) })) });
