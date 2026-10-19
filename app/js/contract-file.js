@@ -92,8 +92,10 @@
     ev.sort((a, b) => String(a[0] || '9999').localeCompare(String(b[0] || '9999')));
 
     /* --- 4. Thuế --- */
+    const khoOf = HAK.ContractStatus && HAK.ContractStatus.khoOf ? HAK.ContractStatus.khoOf : () => '';
+    const xh = rows.filter((r) => r.lot && r.lot.trips > 0).map((r) => ({ ship: r.d.ship || '', kho: Array.from(new Set((r.lot.recs || []).map(khoOf).filter(Boolean))).join(', '), trips: r.lot.trips, ton: r.lot.delKg / 1000, from: r.lot.from || '', to: r.lot.to || '', mt: r.d.mt }));
     const hd = checks.find((k) => k.who === 'Cả hợp đồng') || null;
-    return { rows, loose, supps, cleared, withCert, hd, c, cust, steps, checks, ev, T, tax, certBdmt, qty, delKg, trips, status: CM.contractStatus(data.customs, cid), addenda };
+    return { xh, rows, loose, supps, cleared, withCert, hd, c, cust, steps, checks, ev, T, tax, certBdmt, qty, delKg, trips, status: CM.contractStatus(data.customs, cid), addenda };
   }
 
   const tonOf = (k) => (k === 'ok' ? 'ok' : k === 'warn' ? 'warn' : '');
@@ -105,7 +107,9 @@
         rows: m.checks.length ? m.checks.map((k, i) => ({ c: [i && m.checks[i - 1].who === k.who ? '' : k.who, k.what, k.a, k.b, k.diff, k.note || (k.ok === null ? 'Thiếu số liệu' : k.ok ? ICON.ok + ' Khớp' : ICON.warn + ' Lệch')], tone: k.ok === null ? 'none' : k.ok ? 'ok' : 'warn' })) : [{ c: ['Chưa có chi tiết hợp đồng', '', '', '', '', ''] }] },
       { caption: 'Thuế xuất khẩu và nộp tiền theo tờ khai', cols: [{ h: 'Số tờ khai' }, { h: 'Lần' }, { h: 'Trạng thái' }, { h: 'Thuế tờ khai gốc', n: 1 }, { h: 'Sau bổ sung', n: 1 }, { h: 'Phải nộp', n: 1 }, { h: 'Đã nộp', n: 1 }, { h: 'CÒN NỢ', n: 1 }, { h: 'Lệ phí đã nộp', n: 1 }],
         rows: m.T.map((x) => ({ c: [x.d.no, x.d.round || 1, CM.STATUS[x.d.status], nf(x.t.base), x.t.lastSupplement ? nf(x.t.lastSupplement.taxVnd) : '', nf(x.t.payable), nf(x.t.paidTax), nf(x.t.remaining), nf(x.t.paidFee)], tone: x.t.remaining > 0 ? 'warn' : 'ok' })).concat(m.T.length ? [{ cls: 'total', c: ['TỔNG CỘNG', '', '', '', '', nf(m.tax.payable), nf(m.tax.paid), nf(m.tax.remaining), nf(m.tax.fee)], tone: m.tax.remaining > 0 ? 'warn' : 'ok' }] : [{ c: ['Chưa có tờ khai', '', '', '', '', '', '', '', ''] }]) },
-      { caption: 'Dòng thời gian của hợp đồng', cols: [{ h: 'Ngày' }, { h: 'Bước' }, { h: 'Diễn biến' }], rows: m.ev.map((e) => ({ c: [vn(e[0]), e[1], e[2]] })) }
+      { caption: 'Xuất hàng theo chi tiết (tàu) — kho xuất, chuyến xe, thực giao', cols: [{ h: 'Tàu / chuyến' }, { h: 'Kho xuất' }, { h: 'Chuyến xe', n: 1 }, { h: 'Thực giao (tấn)', n: 1 }, { h: 'MT chứng thư (tấn)', n: 1 }, { h: 'MT − thực giao', n: 1 }, { h: 'Thời gian cân' }],
+        rows: m.xh.length ? m.xh.map((x) => ({ c: [x.ship, x.kho, String(x.trips), nf(x.ton), hasNum(x.mt) ? nf(x.mt) : '', hasNum(x.mt) ? nf(x.mt - x.ton) : '', x.from + (x.to && x.to !== x.from ? ' → ' + x.to : '')] })).concat([{ cls: 'total', c: ['TỔNG CỘNG', '', String(m.xh.reduce((a, x) => a + x.trips, 0)), nf(m.xh.reduce((a, x) => a + x.ton, 0)), '', '', ''] }]) : [{ c: ['Chưa có phiếu cân gắn vào hợp đồng này', '', '', '', '', '', ''] }] },
+      { pageBreak: true, caption: 'Dòng thời gian của hợp đồng', cols: [{ h: 'Ngày' }, { h: 'Bước' }, { h: 'Diễn biến' }], rows: m.ev.map((e) => ({ c: [vn(e[0]), e[1], e[2]] })) }
     ];
     return { title: 'HỒ SƠ HỢP ĐỒNG ' + (c.no || ''), sub: label + ' · KL hiện hành ' + nf(m.qty) + ' BDMT · ' + m.status.label + ' · Thuế còn nợ ' + nf(m.tax.remaining) + ' đ', file: 'HoSoHopDong_' + String(c.no || c.id).replace(/[^\w-]+/g, '_'), tables };
   }
@@ -123,10 +127,26 @@
   function ensureModal() {
     let m = $('#cfModal'); if (m) return m;
     m = document.createElement('div'); m.className = 'modal fade'; m.id = 'cfModal'; m.tabIndex = -1;
-    m.innerHTML = '<div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="cfTitle"></h5><button type="button" class="btn btn-sm btn-outline-secondary ms-auto me-2" id="cfPdf">🖨 Tải PDF</button><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button></div><div class="modal-body" id="cfBody"></div></div></div>';
+    m.innerHTML = '<div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="cfTitle"></h5><button type="button" class="btn btn-sm btn-success ms-auto" id="cfXls">📊 Xuất Excel</button><button type="button" class="btn btn-sm btn-outline-secondary me-2" id="cfPdf">🖨 Tải PDF</button><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button></div><div class="modal-body" id="cfBody"></div></div></div>';
     document.body.append(m);
     $('#cfPdf').addEventListener('click', () => { if (current && HAK.Customs && HAK.Customs.printReport) HAK.Customs.printReport(current).catch(() => {}); });
+    $('#cfXls').addEventListener('click', () => exportXls().catch((e) => HAK.UI.toast(e.message || String(e), 'error')));
     return m;
+  }
+  /** Excel của 1 hợp đồng: mỗi bảng một trang tính (Quy trình, Đối chiếu, Thuế, Xuất hàng, Dòng thời gian). */
+  async function exportXls() {
+    if (!current) return;
+    if (!root.ExcelJS && HAK.UI.needLib) await HAK.UI.needLib('exceljs');
+    const R = HAK.Report, wb = R.newWorkbook(), names = ['Quy trình', 'Đối chiếu', 'Thuế', 'Xuất hàng', 'Dòng thời gian'];
+    current.tables.forEach((t, k) => {
+      const widths = t.cols.map((c, i) => Math.min(60, Math.max(c.n ? 16 : 14, ...t.rows.map((r) => String(r.c[i] == null ? '' : r.c[i]).length * 0.9 + 2))));
+      R.buildSheet(wb, names[k] || 'Bảng ' + (k + 1), current.title + ' — ' + t.caption, current.sub,
+        t.cols.map((c, i) => ({ h: c.h, w: widths[i], n: c.n ? '#,##0.00' : undefined })),
+        t.rows.map((r) => r.c.map((v, i) => { if (!t.cols[i].n || v === '' || v == null) return v; const x = HAK.NumFmt.parse(String(v), 'num'); return x === null ? v : x; })), { total: false });
+    });
+    const blob = new Blob([await wb.xlsx.writeBuffer()], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    if (!await HAK.Word.Files.saveBlob(blob, current.file + '.xlsx')) return;
+    HAK.UI.toast('Đã xuất Excel hồ sơ hợp đồng.', 'success');
   }
   async function open(cid) {
     const CS = HAK.ContractStatus; if (CS && CS.load) { try { await CS.load(); } catch (e) { /* vẫn hiển thị phần không có phiếu cân */ } }
