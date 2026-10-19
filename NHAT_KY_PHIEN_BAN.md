@@ -291,6 +291,13 @@ Thủy chốt 28/09/2026: "1. bỏ Trao đổi KHÔNG đồng bộ lên Google S
 - pages.js generateBkls: không chặn khi thiếu Số BKLS / hệ số / tên bên mua — tự điền hoặc để trống + cảnh báo.
 - tests/parse-num.test.cjs, tests/numfmt.test.cjs.
 
+## v2.16.0 — Phụ lục hợp đồng, Hồ sơ hợp đồng, Báo cáo thực hiện hợp đồng
+- Phụ lục hợp đồng điều chỉnh khối lượng (Danh mục): KL hiện hành theo phụ lục mới nhất, giữ KL gốc; báo cáo ghi "đã điều chỉnh (gốc …)".
+- 📋 Hồ sơ hợp đồng (xem riêng 1 hợp đồng): 7 bước quy trình, đối chiếu tờ khai ↔ chứng thư ↔ hợp đồng ↔ thực giao, thuế còn nợ, xuất hàng theo tàu (kho xuất), dòng thời gian; Excel 5 trang tính + PDF.
+- Menu mới 🧭 Báo cáo thực hiện hợp đồng: một bảng cho tất cả hợp đồng, 7 nhóm cột theo quy trình (kèm Kho xuất), lọc smart, Excel (nhóm gộp ô, màu) và PDF chia 2 phần.
+- Trang 📑 đổi tên thành "Chi tiết xuất hàng theo hợp đồng"; thêm dải 7 bước quy trình dưới mỗi hợp đồng và ô tổng thuế còn nợ.
+- Bao gồm các sửa của v2.15.1 (số TKHQ một nguồn, quyền Nhân viên, số lẻ ở báo cáo).
+
 ## v2.15.1 — Số TKHQ một nguồn, quyền Nhân viên, sửa số lẻ
 - Chi tiết hợp đồng: chọn tờ khai thì ô "Số tờ khai HQ" tự điền và khóa; gõ số chưa có thì khi lưu app hỏi tạo tờ khai (Đã mở) và gắn luôn, hoặc gắn tờ khai đã có.
 - Hợp đồng Xuất khẩu / Ủy thác XK lưu chi tiết khi chưa có tờ khai: cảnh báo 2 lần mới cho lưu.
