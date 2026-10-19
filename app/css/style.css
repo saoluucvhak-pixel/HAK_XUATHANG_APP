@@ -427,3 +427,8 @@ svg.i { width: 1.1em; height: 1.1em; vertical-align: -.18em; flex: none; }
 
 /* v2.13.0: ô vừa được OCR tự điền — tô vàng nhạt để người dùng đối chiếu với PDF gốc */
 .ocr-filled { background-color: #fff6cc !important; box-shadow: inset 0 0 0 1px #e0b100; }
+/* v2.16.0 Toàn cảnh hợp đồng: cột đầu cố định khi kéo ngang */
+.co-table th.co-first, .co-table td.co-first { position: sticky; left: 0; z-index: 1; background: var(--card-bg, #fff); min-width: 260px; max-width: 320px; }
+.co-table thead th { white-space: normal; vertical-align: middle; }
+.co-table td { white-space: normal; }
+.co-table tr.table-light td.co-first { background: var(--bs-table-bg, #f8f9fa); }

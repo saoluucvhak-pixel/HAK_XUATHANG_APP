@@ -74,7 +74,7 @@
 
   const TITLES = {
     home: 'Tổng quan', file: 'Nhập liệu', chungtu: 'Chứng từ xuất hàng', guikho: 'Trung chuyển gửi kho', xuatkhogui: 'Xuất hàng kho gửi', xuatkhau: 'Xuất khẩu', xuatban: 'Xuất bán', uythac: 'Ủy thác xuất khẩu',
-    dieuchuyen: 'Điều chuyển nội bộ', traodoi: 'Trao đổi hàng hóa', archive: 'Lưu trữ', report: 'Báo cáo tổng hợp', contractstatus: 'Tình hình thực hiện hợp đồng', catalog: 'Danh mục hợp đồng & khách hàng', settings: 'Cài đặt', help: 'Hướng dẫn'
+    dieuchuyen: 'Điều chuyển nội bộ', traodoi: 'Trao đổi hàng hóa', archive: 'Lưu trữ', report: 'Báo cáo tổng hợp', contractoverview: 'Toàn cảnh hợp đồng', contractstatus: 'Tình hình thực hiện hợp đồng', catalog: 'Danh mục hợp đồng & khách hàng', settings: 'Cài đặt', help: 'Hướng dẫn'
   };
 
   /* ===============================================================
@@ -94,6 +94,7 @@
     updateChips();
     if (key === 'archive' && HAK.Archive) HAK.Archive.render();
     if (key === 'report' && HAK.Report) HAK.Report.render();
+    if (key === 'contractoverview' && HAK.ContractOverview) HAK.ContractOverview.render();
     if (key === 'contractstatus' && HAK.ContractStatus) HAK.ContractStatus.render();
     if (key === 'catalog' && HAK.Catalog) HAK.Catalog.render();
     if (key === 'help' && HAK.Help) HAK.Help.render();
@@ -576,6 +577,7 @@
     if (HAK.Auth) HAK.Auth.init();
     if (HAK.Report) HAK.Report.init();
     if (HAK.ContractStatus) HAK.ContractStatus.init();
+    if (HAK.ContractOverview) HAK.ContractOverview.init();
     if (HAK.Chungtu) HAK.Chungtu.init();
     if (HAK.Backup) HAK.Backup.init();
 

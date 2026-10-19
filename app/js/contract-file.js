@@ -57,6 +57,7 @@
       checks.push({ who, what, a: fmt ? fmt(a) : a, b: fmt ? fmt(b) : b, diff: kind === 'text' ? '' : diff === null ? '' : nf(diff), ok, miss: !(a || a === 0) || !(b || b === 0) });
     };
     rows.forEach((r) => {
+      const from0 = checks.length;
       const d = r.d, who = [d.ship, d.certNo && 'CT ' + d.certNo].filter(Boolean).join(' · ') || 'Chi tiết hợp đồng';
       if (!r.decl) { checks.push({ who, what: 'Tờ khai ↔ chứng thư', a: '', b: '', diff: '', ok: false, note: 'Chưa gắn tờ khai hải quan' }); }
       else {
@@ -68,6 +69,10 @@
         add(who, 'Số chứng thư', certKey(x.certNo), certKey(d.certNo), 0, (v) => (v ? (v === certKey(x.certNo) ? x.certNo : d.certNo) : ''), 'text');
       }
       if (r.lot && r.lot.trips > 0 && hasNum(d.mt)) add(who, 'KL tươi: chứng thư ↔ thực giao qua cân (tấn)', d.mt, r.lot.delKg / 1000, 0.01, nf);
+      const mine = checks.slice(from0), SH = { 'KL khô': 'KL khô', 'Trị giá': 'Trị giá', 'Tỷ giá': 'Tỷ giá', 'Tên tàu': 'Tên tàu', 'Số chứng thư': 'Số CT' };
+      const bad = mine.filter((k) => !/^KL tươi/.test(k.what) && k.ok === false), tw = mine.find((k) => /^KL tươi/.test(k.what));
+      r.tkct = !r.decl ? { s: 'warn', t: '⚠ Chưa có tờ khai' } : bad.length ? { s: 'warn', t: '⚠ Lệch: ' + bad.map((k) => (SH[Object.keys(SH).find((x) => k.what.indexOf(x) === 0)] || k.what) + (k.diff ? ' ' + k.diff : '')).join(', ') } : { s: 'ok', t: '✔ Khớp' };
+      r.cttt = !tw ? { s: 'none', t: '—' } : tw.ok ? { s: 'ok', t: '✔ Khớp' } : { s: 'warn', t: '⚠ Lệch ' + tw.diff + ' tấn' };
     });
     loose.forEach((x) => checks.push({ who: 'Tờ khai ' + x.no, what: 'Tờ khai chưa gắn chi tiết hợp đồng (tàu · chứng thư)', a: '', b: '', diff: '', ok: false, note: 'Gắn ở Danh mục → Chi tiết hợp đồng' }));
     if (qty != null) checks.push({ who: 'Cả hợp đồng', what: 'Chứng thư ↔ hợp đồng: Σ KL khô thực hiện ↔ KL hợp đồng hiện hành (BDMT)', a: nf(certBdmt), b: nf(qty), diff: nf(certBdmt - qty), ok: certBdmt <= qty + 0.005, note: certBdmt <= qty + 0.005 ? 'Còn lại ' + nf(qty - certBdmt) + ' BDMT (' + (qty ? nf(Math.round(certBdmt / qty * 1000) / 10) : 0) + '% đã thực hiện)' : 'VƯỢT hợp đồng ' + nf(certBdmt - qty) + ' BDMT' });
@@ -87,7 +92,8 @@
     ev.sort((a, b) => String(a[0] || '9999').localeCompare(String(b[0] || '9999')));
 
     /* --- 4. Thuế --- */
-    return { c, cust, steps, checks, ev, T, tax, certBdmt, qty, delKg, trips, status: CM.contractStatus(data.customs, cid), addenda };
+    const hd = checks.find((k) => k.who === 'Cả hợp đồng') || null;
+    return { rows, loose, supps, cleared, withCert, hd, c, cust, steps, checks, ev, T, tax, certBdmt, qty, delKg, trips, status: CM.contractStatus(data.customs, cid), addenda };
   }
 
   const tonOf = (k) => (k === 'ok' ? 'ok' : k === 'warn' ? 'warn' : '');
@@ -135,6 +141,6 @@
       return '<div class="mt-1 d-flex flex-wrap gap-1 fw-normal">' + m.steps.map((x, i) => '<span class="badge ' + (x.s === 'ok' ? 'text-bg-success' : x.s === 'warn' ? 'text-bg-warning' : x.s === 'info' ? 'text-bg-info' : 'text-bg-light border') + '" style="font-size:.68rem" title="' + esc(x.t + ': ' + x.x) + '">' + ICON[x.s] + ' ' + short[i] + '</span>').join('') + '</div>';
     } catch (e) { return ''; }
   }
-  HAK.ContractFile = { open, build, specOf, strip };
+  HAK.ContractFile = { open, build, specOf, strip, nf, vn, TYPES };
   if (typeof module === 'object' && module.exports) module.exports = HAK.ContractFile;
 })(typeof window !== 'undefined' ? window : globalThis);
