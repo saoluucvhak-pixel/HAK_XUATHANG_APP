@@ -170,3 +170,17 @@ test('phụ lục hợp đồng: KL hiện hành theo phụ lục mới nhất, 
   c.addenda.forEach((a) => { a.deletedAt = 'x'; }); M.applyAddenda(c);
   assert.equal(c.contractQty, 6000); assert.equal(c.qtyOrig, undefined);
 });
+
+test('hồ sơ hợp đồng: đối chiếu và thuế còn nợ', () => {
+  global.document = undefined;
+  const CM = require('../app/js/customs-model.js'), M = require('../app/js/contract-model.js');
+  global.HAK.NumFmt = require('../app/js/numfmt.js'); global.HAK.CustomsModel = CM; global.HAK.ContractModel = M;
+  const c = M.parent({ type: 'xuatkhau', no: 'HD1', contractQty: 6000, priceUsd: 176, details: [] });
+  c.details.push(M.child(c.id, { ship: 'M/V A', certNo: 'C1', bdmt: 6128.4, exchangeRate: 26000 }));
+  const decl = CM.newDecl({ no: '308629701721', contractId: c.id, detailId: c.details[0].id, ship: 'MV A', certNo: 'C-1', qtyBdmt: 6128.4, taxVnd: 100, payments: [{ amount: 40 }] });
+  global.HAK.Catalog = { core: { get: () => ({ contracts: [c], customers: [], customs: [decl] }) } };
+  const F = require('../app/js/contract-file.js'), m = F.build(c.id, []);
+  assert.equal(m.tax.remaining, 60);
+  assert.ok(m.checks.filter((k) => k.what === 'Tên tàu' || k.what === 'Số chứng thư').every((k) => k.ok));
+  const all = m.checks.find((k) => k.who === 'Cả hợp đồng'); assert.equal(all.ok, false); assert.match(all.note, /VƯỢT/);
+});
