@@ -475,13 +475,19 @@
         c.contractFiles=await HAK.Documents.commit();res=upsertContract(c,ed.revision);
       }else if(ed.kind==='exec'){
         const c=M.copy(ed.draft),d=M.copy(ed.detail);
-        if((c.type==='xuatkhau'||c.type==='uythac')&&!($('#cf-customsId')||{}).value){
+        const selTk=($('#cf-customsId')||{}).value,typedTk=HAK.CustomsModel?HAK.CustomsModel.digits(($('#cf-tkhq')||{}).value):'';
+        if(!selTk&&typedTk&&HAK.Customs){
+          const ask0=typeof confirm==='function'?confirm:()=>true,had=HAK.Customs.findByNo(typedTk);
+          if(typedTk.length<8)throw Error('Số tờ khai phải là dãy số (thường 12 chữ số).');
+          if(!ask0(had?'Tờ khai số '+typedTk+' đã có trong tab 🛃 Tờ khai hải quan.\nGắn tờ khai đó vào chi tiết hợp đồng này?':'Số tờ khai '+typedTk+' chưa có trong tab 🛃 Tờ khai hải quan.\nTạo tờ khai này luôn (trạng thái "Đã mở tờ khai") và gắn vào chi tiết hợp đồng?'))return;
+        }
+        if(!(selTk||typedTk)&&(c.type==='xuatkhau'||c.type==='uythac')){
           const ask=typeof confirm==='function'?confirm:()=>true;
           if(!ask('⚠ Chưa chọn TỜ KHAI HẢI QUAN cho chứng thư / chi tiết này.\n\nHợp đồng Xuất khẩu / Ủy thác XK phải có tờ khai (thêm ở tab 🛃 Tờ khai hải quan) thì mới gắn được đợt giao hàng và tính thuế.\n\nBấm Hủy để quay lại chọn tờ khai.'))return;
           if(!ask('⚠ Xác nhận lần 2: vẫn LƯU khi chưa có tờ khai hải quan?\n\nChi tiết này sẽ chưa gắn được đợt giao hàng cho tới khi bổ sung tờ khai.'))return;
         }
         ['product','tkhq','ship','exchangeRate',...EXEC_FIELDS].forEach(k=>{const value=fv(k);d[k]=['exchangeRate','mt','bdmt','moisture'].includes(k)?(value===''?null:Number(value)):value;});d.note=fv('detailNote');d.revision=(d.revision||0)+1;
-        for(const key of ['deliverId','receiverId'])if(d[key]==='__new'){const name=String(fv(key+'-newName')).trim(),tax=String(fv(key+'-newTax')).trim();if(!name)throw Error('Chưa nhập tên bên giao / nhận');const match=HAK.ContractParser.matchParty({name,tax},customers());const result=match||ensureCustomer(name,fv(key+'-newAddr'),key==='receiverId'?'ngoai':'trongnuoc').c;if(tax&&!result.tax&&!result.companyId)result.tax=tax;d[key]=result.id;}d.certificateFiles=await HAK.Documents.commit();const i=c.details.findIndex(x=>x.id===d.id);if(i<0)c.details.push(d);else c.details[i]=d;ed.linkTo={contract:c.id,detail:d.id,customs:($('#cf-customsId')||{}).value||''};
+        for(const key of ['deliverId','receiverId'])if(d[key]==='__new'){const name=String(fv(key+'-newName')).trim(),tax=String(fv(key+'-newTax')).trim();if(!name)throw Error('Chưa nhập tên bên giao / nhận');const match=HAK.ContractParser.matchParty({name,tax},customers());const result=match||ensureCustomer(name,fv(key+'-newAddr'),key==='receiverId'?'ngoai':'trongnuoc').c;if(tax&&!result.tax&&!result.companyId)result.tax=tax;d[key]=result.id;}d.certificateFiles=await HAK.Documents.commit();const i=c.details.findIndex(x=>x.id===d.id);if(i<0)c.details.push(d);else c.details[i]=d;ed.linkTo={contract:c.id,detail:d.id,customs:($('#cf-customsId')||{}).value||'',newNo:(($('#cf-customsId')||{}).value?'':(HAK.CustomsModel?HAK.CustomsModel.digits(($('#cf-tkhq')||{}).value):''))};
         res=upsertContract(c,ed.revision);
       }else res=upsertCustomer({id:ed.id,kind:fv('kind'),name:fv('name'),address:fv('address'),country:fv('country'),tax:fv('tax'),note:fv('note')});
       if(res.error)throw Error(res.error);await persist();

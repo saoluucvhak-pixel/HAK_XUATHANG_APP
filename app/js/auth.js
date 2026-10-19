@@ -6,7 +6,7 @@
  * ai vào được tài khoản Windows của máy vẫn đọc được dữ liệu trình duyệt nếu cố ý. Mật khẩu chỉ lưu dạng băm (SHA-256 × 2.000 vòng + muối).
  * Dữ liệu: HAK.Store 'hak.auth.v1' = { v, users:[{ id, username, name, role:'admin'|'staff', companies:[companyId], disabled, salt, hash, createdAt }], rec:{ salt, hash } }
  *          (nằm trong Sao lưu toàn bộ). Phiên: sessionStorage 'hak.session' → giữ đăng nhập tới khi đóng trình duyệt.
- * Quyền Nhân viên (ẩn bằng lớp body.role-staff — xem style.css): không vào Cài đặt (trừ tab 👤 Tài khoản), Danh mục chỉ xem,
+ * Quyền Nhân viên (ẩn bằng lớp body.role-staff — xem style.css): không vào Cài đặt (trừ tab 👤 Tài khoản), Danh mục: được thêm / sửa hợp đồng và khách hàng, KHÔNG sửa chi tiết hợp đồng (tàu · chứng thư · tờ khai), không vào tab Tờ khai hải quan, không xóa;
  * không xóa hồ sơ Lưu trữ / dòng nhật ký, không khôi phục sao lưu.
  * v2.6.2 Phase C — CÔNG TY LÀM VIỆC (Thủy chốt 2a/3a): chọn sau khi đăng nhập (chỉ công ty người dùng được làm; Quản trị = mọi công ty
  * trong Cài đặt; 1 công ty thì vào thẳng), lưu trong phiên ('hak.session'.co) + nhớ lần trước ('hak.auth.lastco'). Công ty = "bên xuất"

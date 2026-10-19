@@ -490,16 +490,31 @@
   function execInfo() {
     const id = ($('#cf-customsId') || {}).value, box = $('#cf-customsInfo'); if (!box) return;
     const x = id ? customsList().find((k) => k.id === id) : null;
-    if (!x) { box.innerHTML = '<div class="small muted pt-4">Chưa gắn tờ khai: ngày mở, lần khai và thuế xuất khẩu sẽ hiện ở đây.</div>'; return; }
+    const tk0 = $('#cf-tkhq'); if (tk0) tk0.readOnly = !!x;
+    if (!x) { box.innerHTML = '<div class="small muted pt-4">Chưa gắn tờ khai: ngày mở, lần khai và thuế xuất khẩu sẽ hiện ở đây. Gõ số tờ khai ở ô <b>Số tờ khai HQ</b> nếu muốn tạo tờ khai mới (app sẽ hỏi khi lưu).</div>'; return; }
     const t = CM().totals(x);
     box.innerHTML = '<div class="border rounded p-2 small"><b>Ngày mở tờ khai:</b> ' + esc(vnDate(x.openDate) || '—') + ' · <b>Lần khai:</b> ' + esc(x.round || 1) + ' · ' + statusBadge(x.status) + '<br><b>Thuế xuất khẩu phải nộp:</b> ' + esc(money(t.payable) || '—') + ' đ · đã nộp ' + esc(money(t.paidTax)) + ' đ · còn ' + esc(money(t.remaining) || '—') + ' đ</div>';
-    const tk = $('#cf-tkhq'); if (tk) { tk.value = x.no; tk.dispatchEvent(new Event('input', { bubbles: true })); }
+    const tk = $('#cf-tkhq'); if (tk) { tk.value = x.no; tk.readOnly = true; tk.dispatchEvent(new Event('input', { bubbles: true })); }
   }
+  const findByNo = (no) => customsList().find((x) => !x.deletedAt && x.no === CM().digits(no)) || null;
   function bindExec() { const s = $('#cf-customsId'); if (s) { s.onchange = execInfo; execInfo(); } }
   /** Sau khi lưu chi tiết hợp đồng: gắn (hoặc gỡ) tờ khai cho đợt đó. */
   async function link(l) {
     if (!l) return;
     const had = customsList().find((x) => x.detailId === l.detail);
+    if (!l.customs && l.newNo) {
+      await commit((next) => {
+        next.customs = next.customs || [];
+        const c = (next.contracts || []).find((x) => x.id === l.contract), d = detailOf(c, l.detail);
+        (next.customs).forEach((x) => { if (x.detailId === l.detail && x.no !== l.newNo) { delete x.detailId; x.revision = (x.revision || 0) + 1; } });
+        let rec = next.customs.find((x) => !x.deletedAt && x.no === l.newNo);
+        if (!rec) { rec = CM().newDecl({ no: l.newNo, status: 'opened', ship: d ? d.ship || '' : '', certNo: d ? d.certNo || '' : '', note: 'Tạo từ chi tiết hợp đồng', source: 'detail' }); next.customs.push(rec); }
+        rec.contractId = l.contract; rec.detailId = l.detail; rec.revision = (rec.revision || 0) + 1;
+        const err = CM().validate(rec, next); if (err) throw Error(err);
+        syncDetail(next, rec);
+      });
+      draw(); return;
+    }
     if (!l.customs && !had) return;
     await commit((next) => {
       (next.customs || []).forEach((x) => { if (x.detailId === l.detail && x.id !== l.customs) { delete x.detailId; x.revision = (x.revision || 0) + 1; } });
@@ -686,5 +701,5 @@
     return id;
   }
   const activeDecls = () => decls();
-  HAK.Customs = { ensureDetail, activeDecls, printReport, contractPdfSpec, customsPdfSpec, pdfReport, render, draw, contractBadge, detailCells, execPicker, bindExec, link, drawReport, drawContractReport, exportContractReport, contractReportModel, initReport, exportReport, suggestLink, importFiles };
+  HAK.Customs = { ensureDetail, activeDecls, printReport, contractPdfSpec, customsPdfSpec, pdfReport, render, draw, contractBadge, detailCells, execPicker, bindExec, findByNo, link, drawReport, drawContractReport, exportContractReport, contractReportModel, initReport, exportReport, suggestLink, importFiles };
 })(window);
