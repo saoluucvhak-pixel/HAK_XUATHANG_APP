@@ -158,3 +158,15 @@ test('điều kiện gắn đợt giao hàng: Xuất khẩu / Ủy thác cần t
   assert.equal(M.readiness({id:'c5',type:'traodoi',details:[{id:'d5'}]},[]).detailId,'d5');
   const other=[M.newDecl({no:'308629701722',contractId:'c9'})];assert.equal(M.readiness(xk,other).ok,false,'tờ khai của hợp đồng khác không tính');
 });
+
+test('phụ lục hợp đồng: KL hiện hành theo phụ lục mới nhất, xóa hết thì về KL gốc', () => {
+  const M = require('../app/js/contract-model.js');
+  const c = M.parent({ type: 'xuatkhau', no: 'HD1', contractQty: 6000, details: [] });
+  c.addenda = [{ no: 'PL02', date: '2026-09-10', qty: 7500 }, { no: 'PL01', date: '2026-08-10', qty: 6500 }];
+  M.applyAddenda(c);
+  assert.equal(c.contractQty, 7500); assert.equal(c.qtyOrig, 6000);
+  c.addenda[0].deletedAt = 'x'; M.applyAddenda(c);
+  assert.equal(c.contractQty, 6500);
+  c.addenda.forEach((a) => { a.deletedAt = 'x'; }); M.applyAddenda(c);
+  assert.equal(c.contractQty, 6000); assert.equal(c.qtyOrig, undefined);
+});
