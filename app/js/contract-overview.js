@@ -108,13 +108,51 @@
 
   /* ---------- Excel / PDF ---------- */
   const xl = (i, v) => (NUM.has(i) && v !== '' && v !== null ? (HAK.NumFmt.parse(v, 'num') === null ? v : HAK.NumFmt.parse(v, 'num')) : v);
+  const BAND_ARGB = ['FF1F4E78', 'FF2E7D32', 'FF0277BD', 'FFB26A00', 'FFC62828', 'FF546E7A', 'FF37474F'];
   async function exportXls() {
     const list = filtered(); if (!list.length) return;
     if (!root.ExcelJS && HAK.UI.needLib) await HAK.UI.needLib('exceljs');
-    const R = HAK.Report, wb = R.newWorkbook();
-    R.buildSheet(wb, 'Báo cáo', 'BÁO CÁO THỰC HIỆN HỢP ĐỒNG THEO QUY TRÌNH', 'Hợp đồng + phụ lục → chứng thư → tờ khai → khai bổ sung → nộp thuế → xuất hàng → đối chiếu' + stamp(),
-      COLS.map((c, i) => ({ h: BANDS_OF[i] + ' · ' + c.h, w: c.w, n: c.n ? (i === 15 ? '#,##0' : '#,##0.00') : undefined })),
-      list.flatMap((it) => rowsOf(it).map((r) => r.c.map((v, i) => xl(i, v)))), { total: false });
+    const R = HAK.Report, wb = R.newWorkbook(), ws = wb.addWorksheet('Báo cáo'), XF = 'Arial', N = COLS.length;
+    const thin = { style: 'thin', color: { argb: 'FF9E9E9E' } }, B = { top: thin, left: thin, bottom: thin, right: thin };
+    const fill = (argb) => ({ type: 'pattern', pattern: 'solid', fgColor: { argb } });
+    ws.columns = COLS.map((c) => ({ width: c.w }));
+    ws.mergeCells(1, 1, 1, N); Object.assign(ws.getCell(1, 1), { value: 'BÁO CÁO THỰC HIỆN HỢP ĐỒNG THEO QUY TRÌNH', font: { name: XF, size: 14, bold: true } });
+    ws.mergeCells(2, 1, 2, N); Object.assign(ws.getCell(2, 1), { value: 'Hợp đồng + phụ lục → chứng thư → tờ khai → khai bổ sung → nộp thuế → xuất hàng → đối chiếu' + stamp() + ' · Ngày xuất: ' + new Date().toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }), font: { name: XF, size: 9, italic: true, color: { argb: 'FF555555' } }, alignment: { wrapText: true, vertical: 'top' } });
+    ws.getRow(2).height = 30;
+    let col = 1;                                                           // hàng 4: nhóm quy trình (gộp ô); hàng 5: tên cột
+    BANDS.forEach((bd, k) => {
+      if (bd[1] > 1) ws.mergeCells(4, col, 4, col + bd[1] - 1);
+      Object.assign(ws.getCell(4, col), { value: bd[0], font: { name: XF, size: 10, bold: true, color: { argb: 'FFFFFFFF' } }, alignment: { horizontal: 'center', vertical: 'middle' } });
+      for (let i = col; i < col + bd[1]; i++) { ws.getCell(4, i).fill = fill(BAND_ARGB[k]); ws.getCell(4, i).border = B; ws.getCell(5, i).fill = fill(BAND_ARGB[k]); }
+      col += bd[1];
+    });
+    COLS.forEach((c, i) => Object.assign(ws.getCell(5, i + 1), { value: c.h, font: { name: XF, size: 9, bold: true, color: { argb: 'FFFFFFFF' } }, border: B, alignment: { horizontal: 'center', vertical: 'middle', wrapText: true } }));
+    ws.getRow(4).height = 20; ws.getRow(5).height = 42;
+    let rr = 6; const mains = [];
+    list.forEach((it) => rowsOf(it).forEach((r) => {
+      const isMain = r.cls === 'main'; if (isMain) mains.push(rr);
+      r.c.forEach((v, i) => {
+        const cell = ws.getCell(rr, i + 1), val = xl(i, v);
+        cell.value = val === '' ? null : val; cell.border = B;
+        const t = tone(v, i), red = /danger/.test(t), grn = /success/.test(t);
+        cell.font = { name: XF, size: 9, bold: isMain || /fw-semibold/.test(t), color: { argb: red ? 'FFC00000' : grn ? 'FF2E7D32' : 'FF000000' } };
+        if (isMain) cell.fill = fill('FFEAF1FB');
+        if (COLS[i].n) { cell.numFmt = i === 15 ? '#,##0' : i === 16 || i === 5 || i === 1 || i === 3 ? '#,##0.00' : '#,##0'; cell.alignment = { horizontal: 'right', vertical: 'top' }; }
+        else cell.alignment = { wrapText: true, vertical: 'top', indent: i === 0 && !isMain ? 2 : 0 };
+      });
+      rr++;
+    }));
+    const tot = rr; ws.getCell(tot, 1).value = 'TỔNG CỘNG (' + list.length + ' hợp đồng)';
+    COLS.forEach((c, i) => {
+      const cell = ws.getCell(tot, i + 1); cell.fill = fill('FFD9E2F3'); cell.font = { name: XF, size: 9, bold: true }; cell.border = { top: { style: 'double', color: { argb: 'FF808080' } }, bottom: { style: 'double', color: { argb: 'FF808080' } }, left: thin, right: thin };
+      if (c.n && [1, 3, 5, 11, 12, 13, 14, 15, 16].indexOf(i) >= 0) {       // chỉ cộng dòng hợp đồng (dòng chi tiết không cộng lại)
+        const L = String.fromCharCode(65 + i); cell.value = { formula: mains.map((m) => L + m).join('+'), result: mains.reduce((a, m) => a + (+ws.getCell(m, i + 1).value || 0), 0) };
+        cell.numFmt = i === 15 ? '#,##0' : i === 16 || i === 5 || i === 1 || i === 3 ? '#,##0.00' : '#,##0'; cell.alignment = { horizontal: 'right' };
+      }
+    });
+    ws.views = [{ state: 'frozen', xSplit: 1, ySplit: 5 }];
+    ws.pageSetup = { orientation: 'landscape', paperSize: 8, fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
+    ws.headerFooter.oddFooter = 'HAK · &D · Trang &P / &N';
     const blob = new Blob([await wb.xlsx.writeBuffer()], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     if (!await HAK.Word.Files.saveBlob(blob, 'BaoCaoThucHienHopDong.xlsx')) return;
     toast('Đã xuất Báo cáo thực hiện hợp đồng.', 'success');
