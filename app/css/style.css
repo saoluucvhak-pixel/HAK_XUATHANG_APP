@@ -326,7 +326,7 @@ body.role-staff [data-del-log], body.role-staff #archClear { display: none !impo
    menu gọn đủ 1 màn hình, thẻ phẳng, thanh tab vùng nhập liệu ở trang biên bản.
    ========================================================================== */
 :root {
-  --sb-w: 256px;
+  --sb-w: 288px;
   --brand: #0b7285; --brand-2: #15aabf; --brand-soft: rgba(11, 114, 133, .10);
   --sb-bg: #0c1a2b; --sb-text: #9fb0c4;
   --page-bg: #f5f7fa; --card-border: #e6ebf1; --muted: #687789; --ink: #102a43;
@@ -442,5 +442,10 @@ svg.i { width: 1.1em; height: 1.1em; vertical-align: -.18em; flex: none; }
 #page-contractstatus .tbl-wrap .table td .badge { font-size: .58rem !important; padding: 1px 3px; }
 #page-contractstatus #csrBody td:last-child { min-width: 88px; }
 #page-contractstatus #csrBody td:last-child .btn, #page-contractstatus #csrBody td:last-child .badge { display: block; width: 100%; margin: 2px 0 0 !important; font-size: .7rem; padding: 2px 4px; text-align: center; }
-#page-contractstatus #csrBody td:first-child { min-width: 150px; }
+#page-contractstatus #csrBody td:first-child { min-width: 128px; }
 #page-contractstatus #csrBody td.num > div { white-space: normal; max-width: 7.5rem; margin-left: auto; line-height: 1.15; }
+/* v2.16.1 menu bên trái rộng hơn, tên mục dài tự xuống dòng — không bị cắt chữ */
+:root { --sb-w: 288px; }
+.sb-link { white-space: normal; line-height: 1.25; padding-top: 7px; padding-bottom: 7px; }
+.sb-title, .sb-sub { white-space: normal; }
+#page-contractstatus .tbl-wrap .table td, #page-contractstatus .tbl-wrap .table th { padding-left: .22rem; padding-right: .22rem; }
