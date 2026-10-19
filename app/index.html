@@ -219,7 +219,7 @@
     <!-- ---------- BÁO CÁO TỔNG HỢP ---------- -->
     <section class="page" id="page-contractoverview" hidden>
       <div class="card mb-3"><div class="card-body">
-        <div class="sec-title d-flex flex-wrap align-items-center gap-2 mb-2"><span>🧭 BÁO CÁO THỰC HIỆN HỢP ĐỒNG — theo trình tự quy trình</span><span class="ms-auto d-flex gap-2"><button class="btn btn-sm btn-outline-secondary" id="coReload" type="button">↻ Làm mới</button><button class="btn btn-sm btn-success" id="coXls" type="button" disabled>📊 Xuất Excel</button><button class="btn btn-sm btn-outline-primary" id="coPdf" type="button" disabled>🖨 Tải PDF</button></span></div>
+        <div class="sec-title d-flex flex-wrap align-items-center gap-2 mb-2"><span>🧭 BÁO CÁO THỰC HIỆN HỢP ĐỒNG — theo trình tự quy trình</span><span class="ms-auto d-flex gap-2"><button class="btn btn-sm btn-outline-secondary" id="coReload" type="button">↻ Làm mới</button><button class="btn btn-sm btn-success" id="coXls" type="button" disabled>📊 Xuất Excel</button><button class="btn btn-sm btn-outline-primary" id="coGs" type="button" title="Ghi hợp đồng, tờ khai, phụ lục lên Google Sheet (NL_HOPDONG, NL_TOKHAI, NL_PHULUC)">☁ Đồng bộ Google Sheet</button><button class="btn btn-sm btn-outline-primary" id="coPdf" type="button" disabled>🖨 Tải PDF</button></span></div>
         <div id="coSmart" class="mb-2"></div>
         <div class="form-text mt-0 mb-2">Một bảng cho tất cả hợp đồng, các nhóm cột xếp đúng quy trình: <b>① Hợp đồng + phụ lục → ② Chứng thư → ③ Tờ khai → ④ Khai bổ sung → ⑤ Nộp thuế (còn nợ) → ⑥ Xuất hàng → ⑦ Đối chiếu</b>. Dòng đậm là hợp đồng, dòng nhỏ là từng chi tiết (tàu · chứng thư · tờ khai). Bấm vào dòng hợp đồng để mở <b>Hồ sơ hợp đồng</b>. Kéo ngang để xem hết các cột.</div>
         <div id="coCards" class="row g-2 mb-2"></div>
@@ -503,6 +503,7 @@
 <script src="js/contract-status.js"></script>
 <script src="js/contract-file.js"></script>
 <script src="js/contract-overview.js"></script>
+<script src="js/gsync-contracts.js"></script>
 <script src="js/backup.js"></script>
 <script src="js/gsync.js"></script>
 <script src="js/auth.js"></script>

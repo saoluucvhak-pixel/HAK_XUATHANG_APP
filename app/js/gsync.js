@@ -35,7 +35,7 @@
   }
   const curCo = () => (HAK.Auth && HAK.Auth.company ? HAK.Auth.company() : '') || 'hak';
   const cfg = (cid) => Object.assign({ url: '', token: '', last: null }, all().cos[cid || curCo()] || {});
-  const saveCfg = (cid, c) => { const d = all(); d.cos[cid] = { url: c.url || '', token: c.token || '', last: c.last || null }; d.migV1 = true; HAK.Store.set(KEY, d); };
+  const saveCfg = (cid, c) => { const d = all(); d.cos[cid] = { url: c.url || '', token: c.token || '', last: c.last || null, lastContracts: c.lastContracts || null }; d.migV1 = true; HAK.Store.set(KEY, d); };
   const configured = (cid) => { const c = cfg(cid); return !!(c.url && c.token); };
   const coName = (cid) => { const c = ((HAK.Config && HAK.Config.data.companies) || []).find((x) => x.id === cid); return c ? (c.short || c.name) : cid; };
   function genToken() {
@@ -59,8 +59,8 @@
       ' * Mã bí mật bên dưới phải TRÙNG với ô "Mã bí mật" trong app. Đổi mã → dán lại mã mới rồi Triển khai → Quản lý → Sửa → Phiên bản mới.',
       ' */',
       'var SECRET = \'' + String(token || '').replace(/[^a-z0-9]/gi, '') + '\';',
-      'var VERSION = 1;',
-      'var MODE = { NL_DH_XB: \'upsert\', NL_PC_XH: \'replace\' };   // sheet nhận dữ liệu và cách ghi',
+      'var VERSION = 2;',
+      'var MODE = { NL_DH_XB: \'upsert\', NL_PC_XH: \'replace\', NL_HOPDONG: \'snapshot\', NL_TOKHAI: \'snapshot\', NL_PHULUC: \'snapshot\' };   // sheet nhận dữ liệu và cách ghi (snapshot = ghi lại toàn bộ bảng)',
       '',
       'function doGet() { return out_({ ok: true, app: \'HAK-XUATHANG\', version: VERSION }); }',
       '',
@@ -122,7 +122,11 @@
       '  }',
       '  var stat = { removed: 0, updated: 0, added: 0 };',
       '  var incoming = sh.rows || [], keyPos = sh.cols.map(function (c) { return c.h; }).indexOf(sh.keyCol);',
-      '  if (mode === \'replace\') {',
+      '  if (mode === \'snapshot\') {',
+      '    var base = data.slice();',
+      '    data = incoming.map(function (r, i) { return toRow(r, base[i]); });',
+      '    stat.updated = Math.min(oldCount, incoming.length); stat.added = Math.max(0, incoming.length - oldCount); stat.removed = Math.max(0, oldCount - incoming.length);',
+      '  } else if (mode === \'replace\') {',
       '    var keep = data.filter(function (row) { return !keyOf(row); });',
       '    stat.removed = data.length - keep.length;',
       '    incoming.forEach(function (r) { keep.push(toRow(r)); stat.added++; });',
@@ -168,6 +172,18 @@
     return j;
   }
   const test = (cid) => call({ action: 'ping' }, cid);
+  /**
+   * Gửi các sheet dạng "snapshot" (ghi lại toàn bộ bảng — hợp đồng, tờ khai, phụ lục) lên Sheet của 1 công ty.
+   * sheets = [{name, keyCol, cols:[{h, n?}], rows:[[…]]}]. Script cũ (VERSION < 2) không có các sheet này → báo rõ cần dán lại Code.gs.
+   */
+  async function pushSheets(cid, sheets) {
+    if (!configured(cid)) return { skipped: true };
+    const j = await call({ action: 'push', keys: [], sheets: sheets.map((s) => ({ name: s.name, keyCol: s.keyCol, cols: s.cols, rows: s.rows })) }, cid);
+    const r = j.result || {}, missing = sheets.filter((s) => !r[s.name]).map((s) => s.name);
+    if (missing.length) throw new Error('Code.gs trên Google Sheet của ' + coName(cid) + ' là bản cũ (chưa có sheet ' + missing.join(', ') + ') — Cài đặt → Chung → ☁ Đồng bộ → 📋 Code.gs, dán lại vào Apps Script rồi Triển khai → Quản lý → Sửa → Phiên bản mới.');
+    const c = cfg(cid); c.lastContracts = { at: Date.now(), hd: (r.NL_HOPDONG || {}).total || 0, tk: (r.NL_TOKHAI || {}).total || 0 }; saveCfg(cid, Object.assign(c, { last: c.last }));
+    return r;
+  }
 
   /**
    * sheets = HAK.Report.xhSheetRows(...) (chỉ NL_DH_XB + NL_PC_XH được gửi); coOf(key) = công ty bên xuất của lô (mã lô) → Sheet đích.
@@ -263,7 +279,7 @@
       '<li><b>Triển khai → Tùy chọn triển khai mới</b> → loại <b>Ứng dụng web</b> · Thực thi với tư cách <b>Tôi</b> · Người có quyền truy cập <b>Bất kỳ ai</b> → <b>Triển khai</b> → cấp quyền.</li>' +
       '<li>Sao chép <b>URL ứng dụng web</b> dán vào ô URL của đúng công ty → <b>🔌 Kiểm tra</b>.</li></ol>' +
       '<div class="tbl-wrap" style="max-height:none"><table class="table table-sm align-middle mb-0"><thead><tr><th>Công ty</th><th>URL ứng dụng web</th><th>Mã bí mật</th><th></th><th>Trạng thái</th></tr></thead><tbody id="gsBody"></tbody></table></div>' +
-      '<div class="form-text">Đồng bộ 1 chiều app → Sheet, bấm ở <b>Báo cáo → 📑 Xuất hàng theo hợp đồng → ☁ Đồng bộ Google Sheet</b>. Lô được gửi bị <b>thay toàn bộ phiếu</b> trên NL_PC_XH và cập nhật dòng ở NL_DH_XB; lô khác trên Sheet giữ nguyên. Công ty chưa cài Sheet: lô của công ty đó được bỏ qua (có báo). Đổi mã bí mật phải dán lại Code.gs và triển khai phiên bản mới.</div>';
+      '<div class="form-text">Đồng bộ 1 chiều app → Sheet, bấm ở <b>Báo cáo → 📑 Xuất hàng theo hợp đồng → ☁ Đồng bộ Google Sheet</b>. Lô được gửi bị <b>thay toàn bộ phiếu</b> trên NL_PC_XH và cập nhật dòng ở NL_DH_XB; lô khác trên Sheet giữ nguyên. Công ty chưa cài Sheet: lô của công ty đó được bỏ qua (có báo). Đổi mã bí mật phải dán lại Code.gs và triển khai phiên bản mới.<br><b>Mới (Code.gs bản 2):</b> nút <b>☁ Đồng bộ Google Sheet</b> ở <b>Báo cáo thực hiện hợp đồng</b> ghi thêm 3 sheet <b>NL_HOPDONG</b> (hợp đồng: KL gốc / hiện hành, chứng thư, tờ khai, thuế còn nợ, thực giao), <b>NL_TOKHAI</b> (tờ khai) và <b>NL_PHULUC</b> (phụ lục khối lượng) — mỗi lần ghi lại toàn bộ 3 bảng. Ai đã cài trước đây cần <b>📋 Code.gs → dán lại → Triển khai → Quản lý → Sửa → Phiên bản mới</b> (URL và mã bí mật giữ nguyên).</div>';
     renderTable();
     const body = $('#gsBody');
     const rowOf = (el) => el.closest('tr[data-cid]'), val = (tr, k) => tr.querySelector('[data-gs="' + k + '"]');
@@ -297,5 +313,5 @@
   }
   function init() { render(); renderStatus(); root.addEventListener('hak:scope', (e) => { if (e.detail && e.detail.key === 'report') renderStatus(); }); }
 
-  HAK.GSync = { init, render, renderStatus, configured, test, push, codeGs, _call: call, BATCH_TRIPS, _cfg: cfg };
+  HAK.GSync = { init, render, renderStatus, configured, test, push, pushSheets, codeGs, _call: call, BATCH_TRIPS, _cfg: cfg };
 })(window);

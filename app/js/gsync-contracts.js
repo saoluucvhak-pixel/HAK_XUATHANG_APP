@@ -1,0 +1,67 @@
+/**
+ * gsync-contracts.js — ☁ Đồng bộ HỢP ĐỒNG lên Google Sheet (v2.16.2): 3 sheet "snapshot" (ghi lại toàn bộ bảng mỗi lần bấm):
+ *   NL_HOPDONG (mỗi hợp đồng 1 dòng: KL gốc/hiện hành, chứng thư, tờ khai, thuế còn nợ, thực giao), NL_TOKHAI (mỗi tờ khai 1 dòng), NL_PHULUC (mỗi phụ lục khối lượng 1 dòng).
+ * Mỗi công ty gửi về Sheet của chính công ty đó (hợp đồng liên quan tới công ty: bên xuất / bên ủy thác / bên mua). Cần Code.gs bản VERSION 2 (📋 Code.gs ở Cài đặt → Chung).
+ */
+(function (root) {
+  'use strict';
+  const HAK = (root.HAK = root.HAK || {});
+  const hasNum = (v) => v !== null && v !== undefined && v !== '' && isFinite(+v);
+  const num = (v) => (hasNum(v) ? +v : '');
+  const r2 = (v) => (hasNum(v) ? Math.round(+v * 100) / 100 : '');
+  const day = (iso) => (/^\d{4}-\d\d-\d\d/.test(iso || '') ? iso.slice(0, 10) + 'T00:00:00.000Z' : '');
+  const DATE = 'dd/mm/yyyy', INT = '#,##0', DEC = '#,##0.00';
+
+  const COLS = {
+    NL_HOPDONG: [['Mã HĐ (app)'], ['Số hợp đồng'], ['Hình thức'], ['Ngày ký', DATE], ['Bên mua'], ['Hàng hóa'], ['KL gốc (BDMT)', DEC], ['KL hiện hành (BDMT)', DEC], ['Số phụ lục', INT], ['KL khô chứng thư (BDMT)', DEC], ['Còn lại (BDMT)', DEC], ['% thực hiện', DEC],
+      ['Số chứng thư'], ['Số tờ khai', INT], ['Đã thông quan', INT], ['Thuế XK phải nộp (đ)', INT], ['Đã nộp thuế (đ)', INT], ['Còn nợ thuế (đ)', INT], ['Lệ phí đã nộp (đ)', INT], ['Số chuyến xe', INT], ['Thực giao (tấn)', DEC], ['Trạng thái hợp đồng'], ['Cập nhật lúc']],
+    NL_TOKHAI: [['Mã TK (app)'], ['Số tờ khai'], ['Lần khai', INT], ['Ngày mở', DATE], ['Trạng thái'], ['Ngày thông quan', DATE], ['Số hợp đồng'], ['Tàu'], ['Số chứng thư'], ['KL khô (BDMT)', DEC], ['Thuế tờ khai gốc (đ)', INT], ['Thuế sau bổ sung (đ)', INT], ['Thuế phải nộp (đ)', INT], ['Đã nộp thuế (đ)', INT], ['Còn nợ (đ)', INT], ['Lệ phí đã nộp (đ)', INT], ['Số lần khai bổ sung', INT]],
+    NL_PHULUC: [['Mã PL (app)'], ['Số hợp đồng'], ['Số phụ lục'], ['Ngày ký', DATE], ['KL sau điều chỉnh (BDMT)', DEC], ['Tăng / giảm (BDMT)', DEC], ['Lý do']]
+  };
+  const KEYCOL = { NL_HOPDONG: 'Mã HĐ (app)', NL_TOKHAI: 'Mã TK (app)', NL_PHULUC: 'Mã PL (app)' };
+  const cols = (name) => COLS[name].map((c) => (c[1] ? { h: c[0], n: c[1] } : { h: c[0] }));
+
+  /** items = [{ c (hợp đồng cha), buyer (tên), m (kết quả HAK.ContractFile.build) }] → 3 sheet [{name,keyCol,cols,rows}] */
+  function buildSheets(items, opt) {
+    opt = opt || {};
+    const CM = opt.CM || HAK.CustomsModel, types = opt.types || {}, stamp = opt.stamp || new Date().toISOString().slice(0, 19) + 'Z';
+    const hd = [], tk = [], pl = [];
+    items.forEach(({ c, buyer, m }) => {
+      const t = m.tax, qtyOrig = c.qtyOrig != null ? c.qtyOrig : c.contractQty;
+      const certNos = (c.details || []).filter((d) => !d.deletedAt && d.certNo).map((d) => d.certNo).join('; ');
+      hd.push([c.id, c.no || '', types[c.type] || c.type || '', day(c.date), buyer || '', c.contractProduct || '', num(qtyOrig), num(c.contractQty), m.addenda.length, r2(m.certBdmt),
+        m.qty == null ? '' : r2(m.qty - m.certBdmt), m.qty ? r2(m.certBdmt / m.qty * 100) : '', certNos, m.T.length, m.cleared, num(t.payable), num(t.paid), num(t.remaining), num(t.fee), m.trips, r2(m.delKg / 1000), m.status.label, stamp]);
+      m.T.forEach(({ d, t: x }) => tk.push([d.id, d.no, d.round || 1, day(d.openDate), CM.STATUS[d.status] || d.status, day(CM.statusDate(d, 'cleared')), c.no || '', d.ship || '', d.certNo || '', r2(d.qtyBdmt), num(x.base), x.lastSupplement ? num(x.lastSupplement.taxVnd) : '', num(x.payable), num(x.paidTax), num(x.remaining), num(x.paidFee), CM.active(d.supplements).length]));
+      let prev = qtyOrig;
+      m.addenda.forEach((a) => { pl.push([a.id, c.no || '', a.no || '', day(a.date), num(a.qty), hasNum(prev) ? r2(a.qty - prev) : '', a.reason || '']); prev = a.qty; });
+    });
+    return [{ name: 'NL_HOPDONG', rows: hd }, { name: 'NL_TOKHAI', rows: tk }, { name: 'NL_PHULUC', rows: pl }].map((s) => ({ name: s.name, keyCol: KEYCOL[s.name], cols: cols(s.name), rows: s.rows }));
+  }
+
+  /** Đọc dữ liệu thật của 1 công ty (hợp đồng liên quan + phiếu cân gắn hợp đồng) → 3 sheet. */
+  async function collect(cid) {
+    const CS = HAK.ContractStatus; if (CS && CS.load) await CS.load();
+    const groups = CS && CS.state ? CS.state.groups : [], K = HAK.Catalog, F = HAK.ContractFile;
+    const list = K.parents().filter((c) => !c.deletedAt && (!K.relatedTo || K.relatedTo(c, [cid])));
+    const items = list.map((c) => { const cu = K.customer(c.buyerId); return { c, buyer: cu ? cu.name : '', m: F.build(c.id, groups) }; });
+    const types = {}; Object.keys(K.TYPES || {}).forEach((k) => { types[k] = K.TYPES[k].label; });
+    return buildSheets(items, { types });
+  }
+  /** Gửi cho mọi công ty đang xem (đã cài Sheet). → [{cid, name, hd, tk, pl, skipped?, error?}] */
+  async function pushAll(onStep) {
+    const scope = HAK.Auth && HAK.Auth.scopeIds ? HAK.Auth.scopeIds('report') : null;
+    const cos = (HAK.Config.data.companies || []).filter((c) => !scope || scope.indexOf(c.id) >= 0);
+    const out = []; let i = 0;
+    for (const co of cos) {
+      const it = { cid: co.id, name: co.short || co.name };
+      if (!HAK.GSync.configured(co.id)) { it.skipped = true; out.push(it); continue; }
+      if (onStep) onStep(++i, cos.length, it.name);
+      try { const sheets = await collect(co.id), r = await HAK.GSync.pushSheets(co.id, sheets); it.hd = (r.NL_HOPDONG || {}).total || 0; it.tk = (r.NL_TOKHAI || {}).total || 0; it.pl = (r.NL_PHULUC || {}).total || 0; }
+      catch (e) { it.error = e.message || String(e); }
+      out.push(it);
+    }
+    return out;
+  }
+  HAK.GSyncContracts = { buildSheets, collect, pushAll, COLS, KEYCOL };
+  if (typeof module === 'object' && module.exports) module.exports = HAK.GSyncContracts;
+})(typeof window !== 'undefined' ? window : globalThis);
