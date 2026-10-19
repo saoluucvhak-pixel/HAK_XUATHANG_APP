@@ -158,10 +158,13 @@
     toast('Đã xuất Báo cáo thực hiện hợp đồng.', 'success');
   }
   const BANDS_OF = BANDS.flatMap((b) => Array(b[1]).fill(b[0].replace(/^[^\s]+\s/, '')));
+  /** PDF chia 2 phần (A4 ngang không đủ chỗ cho 21 cột): phần 1 = ①–④ (đến khai bổ sung), phần 2 = ⑤–⑦ (nộp thuế, xuất hàng, đối chiếu); cột đầu lặp lại để đối chiếu dòng. */
+  const PART1 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], PART2 = [0, 12, 13, 14, 15, 16, 17, 18, 19, 20];
   async function exportPdf() {
     const list = filtered(); if (!list.length) return;
+    const all = list.flatMap((it) => rowsOf(it)), pick = (idx) => ({ cols: idx.map((i) => ({ h: COLS[i].h, n: !!COLS[i].n })), rows: all.map((r) => ({ cls: r.cls, c: idx.map((i) => r.c[i]) })) });
     await HAK.Customs.printReport({ file: 'BaoCaoThucHienHopDong', title: 'BÁO CÁO THỰC HIỆN HỢP ĐỒNG THEO QUY TRÌNH', sub: 'Hợp đồng + phụ lục → chứng thư → tờ khai → khai bổ sung → nộp thuế → xuất hàng → đối chiếu' + stamp(),
-      tables: [{ cols: COLS.map((c) => ({ h: c.h, n: !!c.n })), rows: list.flatMap((it) => rowsOf(it).map((r) => ({ cls: r.cls, c: r.c }))) }] });
+      tables: [Object.assign({ caption: 'PHẦN 1 — ① Hợp đồng + phụ lục · ② Chứng thư · ③ Tờ khai hải quan · ④ Khai bổ sung' }, pick(PART1)), Object.assign({ pageBreak: true, caption: 'PHẦN 2 — ⑤ Nộp thuế · ⑥ Xuất hàng · ⑦ Đối chiếu' }, pick(PART2))] });
   }
 
   function init() {

@@ -630,7 +630,7 @@
   }
 
   /* ---------------- PDF: dựng bản in A4 ngang rồi mở hộp thoại in ("Lưu dưới dạng PDF"), giống nút Tải PDF của biên bản ---------------- */
-  const PRINT_CSS = '.rp-h{font:bold 13pt Arial,sans-serif;margin:0 0 1mm}.rp-s{font:italic 8pt Arial,sans-serif;color:#444;margin:0 0 3mm}.rp-c{font:bold 9pt Arial,sans-serif;margin:3mm 0 1mm}' +
+  const PRINT_CSS = '.rp-h{font:bold 13pt Arial,sans-serif;margin:0 0 1mm}.rp-s{font:italic 8pt Arial,sans-serif;color:#444;margin:0 0 3mm}.rp-c{font:bold 9pt Arial,sans-serif;margin:3mm 0 1mm}.rp-pb{break-before:page}' +
     '.rp-t{width:100%;border-collapse:collapse;font:7.5pt Arial,sans-serif;margin-bottom:4mm}.rp-t th{background:#1f4e78 !important;color:#fff !important;border:.3pt solid #808080;padding:1mm;text-align:center}' +
     '.rp-t td{border:.3pt solid #808080;padding:.8mm 1mm;vertical-align:top}.rp-t .n{text-align:right;white-space:nowrap}.rp-t tr.main td{background:#eef3f8 !important;font-weight:bold}.rp-t tr.sub td{font-size:7pt;color:#333}.rp-t tr.total td{background:#d9e2f3 !important;font-weight:bold}.rp-f{font:7pt Arial,sans-serif;color:#666;text-align:right}';
   /** spec: {file, title, sub, tables:[{caption, cols:[{h, n}], rows:[{c:[...], cls}]}]}. Ô trong c là văn bản thường (đã escape ở đây). */
@@ -638,7 +638,7 @@
     const W = HAK.Word && HAK.Word.Pdf; if (W) W.cleanup();
     const host = document.createElement('div'); host.id = 'printRoot';
     host.innerHTML = '<div class="rp-h">' + esc(spec.title) + '</div><div class="rp-s">' + esc(spec.sub) + '</div>' + spec.tables.map((t) =>
-      (t.caption ? '<div class="rp-c">' + esc(t.caption) + '</div>' : '') + '<table class="rp-t"><thead><tr>' + t.cols.map((c) => '<th>' + esc(c.h) + '</th>').join('') + '</tr></thead><tbody>' +
+      (t.caption ? '<div class="rp-c' + (t.pageBreak ? ' rp-pb' : '') + '">' + esc(t.caption) + '</div>' : '') + '<table class="rp-t"><thead><tr>' + t.cols.map((c) => '<th>' + esc(c.h) + '</th>').join('') + '</tr></thead><tbody>' +
       t.rows.map((r) => '<tr class="' + (r.cls || '') + '">' + r.c.map((x, i) => '<td' + (t.cols[i] && t.cols[i].n ? ' class="n"' : '') + '>' + esc(x == null ? '' : x) + '</td>').join('') + '</tr>').join('') + '</tbody></table>').join('') +
       '<div class="rp-f">HAK · ' + esc(new Date().toLocaleDateString('vi-VN')) + ' · v' + esc(HAK.VERSION || '') + '</div>';
     document.body.appendChild(host);
