@@ -276,10 +276,6 @@ body.auth-locked .app { visibility: hidden; }
 /* Nhân viên: ẩn chức năng quản trị (chốt ở giao diện — xem ghi chú đầu auth.js) */
 body.role-staff .admin-only,
 body.role-staff #catalogRoot label:has(#catImport),
-body.role-staff #catalogRoot [data-del], body.role-staff #catalogRoot [data-exec],
-body.role-staff #catalogRoot [data-ctab="customs"], body.role-staff #customsRoot,
-body.role-staff #catDetailsPanel [data-detail-add], body.role-staff #catDetailsPanel [data-detail-edit],
-body.role-staff #catDetailsPanel [data-detail-archive], body.role-staff #catDetailsPanel [data-detail-restore],
 body.role-staff #archBody [data-act="del"], body.role-staff label:has(#archRestore),
 body.role-staff [data-del-log], body.role-staff #archClear { display: none !important; }
 /* v2.6.2 chọn công ty làm việc */
