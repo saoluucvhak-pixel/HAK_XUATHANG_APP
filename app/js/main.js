@@ -74,7 +74,7 @@
 
   const TITLES = {
     home: 'Tổng quan', file: 'Nhập liệu', chungtu: 'Chứng từ xuất hàng', guikho: 'Trung chuyển gửi kho', xuatkhogui: 'Xuất hàng kho gửi', xuatkhau: 'Xuất khẩu', xuatban: 'Xuất bán', uythac: 'Ủy thác xuất khẩu',
-    dieuchuyen: 'Điều chuyển nội bộ', traodoi: 'Trao đổi hàng hóa', archive: 'Lưu trữ', report: 'Báo cáo tổng hợp', contractoverview: 'Toàn cảnh hợp đồng', contractstatus: 'Tình hình thực hiện hợp đồng', catalog: 'Danh mục hợp đồng & khách hàng', settings: 'Cài đặt', help: 'Hướng dẫn'
+    dieuchuyen: 'Điều chuyển nội bộ', traodoi: 'Trao đổi hàng hóa', archive: 'Lưu trữ', report: 'Báo cáo tổng hợp', contractoverview: 'Báo cáo thực hiện hợp đồng', contractstatus: 'Tình hình thực hiện hợp đồng', catalog: 'Danh mục hợp đồng & khách hàng', settings: 'Cài đặt', help: 'Hướng dẫn'
   };
 
   /* ===============================================================

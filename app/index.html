@@ -63,7 +63,7 @@
       <div class="sb-label">Hệ thống</div>
       <a class="sb-link" href="#/catalog" data-nav="catalog"><span class="ico">📇</span> Danh mục HĐ &amp; khách hàng</a>
       <a class="sb-link" href="#/report" data-nav="report"><span class="ico">📊</span> Báo cáo tổng hợp</a>
-      <a class="sb-link" href="#/contractoverview" data-nav="contractoverview"><span class="ico">🧭</span> Toàn cảnh hợp đồng</a>
+      <a class="sb-link" href="#/contractoverview" data-nav="contractoverview"><span class="ico">🧭</span> Báo cáo thực hiện hợp đồng</a>
       <a class="sb-link" href="#/contractstatus" data-nav="contractstatus"><span class="ico">📑</span> Tình hình hợp đồng</a>
       <a class="sb-link" href="#/archive" data-nav="archive"><span class="ico">🗄️</span> Lưu trữ <span class="cnt d-none" id="archCount"></span></a>
       <a class="sb-link" href="#/settings" data-nav="settings"><span class="ico">⚙️</span> Cài đặt</a>
@@ -219,7 +219,7 @@
     <!-- ---------- BÁO CÁO TỔNG HỢP ---------- -->
     <section class="page" id="page-contractoverview" hidden>
       <div class="card mb-3"><div class="card-body">
-        <div class="sec-title d-flex flex-wrap align-items-center gap-2 mb-2"><span>🧭 Toàn cảnh hợp đồng — theo trình tự quy trình</span><span class="ms-auto d-flex gap-2"><button class="btn btn-sm btn-outline-secondary" id="coReload" type="button">↻ Làm mới</button><button class="btn btn-sm btn-success" id="coXls" type="button" disabled>📊 Xuất Excel</button><button class="btn btn-sm btn-outline-primary" id="coPdf" type="button" disabled>🖨 Tải PDF</button></span></div>
+        <div class="sec-title d-flex flex-wrap align-items-center gap-2 mb-2"><span>🧭 BÁO CÁO THỰC HIỆN HỢP ĐỒNG — theo trình tự quy trình</span><span class="ms-auto d-flex gap-2"><button class="btn btn-sm btn-outline-secondary" id="coReload" type="button">↻ Làm mới</button><button class="btn btn-sm btn-success" id="coXls" type="button" disabled>📊 Xuất Excel</button><button class="btn btn-sm btn-outline-primary" id="coPdf" type="button" disabled>🖨 Tải PDF</button></span></div>
         <div id="coSmart" class="mb-2"></div>
         <div class="form-text mt-0 mb-2">Một bảng cho tất cả hợp đồng, các nhóm cột xếp đúng quy trình: <b>① Hợp đồng + phụ lục → ② Chứng thư → ③ Tờ khai → ④ Khai bổ sung → ⑤ Nộp thuế (còn nợ) → ⑥ Xuất hàng → ⑦ Đối chiếu</b>. Dòng đậm là hợp đồng, dòng nhỏ là từng chi tiết (tàu · chứng thư · tờ khai). Bấm vào dòng hợp đồng để mở <b>Hồ sơ hợp đồng</b>. Kéo ngang để xem hết các cột.</div>
         <div id="coCards" class="row g-2 mb-2"></div>

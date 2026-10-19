@@ -1,5 +1,5 @@
 /**
- * contract-overview.js — 🧭 Toàn cảnh hợp đồng (v2.16.0): MỘT bảng cho tất cả hợp đồng, các cột xếp đúng trình tự quy trình:
+ * contract-overview.js — 🧭 Báo cáo thực hiện hợp đồng (v2.16.0): MỘT bảng cho tất cả hợp đồng, các cột xếp đúng trình tự quy trình:
  *   ① Hợp đồng + phụ lục → ② Chứng thư → ③ Tờ khai → ④ Khai bổ sung → ⑤ Nộp thuế (còn nợ) → ⑥ Xuất hàng → ⑦ Đối chiếu.
  * Dòng đậm = hợp đồng; dòng nhỏ = từng chi tiết (tàu · chứng thư · tờ khai). Dữ liệu dùng chung với trang Tình hình hợp đồng và Hồ sơ hợp đồng.
  */
@@ -112,17 +112,17 @@
     const list = filtered(); if (!list.length) return;
     if (!root.ExcelJS && HAK.UI.needLib) await HAK.UI.needLib('exceljs');
     const R = HAK.Report, wb = R.newWorkbook();
-    R.buildSheet(wb, 'Toàn cảnh', 'TOÀN CẢNH HỢP ĐỒNG THEO QUY TRÌNH', 'Hợp đồng + phụ lục → chứng thư → tờ khai → khai bổ sung → nộp thuế → xuất hàng → đối chiếu' + stamp(),
+    R.buildSheet(wb, 'Báo cáo', 'BÁO CÁO THỰC HIỆN HỢP ĐỒNG THEO QUY TRÌNH', 'Hợp đồng + phụ lục → chứng thư → tờ khai → khai bổ sung → nộp thuế → xuất hàng → đối chiếu' + stamp(),
       COLS.map((c, i) => ({ h: BANDS_OF[i] + ' · ' + c.h, w: c.w, n: c.n ? (i === 15 ? '#,##0' : '#,##0.00') : undefined })),
       list.flatMap((it) => rowsOf(it).map((r) => r.c.map((v, i) => xl(i, v)))), { total: false });
     const blob = new Blob([await wb.xlsx.writeBuffer()], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    if (!await HAK.Word.Files.saveBlob(blob, 'ToanCanhHopDong.xlsx')) return;
-    toast('Đã xuất Toàn cảnh hợp đồng.', 'success');
+    if (!await HAK.Word.Files.saveBlob(blob, 'BaoCaoThucHienHopDong.xlsx')) return;
+    toast('Đã xuất Báo cáo thực hiện hợp đồng.', 'success');
   }
   const BANDS_OF = BANDS.flatMap((b) => Array(b[1]).fill(b[0].replace(/^[^\s]+\s/, '')));
   async function exportPdf() {
     const list = filtered(); if (!list.length) return;
-    await HAK.Customs.printReport({ file: 'ToanCanhHopDong', title: 'TOÀN CẢNH HỢP ĐỒNG THEO QUY TRÌNH', sub: 'Hợp đồng + phụ lục → chứng thư → tờ khai → khai bổ sung → nộp thuế → xuất hàng → đối chiếu' + stamp(),
+    await HAK.Customs.printReport({ file: 'BaoCaoThucHienHopDong', title: 'BÁO CÁO THỰC HIỆN HỢP ĐỒNG THEO QUY TRÌNH', sub: 'Hợp đồng + phụ lục → chứng thư → tờ khai → khai bổ sung → nộp thuế → xuất hàng → đối chiếu' + stamp(),
       tables: [{ cols: COLS.map((c) => ({ h: c.h, n: !!c.n })), rows: list.flatMap((it) => rowsOf(it).map((r) => ({ cls: r.cls, c: r.c }))) }] });
   }
 
