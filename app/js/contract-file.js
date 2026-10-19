@@ -128,6 +128,13 @@
     const el = ensureModal(); $('#cfTitle').textContent = '📋 Hồ sơ hợp đồng — ' + (m.c.no || m.c.id); $('#cfBody').innerHTML = html(m, spec);
     bootstrap.Modal.getOrCreateInstance(el).show();
   }
-  HAK.ContractFile = { open, build, specOf };
+  /** Dải 7 bước nhỏ (dưới số hợp đồng ở trang Tình hình hợp đồng): ✔ đủ · ⚠ thiếu / còn nợ · ○ chưa có. */
+  function strip(cid, groups) {
+    try {
+      const m = build(cid, groups), short = ['HĐ', 'CT', 'TK', 'TQ', 'BS', 'Thuế', 'Xuất'];
+      return '<div class="mt-1 d-flex flex-wrap gap-1 fw-normal">' + m.steps.map((x, i) => '<span class="badge ' + (x.s === 'ok' ? 'text-bg-success' : x.s === 'warn' ? 'text-bg-warning' : x.s === 'info' ? 'text-bg-info' : 'text-bg-light border') + '" style="font-size:.68rem" title="' + esc(x.t + ': ' + x.x) + '">' + ICON[x.s] + ' ' + short[i] + '</span>').join('') + '</div>';
+    } catch (e) { return ''; }
+  }
+  HAK.ContractFile = { open, build, specOf, strip };
   if (typeof module === 'object' && module.exports) module.exports = HAK.ContractFile;
 })(typeof window !== 'undefined' ? window : globalThis);
