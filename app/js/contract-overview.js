@@ -173,7 +173,7 @@
     try {
       const r = await HAK.GSyncContracts.pushAll((i, n, name) => HAK.UI.Loading.set(Math.round((i - 1) / n * 100), 'Đang ghi Google Sheet ' + name + ' (' + i + '/' + n + ')…'));
       HAK.UI.Loading.hide();
-      const parts = r.map((p) => p.skipped ? p.name + ': chưa cài Sheet' : p.error ? p.name + ': LỖI — ' + p.error : p.name + ': ' + p.hd + ' hợp đồng, ' + p.tk + ' tờ khai, ' + p.pl + ' phụ lục');
+      const parts = r.map((p) => p.skipped ? p.name + ': chưa cài Sheet' : p.error ? p.name + ': LỖI — ' + p.error : p.name + ': ' + p.hd + ' hợp đồng, ' + p.ct + ' chứng thư, ' + p.tk + ' tờ khai, ' + p.pl + ' phụ lục');
       const bad = r.some((p) => p.skipped || p.error);
       toast((bad ? 'Đồng bộ xong một phần. ' : 'Đã đồng bộ Google Sheet. ') + parts.join(' · ') + '.', r.some((p) => p.error) ? 'error' : bad ? 'warning' : 'success');
     } catch (e) { HAK.UI.Loading.hide(); throw e; }
@@ -184,7 +184,7 @@
       const row = e.target.closest('[data-co-file]'); if (row && !e.target.closest('a,button')) { CF().open(row.dataset.coFile).catch((x) => toast(x.message || String(x), 'error')); return; }
       if (e.target.closest('#coXls')) exportXls().catch((x) => toast(x.message || String(x), 'error'));
       else if (e.target.closest('#coPdf')) exportPdf().catch((x) => toast(x.message || String(x), 'error'));
-      else if (e.target.closest('#coGs')) { const b = e.target.closest('#coGs'); HAK.UI.confirmClick(b, () => syncSheet().catch((x) => toast(x.message || String(x), 'error')), 'Bấm lần nữa: ghi đè 3 sheet trên Google Sheet'); }
+      else if (e.target.closest('#coGs')) { const b = e.target.closest('#coGs'); HAK.UI.confirmClick(b, () => syncSheet().catch((x) => toast(x.message || String(x), 'error')), 'Bấm lần nữa: ghi đè 4 sheet trên Google Sheet'); }
       else if (e.target.closest('#coReload')) render();
     });
   }

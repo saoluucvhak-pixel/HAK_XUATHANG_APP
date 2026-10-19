@@ -60,7 +60,7 @@
       ' */',
       'var SECRET = \'' + String(token || '').replace(/[^a-z0-9]/gi, '') + '\';',
       'var VERSION = 2;',
-      'var MODE = { NL_DH_XB: \'upsert\', NL_PC_XH: \'replace\', NL_HOPDONG: \'snapshot\', NL_TOKHAI: \'snapshot\', NL_PHULUC: \'snapshot\' };   // sheet nhận dữ liệu và cách ghi (snapshot = ghi lại toàn bộ bảng)',
+      'var MODE = { NL_DH_XB: \'upsert\', NL_PC_XH: \'replace\', NL_HOPDONG: \'snapshot\', NL_TOKHAI: \'snapshot\', NL_PHULUC: \'snapshot\', NL_CHUNGTHU: \'snapshot\' };   // sheet nhận dữ liệu và cách ghi (snapshot = ghi lại toàn bộ bảng)',
       '',
       'function doGet() { return out_({ ok: true, app: \'HAK-XUATHANG\', version: VERSION }); }',
       '',
@@ -279,7 +279,7 @@
       '<li><b>Triển khai → Tùy chọn triển khai mới</b> → loại <b>Ứng dụng web</b> · Thực thi với tư cách <b>Tôi</b> · Người có quyền truy cập <b>Bất kỳ ai</b> → <b>Triển khai</b> → cấp quyền.</li>' +
       '<li>Sao chép <b>URL ứng dụng web</b> dán vào ô URL của đúng công ty → <b>🔌 Kiểm tra</b>.</li></ol>' +
       '<div class="tbl-wrap" style="max-height:none"><table class="table table-sm align-middle mb-0"><thead><tr><th>Công ty</th><th>URL ứng dụng web</th><th>Mã bí mật</th><th></th><th>Trạng thái</th></tr></thead><tbody id="gsBody"></tbody></table></div>' +
-      '<div class="form-text">Đồng bộ 1 chiều app → Sheet, bấm ở <b>Báo cáo → 📑 Xuất hàng theo hợp đồng → ☁ Đồng bộ Google Sheet</b>. Lô được gửi bị <b>thay toàn bộ phiếu</b> trên NL_PC_XH và cập nhật dòng ở NL_DH_XB; lô khác trên Sheet giữ nguyên. Công ty chưa cài Sheet: lô của công ty đó được bỏ qua (có báo). Đổi mã bí mật phải dán lại Code.gs và triển khai phiên bản mới.<br><b>Mới (Code.gs bản 2):</b> nút <b>☁ Đồng bộ Google Sheet</b> ở <b>Báo cáo thực hiện hợp đồng</b> ghi thêm 3 sheet <b>NL_HOPDONG</b> (hợp đồng: KL gốc / hiện hành, chứng thư, tờ khai, thuế còn nợ, thực giao), <b>NL_TOKHAI</b> (tờ khai) và <b>NL_PHULUC</b> (phụ lục khối lượng) — mỗi lần ghi lại toàn bộ 3 bảng. Ai đã cài trước đây cần <b>📋 Code.gs → dán lại → Triển khai → Quản lý → Sửa → Phiên bản mới</b> (URL và mã bí mật giữ nguyên).</div>';
+      '<div class="form-text">Đồng bộ 1 chiều app → Sheet, bấm ở <b>Báo cáo → 📑 Xuất hàng theo hợp đồng → ☁ Đồng bộ Google Sheet</b>. Lô được gửi bị <b>thay toàn bộ phiếu</b> trên NL_PC_XH và cập nhật dòng ở NL_DH_XB; lô khác trên Sheet giữ nguyên. Công ty chưa cài Sheet: lô của công ty đó được bỏ qua (có báo). Đổi mã bí mật phải dán lại Code.gs và triển khai phiên bản mới.<br><b>Mới (Code.gs bản 2):</b> nút <b>☁ Đồng bộ Google Sheet</b> ở <b>Báo cáo thực hiện hợp đồng</b> ghi thêm 4 sheet <b>NL_HOPDONG</b> (hợp đồng: KL gốc / hiện hành, tờ khai, thuế còn nợ, thực giao), <b>NL_CHUNGTHU</b> (từng chứng thư: KL tươi / khô, độ ẩm, giá trị, tờ khai gắn), <b>NL_TOKHAI</b> (tờ khai) và <b>NL_PHULUC</b> (phụ lục khối lượng) — mỗi lần ghi lại toàn bộ 4 bảng. Ai đã cài trước đây cần <b>📋 Code.gs → dán lại → Triển khai → Quản lý → Sửa → Phiên bản mới</b> (URL và mã bí mật giữ nguyên).</div>';
     renderTable();
     const body = $('#gsBody');
     const rowOf = (el) => el.closest('tr[data-cid]'), val = (tr, k) => tr.querySelector('[data-gs="' + k + '"]');

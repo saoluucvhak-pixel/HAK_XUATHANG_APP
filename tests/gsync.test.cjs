@@ -80,8 +80,8 @@ test('client: push() gửi đúng theo công ty, báo "chưa cài Sheet"; pushSh
   assert.equal(r.per.find((p) => p.cid === 'hak').added, 2, JSON.stringify(r)); assert.equal(r.per.find((p) => p.cid === 'zzz').skipped, true);
   // đồng bộ hợp đồng: script mới nhận
   const hd = GC.buildSheets([], {});
-  assert.deepEqual(hd.map((s) => s.name), ['NL_HOPDONG', 'NL_TOKHAI', 'NL_PHULUC']);
-  const ok = await G.pushSheets('hak', hd); assert.equal(ok.NL_HOPDONG.total, 0);
+  assert.deepEqual(hd.map((s) => s.name), ['NL_HOPDONG', 'NL_CHUNGTHU', 'NL_TOKHAI', 'NL_PHULUC']);
+  const ok = await G.pushSheets('hak', hd); assert.equal(ok.NL_HOPDONG.total, 0); assert.equal(ok.NL_CHUNGTHU.total, 0);
   // script cũ (không trả kết quả cho sheet mới) → lỗi rõ ràng
   await assert.rejects(() => G.pushSheets('dh', hd), /bản cũ.*NL_HOPDONG/);
 });
@@ -93,10 +93,11 @@ test('buildSheets: số liệu hợp đồng / tờ khai / phụ lục đúng (K
   const decl = CM.newDecl({ no: '308629701721', contractId: c.id, detailId: c.details[0].id, status: 'cleared', qtyBdmt: 4000, taxVnd: 100, openDate: '2026-08-19', supplements: [{ no: '308629701722', date: '2026-08-25', taxVnd: 120 }], payments: [{ amount: 50 }] });
   HAK.Catalog = { core: { get: () => ({ contracts: [c], customers: [], customs: [decl] }) } };
   const m = CF.build(c.id, []), sheets = GC.buildSheets([{ c, buyer: 'IWC', m }], { types: { xuatkhau: 'Xuất khẩu' }, stamp: 'T' });
-  const [hd, tk, pl] = sheets.map((s) => s.rows), H = (n) => GC.COLS.NL_HOPDONG.findIndex((x) => x[0] === n), T = (n) => GC.COLS.NL_TOKHAI.findIndex((x) => x[0] === n);
+  const [hd, ct, tk, pl] = sheets.map((s) => s.rows), C = (n) => GC.COLS.NL_CHUNGTHU.findIndex((x) => x[0] === n), H = (n) => GC.COLS.NL_HOPDONG.findIndex((x) => x[0] === n), T = (n) => GC.COLS.NL_TOKHAI.findIndex((x) => x[0] === n);
   assert.equal(hd.length, 1); assert.equal(hd[0][H('KL gốc (BDMT)')], 6000); assert.equal(hd[0][H('KL hiện hành (BDMT)')], 7500); assert.equal(hd[0][H('Còn lại (BDMT)')], 3500);
   assert.equal(hd[0][H('% thực hiện')], 53.33); assert.equal(hd[0][H('Thuế XK phải nộp (đ)')], 120); assert.equal(hd[0][H('Còn nợ thuế (đ)')], 70); assert.equal(hd[0][H('Đã thông quan')], 1);
   assert.equal(tk[0][T('Thuế sau bổ sung (đ)')], 120); assert.equal(tk[0][T('Còn nợ (đ)')], 70); assert.equal(tk[0][T('Trạng thái')], 'Đã thông quan');
+  assert.equal(ct.length, 1); assert.equal(ct[0][C('Số chứng thư')], 'C1'); assert.equal(ct[0][C('KL tươi MT (tấn)')], 8000); assert.equal(ct[0][C('KL khô BDMT')], 4000); assert.equal(ct[0][C('Số tờ khai')], '308629701721'); assert.equal(ct[0][C('Trạng thái tờ khai')], 'Đã thông quan'); assert.equal(ct[0][C('Giá trị (USD)')], 704000);
   assert.equal(pl[0][5], 1500); assert.equal(pl[0][4], 7500);
   sheets.forEach((s) => s.rows.forEach((r) => assert.equal(r.length, s.cols.length)));
 });
