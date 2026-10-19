@@ -108,6 +108,16 @@
 
   /* ---------- Excel / PDF ---------- */
   const xl = (i, v) => (NUM.has(i) && v !== '' && v !== null ? (HAK.NumFmt.parse(v, 'num') === null ? v : HAK.NumFmt.parse(v, 'num')) : v);
+  /** Thêm các trang tính chi tiết: Chứng thư (mỗi chứng thư 1 dòng), Tờ khai, Phụ lục — cùng nguồn với ☁ Đồng bộ Google Sheet. */
+  function addDetailSheets(wb, R, list) {
+    const items = list.map((it) => ({ c: it.m.c, buyer: it.g.f.buyer, m: it.m })), sheets = HAK.GSyncContracts.buildSheets(items, { types: CF().TYPES });
+    const TITLES = { NL_CHUNGTHU: ['Chứng thư', 'CHỨNG THƯ THEO HỢP ĐỒNG'], NL_TOKHAI: ['Tờ khai', 'TỜ KHAI HẢI QUAN THEO HỢP ĐỒNG'], NL_PHULUC: ['Phụ lục', 'PHỤ LỤC HỢP ĐỒNG (ĐIỀU CHỈNH KHỐI LƯỢNG)'] };
+    sheets.filter((sh) => TITLES[sh.name]).forEach((sh) => {
+      const isDate = (i) => sh.cols[i].n === 'dd/mm/yyyy';
+      const rows = sh.rows.map((r) => r.map((v, i) => (isDate(i) && /^\d{4}-\d\d-\d\dT/.test(v || '') ? new Date(v) : v)));
+      R.buildSheet(wb, TITLES[sh.name][0], TITLES[sh.name][1], 'Dòng đầu mỗi bảng = tiêu đề cột · ' + new Date().toLocaleDateString('vi-VN') + stamp(), sh.cols.map((c) => ({ h: c.h, w: Math.max(12, Math.min(34, c.h.length + 6)), n: c.n })), rows, { total: false });
+    });
+  }
   const BAND_ARGB = ['FF1F4E78', 'FF2E7D32', 'FF0277BD', 'FFB26A00', 'FFC62828', 'FF546E7A', 'FF37474F'];
   async function exportXls() {
     const list = filtered(); if (!list.length) return;
@@ -153,6 +163,7 @@
     ws.views = [{ state: 'frozen', xSplit: 1, ySplit: 5 }];
     ws.pageSetup = { orientation: 'landscape', paperSize: 8, fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
     ws.headerFooter.oddFooter = 'HAK · &D · Trang &P / &N';
+    addDetailSheets(wb, R, list);
     const blob = new Blob([await wb.xlsx.writeBuffer()], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     if (!await HAK.Word.Files.saveBlob(blob, 'BaoCaoThucHienHopDong.xlsx')) return;
     toast('Đã xuất Báo cáo thực hiện hợp đồng.', 'success');

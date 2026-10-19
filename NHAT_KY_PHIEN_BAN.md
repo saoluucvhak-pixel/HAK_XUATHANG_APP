@@ -295,6 +295,7 @@ Thủy chốt 28/09/2026: "1. bỏ Trao đổi KHÔNG đồng bộ lên Google S
 - Trang "Chi tiết xuất hàng theo hợp đồng": bỏ khung cuộn lồng nhau, bảng vừa khung (không thanh trượt ở màn hình ≥ 1600px); Báo cáo thực hiện hợp đồng bỏ khung cuộn dọc.
 - Menu bên trái rộng 288px, tên mục dài tự xuống dòng — không bị che chữ.
 - ☁ Đồng bộ Google Sheet cho hợp đồng: sheet NL_HOPDONG, NL_CHUNGTHU (từng chứng thư), NL_TOKHAI, NL_PHULUC (ghi lại toàn bộ bảng, mỗi công ty về Sheet của mình). Cần dán lại Code.gs bản 2 (đã nâng VERSION = 2; script cũ vẫn dùng được cho Xuất hàng, app báo rõ khi thiếu bản mới).
+- Excel Báo cáo thực hiện hợp đồng có thêm trang tính Chứng thư, Tờ khai, Phụ lục; Excel và PDF Hồ sơ hợp đồng có thêm bảng/sheet Chứng thư.
 - Bộ test mới tests/gsync.test.cjs: chạy nguyên văn Code.gs trong Google Sheet giả + client gsync.js (thay lô, cập nhật tại chỗ, snapshot, từ chối sai mã, script cũ).
 
 ## v2.16.0 — Phụ lục hợp đồng, Hồ sơ hợp đồng, Báo cáo thực hiện hợp đồng

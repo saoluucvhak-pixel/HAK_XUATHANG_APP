@@ -103,6 +103,8 @@
     const c = m.c, CM = HAK.CustomsModel, label = (c.no || c.id) + ' · ' + (TYPES[c.type] || '') + (m.cust ? ' · ' + m.cust.name : '');
     const tables = [
       { caption: 'Các bước quy trình', cols: [{ h: 'Bước' }, { h: 'Nội dung' }, { h: 'Tình trạng' }, { h: 'Số liệu' }], rows: m.steps.map((s) => ({ c: [s.n, s.t, ICON[s.s], s.x], tone: s.s })) },
+      { caption: 'Chứng thư (chi tiết hợp đồng: tàu · chứng thư · tờ khai)', cols: [{ h: 'Tàu / chuyến' }, { h: 'Số chứng thư' }, { h: 'Ngày chứng thư' }, { h: 'KL tươi MT (tấn)', n: 1 }, { h: 'KL khô BDMT', n: 1 }, { h: 'Độ ẩm (%)', n: 1 }, { h: 'Tỷ giá', n: 1 }, { h: 'Giá trị (USD)', n: 1 }, { h: 'Giá trị (VNĐ)', n: 1 }, { h: 'Số tờ khai' }, { h: 'Trạng thái tờ khai' }],
+        rows: m.rows.length ? m.rows.map((r) => ({ c: [r.d.ship || '', r.d.certNo || '(chưa có)', vn(r.d.certDate), hasNum(r.d.mt) ? nf(r.d.mt) : '', hasNum(r.d.bdmt) ? nf(r.d.bdmt) : '', hasNum(r.d.moisture) ? nf(r.d.moisture) : '', hasNum(r.d.exchangeRate) ? nf(r.d.exchangeRate) : '', hasNum(r.v.valueUsd) ? nf(r.v.valueUsd) : '', hasNum(r.v.valueVnd) ? nf(r.v.valueVnd) : '', r.decl ? r.decl.no : '(chưa có)', r.decl ? CM.STATUS[r.decl.status] : ''] })).concat([{ cls: 'total', c: ['TỔNG CỘNG', String(m.withCert) + '/' + m.rows.length + ' chứng thư', '', nf(m.rows.reduce((a, r) => a + (Number(r.d.mt) || 0), 0)), nf(m.certBdmt), '', '', nf(m.rows.reduce((a, r) => a + (Number(r.v.valueUsd) || 0), 0)), nf(m.rows.reduce((a, r) => a + (Number(r.v.valueVnd) || 0), 0)), '', ''] }]) : [{ c: ['Chưa có chi tiết hợp đồng', '', '', '', '', '', '', '', '', '', ''] }] },
       { caption: 'Đối chiếu tờ khai ↔ chứng thư ↔ hợp đồng ↔ thực giao', cols: [{ h: 'Tàu · chứng thư' }, { h: 'Nội dung đối chiếu' }, { h: 'Bên 1', n: 1 }, { h: 'Bên 2', n: 1 }, { h: 'Chênh lệch', n: 1 }, { h: 'Kết quả' }],
         rows: m.checks.length ? m.checks.map((k, i) => ({ c: [i && m.checks[i - 1].who === k.who ? '' : k.who, k.what, k.a, k.b, k.diff, k.note || (k.ok === null ? 'Thiếu số liệu' : k.ok ? ICON.ok + ' Khớp' : ICON.warn + ' Lệch')], tone: k.ok === null ? 'none' : k.ok ? 'ok' : 'warn' })) : [{ c: ['Chưa có chi tiết hợp đồng', '', '', '', '', ''] }] },
       { caption: 'Thuế xuất khẩu và nộp tiền theo tờ khai', cols: [{ h: 'Số tờ khai' }, { h: 'Lần' }, { h: 'Trạng thái' }, { h: 'Thuế tờ khai gốc', n: 1 }, { h: 'Sau bổ sung', n: 1 }, { h: 'Phải nộp', n: 1 }, { h: 'Đã nộp', n: 1 }, { h: 'CÒN NỢ', n: 1 }, { h: 'Lệ phí đã nộp', n: 1 }],
@@ -137,7 +139,7 @@
   async function exportXls() {
     if (!current) return;
     if (!root.ExcelJS && HAK.UI.needLib) await HAK.UI.needLib('exceljs');
-    const R = HAK.Report, wb = R.newWorkbook(), names = ['Quy trình', 'Đối chiếu', 'Thuế', 'Xuất hàng', 'Dòng thời gian'];
+    const R = HAK.Report, wb = R.newWorkbook(), names = ['Quy trình', 'Chứng thư', 'Đối chiếu', 'Thuế', 'Xuất hàng', 'Dòng thời gian'];
     current.tables.forEach((t, k) => {
       const widths = t.cols.map((c, i) => Math.min(60, Math.max(c.n ? 16 : 14, ...t.rows.map((r) => String(r.c[i] == null ? '' : r.c[i]).length * 0.9 + 2))));
       R.buildSheet(wb, names[k] || 'Bảng ' + (k + 1), current.title + ' — ' + t.caption, current.sub,
