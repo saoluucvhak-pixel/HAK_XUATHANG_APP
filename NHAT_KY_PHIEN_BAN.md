@@ -291,6 +291,12 @@ Thủy chốt 28/09/2026: "1. bỏ Trao đổi KHÔNG đồng bộ lên Google S
 - pages.js generateBkls: không chặn khi thiếu Số BKLS / hệ số / tên bên mua — tự điền hoặc để trống + cảnh báo.
 - tests/parse-num.test.cjs, tests/numfmt.test.cjs.
 
+## v2.15.1 — Số TKHQ một nguồn, quyền Nhân viên, sửa số lẻ
+- Chi tiết hợp đồng: chọn tờ khai thì ô "Số tờ khai HQ" tự điền và khóa; gõ số chưa có thì khi lưu app hỏi tạo tờ khai (Đã mở) và gắn luôn, hoặc gắn tờ khai đã có.
+- Hợp đồng Xuất khẩu / Ủy thác XK lưu chi tiết khi chưa có tờ khai: cảnh báo 2 lần mới cho lưu.
+- Quyền Nhân viên: được thêm / sửa / xóa hợp đồng, chứng thư (chi tiết hợp đồng) và tờ khai hải quan; vẫn không nhập hàng loạt từ file, không vào Cài đặt, không xóa hồ sơ Lưu trữ.
+- Báo cáo: hết số lẻ dài (-128,39999999999964 → -128,4).
+
 ## v2.15.0 — Trang "Tình hình hợp đồng" (theo phiếu cân)
 - Menu mới **📑 Tình hình hợp đồng** (dưới Báo cáo tổng hợp; báo cáo tổng hợp giữ nguyên): mỗi hợp đồng có số chuyến xe, số hồ sơ, KL qua cân / xe trả về / thực giao, **kho xuất**, tàu, thời gian cân, chênh lệch MT chứng thư ↔ thực giao, chứng thư, tờ khai, thuế; dòng nhỏ từng đợt thực hiện. Bộ lọc smart (hình thức, bên mua, trạng thái, kho xuất, tàu, chỉ hợp đồng có phiếu cân, chỉ hợp đồng lệch KL).
 - **Bấm một dòng** → chi tiết xuất hàng từng xe (ngày, giờ cân 1/2, số phiếu, biển số, tài xế, đơn vị vận chuyển, kho xuất, KL, hồ sơ, xe trả về, số BKLS) có **bộ lọc smart** (tìm không dấu, biển số, đơn vị vận chuyển, tài xế, kho xuất, hồ sơ, khoảng ngày, chỉ xe trả về). Xuất Excel và Tải PDF cho cả bảng tổng hợp và bảng từng xe.
