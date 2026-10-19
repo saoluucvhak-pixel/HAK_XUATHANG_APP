@@ -432,3 +432,15 @@ svg.i { width: 1.1em; height: 1.1em; vertical-align: -.18em; flex: none; }
 .co-table thead th { white-space: normal; vertical-align: middle; }
 .co-table td { white-space: normal; }
 .co-table tr.table-light td.co-first { background: var(--bs-table-bg, #f8f9fa); }
+/* v2.16.1 Chi tiết xuất hàng theo hợp đồng: không lồng khung cuộn — trang cuộn một lần, chữ xuống dòng để bảng vừa chiều ngang */
+#page-contractstatus .tbl-wrap, #csrDetail .tbl-wrap { max-height: none; overflow-x: auto; overflow-y: visible; }
+#page-contractstatus .tbl-wrap .table { font-size: .78rem; }
+#page-contractstatus .tbl-wrap .table td, #page-contractstatus .tbl-wrap .table th { white-space: normal; vertical-align: top; padding: .25rem .3rem; }
+#page-contractstatus .tbl-wrap .table th { font-size: .68rem; line-height: 1.15; }
+#page-contractstatus .tbl-wrap .table td.num { white-space: nowrap; }
+#page-contractstatus .tbl-wrap .table td > .d-flex.flex-wrap { flex-wrap: nowrap !important; gap: 2px !important; margin-top: 2px; }
+#page-contractstatus .tbl-wrap .table td .badge { font-size: .58rem !important; padding: 1px 3px; }
+#page-contractstatus #csrBody td:last-child { min-width: 88px; }
+#page-contractstatus #csrBody td:last-child .btn, #page-contractstatus #csrBody td:last-child .badge { display: block; width: 100%; margin: 2px 0 0 !important; font-size: .7rem; padding: 2px 4px; text-align: center; }
+#page-contractstatus #csrBody td:first-child { min-width: 150px; }
+#page-contractstatus #csrBody td.num > div { white-space: normal; max-width: 7.5rem; margin-left: auto; line-height: 1.15; }
