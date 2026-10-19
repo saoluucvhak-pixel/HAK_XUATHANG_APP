@@ -19,7 +19,7 @@
   /** Số → chữ Việt: nghìn "." thập phân ","; đúng 3 chữ số lẻ ở chế độ num thì thêm "0" (54,1230) để không bị đọc nhầm là dấu nghìn. */
   function txt(n, mode) {
     if (n === null || n === undefined || n === '' || !isFinite(+n)) return '';
-    const s = String(+n), neg = s[0] === '-', [i, d] = s.replace('-', '').split('.');
+    const s = String(Number((+n).toFixed(6))), neg = s[0] === '-', [i, d] = s.replace('-', '').split('.');
     const dec = d ? (mode !== 'dec' && d.length === 3 && i !== '0' ? d + '0' : d) : '';   // "0,123" không mơ hồ → không cần thêm 0
     return (neg ? '-' : '') + (mode === 'dec' ? i : i.replace(/\B(?=(\d{3})+(?!\d))/g, '.')) + (dec ? ',' + dec : '');
   }
