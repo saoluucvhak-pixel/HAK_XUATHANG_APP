@@ -15,9 +15,7 @@
   const CUSTOM = '__custom';
 
   /** Các cột của file import Bkav eHoadon (BTF.eHD v1.00) — đúng thứ tự file mẫu PXKKVCNB. */
-  const PXK_HEADER = ['STT', 'LoaiHoaDon', 'IDChungTu/MaBill', 'MaHang', 'TenHangHoaDichVu', 'DonViTinh/ChietKhau', 'SoLuong', 'DonGia', 'ThanhTien', 'MaTienTe', 'TyGia',
-    'TenDonVi', 'MaSoThue', 'NhapKhoTai', 'NgayXuatKho', 'CanCuLenh', 'Ngay', 'Cua', 'VeViec', 'LyDoXuatKho', 'NguoiVanChuyen', 'DonViVanChuyen', 'HopDongSo',
-    'PhuongTienVanChuyen', 'XuatKhoTai', 'GhiChu'];
+  const PXK_HEADER = HAK.Pxk.HEADER;
 
   const st = { type: '', batchName: '', vals: {} };      // vals[hình thức] = giá trị các ô của form
   let built = false;
@@ -25,7 +23,7 @@
   const cfg = () => C().data;
   const DOCS = () => HAK.Pages.DOCS;
   const CT = (t) => HAK.CHUNGTU[t];
-  const pad6 = (n) => 'PXK' + String(n).padStart(6, '0');
+  const pad6 = HAK.Pxk.pad6;
   const isKhoXuat = (w) => w.type === 'Kho xuất' || w.type === 'Kho gửi';
 
   /* ---------------- Dữ liệu đợt ---------------- */
@@ -182,14 +180,7 @@
         try {
           const wb = root.XLSX.read(await f.arrayBuffer(), { type: 'array' }), name = wb.SheetNames.indexOf('PXK') >= 0 ? 'PXK' : wb.SheetNames[0], ws = wb.Sheets[name];
           const aoa = root.XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: true });
-          if (!aoa.length || aoa[0].indexOf('IDChungTu/MaBill') < 0) throw new Error('không phải file phiếu xuất kho (không có cột IDChungTu/MaBill)');
-          let col = aoa[0].indexOf('HopDongSo'); if (col < 0) { col = aoa[0].length; aoa[0].push('HopDongSo'); }
-          let filled = 0, kept = 0;
-          for (let i = 1; i < aoa.length; i++) {
-            const row = aoa[i]; if (!row.some((x) => String(x).trim() !== '')) continue;
-            while (row.length <= col) row.push('');
-            if (String(row[col]).trim() === '' || all) { if (row[col] !== no) filled++; row[col] = no; } else kept++;
-          }
+          const { filled, kept } = HAK.Pxk.fillHopDong(aoa, no, all);
           wb.Sheets[name] = root.XLSX.utils.aoa_to_sheet(aoa);
           const blob = new Blob([root.XLSX.write(wb, { bookType: 'xlsx', type: 'array' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
           const outName = f.name.replace(/\.xlsx?$/i, '') + '_DaDienHD.xlsx';
@@ -294,27 +285,12 @@
   function buildPxk(rows, v) {
     const co = cfg().companies.find((c) => c.id === v.cua);
     const cua = co ? C().companyAttr(co, 'cua') : '';
-    const start = parseInt(v.idBatDau, 10);
     const ct = v.contractId && HAK.Catalog ? HAK.Catalog.contract(v.contractId, { history: true }) : null, hopDong = ct ? ct.no || '' : '';
-    const idx = (n) => PXK_HEADER.indexOf(n);
-    const aoa = [PXK_HEADER.slice()];
-    rows.forEach((r, i) => {
-      const row = new Array(PXK_HEADER.length).fill(null);
-      const set = (n, val) => { const k = idx(n); if (k >= 0) row[k] = val; };
-      set('STT', i + 1); set('LoaiHoaDon', 'pxk'); set('IDChungTu/MaBill', pad6(start + i));
-      set('MaHang', v.maHang); set('TenHangHoaDichVu', v.tenHang); set('DonViTinh/ChietKhau', v.dvt);
-      set('SoLuong', Math.round((r.net || 0) / 1000 * 100) / 100);
-      set('TenDonVi', v.tenDonVi); set('NhapKhoTai', v.nhapKho);
-      set('NgayXuatKho', r.dateStr || ''); set('CanCuLenh', v.canCuLenh); set('Ngay', r.dateStr || '');
-      set('Cua', cua); set('VeViec', v.veViec); set('LyDoXuatKho', v.lyDo);
-      set('HopDongSo', hopDong); set('NguoiVanChuyen', r.driver || ''); set('DonViVanChuyen', r.carrier || v.donViVC);
-      set('PhuongTienVanChuyen', r.plate); set('XuatKhoTai', v.xuatKhoTai);
-      aoa.push(row);
-    });
-    const ws = root.XLSX.utils.aoa_to_sheet(aoa), wb = root.XLSX.utils.book_new();
+    const px = HAK.Pxk.aoa(rows, v, { cua, hopDong });
+    const ws = root.XLSX.utils.aoa_to_sheet(px.aoa), wb = root.XLSX.utils.book_new();
     root.XLSX.utils.book_append_sheet(wb, ws, 'PXK');
     const buf = root.XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-    return { blob: new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), count: rows.length, from: start, to: start + rows.length - 1 };
+    return { blob: new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), count: px.count, from: px.from, to: px.to };
   }
 
   /* ---------------- Nhật ký chứng từ & cảnh báo trùng số ---------------- */
