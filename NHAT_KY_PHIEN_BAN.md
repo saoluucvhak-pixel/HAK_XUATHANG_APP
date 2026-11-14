@@ -291,7 +291,7 @@ Thủy chốt 28/09/2026: "1. bỏ Trao đổi KHÔNG đồng bộ lên Google S
 - pages.js generateBkls: không chặn khi thiếu Số BKLS / hệ số / tên bên mua — tự điền hoặc để trống + cảnh báo.
 - tests/parse-num.test.cjs, tests/numfmt.test.cjs.
 
-## (Chưa phát hành — đang chờ duyệt) Rà soát logic nghiệp vụ: phiếu cân, trạng thái, thuế, chứng thư
+## v2.17.0 — Rà soát logic nghiệp vụ: phiếu cân, trạng thái, thuế, chứng thư, gộp sao lưu
 - Phiếu cân: chống trùng ở cấp PHIẾU (hồ sơ cùng tàu / chi tiết hợp đồng giao nhau về ngày giữ các phiếu riêng, phiếu lặp tính 1 lần); khác khối lượng / xe trả về / liên kết → báo XUNG ĐỘT + tổng chờ đối soát; chống trùng nguyên hồ sơ nay xét thêm công ty + chi tiết hợp đồng (weigh-model.js, Report.prepareTickets). Excel Báo cáo Xuất hàng bỏ đúng các phiếu trùng; thêm sheet "Đối soát phiếu cân".
 - Hợp đồng có 4 chỉ tiêu riêng (tiến độ · thông quan · thuế · thực giao). Quy tắc đã xác nhận: hợp đồng "Đã hoàn thành" khi mọi tờ khai đã thông quan (kèm lý do); đóng thủ công hiện "Đã đóng hợp đồng".
 - Thuế: còn nợ / nộp thừa cộng riêng từng tờ khai (không bù trừ), tờ khai chưa xác định nghĩa vụ, lệ phí tách riêng; cột mới NỘP THỪA, "Tờ khai chưa xác định thuế"; khai bổ sung mới nhất chưa có số thuế → cảnh báo. Giấy nộp tiền: nhận ra cùng khoản khi nhập tay rồi OCR (chuẩn hóa số giấy, so NDKT / kỳ thuế), giữ các dòng cùng số tiền nhưng khác khoản; nhập tay trùng → hỏi xác nhận.
@@ -306,6 +306,9 @@ Thủy chốt 28/09/2026: "1. bỏ Trao đổi KHÔNG đồng bộ lên Google S
 - Đóng / mở lại hợp đồng + gộp bản sao lưu (Gói cấu hình): thêm SỐ PHIÊN BẢN ĐÓNG closeRev (mỗi lần đóng hoặc mở lại +1, bản cao hơn thắng; bản đã phát hành chưa có closeRev: có closedAt = 1, không có = 0). Trước đây bản mở lại (không còn closedAt) gộp với bản đóng cũ vẫn ra "đã đóng". Xung đột cùng phiên bản → bản có mốc ngày muộn hơn.
 - Gộp bản sao lưu / Gói cấu hình theo PHIÊN BẢN (revision): bản cũ không còn ghi đè hợp đồng / chi tiết / phụ lục / tờ khai đã sửa ở phiên bản mới hơn (vd máy 700 BDMT phiên bản 4 nhập bản 500 BDMT phiên bản 2 → giữ 700, phiên bản không tăng); bản thiếu phiên bản = 0; cùng phiên bản khác nội dung = xung đột (giữ bản trên máy, báo khi nhập gói); dữ liệu đã ngừng dùng (deletedAt) ở bản mới không sống lại; tệp đính kèm là hợp; nhập lặp lại ổn định.
 - Báo cáo tổng hợp: thêm ô "Kỳ báo cáo tính theo" — Ngày bắt đầu hồ sơ (mặc định, đúng cách đọc của các báo cáo lịch sử) hoặc Ngày cân từng phiếu (hồ sơ qua tháng / năm chia từng phiếu về đúng tháng / năm; lọc ngày theo ngày cân; Excel ghi rõ cách tính).
+- Khôi phục sao lưu: tự chụp cài đặt + danh mục hiện có trước khi ghi đè; nút "↶ Hoàn tác khôi phục"; không chụp được thì từ chối khôi phục (không đổi gì).
+- Mục "Toàn vẹn danh mục" trong sức khỏe dữ liệu: báo tờ khai mồ côi, khóa trùng, khóa ngoại sai, khoản nộp nhập trùng, hồ sơ gắn chi tiết không còn (chỉ báo, không sửa).
+- HAK_SMART_FILTER cập nhật e99bb7e (kho bộ lọc lỗi / khác phiên bản không bị ghi đè). Ghi chú phát hành kèm SHA-256 bộ cài.
 - Xem docs/QUY_TAC_NGHIEP_VU_CAN_XAC_NHAN.md.
 
 ## v2.16.2 — Rà soát mã nguồn: bảo mật, độ bền, đóng hợp đồng

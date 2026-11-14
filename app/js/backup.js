@@ -82,7 +82,7 @@
   /* ---------------- Sao lưu / khôi phục toàn bộ ---------------- */
   async function collect() {
     const keys = {};
-    HAK.Store.keys().forEach((k) => { if (k !== LAST_KEY && k !== AUTO_KEY) keys[k] = HAK.Store.get(k, null); });   // v2.7.5: cài đặt tự sao lưu gắn với thư mục của máy này → không mang đi
+    HAK.Store.keys().forEach((k) => { if (k !== LAST_KEY && k !== AUTO_KEY && k !== PRE_KEY) keys[k] = HAK.Store.get(k, null); });   // v2.7.5: cài đặt tự sao lưu gắn với thư mục của máy này → không mang đi
     const items = HAK.Archive ? await HAK.Archive.collectItems() : [];
     const batches = HAK.Batches ? await HAK.Batches.exportAll() : [];
     const issued = HAK.Issued ? await HAK.DB.getAll('issued') : [];
@@ -130,6 +130,25 @@
   }
   /** Khóa tài khoản đăng nhập — giữ nguyên khi khôi phục với tùy chọn "Giữ tài khoản đang dùng trên máy này" (v2.6.6). */
   const AUTH_KEYS = ['hak.auth.v1', 'hak.auth.lastco'];
+  /* v2.17.0 (theo hak-migration-manager: sao lưu TRƯỚC khi ghi đè): trước khi khôi phục, chụp cài đặt + danh mục + tài khoản đang có vào 'hak.prerestore.v1' để HOÀN TÁC.
+   * Chỉ phần cài đặt / danh mục (localStorage); hồ sơ Lưu trữ nhập vào là thêm / cập nhật theo phiên bản nên không bị xóa. Bản chụp không nằm trong sao lưu toàn bộ. */
+  const PRE_KEY = 'hak.prerestore.v1';
+  function snapshotBeforeRestore() {
+    try {
+      const keys = {}; HAK.Store.keys().forEach((k) => { if (k.indexOf('hak.') === 0 && k !== LAST_KEY && k !== AUTO_KEY && k !== PRE_KEY) keys[k] = HAK.Store.get(k, null); });
+      return HAK.Store.set(PRE_KEY, { at: Date.now(), keys }) !== false;   // Store.set trả false khi không lưu được ở cả localStorage lẫn IndexedDB
+    } catch (e) { return false; }
+  }
+  const preRestoreInfo = () => { const p = HAK.Store.get(PRE_KEY, null); return p && p.keys ? { at: p.at, n: Object.keys(p.keys).length } : null; };
+  /** Hoàn tác lần khôi phục gần nhất: trả cài đặt / danh mục về bản chụp; khóa mới do khôi phục tạo ra (không có trong bản chụp) bị gỡ. */
+  function undoRestore() {
+    const p = HAK.Store.get(PRE_KEY, null); if (!p || !p.keys) throw new Error('Chưa có bản chụp trước khi khôi phục.');
+    let set = 0, removed = 0;
+    HAK.Store.keys().forEach((k) => { if (k.indexOf('hak.') === 0 && k !== LAST_KEY && k !== AUTO_KEY && k !== PRE_KEY && !(k in p.keys)) { HAK.Store.remove(k); removed++; } });
+    Object.keys(p.keys).forEach((k) => { if (p.keys[k] !== null) { HAK.Store.set(k, p.keys[k]); set++; } });
+    HAK.Store.remove(PRE_KEY);
+    return { set, removed };
+  }
   async function restoreFile(file, opts) {
     const keepAuth = !!(opts && opts.keepAuth);
     const j = await readJson(file);                                      // v2.7.5: .zip hoặc .json
@@ -149,8 +168,11 @@
       for (const c of catalog.contracts) { const error = HAK.ContractModel.validate(c,catalog); if (error) throw new Error('Danh mục trong bản sao lưu không hợp lệ: '+error); }
     }
     if(j.yearbook&&HAK.Yearbook)HAK.Yearbook.validateBundle(j.yearbook.records);
+    const snapshot = snapshotBeforeRestore();
+    if (!snapshot) throw new Error('Không chụp được bản hiện tại trước khi khôi phục (bộ nhớ trình duyệt đầy?). Chưa thay đổi gì — hãy Sao lưu toàn bộ ra file rồi dọn bớt dữ liệu trước.');
     let keys = 0;
     Object.keys(j.keys).forEach((k) => {
+      if (k === PRE_KEY) return;
       if (keepAuth && AUTH_KEYS.indexOf(k) >= 0) return;                // giữ tài khoản / mật khẩu / khóa khôi phục / loại máy hiện tại
       if (k.indexOf('hak.') === 0 && k !== LAST_KEY && k !== AUTO_KEY && j.keys[k] !== null) { HAK.Store.set(k, j.keys[k]); keys++; }
     });
@@ -164,7 +186,7 @@
     }
     const nb = HAK.Batches && Array.isArray(j.batches) ? await HAK.Batches.importAll(j.batches) : 0;
     const ni = HAK.Issued && Array.isArray(j.issued) ? await HAK.Issued.importAll(j.issued) : 0;
-    return { legacy: false, keys, added: r.added, updated: r.updated, skipped: r.skipped, batches: nb, issued: ni, keepAuth };
+    return { legacy: false, keys, added: r.added, updated: r.updated, skipped: r.skipped, batches: nb, issued: ni, keepAuth, snapshot };
   }
 
   /* ---------------- v2.6.4 D2 — Gói cấu hình cài đặt (cài cho nhiều công ty / nhiều máy) ----------------
@@ -489,6 +511,7 @@
       '</ul>' +
       '<div class="d-flex flex-wrap gap-2">' +
       '<button class="btn btn-primary" id="bkSave" type="button">⬇ Sao lưu toàn bộ (.zip)</button>' +
+      (preRestoreInfo() ? '<button class="btn btn-outline-warning admin-only" id="bkUndo" type="button" title="Trả cài đặt / danh mục về trạng thái trước lần khôi phục gần nhất (' + esc(fmtDT(preRestoreInfo().at)) + ')">↶ Hoàn tác khôi phục</button>' : '') +
       '<label class="btn btn-outline-primary mb-0 admin-only">⬆ Khôi phục toàn bộ<input type="file" id="bkRestore" accept=".zip,.json,application/zip,application/json" hidden></label>' +
       (dirOk ? '<button class="btn btn-outline-secondary" id="bkPickDir" type="button">📁 ' + (dir ? 'Đổi thư mục…' : 'Chọn thư mục mặc định…') + '</button>' : '') +
       (dirOk && dir ? '<button class="btn btn-outline-secondary" id="bkClearDir" type="button">✕ Bỏ chọn thư mục</button>' : '') +
@@ -513,6 +536,8 @@
       catch (e) { if (!(e && e.name === 'AbortError')) { console.error(e); toast('Không chọn được thư mục: ' + (e.message || e), 'error'); } }
     });
     if (b5) b5.addEventListener('click', async () => { await setSavedDir(null); toast('Đã bỏ chọn thư mục mặc định.', 'info'); render(); });
+    const bu = $('#bkUndo');
+    if (bu) bu.addEventListener('click', () => HAK.UI.confirmClick(bu, () => { try { const r = undoRestore(); toast('Đã hoàn tác khôi phục: trả ' + r.set + ' mục cài đặt / danh mục, gỡ ' + r.removed + ' mục mới. Hồ sơ Lưu trữ đã nhập vẫn giữ.', 'success'); setTimeout(() => root.location.reload(), 1200); } catch (err) { toast(err.message || String(err), 'error'); } }, 'Bấm lần nữa để hoàn tác'));
     b2.addEventListener('change', async (e) => {
       const f = e.target.files[0]; e.target.value = ''; if (!f) return;
       HAK.UI.Loading.show('Đang khôi phục…');
@@ -579,7 +604,7 @@
     root.addEventListener('hashchange', () => setTimeout(bkBanner, 300));
   }
 
-  HAK.Backup = { boot, init, render, saveAll, restoreFile, collect, dirPickerSupported, getSavedDir, pickDefaultDir, setSavedDir, saveBackupBlob,
+  HAK.Backup = { boot, init, render, saveAll, restoreFile, undoRestore, preRestoreInfo, collect, dirPickerSupported, getSavedDir, pickDefaultDir, setSavedDir, saveBackupBlob,
     backupNag, bkBanner, readJson, buildFull, zipParts, health, autoStatus, autoRun, autoTick, autoAllowAndRun, autoList, autoPick,
     packBuild, packExport, packRead, packSummaryHtml, packApply, packMsg };
 })(window);
