@@ -6,9 +6,9 @@
 (function (root) {
   'use strict';
   const HAK = (root.HAK = root.HAK || {});
+  const { hasNum } = HAK.Util || (typeof require === 'function' ? require('./util.js') : {});   // hàm dùng chung (util.js)
   const $ = (s) => document.querySelector(s);
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const hasNum = (v) => v !== null && v !== undefined && v !== '' && isFinite(+v);
   const r4 = (n) => Math.round(n * 10000) / 10000;
   const nf = (n) => (hasNum(n) ? HAK.NumFmt.txt(r4(+n), 'num') : '');
   const vn = (iso) => (iso && /^\d{4}-\d\d-\d\d/.test(iso) ? iso.slice(8, 10) + '/' + iso.slice(5, 7) + '/' + iso.slice(0, 4) : iso || '');

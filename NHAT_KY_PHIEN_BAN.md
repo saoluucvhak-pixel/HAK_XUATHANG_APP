@@ -291,6 +291,10 @@ Thủy chốt 28/09/2026: "1. bỏ Trao đổi KHÔNG đồng bộ lên Google S
 - pages.js generateBkls: không chặn khi thiếu Số BKLS / hệ số / tên bên mua — tự điền hoặc để trống + cảnh báo.
 - tests/parse-num.test.cjs, tests/numfmt.test.cjs.
 
+## v2.17.1 — Dọn mã dùng chung
+- util.js (HAK.Util: hasNum, vnDate) thay cho các bản sao giống hệt ở contract-file, contract-status, customs, gsync-contracts, catalog. Không đổi hành vi; ESLint, 256 test (Node 18 / 20 / 22) và mở thử 17 màn hình + Hồ sơ hợp đồng đạt.
+- Chưa áp Prettier cho toàn bộ mã: định dạng lại hàng chục nghìn dòng sẽ tạo thay đổi không thể duyệt; nên làm riêng theo từng file khi sửa.
+
 ## v2.17.0 — Rà soát logic nghiệp vụ: phiếu cân, trạng thái, thuế, chứng thư, gộp sao lưu
 - Phiếu cân: chống trùng ở cấp PHIẾU (hồ sơ cùng tàu / chi tiết hợp đồng giao nhau về ngày giữ các phiếu riêng, phiếu lặp tính 1 lần); khác khối lượng / xe trả về / liên kết → báo XUNG ĐỘT + tổng chờ đối soát; chống trùng nguyên hồ sơ nay xét thêm công ty + chi tiết hợp đồng (weigh-model.js, Report.prepareTickets). Excel Báo cáo Xuất hàng bỏ đúng các phiếu trùng; thêm sheet "Đối soát phiếu cân".
 - Hợp đồng có 4 chỉ tiêu riêng (tiến độ · thông quan · thuế · thực giao). Quy tắc đã xác nhận: hợp đồng "Đã hoàn thành" khi mọi tờ khai đã thông quan (kèm lý do); đóng thủ công hiện "Đã đóng hợp đồng".

@@ -6,7 +6,7 @@
 (function (root) {
   'use strict';
   const HAK = (root.HAK = root.HAK || {});
-  const hasNum = (v) => v !== null && v !== undefined && v !== '' && isFinite(+v);
+  const { hasNum } = HAK.Util || (typeof require === 'function' ? require('./util.js') : {});   // hàm dùng chung (util.js)
   const num = (v) => (hasNum(v) ? +v : '');
   const r2 = (v) => (hasNum(v) ? Math.round(+v * 100) / 100 : '');
   const day = (iso) => (/^\d{4}-\d\d-\d\d/.test(iso || '') ? iso.slice(0, 10) + 'T00:00:00.000Z' : '');

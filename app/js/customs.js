@@ -8,6 +8,7 @@
 (function (root) {
   'use strict';
   const HAK = (root.HAK = root.HAK || {});
+  const { hasNum, vnDate } = HAK.Util || (typeof require === 'function' ? require('./util.js') : {});   // hàm dùng chung (util.js)
   const CM = () => HAK.CustomsModel, CP = () => HAK.CustomsParser;
   const core = () => HAK.Catalog.core;
   const $ = (s) => document.querySelector(s);
@@ -15,7 +16,6 @@
   const st = { sel: '', q: '', status: '', showDeleted: false, modal: null };
   const NF = () => HAK.NumFmt;
   const money = (n) => (n === null || n === undefined || n === '' || !isFinite(+n) ? '' : NF().txt(+n, 'num'));
-  const vnDate = (iso) => (iso && /^\d{4}-\d\d-\d\d/.test(iso) ? iso.slice(8, 10) + '/' + iso.slice(5, 7) + '/' + iso.slice(0, 4) : '');
   const today = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
   const fold = (s) => String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[đĐ]/g, 'd').toLowerCase();
   const shipKey = (s) => fold(s).replace(/^m\s*\/?\s*v\.?\s*/, '').replace(/[^a-z0-9]/g, '');
@@ -573,7 +573,6 @@
 
   /* ---------------- Báo cáo "Tình hình thực hiện hợp đồng" (hợp đồng · chứng thư · tờ khai · nộp thuế · lệ phí) ---------------- */
   const sumOf = (arr) => arr.reduce((a, x) => a + (Number(x) || 0), 0);
-  const hasNum = (v) => v !== null && v !== undefined && v !== '' && isFinite(+v);
   /** Mỗi hợp đồng: các dòng thực hiện (đợt → chứng thư + tờ khai) và cộng dồn. Tờ khai gắn hợp đồng nhưng chưa gắn đợt là dòng riêng. */
   function contractReportModel() {
     const M = HAK.ContractModel, scope = HAK.Auth && HAK.Auth.scopeIds ? HAK.Auth.scopeIds('report') : null, all = customsList().filter((d) => !d.deletedAt);

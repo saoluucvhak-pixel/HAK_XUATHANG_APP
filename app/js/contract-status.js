@@ -6,16 +6,15 @@
 (function (root) {
   'use strict';
   const HAK = (root.HAK = root.HAK || {});
+  const { hasNum, vnDate } = HAK.Util || (typeof require === 'function' ? require('./util.js') : {});   // hàm dùng chung (util.js)
   const $ = (s) => document.querySelector(s);
   const esc = (s) => HAK.UI.esc(s);
   const toast = (m, t) => HAK.UI.toast(m, t || 'info');
   const G = () => HAK.Generator, F = () => HAK.Filters, K = () => HAK.Catalog;
-  const hasNum = (v) => v !== null && v !== undefined && v !== '' && isFinite(+v);
   const int = (n) => (hasNum(n) ? Math.round(+n).toLocaleString('vi-VN') : '');
   const ton = (kg) => (hasNum(kg) ? G().fmtTon(+kg) : '');
   const dec = (n, d) => (hasNum(n) ? G().fmtDec(+n, d == null ? 2 : d) : '');
   const money = (n) => (hasNum(n) ? HAK.NumFmt.txt(+n, 'num') : '');
-  const vnDate = (iso) => (iso && /^\d{4}-\d\d-\d\d/.test(iso) ? iso.slice(8, 10) + '/' + iso.slice(5, 7) + '/' + iso.slice(0, 4) : '');
   const sum = (arr) => arr.reduce((a, x) => a + (Number(x) || 0), 0);
   const state = { groups: [], loading: false, view: null, detail: null, conflicts: [], pendingKg: 0, dupTickets: { trips: 0, kg: 0 }, overall: null };
   const ticketCache = new Map();

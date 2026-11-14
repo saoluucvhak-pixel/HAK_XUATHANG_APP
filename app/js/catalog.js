@@ -7,6 +7,7 @@
 (function (root) {
   'use strict';
   const HAK = (root.HAK = root.HAK || {});
+  const { vnDate } = HAK.Util || (typeof require === 'function' ? require('./util.js') : {});   // hàm dùng chung (util.js)
   const KEY = 'hak.catalog.v1';
   const M = HAK.ContractModel;
   let migrationBackup = null, persistedSnapshot = 'null';
@@ -31,7 +32,6 @@
   const keyName = (s) => U().norm(s).replace(/[^a-z0-9]/g, '');
   const num = (v) => { const n = U().parseNum(v); return n === null || n === undefined || !isFinite(n) ? null : n; };
   const isoOf = (v) => { const p = U().parseDT(v); return p && p.hasDate ? p.y + '-' + pad(p.m) + '-' + pad(p.d) : ''; };
-  const vnDate = (iso) => (iso && /^\d{4}-\d\d-\d\d/.test(iso) ? iso.slice(8, 10) + '/' + iso.slice(5, 7) + '/' + iso.slice(0, 4) : '');
   /** Số TKHQ luôn giữ dạng CHUỖI đủ chữ số (Excel hay lưu thành số thực 307091039861.0). */
   const tkhqOf = (v) => (v === null || v === undefined || v === '' ? '' : typeof v === 'number' ? String(Math.round(v)) : String(v).replace(/\s+/g, '').trim());
   const fmtNum = (n, d) => (n === null || n === undefined || n === '' ? '' : G().fmtDec(+n, d));
