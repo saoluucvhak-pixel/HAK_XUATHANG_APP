@@ -258,3 +258,20 @@ test('khai bổ sung mới nhất chưa có số thuế → đánh dấu để n
   assert.match(M.taxText(M.settlement([d])), /khai bổ sung mới nhất chưa nhập số thuế/);
   d.supplements[1].taxVnd = 130; assert.equal(M.totals(d).payable, 130); assert.equal(M.totals(d).staleSupplement, false);
 });
+
+test('thiếu dữ liệu nhận diện: khoản nhập tay không ghi số giấy cùng số tiền → "có thể trùng" (đưa ra đối soát), khác số giấy → chắc chắn khác', () => {
+  const ocr = { receiptNo: 'DN0206/26', refNo: '123456789', amount: 100, kind: 'tax' };
+  assert.equal(M.maybeSamePayment({ amount: 100, kind: 'tax' }, ocr), true, 'nhập tay chưa ghi số giấy');
+  assert.equal(M.samePayment({ amount: 100, kind: 'tax' }, ocr), false, 'nhưng chưa đủ căn cứ để tự coi là trùng');
+  assert.equal(M.maybeSamePayment({ receiptNo: 'DN0207/26', amount: 100, kind: 'tax' }, ocr), false, 'khác số giấy');
+  assert.equal(M.maybeSamePayment({ amount: 90, kind: 'tax' }, ocr), false, 'khác số tiền');
+  assert.equal(M.maybeSamePayment({ amount: 100, kind: 'fee' }, ocr), false, 'khác loại');
+  assert.equal(M.maybeSamePayment(Object.assign({}, ocr, { receiptNo: 'dn 0206/26' }), ocr), false, 'đủ căn cứ → là samePayment, không còn "có thể"');
+});
+test('thuế bằng 0, thuế chưa nhập, tờ khai có khai bổ sung', () => {
+  const zero = M.newDecl({ no: '308629701001', taxVnd: 0 }), none = M.newDecl({ no: '308629701002' }), supp = M.newDecl({ no: '308629701003', taxVnd: 100, payments: [{ amount: 100, receiptNo: 'A1' }], supplements: [{ round: 2, date: '2026-06-01', taxVnd: 130 }] });
+  assert.equal(M.taxText(M.settlement([zero])), 'Chưa có thuế phát sinh'); assert.equal(M.totals(zero).owed, 0); assert.equal(M.totals(zero).undetermined, false);
+  assert.equal(M.totals(none).undetermined, true); assert.match(M.taxText(M.settlement([none])), /1 tờ khai chưa xác định nghĩa vụ thuế/);
+  const t = M.totals(supp); assert.equal(t.payable, 130); assert.equal(t.owed, 30); assert.equal(t.extra, 30); assert.equal(M.settlement([supp]).owed, 30);
+  const all = M.settlement([zero, none, supp]); assert.equal(all.nDecl, 3); assert.equal(all.undetermined, 1); assert.equal(all.owed, 30); assert.equal(all.payable, 130);
+});

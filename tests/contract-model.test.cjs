@@ -19,3 +19,23 @@ test('different tax number prevents matching an existing party by name alone',()
 
 test('parent goods and contract quantity survive multiple execution rows without multiplying the contract total',()=>{const c=M.parent({id:'parent-total',no:'QA-P',contractProduct:'Contract goods',contractQty:18000,details:[{id:'lot-a',contractId:'parent-total',mt:100},{id:'lot-b',contractId:'parent-total',mt:200}]});const saved=M.upsert(blank(),c).record;assert.equal(saved.contractProduct,'Contract goods');assert.equal(saved.contractQty,18000);const views=M.choices({contracts:[saved]});assert.equal(views[0].product,'Contract goods');assert.equal(views[0].qty,null);assert.equal(views[1].qty,null);const one=M.parent({...saved,details:[saved.details[0]]});assert.equal(M.choices({contracts:[one]})[0].qty,18000);assert.equal(M.sum(saved,'mt'),300);});
 test('migration derives parent summary once and retains per-lot quantities and receiving party',()=>{const old={v:3,customers:[],contracts:[{id:'p',no:'QA',details:[{id:'a',contractId:'p',product:'Goods A',qty:6000,receiverId:'buyer'},{id:'b',contractId:'p',product:'Goods B',qty:12000}]}]};const result=M.migrate(old);assert.equal(result.changed,true);assert.equal(result.data.contracts[0].contractProduct,'Goods A; Goods B');assert.equal(result.data.contracts[0].contractQty,18000);assert.equal(result.data.contracts[0].details[0].receiverId,'buyer');assert.equal(M.migrate(result.data).changed,false);assert.equal(old.contracts[0].contractQty,undefined);});
+
+test('KL gốc để trống + phụ lục 500: giữ trống qua nhiều lần tính; ngừng dùng phụ lục cuối → KL hiện hành về trống', () => {
+  const M = require('../app/js/contract-model.js');
+  const c = M.parent({ type: 'xuatkhau', no: 'HD-B', contractQty: null, details: [], addenda: [{ no: 'PL1', date: '2026-09-01', qty: 500 }] });
+  M.applyAddenda(c); assert.equal(c.contractQty, 500); assert.equal(c.qtyOrig, null); assert.equal(M.originalQty(c), null);
+  for (let i = 0; i < 3; i++) M.applyAddenda(c);                       // nhiều lần tính lại
+  assert.equal(c.qtyOrig, null, 'KL gốc vẫn trống'); assert.equal(c.contractQty, 500);
+  const again = M.parent(JSON.parse(JSON.stringify(c))); assert.equal(again.qtyOrig, null); assert.equal(M.originalQty(again), null);   // qua lưu / đọc lại
+  c.addenda[0].deletedAt = '2026-10-01'; M.applyAddenda(c);
+  assert.equal(c.contractQty, null, 'ngừng dùng phụ lục cuối cùng → KL hiện hành trống'); assert.equal('qtyOrig' in c, false);
+});
+test('KL gốc có số: giữ qua phụ lục; bỏ phụ lục → trả KL gốc; hồ sơ nghi ghi nhầm (gốc = phụ lục đầu) được gắn cờ đối chiếu, không tự sửa', () => {
+  const M = require('../app/js/contract-model.js');
+  const c = M.parent({ type: 'xuatkhau', no: 'HD-C', contractQty: 1000, details: [], addenda: [{ no: 'PL1', date: '2026-09-01', qty: 1200 }] });
+  M.applyAddenda(c); assert.equal(c.qtyOrig, 1000); assert.equal(c.contractQty, 1200); assert.equal(M.originalQty(c), 1000); assert.equal(M.auditOriginal(c), '');
+  c.addenda[0].deletedAt = 'x'; M.applyAddenda(c); assert.equal(c.contractQty, 1000);
+  const bad = M.parent({ type: 'xuatkhau', no: 'HD-D', contractQty: 500, qtyOrig: 500, details: [], addenda: [{ no: 'PL1', date: '2026-09-01', qty: 500 }] });
+  M.applyAddenda(bad); assert.equal(bad.qtyOrig, 500, 'không tự sửa'); assert.match(M.auditOriginal(bad), /[Đđ]ối chiếu/);
+  assert.equal(M.originalQty({ contractQty: 700, addenda: [] }), 700, 'chưa có phụ lục → KL gốc = KL hợp đồng');
+});

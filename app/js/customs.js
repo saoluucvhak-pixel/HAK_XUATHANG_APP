@@ -348,13 +348,20 @@
         let n = 0;
         await commit((next) => {
           next.customs = next.customs || [];
-          const pool = new Map();     // các khoản đã có TRƯỚC lần nhập này, mỗi khoản chỉ "khớp" được một dòng → hai dòng giống hệt trong cùng giấy vẫn được giữ cả hai
+          const pool = new Map(); let pending = 0;     // các khoản đã có TRƯỚC lần nhập này, mỗi khoản chỉ "khớp" được một dòng → hai dòng giống hệt trong cùng giấy vẫn được giữ cả hai
           picked.forEach((x) => {
             let d = x.target === '__new' ? null : next.customs.find((y) => y.id === x.target);
             if (!d) { d = CM().newDecl({ no: x.no, openDate: x.declDate || '', type: x.declType || '', status: 'opened', note: 'Tạo từ giấy nộp tiền ' + (v.receiptNo || ''), supplements: [], payments: [] }); next.customs.push(d); }
             if (!pool.has(d.id)) pool.set(d.id, CM().active(d.payments).slice());
             const cand = { receiptNo: v.receiptNo, refNo: v.refNo, kind: x.kind, amount: x.amount, ndkt: x.ndkt, chapter: x.chapter, dbhc: x.dbhc, periodDate: x.periodDate }, left = pool.get(d.id), at = left.findIndex((y) => CM().samePayment(y, cand));
             if (at >= 0) { left.splice(at, 1); return; }   // nhập lại cùng khoản (kể cả đã nhập tay) → không nhân đôi
+            // Thiếu dữ liệu nhận diện (vd khoản nhập tay không ghi số giấy) → KHÔNG tự quyết: hỏi để đối soát, mặc định không thêm.
+            const maybe = left.findIndex((y) => CM().maybeSamePayment(y, cand));
+            if (maybe >= 0) {
+              const y = left[maybe];
+              if (!confirm('Cần đối soát: dòng ' + money(x.amount) + ' đ (' + (CM().PAY_KIND[x.kind] || x.kind) + ') của giấy ' + (v.receiptNo || v.refNo || '?') + ' có thể TRÙNG khoản đã nhập tay ' + (y.receiptNo || y.refNo ? 'giấy ' + (y.receiptNo || y.refNo) : '(chưa ghi số giấy)') + ' cùng số tiền, tờ khai ' + d.no + '.\n\nBấm OK nếu là khoản KHÁC (vẫn thêm); Hủy nếu là cùng một khoản (bỏ dòng này — bạn có thể bổ sung số giấy vào khoản đã nhập tay).')) { left.splice(maybe, 1); pending++; return; }
+              left.splice(maybe, 1);
+            }
             (d.payments = d.payments || []).push(CM().newPay({ receiptNo: v.receiptNo, formCode: v.formCode, refNo: v.refNo, date: v.date, payer: v.payer, kind: x.kind, content: x.content, amount: x.amount, periodDate: x.periodDate, chapter: x.chapter, ndkt: x.ndkt, dbhc: x.dbhc }));
             d.revision = (d.revision || 0) + 1; n++;
           });
@@ -641,19 +648,24 @@
   /** spec: {file, title, sub, tables:[{caption, cols:[{h, n}], rows:[{c:[...], cls}]}]}. Ô trong c là văn bản thường (đã escape ở đây). */
   function printReport(spec) {
     const W = HAK.Word && HAK.Word.Pdf; if (W) W.cleanup();
-    const host = document.createElement('div'); host.id = 'printRoot';
-    host.innerHTML = '<div class="rp-h">' + esc(spec.title) + '</div><div class="rp-s">' + esc(spec.sub) + '</div>' + spec.tables.map((t) =>
-      (t.caption ? '<div class="rp-c' + (t.pageBreak ? ' rp-pb' : '') + '">' + esc(t.caption) + '</div>' : '') + '<table class="rp-t"><thead><tr>' + t.cols.map((c) => '<th>' + esc(c.h) + '</th>').join('') + '</tr></thead><tbody>' +
-      t.rows.map((r) => '<tr class="' + (r.cls || '') + '">' + r.c.map((x, i) => '<td' + (t.cols[i] && t.cols[i].n ? ' class="n"' : '') + '>' + esc(x == null ? '' : x) + '</td>').join('') + '</tr>').join('') + '</tbody></table>').join('') +
-      '<div class="rp-f">HAK · ' + esc(new Date().toLocaleDateString('vi-VN')) + ' · v' + esc(HAK.VERSION || '') + '</div>';
-    document.body.appendChild(host);
-    const css = document.createElement('style'); css.id = 'printPageStyle'; css.textContent = '@page { size: A4 landscape; margin: 10mm; }' + PRINT_CSS; document.head.appendChild(css);
-    document.body.classList.add('printing');
-    const old = document.title; document.title = spec.file;
-    const done = () => { root.removeEventListener('afterprint', done); setTimeout(() => { if (W) W.cleanup(); document.title = old; }, 300); };
-    root.addEventListener('afterprint', done);
-    toast('Trong hộp thoại in, chọn máy in "Lưu dưới dạng PDF" (Save as PDF) rồi bấm Lưu. Nên tắt mục "Đầu trang và chân trang".', 'info');
-    return new Promise((r) => setTimeout(() => { root.print(); r(); }, 350));
+    let host = null, css = null; const old = document.title;
+    // Trả giao diện về bình thường dù dựng bảng / mở hộp thoại in bị lỗi (trước đây lỗi trong setTimeout làm trang kẹt ở chế độ "đang in", trắng màn hình, không báo gì).
+    const restore = () => { root.removeEventListener('afterprint', done); if (host && host.parentNode) host.remove(); if (css && css.parentNode) css.remove(); document.body.classList.remove('printing'); document.title = old; if (W) W.cleanup(); };
+    const done = () => { root.removeEventListener('afterprint', done); setTimeout(restore, 300); };
+    try {
+      host = document.createElement('div'); host.id = 'printRoot';
+      host.innerHTML = '<div class="rp-h">' + esc(spec.title) + '</div><div class="rp-s">' + esc(spec.sub) + '</div>' + spec.tables.map((t) =>
+        (t.caption ? '<div class="rp-c' + (t.pageBreak ? ' rp-pb' : '') + '">' + esc(t.caption) + '</div>' : '') + '<table class="rp-t"><thead><tr>' + t.cols.map((c) => '<th>' + esc(c.h) + '</th>').join('') + '</tr></thead><tbody>' +
+        t.rows.map((r) => '<tr class="' + (r.cls || '') + '">' + r.c.map((x, i) => '<td' + (t.cols[i] && t.cols[i].n ? ' class="n"' : '') + '>' + esc(x == null ? '' : x) + '</td>').join('') + '</tr>').join('') + '</tbody></table>').join('') +
+        '<div class="rp-f">HAK · ' + esc(new Date().toLocaleDateString('vi-VN')) + ' · v' + esc(HAK.VERSION || '') + '</div>';
+      document.body.appendChild(host);
+      css = document.createElement('style'); css.id = 'printPageStyle'; css.textContent = '@page { size: A4 landscape; margin: 10mm; }' + PRINT_CSS; document.head.appendChild(css);
+      document.body.classList.add('printing');
+      document.title = spec.file;
+      root.addEventListener('afterprint', done);
+      toast('Trong hộp thoại in, chọn máy in "Lưu dưới dạng PDF" (Save as PDF) rồi bấm Lưu. Nên tắt mục "Đầu trang và chân trang".', 'info');
+    } catch (e) { restore(); return Promise.reject(e); }
+    return new Promise((ok, no) => setTimeout(() => { try { root.print(); ok(); } catch (e) { restore(); no(e); } }, 350));
   }
   const m0 = (n) => (hasNum(n) ? money(n) : '');
   function contractPdfSpec() {

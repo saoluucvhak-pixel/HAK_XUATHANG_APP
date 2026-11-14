@@ -14,8 +14,10 @@
 
   const COLS = {
     NL_HOPDONG: [['Mã HĐ (app)'], ['Số hợp đồng'], ['Hình thức'], ['Ngày ký', DATE], ['Bên mua'], ['Hàng hóa'], ['KL gốc (BDMT)', DEC], ['KL hiện hành (BDMT)', DEC], ['Số phụ lục', INT], ['KL khô chứng thư (BDMT)', DEC], ['Còn lại (BDMT)', DEC], ['% thực hiện', DEC],
-      ['Số chứng thư'], ['Số tờ khai', INT], ['Đã thông quan', INT], ['Thuế XK phải nộp (đ)', INT], ['Đã nộp thuế (đ)', INT], ['Còn nợ thuế (đ)', INT], ['Lệ phí đã nộp (đ)', INT], ['Số chuyến xe', INT], ['Thực giao (tấn)', DEC], ['Trạng thái hợp đồng'], ['Cập nhật lúc']],
-    NL_TOKHAI: [['Mã TK (app)'], ['Số tờ khai'], ['Lần khai', INT], ['Ngày mở', DATE], ['Trạng thái'], ['Ngày thông quan', DATE], ['Số hợp đồng'], ['Tàu'], ['Số chứng thư'], ['KL khô (BDMT)', DEC], ['Thuế tờ khai gốc (đ)', INT], ['Thuế sau bổ sung (đ)', INT], ['Thuế phải nộp (đ)', INT], ['Đã nộp thuế (đ)', INT], ['Còn nợ (đ)', INT], ['Lệ phí đã nộp (đ)', INT], ['Số lần khai bổ sung', INT]],
+      ['Số chứng thư'], ['Số tờ khai', INT], ['Đã thông quan', INT], ['Thuế XK phải nộp (đ)', INT], ['Đã nộp thuế (đ)', INT], ['Còn nợ thuế (đ)', INT], ['Lệ phí đã nộp (đ)', INT], ['Số chuyến xe', INT], ['Thực giao (tấn)', DEC], ['Trạng thái hợp đồng'], ['Cập nhật lúc'],
+      // v2.17.0 — cột THÊM Ở CUỐI (giữ nguyên vị trí các cột cũ để công thức / bảng khác trong Sheet không lệch): thuế tách riêng + 4 trạng thái
+      ['Nộp thừa (đ)', INT], ['Tờ khai chưa xác định thuế', INT], ['Số dư ròng thuế (đ)', INT], ['Tiến độ thực hiện'], ['Thông quan'], ['Tình trạng thuế'], ['Thực giao']],
+    NL_TOKHAI: [['Mã TK (app)'], ['Số tờ khai'], ['Lần khai', INT], ['Ngày mở', DATE], ['Trạng thái'], ['Ngày thông quan', DATE], ['Số hợp đồng'], ['Tàu'], ['Số chứng thư'], ['KL khô (BDMT)', DEC], ['Thuế tờ khai gốc (đ)', INT], ['Thuế sau bổ sung (đ)', INT], ['Thuế phải nộp (đ)', INT], ['Đã nộp thuế (đ)', INT], ['Còn nợ (đ)', INT], ['Lệ phí đã nộp (đ)', INT], ['Số lần khai bổ sung', INT], ['Nộp thừa (đ)', INT], ['Nghĩa vụ thuế']],
     NL_CHUNGTHU: [['Mã CT (app)'], ['Số hợp đồng'], ['Tàu / chuyến'], ['Hàng hóa'], ['Số chứng thư'], ['Ngày chứng thư', DATE], ['KL tươi MT (tấn)', DEC], ['KL khô BDMT', DEC], ['Độ ẩm (%)', DEC], ['Tỷ giá (VNĐ/USD)', DEC], ['Giá trị (USD)', DEC], ['Giá trị (VNĐ)', INT], ['Số tờ khai'], ['Trạng thái tờ khai'], ['Số chuyến xe', INT], ['Thực giao (tấn)', DEC], ['MT − thực giao (tấn)', DEC], ['Thời gian cân']],
     NL_PHULUC: [['Mã PL (app)'], ['Số hợp đồng'], ['Số phụ lục'], ['Ngày ký', DATE], ['KL sau điều chỉnh (BDMT)', DEC], ['Tăng / giảm (BDMT)', DEC], ['Lý do']]
   };
@@ -28,16 +30,16 @@
     const CM = opt.CM || HAK.CustomsModel, types = opt.types || {}, stamp = opt.stamp || new Date().toISOString().slice(0, 19) + 'Z';
     const hd = [], tk = [], pl = [], ct = [], M = opt.M || HAK.ContractModel;
     items.forEach(({ c, buyer, m }) => {
-      const t = m.tax, qtyOrig = c.qtyOrig != null ? c.qtyOrig : c.contractQty;
+      const t = m.tax, qtyOrig = (opt.M || HAK.ContractModel).originalQty(c);
       const certNos = (c.details || []).filter((d) => !d.deletedAt && d.certNo).map((d) => d.certNo).join('; ');
       hd.push([c.id, c.no || '', types[c.type] || c.type || '', day(c.date), buyer || '', c.contractProduct || '', num(qtyOrig), num(c.contractQty), m.addenda.length, r2(m.certBdmt),
-        m.qty == null ? '' : r2(m.qty - m.certBdmt), m.qty ? r2(m.certBdmt / m.qty * 100) : '', certNos, m.T.length, m.cleared, num(t.payable), num(t.paid), num(t.remaining), num(t.fee), m.trips, r2(m.delKg / 1000), m.status.label, stamp]);
+        m.qty == null ? '' : r2(m.qty - m.certBdmt), m.qty ? r2(m.certBdmt / m.qty * 100) : '', certNos, m.T.length, m.cleared, num(t.payable), num(t.paid), num(t.remaining), num(t.fee), m.trips, r2(m.delKg / 1000), m.status.label, stamp, num(t.over), t.undetermined || 0, num(t.net), m.axes.progress.label, m.axes.customs.label, m.axes.tax.label + (m.axes.tax.text ? ' — ' + m.axes.tax.text : ''), m.axes.delivery.label]);
       m.rows.forEach((r) => {
         const d = r.d, L = r.lot, tons = L && L.trips > 0 ? L.delKg / 1000 : '', v = r.v || (M ? M.valuation(c, d) : {});
         ct.push([d.id, c.no || '', d.ship || '', d.product || c.contractProduct || '', d.certNo || '', day(d.certDate), r2(d.mt), r2(d.bdmt), r2(d.moisture), num(d.exchangeRate), r2(v.valueUsd), num(v.valueVnd),
           r.decl ? r.decl.no : '', r.decl ? (CM.STATUS[r.decl.status] || r.decl.status) : '', tons === '' ? '' : L.trips, tons === '' ? '' : r2(tons), tons !== '' && hasNum(d.mt) ? r2(d.mt - tons) : '', L && L.from ? L.from + (L.to && L.to !== L.from ? ' → ' + L.to : '') : '']);
       });
-      m.T.forEach(({ d, t: x }) => tk.push([d.id, d.no, d.round || 1, day(d.openDate), CM.STATUS[d.status] || d.status, day(CM.statusDate(d, 'cleared')), c.no || '', d.ship || '', d.certNo || '', r2(d.qtyBdmt), num(x.base), x.lastSupplement ? num(x.lastSupplement.taxVnd) : '', num(x.payable), num(x.paidTax), num(x.remaining), num(x.paidFee), CM.active(d.supplements).length]));
+      m.T.forEach(({ d, t: x }) => tk.push([d.id, d.no, d.round || 1, day(d.openDate), CM.STATUS[d.status] || d.status, day(CM.statusDate(d, 'cleared')), c.no || '', d.ship || '', d.certNo || '', r2(d.qtyBdmt), num(x.base), x.lastSupplement ? num(x.lastSupplement.taxVnd) : '', num(x.payable), num(x.paidTax), num(x.remaining), num(x.paidFee), CM.active(d.supplements).length, x.undetermined ? '' : num(x.over), x.undetermined ? 'Chưa xác định' : 'Đã xác định']));
       let prev = qtyOrig;
       m.addenda.forEach((a) => { pl.push([a.id, c.no || '', a.no || '', day(a.date), num(a.qty), hasNum(prev) ? r2(a.qty - prev) : '', a.reason || '']); prev = a.qty; });
     });

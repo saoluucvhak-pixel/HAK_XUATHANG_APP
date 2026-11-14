@@ -297,6 +297,12 @@ Thủy chốt 28/09/2026: "1. bỏ Trao đổi KHÔNG đồng bộ lên Google S
 - Thuế: còn nợ / nộp thừa cộng riêng từng tờ khai (không bù trừ), tờ khai chưa xác định nghĩa vụ, lệ phí tách riêng; cột mới NỘP THỪA, "Tờ khai chưa xác định thuế"; khai bổ sung mới nhất chưa có số thuế → cảnh báo. Giấy nộp tiền: nhận ra cùng khoản khi nhập tay rồi OCR (chuẩn hóa số giấy, so NDKT / kỳ thuế), giữ các dòng cùng số tiền nhưng khác khoản; nhập tay trùng → hỏi xác nhận.
 - Đối chiếu: thiếu dữ liệu (số chứng thư, đơn giá, tỷ giá, MT) hiển thị "Thiếu số liệu đối chiếu" thay vì "Khớp".
 - Chứng thư: kiểm tra số âm / BDMT > MT / độ ẩm / công thức BDMT ≈ MT × (1 − độ ẩm) (cert-model.js); lưu bản chụp số liệu + ô khác Danh mục + lý do vào hồ sơ Lưu trữ; ô "Lý do điều chỉnh" ở form lập biên bản.
+- Lưu hồ sơ: ghi lỗi IndexedDB nay BÁO LỖI cho người dùng (trước đây lặng lẽ không hiện "đã lưu"); thông số + phiếu cân vẫn cùng 1 giao dịch.
+- In PDF: lỗi dựng bảng / hộp thoại in được báo và giao diện trở về bình thường (trước đây kẹt chế độ in); nút PDF trong Hồ sơ hợp đồng không còn nuốt lỗi.
+- Mở liên tiếp hai hồ sơ cũ: ô không có trong hồ sơ sau được đưa về mặc định (không mang dữ liệu hồ sơ trước); lưu lại giữ liên kết chi tiết hợp đồng.
+- KL hợp đồng gốc để trống + phụ lục: giữ trống qua nhiều lần tính (trước đây lần tính thứ 2 ghi KL phụ lục vào KL gốc); ngừng dùng phụ lục cuối → KL hiện hành trống; form / báo cáo / Excel / PDF / Google Sheet dùng chung originalQty; hồ sơ nghi ghi nhầm (gốc = phụ lục đầu) gắn cờ "cần đối chiếu", không tự sửa.
+- Google Sheet NL_HOPDONG / NL_TOKHAI: thêm cột Ở CUỐI (nộp thừa, chưa xác định thuế, số dư ròng, 4 trạng thái); cột cũ giữ vị trí. Lưu ý: cột "Trạng thái hợp đồng" nay là "Đã thông quan đủ tờ khai" / "Đã đóng hợp đồng" thay "Đã hoàn thành".
+- Giấy nộp tiền: khoản nhập tay thiếu số giấy mà cùng số tiền với dòng OCR → hỏi đối soát thay vì tự thêm / tự gộp.
 - Xem docs/QUY_TAC_NGHIEP_VU_CAN_XAC_NHAN.md.
 
 ## v2.16.2 — Rà soát mã nguồn: bảo mật, độ bền, đóng hợp đồng

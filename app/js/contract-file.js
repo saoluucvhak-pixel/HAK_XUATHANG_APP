@@ -41,7 +41,7 @@
 
     /* --- 1. Các bước quy trình --- */
     const steps = [
-      { n: 1, t: 'Hợp đồng + phụ lục', s: 'ok', x: (qty != null ? nf(qty) + ' BDMT' : 'chưa nhập KL') + (addenda.length ? ' · ' + addenda.length + ' phụ lục (gốc ' + nf(c.qtyOrig) + ')' : '') },
+      { n: 1, t: 'Hợp đồng + phụ lục', s: 'ok', x: (qty != null ? nf(qty) + ' BDMT' : 'chưa nhập KL') + (addenda.length ? ' · ' + addenda.length + ' phụ lục (gốc ' + (M.originalQty(c) == null ? 'để trống' : nf(M.originalQty(c))) + ')' : '') },
       { n: 2, t: 'Chứng thư', s: !details.length ? 'none' : withCert === details.length ? 'ok' : 'warn', x: withCert + '/' + details.length + ' chi tiết có chứng thư · ' + nf(certBdmt) + ' BDMT' },
       { n: 3, t: 'Tờ khai hải quan', s: !decls.length ? (c.type === 'xuatkhau' || c.type === 'uythac' ? 'warn' : 'none') : (rows.every((r) => r.decl) && !loose.length ? 'ok' : 'warn'), x: decls.length ? decls.length + ' tờ khai' : 'chưa có tờ khai' },
       { n: 4, t: 'Thông quan', s: !decls.length ? 'none' : cleared === decls.length ? 'ok' : 'warn', x: cleared + '/' + decls.length + ' đã thông quan' },
@@ -82,9 +82,11 @@
     loose.forEach((x) => checks.push({ who: 'Tờ khai ' + x.no, what: 'Tờ khai chưa gắn chi tiết hợp đồng (tàu · chứng thư)', a: '', b: '', diff: '', ok: false, note: 'Gắn ở Danh mục → Chi tiết hợp đồng' }));
     if (qty != null) checks.push({ who: 'Cả hợp đồng', what: 'Chứng thư ↔ hợp đồng: Σ BDMT theo chứng thư ↔ BDMT hợp đồng hiện hành sau phụ lục', a: nf(certBdmt), b: nf(qty), diff: nf(certBdmt - qty), ok: certBdmt <= qty + 0.005, note: certBdmt <= qty + 0.005 ? 'Còn lại ' + nf(qty - certBdmt) + ' BDMT (' + (qty ? nf(Math.round(certBdmt / qty * 1000) / 10) : 0) + '% đã thực hiện)' : 'VƯỢT hợp đồng ' + nf(certBdmt - qty) + ' BDMT' });
 
+    { const aud = M.auditOriginal(c); if (aud) checks.push({ who: 'Cả hợp đồng', what: 'KL gốc ↔ phụ lục đầu tiên (nghi ghi nhầm)', a: nf(c.qtyOrig), b: nf(addenda[0].qty), diff: '', ok: null, note: 'CẦN ĐỐI CHIẾU chứng từ: ' + aud }); }
+
     /* --- 3. Dòng thời gian --- */
     const ev = [];
-    if (c.date) ev.push([c.date, 'Hợp đồng', 'Ký hợp đồng ' + (c.no || '') + ' · KL ' + nf(c.qtyOrig != null ? c.qtyOrig : c.contractQty) + ' BDMT']);
+    if (c.date) ev.push([c.date, 'Hợp đồng', 'Ký hợp đồng ' + (c.no || '') + ' · KL ' + (M.originalQty(c) == null ? '(chưa nhập)' : nf(M.originalQty(c))) + ' BDMT']);
     addenda.forEach((a) => ev.push([a.date, 'Phụ lục', (a.no || 'Phụ lục') + ' → KL ' + nf(a.qty) + ' BDMT' + (a.reason ? ' (' + a.reason + ')' : '')]));
     details.forEach((d) => { if (d.certDate || d.certNo) ev.push([d.certDate || '', 'Chứng thư', [d.certNo, d.ship, hasNum(d.bdmt) ? nf(d.bdmt) + ' BDMT' : ''].filter(Boolean).join(' · ')]); });
     decls.forEach((d) => {
@@ -100,7 +102,7 @@
     const khoOf = HAK.ContractStatus && HAK.ContractStatus.khoOf ? HAK.ContractStatus.khoOf : () => '';
     const xh = rows.filter((r) => r.lot && r.lot.trips > 0).map((r) => ({ ship: r.d.ship || '', kho: Array.from(new Set((r.lot.recs || []).map(khoOf).filter(Boolean))).join(', '), trips: r.lot.trips, ton: r.lot.delKg / 1000, from: r.lot.from || '', to: r.lot.to || '', mt: r.d.mt }));
     const hd = checks.find((k) => k.who === 'Cả hợp đồng') || null;
-    return { xh, rows, loose, supps, cleared, withCert, hd, c, cust, steps, checks, ev, T, tax, certBdmt, qty, delKg, trips, status: CM.contractStatus(data.customs, cid, c), axes: CM.axes(c, data.customs, { delKg, trips, certBdmt }), addenda };
+    return { xh, rows, loose, supps, cleared, withCert, hd, c, cust, steps, checks, ev, T, tax, certBdmt, qty, delKg, trips, status: CM.contractStatus(data.customs, cid, c), axes: CM.axes(c, data.customs, { delKg, trips, certBdmt, mtCert: details.reduce((a, d) => a + (Number(d.mt) || 0), 0) }), addenda };
   }
 
   function specOf(m) {
@@ -123,7 +125,7 @@
   function html(m, spec) {
     const c = m.c;
     const stepper = '<div class="d-flex flex-wrap gap-2 mb-3">' + m.steps.map((s) => '<div class="border rounded p-2 flex-fill ' + (s.s === 'warn' ? 'border-warning bg-warning-subtle' : s.s === 'ok' ? 'border-success-subtle' : '') + '" style="min-width:150px"><div class="small muted">Bước ' + s.n + '</div><div class="fw-semibold">' + ICON[s.s] + ' ' + esc(s.t) + '</div><div class="small">' + esc(s.x) + '</div></div>').join('') + '</div>';
-    const cards = '<div class="row g-2 mb-3">' + [['KL hợp đồng hiện hành', nf(m.qty) + ' BDMT', m.addenda.length ? 'gốc ' + nf(c.qtyOrig) + ' · ' + m.addenda.length + ' phụ lục' : 'chưa có phụ lục'], ['Σ KL khô chứng thư', nf(m.certBdmt) + ' BDMT', m.qty != null ? 'còn lại ' + nf(m.qty - m.certBdmt) : ''], ['Thực giao (qua cân)', nf(m.delKg / 1000) + ' tấn', m.trips + ' chuyến'], ['Thuế còn nợ', '<span class="' + (m.tax.owed > 0 ? 'text-danger' : 'text-success') + '">' + nf(m.tax.owed) + ' đ</span>', 'phải nộp ' + nf(m.tax.payable) + ' · đã nộp ' + nf(m.tax.paid) + (m.tax.over > 0 ? ' · NỘP THỪA ' + nf(m.tax.over) : '') + (m.tax.undetermined ? ' · ' + m.tax.undetermined + ' tờ khai chưa xác định nghĩa vụ' : '')]]
+    const cards = '<div class="row g-2 mb-3">' + [['KL hợp đồng hiện hành', nf(m.qty) + ' BDMT', m.addenda.length ? 'gốc ' + (M.originalQty(c) == null ? 'để trống' : nf(c.qtyOrig)) + ' · ' + m.addenda.length + ' phụ lục' : 'chưa có phụ lục'], ['Σ KL khô chứng thư', nf(m.certBdmt) + ' BDMT', m.qty != null ? 'còn lại ' + nf(m.qty - m.certBdmt) : ''], ['Thực giao (qua cân)', nf(m.delKg / 1000) + ' tấn', m.trips + ' chuyến'], ['Thuế còn nợ', '<span class="' + (m.tax.owed > 0 ? 'text-danger' : 'text-success') + '">' + nf(m.tax.owed) + ' đ</span>', 'phải nộp ' + nf(m.tax.payable) + ' · đã nộp ' + nf(m.tax.paid) + (m.tax.over > 0 ? ' · NỘP THỪA ' + nf(m.tax.over) : '') + (m.tax.undetermined ? ' · ' + m.tax.undetermined + ' tờ khai chưa xác định nghĩa vụ' : '')]]
       .map((x) => '<div class="col-6 col-md-3"><div class="border rounded p-2 h-100"><div class="small muted">' + x[0] + '</div><div class="fs-5 fw-semibold">' + x[1] + '</div><div class="small muted">' + esc(x[2]) + '</div></div></div>').join('') + '</div>';
     const tbl = (t) => '<h6 class="mt-3">' + esc(t.caption) + '</h6><div class="tbl-wrap" style="max-height:none;overflow-x:visible"><table class="table table-sm align-middle small"><thead><tr>' + t.cols.map((x) => '<th' + (x.n ? ' class="num"' : '') + '>' + esc(x.h) + '</th>').join('') + '</tr></thead><tbody>' +
       t.rows.map((r) => '<tr class="' + (r.cls === 'total' ? 'fw-semibold table-light' : '') + (r.tone === 'warn' ? ' table-warning' : '') + '">' + r.c.map((x, i) => '<td' + (t.cols[i] && t.cols[i].n ? ' class="num text-nowrap"' : ' style="white-space:normal;word-break:break-word"') + '>' + esc(x == null ? '' : x) + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>';
@@ -135,7 +137,7 @@
     m = document.createElement('div'); m.className = 'modal fade'; m.id = 'cfModal'; m.tabIndex = -1;
     m.innerHTML = '<div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="cfTitle"></h5><button type="button" class="btn btn-sm btn-success ms-auto" id="cfXls">📊 Xuất Excel</button><button type="button" class="btn btn-sm btn-outline-secondary me-2" id="cfPdf">🖨 Tải PDF</button><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button></div><div class="modal-body" id="cfBody"></div></div></div>';
     document.body.append(m);
-    $('#cfPdf').addEventListener('click', () => { if (current && HAK.Customs && HAK.Customs.printReport) HAK.Customs.printReport(current).catch(() => {}); });
+    $('#cfPdf').addEventListener('click', () => { if (current && HAK.Customs && HAK.Customs.printReport) HAK.Customs.printReport(current).catch((e) => HAK.UI.toast('Không in được PDF hồ sơ hợp đồng: ' + (e && e.message ? e.message : e), 'error')); });
     $('#cfXls').addEventListener('click', () => exportXls().catch((e) => HAK.UI.toast(e.message || String(e), 'error')));
     return m;
   }

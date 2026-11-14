@@ -79,3 +79,18 @@ test('ba chỉ tiêu khối lượng tách bạch: BDMT hợp đồng hiện hà
   assert.ok(what.some((w) => /MT theo chứng thư ↔ MT thực giao qua cân, đã trừ xe trả về/.test(w)));
   const gap = m.checks.find((k) => /MT thực giao/.test(k.what)); assert.equal(gap.a, '8.000'); assert.equal(gap.b, '8'); assert.equal(gap.diff, '7.992');   // MT 8000 t tươi vs thực giao 8,000 t (8000 kg − 0)
 });
+
+test('Google Sheet: cột mới thêm Ở CUỐI (cột cũ giữ vị trí), mọi dòng đủ cột; nợ 20 / thừa 20 và KL gốc trống nhất quán với màn hình', () => {
+  const GS = require('../app/js/gsync-contracts.js');
+  const { m } = fx2(), c = HAK.Catalog.core.get().contracts[0];
+  c.addenda = [{ id: 'pl1', no: 'PL1', date: '2026-09-01', qty: 500, seq: 1 }]; c.qtyOrig = null; c.contractQty = 500;
+  const sheets = GS.buildSheets([{ c, buyer: 'IWC', m: CF.build(c.id, [{ key: c.id, c, lots: [] }]) }], { M, CM });
+  sheets.forEach((s) => s.rows.forEach((r) => assert.equal(r.length, s.cols.length, s.name + ' đủ cột')));
+  const hd = sheets.find((s) => s.name === 'NL_HOPDONG'), H = hd.cols.map((x) => x.h), row = hd.rows[0];
+  assert.equal(H[21], 'Trạng thái hợp đồng'); assert.equal(H[22], 'Cập nhật lúc'); assert.equal(H[0], 'Mã HĐ (app)');          // vị trí cột cũ không đổi
+  assert.equal(row[H.indexOf('KL gốc (BDMT)')], '', 'KL gốc để trống, không lấy 500 của phụ lục'); assert.equal(row[H.indexOf('KL hiện hành (BDMT)')], 500);
+  assert.equal(row[H.indexOf('Còn nợ thuế (đ)')], 20); assert.equal(row[H.indexOf('Nộp thừa (đ)')], 20); assert.equal(row[H.indexOf('Số dư ròng thuế (đ)')], 0);
+  assert.equal(row[H.indexOf('Thông quan')], 'Đã thông quan đủ'); assert.match(row[H.indexOf('Tình trạng thuế')], /Còn nợ 20 đ.*Nộp thừa 20 đ/);
+  const pl = sheets.find((s) => s.name === 'NL_PHULUC'); assert.equal(pl.rows[0][5], '', 'không có KL gốc thì không có cột tăng / giảm');
+  const spec = CF.specOf(CF.build(c.id, [{ key: c.id, c, lots: [] }])); assert.match(spec.tables[0].rows ? JSON.stringify(spec.tables[0]) : '', /để trống|chưa nhập/);
+});

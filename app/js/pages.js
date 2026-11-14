@@ -661,6 +661,12 @@
       if (f.type === 'warehouse') toggleCustomWh(el);
     } else el.value = val;
   }
+  /** Ô mà hồ sơ đang mở KHÔNG có giá trị → đưa về mặc định (trống / bỏ tick), để hồ sơ trước không "để sót" dữ liệu sang hồ sơ sau. */
+  function resetField(type, f, node) {
+    if (f.type === 'check') { node.checked = !!f.def; return; }
+    if (node.tagName === 'SELECT') { const want = f.def !== undefined ? String(f.def) : '', opts = Array.from(node.options || []), hit = opts.find((o) => o.value === want); if (hit) node.value = want; else if (opts.length) node.selectedIndex = 0; return; }
+    setField(type, f, f.def !== undefined ? f.def : '');
+  }
   const ctFillKey = (type) => 'hak.ctfill.' + type;
   /** Áp khoảng ngày cân của hợp đồng (nếu hợp đồng bật "Lọc xe theo khoảng ngày cân"). */
   function applyContractFilter(type, flt) {
@@ -765,7 +771,13 @@
       if (det) p.certSnap = HAK.Cert.snapshot(det, p, p.certReason, old && old.at && !linked ? old.at : undefined);
     }
     if (linked) { p.product = linked.product || '';p.contractNo=p.contractNo||linked.no||''; p.tkhq = linked.tkhq || ''; p.parentContractId = linked.parentId; p.contractDetailId = linked.detailId; }
-    return ST[type].snapshotParams?Object.assign({},ST[type].snapshotParams,p):p;
+    if (ST[type].snapshotParams) {
+      const merged = Object.assign({}, ST[type].snapshotParams, p);
+      // Hồ sơ cũ mở ra: ô chọn hợp đồng bị khóa (trống) → không được ghi đè liên kết chi tiết hợp đồng đã lưu trong hồ sơ.
+      if (!merged.contractId && ST[type].snapshotParams.contractId) merged.contractId = ST[type].snapshotParams.contractId;
+      return merged;
+    }
+    return p;
   }
   function saveForm(type) {
     const o = {};
@@ -889,7 +901,16 @@
   /** Lưu hồ sơ vào 🗄️ Lưu trữ (không bao giờ làm hỏng việc xuất file). */
   async function archive(type, params, res, ds, mode) {
     if(HAK.Yearbook&&HAK.Yearbook.active(type)&&HAK.Yearbook.active(type).readonly)return false;
-    try { const ok=!!(HAK.Archive && await HAK.Archive.save(type, params, res, ds, mode));if(HAK.Yearbook&&ds===getDs(type))await HAK.Yearbook.save(type,true);return ok; } catch (e) { console.warn(e); return false; }
+    // Chỉ trả true (→ thông báo "đã lưu vào Lưu trữ") khi giao dịch IndexedDB đã HOÀN TẤT; lỗi ghi thì báo rõ cho người dùng (file Word/PDF/Excel đã xuất vẫn dùng được).
+    const fail = (why) => { toast('⚠ Đã xuất file nhưng CHƯA lưu được hồ sơ vào Lưu trữ: ' + why + ' — xuất lại sau khi xử lý (dung lượng trình duyệt, cửa sổ khác đang mở app) hoặc dùng Cài đặt → Sao lưu toàn bộ.', 'error'); return false; };
+    let ok = false;
+    try {
+      ok = !!(HAK.Archive && await HAK.Archive.save(type, params, res, ds, mode));
+      if (!ok && HAK.Archive && HAK.Archive.lastError) fail(HAK.Archive.lastError);
+    } catch (e) { console.warn(e); fail(e && e.message ? e.message : String(e)); }
+    try { if (HAK.Yearbook && ds === getDs(type)) await HAK.Yearbook.save(type, true); }   // sổ năm là kho riêng: lỗi ở đây không làm mất trạng thái lưu của Lưu trữ
+    catch (e) { console.warn('Sổ hồ sơ năm:', e); }
+    return ok;
   }
   const SAVED = ' · đã lưu vào Lưu trữ';
 
@@ -1297,7 +1318,7 @@
     unloadSnapshot(type){delete ST[type].savedDs;delete ST[type].snapshotParams;ST[type].filter={groups:null,from:'',to:''};ST[type].returned.clear();ST[type].omit.clear();HAK.Pages.readOnly(type,false);renderFilter(type);updateSummary(type);},
     readOnly(type,on){ST[type].ro=!!on;$$('#page-'+type+' input,#page-'+type+' select,#page-'+type+' textarea').forEach(n=>n.disabled=on);if(on)$('#year-note-'+type).textContent='Chỉ xem năm đã đóng · Không ghi vào kho làm việc. Dùng Khôi phục năm nếu cần sửa.';},
     snapshot(type){const ds=getDs(type);if(!ds)throw Error('Chưa có dữ liệu cân.');const params=collect(type);return {params,rows:JSON.parse(JSON.stringify(G().filterRows(ds.rows,params.filter)))};},
-    openSnapshot(record){const type=record.type;if(!DOCS[type])throw Error('Loại hồ sơ không hỗ trợ.');const rows=JSON.parse(JSON.stringify(record.rows));ST[type].savedDs={ok:true,rows,stats:HAK.Excel.computeStats(rows)};ST[type].snapshotParams=JSON.parse(JSON.stringify(record.params));ST[type].filter=Object.assign({groups:null,from:'',to:''},record.params.filter||{});if(ST[type].filter.groups)ST[type].filter.groups=new Set(ST[type].filter.groups);ST[type].returned=new Set(record.params.returned||[]);ST[type].omit=new Map(((record.params.filter||{}).omitLog||[]).map(e=>[e.key,e]));Object.assign(HAK.Config.custom,record.context&&record.context.custom||{});DOCS[type].groups.forEach(g=>g.fields.forEach(f=>{const node=$('#'+fid(type,f.id)),value=record.params[f.id];if(!node)return;if(node.tagName==='SELECT'&&value!=null&&!Array.from(node.options).some(o=>o.value===value)){const option=document.createElement('option');option.value=value;option.textContent=value+' (đã lưu)';node.append(option);}if(f.type!=='contract'&&value!=null)setField(type,f,value);}));const contract=$('#'+fid(type,'contractId'));if(contract){contract.value='';contract.disabled=true;contract.title='Hồ sơ dùng thông tin hợp đồng đã lưu; chọn Thêm mới để dùng hợp đồng khác.';}renderFilter(type);updateSummary(type);$('#year-note-'+type).textContent='Đang sửa hồ sơ năm '+record.year+' · phiên bản '+record.revision+' · Lưu hồ sơ để ghi thay đổi';},
+    openSnapshot(record){const type=record.type;if(!DOCS[type])throw Error('Loại hồ sơ không hỗ trợ.');const rows=JSON.parse(JSON.stringify(record.rows));ST[type].savedDs={ok:true,rows,stats:HAK.Excel.computeStats(rows)};ST[type].snapshotParams=JSON.parse(JSON.stringify(record.params));ST[type].filter=Object.assign({groups:null,from:'',to:''},record.params.filter||{});if(ST[type].filter.groups)ST[type].filter.groups=new Set(ST[type].filter.groups);ST[type].returned=new Set(record.params.returned||[]);ST[type].omit=new Map(((record.params.filter||{}).omitLog||[]).map(e=>[e.key,e]));Object.assign(HAK.Config.custom,record.context&&record.context.custom||{});DOCS[type].groups.forEach(g=>g.fields.forEach(f=>{const node=$('#'+fid(type,f.id)),value=record.params[f.id];if(!node)return;if(node.tagName==='SELECT'&&value!=null&&!Array.from(node.options).some(o=>o.value===value)){const option=document.createElement('option');option.value=value;option.textContent=value+' (đã lưu)';node.append(option);}if(f.type==='contract')return;if(value!=null)setField(type,f,value);else resetField(type,f,node);}));const contract=$('#'+fid(type,'contractId'));if(contract){contract.value='';contract.disabled=true;contract.title='Hồ sơ dùng thông tin hợp đồng đã lưu; chọn Thêm mới để dùng hợp đồng khác.';}renderFilter(type);updateSummary(type);$('#year-note-'+type).textContent='Đang sửa hồ sơ năm '+record.year+' · phiên bản '+record.revision+' · Lưu hồ sơ để ghi thay đổi';},
     refreshSelects, generate, generateBkls,
     /** Loại biên bản có lập BKLS hay không (dùng ở Lưu trữ). */
     hasBkls: (t) => pageBkls(t),

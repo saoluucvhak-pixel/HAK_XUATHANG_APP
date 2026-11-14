@@ -399,9 +399,9 @@
   /** Phụ lục hợp đồng (điều chỉnh khối lượng): bảng con của hợp đồng. */
   function addendaBlock(c){
     const list=(c.addenda||[]).filter(a=>!a.deletedAt).slice().sort((a,b)=>String(a.date||'').localeCompare(String(b.date||'')));
-    const has=list.some(a=>a.qty!=null),orig=c.qtyOrig!=null?c.qtyOrig:c.contractQty;
+    const has=list.some(a=>a.qty!=null),orig=M.originalQty(c);
     return '<div class="border rounded p-2 mb-3"><div class="d-flex flex-wrap gap-2 align-items-center mb-1"><b>Phụ lục hợp đồng</b><span class="small muted">điều chỉnh khối lượng</span><button type="button" class="btn btn-sm btn-outline-primary ms-auto" data-add-new="'+esc(c.id)+'"'+(c.deletedAt?' disabled':'')+'>＋ Thêm phụ lục</button></div>'+
-      '<div class="small mb-1">KL hợp đồng gốc: <b>'+fmtNum(orig,2)+'</b> BDMT'+(has?' → <b>hiện hành: '+fmtNum(c.contractQty,2)+' BDMT</b> (theo phụ lục mới nhất)':'')+'</div>'+
+      '<div class="small mb-1">KL hợp đồng gốc: <b>'+(orig==null?'(trống)':fmtNum(orig,2))+'</b> BDMT'+(has?' → <b>hiện hành: '+fmtNum(c.contractQty,2)+' BDMT</b> (theo phụ lục mới nhất)':'')+'</div>'+
       (list.length?'<div class="tbl-wrap"><table class="table table-sm align-middle mb-0"><thead><tr><th>Số phụ lục</th><th>Ngày ký</th><th class="num">KL sau điều chỉnh (BDMT)</th><th class="num">Tăng / giảm</th><th>Lý do</th><th></th></tr></thead><tbody>'+list.map((a,i)=>{const prev=i?list[i-1].qty:orig,diff=a.qty!=null&&prev!=null?a.qty-prev:null;return '<tr><td>'+esc(a.no||'—')+'</td><td>'+esc(vnDate(a.date)||'')+'</td><td class="num">'+fmtNum(a.qty,2)+'</td><td class="num '+(diff>0?'text-success':diff<0?'text-danger':'')+'">'+(diff==null?'':(diff>0?'+':'')+fmtNum(diff,2))+'</td><td>'+esc(a.reason||'')+'</td><td class="text-nowrap"><button type="button" class="btn btn-sm btn-outline-primary" data-add-edit="'+esc(a.id)+'" data-parent="'+esc(c.id)+'">Sửa</button> <button type="button" class="btn btn-sm btn-outline-danger" data-add-del="'+esc(a.id)+'" data-parent="'+esc(c.id)+'">Xóa</button></td></tr>';}).join('')+'</tbody></table></div>':'<div class="small muted">Chưa có phụ lục. Khi ký phụ lục đổi khối lượng, bấm Thêm phụ lục — báo cáo sẽ tính theo khối lượng hiện hành.</div>')+'</div>';
   }
   /** Đóng hợp đồng thủ công (Xuất bán / Trao đổi không có tờ khai, hoặc đã giao đủ) và gợi ý đóng khi đủ khối lượng. */
@@ -420,7 +420,7 @@
     const c=contract(parentId);if(!c||!HAK.Customs||!HAK.Customs.openModal)return;
     const cur=(c.addenda||[]).find(a=>a.id===addId)||{};
     HAK.Customs.openModal({title:(addId?'Sửa':'Thêm')+' phụ lục — '+(c.no||c.id),values:cur,saveLabel:'Lưu phụ lục',
-      notice:'<div class="small muted mb-2">KL gốc: <b>'+fmtNum(c.qtyOrig!=null?c.qtyOrig:c.contractQty,2)+'</b> BDMT · hiện hành: <b>'+fmtNum(c.contractQty,2)+'</b> BDMT. Nhập <b>tổng khối lượng sau điều chỉnh</b> (không phải số tăng thêm).</div>',
+      notice:'<div class="small muted mb-2">KL gốc: <b>'+(M.originalQty(c)==null?'(trống)':fmtNum(M.originalQty(c),2))+'</b> BDMT · hiện hành: <b>'+fmtNum(c.contractQty,2)+'</b> BDMT. Nhập <b>tổng khối lượng sau điều chỉnh</b> (không phải số tăng thêm).</div>',
       fields:[{id:'no',label:'Số phụ lục',type:'text',col:4},{id:'date',label:'Ngày ký phụ lục',type:'date',col:4},{id:'qty',label:'KL hợp đồng sau điều chỉnh (BDMT)',type:'num',col:4},{id:'reason',label:'Lý do điều chỉnh',type:'text',col:12},{id:'note',label:'Ghi chú',type:'text',col:12}],
       onSave:async v=>{
         if(v.qty==null||v.qty<0)throw Error('Nhập khối lượng sau điều chỉnh (số không âm).');
@@ -452,7 +452,7 @@
     if(isC){
       $('#catForm').innerHTML=secTitle('Hợp đồng — thông tin chung')+
         '<div class="col-md-3"><label class="form-label" for="cf-type">Hình thức</label><select class="form-select" id="cf-type">'+Object.keys(TYPES).map(t=>'<option value="'+t+'"'+(t===c.type?' selected':'')+'>'+esc(TYPES[t].label)+'</option>').join('')+'</select></div>'+
-        inp('no','Số hợp đồng',5,c.no)+inp('date','Ngày ký',4,c.date,{type:'date'})+goodsInput('contractProduct','Tên hàng hóa hợp đồng',8,c.contractProduct)+inp('contractQty','KL hợp đồng (BDMT)'+((c.addenda||[]).some(x=>!x.deletedAt)?' — gốc':''),4,c.qtyOrig!=null?c.qtyOrig:c.contractQty,{type:'number',step:'any',help:(c.addenda||[]).some(x=>!x.deletedAt)?'Đây là KL gốc. KL hiện hành theo phụ lục: '+fmtNum(c.contractQty,2)+' BDMT.':''})+
+        inp('no','Số hợp đồng',5,c.no)+inp('date','Ngày ký',4,c.date,{type:'date'})+goodsInput('contractProduct','Tên hàng hóa hợp đồng',8,c.contractProduct)+inp('contractQty','KL hợp đồng (BDMT)'+((c.addenda||[]).some(x=>!x.deletedAt)?' — gốc':''),4,(c.addenda||[]).some(x=>!x.deletedAt)?(M.originalQty(c)==null?'':M.originalQty(c)):c.contractQty,{type:'number',step:'any',help:(c.addenda||[]).some(x=>!x.deletedAt)?'Đây là KL gốc'+(M.originalQty(c)==null?' (đang để trống)':'')+'. KL hiện hành theo phụ lục: '+fmtNum(c.contractQty,2)+' BDMT.'+(M.auditOriginal(c)?' ⚠ '+M.auditOriginal(c):''):''})+
         custSelect('exporterId','Bên xuất khẩu / bán / nhận ủy thác',6,c.exporterId,true)+custSelect('principalId','Bên ủy thác (nếu có)',6,c.principalId,true)+custSelect('buyerId','Bên mua hàng',6,c.buyerId,true)+
         inp('priceUsd','Đơn giá hợp đồng / BDMT',3,c.priceUsd,{type:'number',step:'any'})+
         '<div class="col-md-3"><label class="form-label" for="cf-currency">Tiền tệ</label><select class="form-select" id="cf-currency"><option value="USD"'+(c.currency==='USD'?' selected':'')+'>USD</option><option value="VND"'+(c.currency==='VND'?' selected':'')+'>VND</option></select></div>'+
@@ -496,7 +496,7 @@
       let res;
       if(ed.kind==='contracts'){
         const c=M.copy(ed.draft);['no','date','type','currency','note','dryFactory','priceUsd','contractProduct','contractQty','exporterId','principalId','buyerId'].forEach(k=>c[k]=fv(k));
-        if((c.addenda||[]).some(x=>!x.deletedAt))c.qtyOrig=c.contractQty;
+        if((c.addenda||[]).some(x=>!x.deletedAt))c.qtyOrig=c.contractQty===''||c.contractQty==null?null:Number(c.contractQty);   // ô trên form là KL GỐC; để trống thì KL gốc trống (không lấy KL phụ lục)
         const base=cleanContract(c),error=validateContract(Object.assign({},base,{exporterId:'',principalId:'',buyerId:''}));if(error)throw Error(error);
         for(const key of ['exporterId','principalId','buyerId']){
           if(c[key]!=='__new')continue;

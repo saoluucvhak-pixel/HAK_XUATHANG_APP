@@ -66,6 +66,18 @@
     if (numOrNull(a.amount) !== numOrNull(b.amount)) return false;
     return ['ndkt', 'chapter', 'dbhc', 'periodDate'].every((k) => { const x = String(a[k] || '').trim(), y = String(b[k] || '').trim(); return !x || !y || x === y; });
   }
+  /**
+   * "Có thể trùng" (chưa đủ dữ liệu nhận diện để quyết định): cùng loại + cùng số tiền, mà một bên thiếu số giấy lẫn số tham chiếu (nhập tay không ghi số)
+   * hoặc hai bên không có chung loại số nào để so. Không tự gộp, cũng không tự thêm → đưa ra ĐỐI SOÁT để người dùng quyết định.
+   */
+  function maybeSamePayment(a, b) {
+    if (!a || !b || samePayment(a, b)) return false;
+    if ((a.kind === 'fee' ? 'fee' : 'tax') !== (b.kind === 'fee' ? 'fee' : 'tax') || numOrNull(a.amount) === null || numOrNull(a.amount) !== numOrNull(b.amount)) return false;
+    const ra = recKey(a.receiptNo), rb = recKey(b.receiptNo), fa = digits(a.refNo), fb = digits(b.refNo);
+    if ((ra && rb && ra !== rb) || (fa && fb && fa !== fb)) return false;                     // có số giấy / tham chiếu khác nhau → chắc chắn là khoản khác
+    const none = (r, f) => !r && !f, shared = (ra && rb) || (fa && fb);
+    return none(ra, fa) || none(rb, fb) || !shared;
+  }
   /** Tìm khoản đã có giống p trong danh sách (bỏ qua dòng đã xóa và dòng skipId). */
   const findSamePayment = (list, p, skipId) => (list || []).find((x) => !x.deletedAt && x.id !== skipId && samePayment(x, p)) || null;
   const act = (list) => (list || []).filter((x) => !x.deletedAt);
@@ -134,7 +146,8 @@
       : st.undetermined ? { code: 'undetermined', label: 'Chưa xác định nghĩa vụ', text: taxText(st) }
       : st.over > 0 ? { code: 'over', label: 'Nộp thừa', text: taxText(st) }
       : { code: 'paid', label: st.payable > 0 || st.paidTax > 0 ? 'Đã nộp đủ' : 'Chưa có thuế', text: taxText(st) };
-    const delivery = x.trips > 0 ? { code: 'shipped', label: 'Đã có thực giao', text: x.trips + ' chuyến · ' + nfm((x.delKg || 0) / 1000) + ' tấn thực giao' } : { code: 'none', label: 'Chưa có phiếu cân', text: '' };
+    const mtCert = x.mtCert != null ? Number(x.mtCert) : null, delT = (x.delKg || 0) / 1000;
+    const delivery = x.trips > 0 ? { code: 'shipped', label: mtCert > 0 && delT + 0.005 >= mtCert ? 'Đã giao đủ MT theo chứng thư' : 'Đã có thực giao', text: x.trips + ' chuyến · ' + nfm(delT) + ' tấn thực giao (sau trừ xe trả về)' + (mtCert > 0 ? ' / ' + nfm(mtCert) + ' tấn MT theo chứng thư' : '') } : { code: 'none', label: 'Chưa có phiếu cân', text: mtCert > 0 ? '0 / ' + nfm(mtCert) + ' tấn MT theo chứng thư' : '' };
     return { progress, customs: customsAx, tax: taxAx, delivery, settlement: st };
   }
   const nfm = (n) => (Math.round((Number(n) || 0) * 100) / 100).toLocaleString('vi-VN');
@@ -225,6 +238,6 @@
     if (!act(customs).some((x) => x.contractId === c.id && (!x.detailId || x.detailId === d.id))) missing.push('tờ khai hải quan');
     return { ok: !missing.length, missing };
   }
-  HAK.CustomsModel = { samePayment, findSamePayment, axes, settlement, taxText, closeHint, detailReady, readiness, STATUS, STATUS_ORDER, PAY_KIND, newDecl, newSupp, newPay, active: act, sum, totals, setStatus, statusDate, contractStatus, validate, upsert, merge, copy, digits };
+  HAK.CustomsModel = { maybeSamePayment, samePayment, findSamePayment, axes, settlement, taxText, closeHint, detailReady, readiness, STATUS, STATUS_ORDER, PAY_KIND, newDecl, newSupp, newPay, active: act, sum, totals, setStatus, statusDate, contractStatus, validate, upsert, merge, copy, digits };
   if (typeof module === 'object' && module.exports) module.exports = HAK.CustomsModel;
 })(typeof window !== 'undefined' ? window : globalThis);

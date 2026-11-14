@@ -46,7 +46,7 @@
     const label = [c.no || c.id, CF().TYPES[c.type] || '', vn(c.date), g.f.buyer].filter(Boolean).join(' · ');
     const pct = m.qty ? Math.round(m.certBdmt / m.qty * 1000) / 10 : null, over = m.qty != null && m.certBdmt > m.qty + 0.005;
     const nBad = m.rows.filter((r) => r.tkct.s === 'warn').length, lots = m.rows.filter((r) => r.cttt.s !== 'none'), nLot = lots.filter((r) => r.cttt.s === 'warn').length, nMiss = m.rows.filter((r) => r.tkct.s === 'info').length, nLotMiss = lots.filter((r) => r.cttt.s === 'info').length;
-    out.push({ cls: 'main', t: [], c: [label, nf(c.qtyOrig != null ? c.qtyOrig : c.contractQty), m.addenda.length ? m.addenda.map((a) => (a.no || 'PL') + ': ' + nf(a.qty)).join(' ; ') : '—', nf(c.contractQty),
+    out.push({ cls: 'main', t: [], c: [label, nf(HAK.ContractModel.originalQty(c)), m.addenda.length ? m.addenda.map((a) => (a.no || 'PL') + ': ' + nf(a.qty)).join(' ; ') : '—', nf(c.contractQty),
       m.withCert + '/' + m.rows.length + ' chứng thư', nf(m.certBdmt), pct == null ? '' : nf(pct) + '% · ' + (over ? 'VƯỢT ' + nf(m.certBdmt - m.qty) : 'còn ' + nf(m.qty - m.certBdmt)),
       (m.T.length || 'chưa có') + ' tờ khai', '', m.cleared + '/' + m.T.length + ' thông quan',
       m.supps + ' lần', nf(sum(m.T.map((x) => x.t.extra))), nf(m.tax.payable), nf(m.tax.paid), nf(m.tax.owed), nf(m.tax.over), m.tax.undetermined ? String(m.tax.undetermined) : '',

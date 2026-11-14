@@ -119,7 +119,9 @@
    * @param {string} mode    word | pdf | xlsx
    * @returns {Promise<boolean>}
    */
+  let lastError = '';   // lý do lần lưu gần nhất thất bại ('' = chưa lỗi) — pages.js dùng để BÁO LỖI cho người dùng thay vì lặng lẽ bỏ qua
   async function save(type, params, res, ds, mode) {
+    lastError = '';
     try {
       const G = HAK.Generator;
       const rows = G.filterRows(ds.rows, params.filter);
@@ -162,7 +164,7 @@
       updateBadge();
       if (navigator.storage && navigator.storage.persist) { try { navigator.storage.persist(); } catch (e) { /* bỏ qua */ } }
       return true;
-    } catch (e) { console.warn('Lưu trữ hồ sơ thất bại:', e); return false; }
+    } catch (e) { console.warn('Lưu trữ hồ sơ thất bại:', e); lastError = e && e.message ? e.message : String(e); return false; }
   }
 
   /** v2.7.4: KHÔNG tự xóa nữa (trước: giữ 500 hồ sơ mới nhất) — chỉ nhắc 1 lần mỗi phiên khi vượt SOFT_WARN. */
@@ -408,5 +410,5 @@
     updateBadge();
   }
 
-  HAK.Archive = { setContract, closeVerified,decode:unpack,SOFT_WARN, save, list, load, ensureStats, regenerate, exportAll, importFile, collectItems, importItems, render, init, updateBadge, get state() { return state; } };
+  HAK.Archive = { get lastError() { return lastError; }, setContract, closeVerified,decode:unpack,SOFT_WARN, save, list, load, ensureStats, regenerate, exportAll, importFile, collectItems, importItems, render, init, updateBadge, get state() { return state; } };
 })(typeof window !== 'undefined' ? window : globalThis);
