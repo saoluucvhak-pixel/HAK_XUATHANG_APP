@@ -13,11 +13,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
+      - run: npm ci   # khóa phiên bản công cụ lint bằng package-lock.json
       - run: npm run check
+      - run: npm run lint   # ESLint: biến chưa khai báo (no-undef), khóa trùng, mã không tới được
       - run: npm test
       - run: npm run quality
       - run: npm run release
       - uses: actions/upload-artifact@v4
+        continue-on-error: true   # hết dung lượng artifact của GitHub không được làm đỏ CI
         with:
           name: hak-quality-node-${{ matrix.node }}
           path: reports/quality/

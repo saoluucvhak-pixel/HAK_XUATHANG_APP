@@ -31,7 +31,6 @@
     const loose = decls.filter((x) => !details.some((d) => d.id === x.detailId));
     const rows = details.map((d) => ({ d, v: M.valuation(c, d), decl: declOf(d), lot: lotOf(d) }));
     const T = decls.map((d) => ({ d, t: CM.totals(d) }));
-    const sumT = (k) => T.reduce((a, x) => a + (Number(x.t[k]) || 0), 0);
     // Thuế KHÔNG bù trừ giữa các tờ khai: còn nợ và nộp thừa cộng riêng; tờ khai chưa xác định nghĩa vụ tách riêng; số dư ròng chỉ để tham khảo.
     const st = CM.settlement(decls), tax = { payable: st.payable, paid: st.paidTax, fee: st.paidFee, remaining: st.owed, owed: st.owed, over: st.over, net: st.net, undetermined: st.undetermined, paidUndetermined: st.paidUndetermined, text: CM.taxText(st) };
     const certBdmt = details.reduce((a, d) => a + (Number(d.bdmt) || 0), 0), qty = hasNum(c.contractQty) ? Number(c.contractQty) : null;
@@ -125,7 +124,7 @@
   function html(m, spec) {
     const c = m.c;
     const stepper = '<div class="d-flex flex-wrap gap-2 mb-3">' + m.steps.map((s) => '<div class="border rounded p-2 flex-fill ' + (s.s === 'warn' ? 'border-warning bg-warning-subtle' : s.s === 'ok' ? 'border-success-subtle' : '') + '" style="min-width:150px"><div class="small muted">Bước ' + s.n + '</div><div class="fw-semibold">' + ICON[s.s] + ' ' + esc(s.t) + '</div><div class="small">' + esc(s.x) + '</div></div>').join('') + '</div>';
-    const cards = '<div class="row g-2 mb-3">' + [['KL hợp đồng hiện hành', nf(m.qty) + ' BDMT', m.addenda.length ? 'gốc ' + (M.originalQty(c) == null ? 'để trống' : nf(c.qtyOrig)) + ' · ' + m.addenda.length + ' phụ lục' : 'chưa có phụ lục'], ['Σ KL khô chứng thư', nf(m.certBdmt) + ' BDMT', m.qty != null ? 'còn lại ' + nf(m.qty - m.certBdmt) : ''], ['Thực giao (qua cân)', nf(m.delKg / 1000) + ' tấn', m.trips + ' chuyến'], ['Thuế còn nợ', '<span class="' + (m.tax.owed > 0 ? 'text-danger' : 'text-success') + '">' + nf(m.tax.owed) + ' đ</span>', 'phải nộp ' + nf(m.tax.payable) + ' · đã nộp ' + nf(m.tax.paid) + (m.tax.over > 0 ? ' · NỘP THỪA ' + nf(m.tax.over) : '') + (m.tax.undetermined ? ' · ' + m.tax.undetermined + ' tờ khai chưa xác định nghĩa vụ' : '')]]
+    const cards = '<div class="row g-2 mb-3">' + [['KL hợp đồng hiện hành', nf(m.qty) + ' BDMT', m.addenda.length ? 'gốc ' + (HAK.ContractModel.originalQty(c) == null ? 'để trống' : nf(c.qtyOrig)) + ' · ' + m.addenda.length + ' phụ lục' : 'chưa có phụ lục'], ['Σ KL khô chứng thư', nf(m.certBdmt) + ' BDMT', m.qty != null ? 'còn lại ' + nf(m.qty - m.certBdmt) : ''], ['Thực giao (qua cân)', nf(m.delKg / 1000) + ' tấn', m.trips + ' chuyến'], ['Thuế còn nợ', '<span class="' + (m.tax.owed > 0 ? 'text-danger' : 'text-success') + '">' + nf(m.tax.owed) + ' đ</span>', 'phải nộp ' + nf(m.tax.payable) + ' · đã nộp ' + nf(m.tax.paid) + (m.tax.over > 0 ? ' · NỘP THỪA ' + nf(m.tax.over) : '') + (m.tax.undetermined ? ' · ' + m.tax.undetermined + ' tờ khai chưa xác định nghĩa vụ' : '')]]
       .map((x) => '<div class="col-6 col-md-3"><div class="border rounded p-2 h-100"><div class="small muted">' + x[0] + '</div><div class="fs-5 fw-semibold">' + x[1] + '</div><div class="small muted">' + esc(x[2]) + '</div></div></div>').join('') + '</div>';
     const tbl = (t) => '<h6 class="mt-3">' + esc(t.caption) + '</h6><div class="tbl-wrap" style="max-height:none;overflow-x:visible"><table class="table table-sm align-middle small"><thead><tr>' + t.cols.map((x) => '<th' + (x.n ? ' class="num"' : '') + '>' + esc(x.h) + '</th>').join('') + '</tr></thead><tbody>' +
       t.rows.map((r) => '<tr class="' + (r.cls === 'total' ? 'fw-semibold table-light' : '') + (r.tone === 'warn' ? ' table-warning' : '') + '">' + r.c.map((x, i) => '<td' + (t.cols[i] && t.cols[i].n ? ' class="num text-nowrap"' : ' style="white-space:normal;word-break:break-word"') + '>' + esc(x == null ? '' : x) + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>';
@@ -169,6 +168,6 @@
       return '<div class="mt-1 d-flex flex-wrap gap-1 fw-normal">' + m.steps.map((x, i) => '<span class="badge ' + (x.s === 'ok' ? 'text-bg-success' : x.s === 'warn' ? 'text-bg-warning' : x.s === 'info' ? 'text-bg-info' : 'text-bg-light border') + '" style="font-size:.68rem" title="' + esc(x.t + ': ' + x.x) + '">' + ICON[x.s] + ' ' + short[i] + '</span>').join('') + '</div>';
     } catch (e) { return ''; }
   }
-  HAK.ContractFile = { open, build, specOf, strip, nf, vn, TYPES };
+  HAK.ContractFile = { open, build, specOf, html, strip, nf, vn, TYPES };
   if (typeof module === 'object' && module.exports) module.exports = HAK.ContractFile;
 })(typeof window !== 'undefined' ? window : globalThis);

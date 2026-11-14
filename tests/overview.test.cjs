@@ -95,3 +95,11 @@ test('Google Sheet: cột mới thêm Ở CUỐI (cột cũ giữ vị trí), m�
   const pl = sheets.find((s) => s.name === 'NL_PHULUC'); assert.equal(pl.rows[0][5], '', 'không có KL gốc thì không có cột tăng / giảm');
   const spec = CF.specOf(CF.build(c.id, [{ key: c.id, c, lots: [] }])); assert.match(spec.tables[0].rows ? JSON.stringify(spec.tables[0]) : '', /để trống|chưa nhập/);
 });
+
+test('khung xem Hồ sơ hợp đồng (HTML) dựng được cả khi KL gốc để trống + phụ lục (không lỗi biến chưa khai báo)', () => {
+  HAK.UI = { esc: (s) => String(s == null ? '' : s) };
+  const { m } = fx2(), c = HAK.Catalog.core.get().contracts[0];
+  c.addenda = [{ id: 'pl1', no: 'PL1', date: '2026-09-01', qty: 500, seq: 1 }]; c.qtyOrig = null; c.contractQty = 500;
+  const mm = CF.build(c.id, [{ key: c.id, c, lots: [] }]), out = CF.html(mm, CF.specOf(mm));
+  assert.match(out, /gốc để trống/); assert.match(out, /Tiến độ/); assert.ok(m);
+});

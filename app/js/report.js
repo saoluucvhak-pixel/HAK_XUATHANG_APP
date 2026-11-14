@@ -80,7 +80,7 @@
     recs.forEach((r) => { if (r.toTs === null) r.toTs = r.fromTs; });
     // v2.17.0 — chống trùng ở cấp PHIẾU CÂN: cụm hồ sơ giao nhau về ngày mà đã có danh sách phiếu (opt.tickets, xem prepareTickets) → đối soát từng phiếu;
     // cụm chưa có phiếu (hồ sơ không đọc được / chưa nạp) → lùi về chống trùng nguyên hồ sơ (cùng nhóm, giữ bản mới nhất).
-    const W = HAK.Weigh, tk = opt.tickets || null, byId = new Map(recs.map((r) => [r.id, r]));
+    const W = HAK.Weigh, tk = opt.tickets || null;
     const tclusters = W && tk ? W.clusters(recs).filter((cl) => cl.every((r) => tk.has(r.id))) : [];
     const ticketed = new Set(tclusters.flat().map((r) => r.id));
     markDuplicates(recs.filter((r) => !ticketed.has(r.id)));

@@ -348,7 +348,7 @@
         let n = 0;
         await commit((next) => {
           next.customs = next.customs || [];
-          const pool = new Map(); let pending = 0;     // các khoản đã có TRƯỚC lần nhập này, mỗi khoản chỉ "khớp" được một dòng → hai dòng giống hệt trong cùng giấy vẫn được giữ cả hai
+          const pool = new Map();     // các khoản đã có TRƯỚC lần nhập này, mỗi khoản chỉ "khớp" được một dòng → hai dòng giống hệt trong cùng giấy vẫn được giữ cả hai
           picked.forEach((x) => {
             let d = x.target === '__new' ? null : next.customs.find((y) => y.id === x.target);
             if (!d) { d = CM().newDecl({ no: x.no, openDate: x.declDate || '', type: x.declType || '', status: 'opened', note: 'Tạo từ giấy nộp tiền ' + (v.receiptNo || ''), supplements: [], payments: [] }); next.customs.push(d); }
@@ -359,7 +359,7 @@
             const maybe = left.findIndex((y) => CM().maybeSamePayment(y, cand));
             if (maybe >= 0) {
               const y = left[maybe];
-              if (!confirm('Cần đối soát: dòng ' + money(x.amount) + ' đ (' + (CM().PAY_KIND[x.kind] || x.kind) + ') của giấy ' + (v.receiptNo || v.refNo || '?') + ' có thể TRÙNG khoản đã nhập tay ' + (y.receiptNo || y.refNo ? 'giấy ' + (y.receiptNo || y.refNo) : '(chưa ghi số giấy)') + ' cùng số tiền, tờ khai ' + d.no + '.\n\nBấm OK nếu là khoản KHÁC (vẫn thêm); Hủy nếu là cùng một khoản (bỏ dòng này — bạn có thể bổ sung số giấy vào khoản đã nhập tay).')) { left.splice(maybe, 1); pending++; return; }
+              if (!confirm('Cần đối soát: dòng ' + money(x.amount) + ' đ (' + (CM().PAY_KIND[x.kind] || x.kind) + ') của giấy ' + (v.receiptNo || v.refNo || '?') + ' có thể TRÙNG khoản đã nhập tay ' + (y.receiptNo || y.refNo ? 'giấy ' + (y.receiptNo || y.refNo) : '(chưa ghi số giấy)') + ' cùng số tiền, tờ khai ' + d.no + '.\n\nBấm OK nếu là khoản KHÁC (vẫn thêm); Hủy nếu là cùng một khoản (bỏ dòng này — bạn có thể bổ sung số giấy vào khoản đã nhập tay).')) { left.splice(maybe, 1); return; }
               left.splice(maybe, 1);
             }
             (d.payments = d.payments || []).push(CM().newPay({ receiptNo: v.receiptNo, formCode: v.formCode, refNo: v.refNo, date: v.date, payer: v.payer, kind: x.kind, content: x.content, amount: x.amount, periodDate: x.periodDate, chapter: x.chapter, ndkt: x.ndkt, dbhc: x.dbhc }));

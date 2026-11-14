@@ -21,7 +21,8 @@ function fakeIdb(mode) {                         // mode: 'ok' | 'abort' | 'thro
 }
 function load(mode) {
   const f = fakeIdb(mode);
-  global.window = global; global.indexedDB = f.indexedDB; global.HAK = { Config: { company: () => ({ short: 'HAK' }) }, Generator: { filterRows: (r) => r, retKey: (r) => r.idx, summarize: (r) => ({ trips: r.length, kg: r.reduce((a, x) => a + x.net, 0), vehicles: r.length, from: '01/10/2026', to: '01/10/2026' }) }, UI: { toast() {} } };
+  global.window = global; global.indexedDB = f.indexedDB; if (typeof navigator === 'undefined') Object.defineProperty(global, 'navigator', { value: {}, configurable: true });   // Node < 21 chưa có navigator (trình duyệt luôn có)
+  global.HAK = { Config: { company: () => ({ short: 'HAK' }) }, Generator: { filterRows: (r) => r, retKey: (r) => r.idx, summarize: (r) => ({ trips: r.length, kg: r.reduce((a, x) => a + x.net, 0), vehicles: r.length, from: '01/10/2026', to: '01/10/2026' }) }, UI: { toast() {} } };
   global.document = { querySelector: () => null, querySelectorAll: () => [], getElementById: () => null, addEventListener() {} };
   delete require.cache[require.resolve('../app/js/archive.js')]; require('../app/js/archive.js');
   return { f, A: global.HAK.Archive };

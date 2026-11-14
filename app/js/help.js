@@ -200,11 +200,19 @@
         '<div class="flex-grow-1" style="min-width:240px"><h5 class="mb-1">📘 Hướng dẫn cài đặt, phân quyền &amp; khôi phục</h5><div class="small muted">Bản đang chạy: <b>v' + esc(HAK.VERSION || '?') + '</b>. In ra hoặc lưu PDF để đưa cho người cài máy.</div>' +
         '<div class="help-toc no-print mt-2">' + SECTIONS.map((s) => '<button type="button" class="btn btn-sm btn-outline-primary' + (s[2] ? ' admin-only' : '') + '" data-help-go="' + s[0] + '">' + esc(s[1].replace(/^[A-F]\. /, '')) + '</button>').join('') + '</div></div>' +
         '<div style="min-width:260px;flex:1 1 280px" id="helpInfo"></div>' +
-        '<button type="button" class="btn btn-primary no-print" id="helpPrint">🖨 In / lưu PDF</button></div></div>' +
+        '<div class="no-print d-flex flex-column gap-2"><button type="button" class="btn btn-primary" id="helpPrint">🖨 In / lưu PDF</button><button type="button" class="btn btn-outline-secondary" id="helpUpdate">🔄 Kiểm tra bản mới</button><div class="small" id="helpUpdateMsg" role="status"></div></div></div></div>' +
         SECTIONS.map((s) => '<div class="card mb-3 help-sec' + (s[2] ? ' admin-only' : '') + '" id="' + s[0] + '"><div class="card-header">' + esc(s[1]) + '</div><div class="card-body">' + s[3] + '</div></div>').join('');
       box.addEventListener('click', (e) => {
         const b = e.target.closest('[data-help-go]'); if (b) go(b.dataset.helpGo);
         if (e.target.closest('#helpPrint')) root.print();
+        const ub = e.target.closest('#helpUpdate');
+        if (ub && HAK.Update) {
+          const msg = $('#helpUpdateMsg'); ub.disabled = true; msg.className = 'small muted'; msg.textContent = 'Đang kiểm tra…';
+          HAK.Update.check().then((v) => {
+            msg.className = 'small ' + (v.state === 'new' ? 'text-warning-emphasis' : 'text-success');
+            msg.innerHTML = esc(v.text) + (v.state === 'new' ? ' <a href="' + esc(v.latest.url) + '" target="_blank" rel="noopener">Tải về</a>' + (v.latest.sha256 ? '<div class="mono small">SHA-256: ' + esc(v.latest.sha256) + '</div>' : '') : '');
+          }).catch((err) => { msg.className = 'small text-danger'; msg.textContent = err.message || String(err); }).finally(() => { ub.disabled = false; });
+        }
       });
       built = true;
     }

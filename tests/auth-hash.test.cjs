@@ -1,6 +1,7 @@
 /* Băm mật khẩu: PBKDF2 cho bản ghi mới; bản ghi cũ (SHA-256 × 2.000) vẫn xác minh được và nhận diện là "cũ" để nâng cấp. */
 const { test } = require('node:test'), assert = require('node:assert/strict');
-global.window = global; global.HAK = {}; global.document = { querySelector() { return null; }, addEventListener() {} };
+global.window = global; if (!global.crypto) global.crypto = require('node:crypto').webcrypto;   // Node 18 chưa có crypto toàn cục (trình duyệt luôn có)
+global.HAK = {}; global.document = { querySelector() { return null; }, addEventListener() {} };
 require('../app/js/auth.js');
 const A = HAK.Auth;
 

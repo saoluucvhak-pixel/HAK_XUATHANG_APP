@@ -5,6 +5,11 @@
     "test": "node --test tests/*.test.cjs",
     "check": "node tools/check.cjs",
     "quality": "node tools/hak-quality/bin/hak-quality.js app --out reports/quality",
-    "release": "node tools/build-release.cjs"
+    "release": "node tools/build-release.cjs",
+    "lint": "eslint app/js"
+  },
+  "devDependencies": {
+    "eslint": "^9.0.0",
+    "globals": "^15.0.0"
   }
 }

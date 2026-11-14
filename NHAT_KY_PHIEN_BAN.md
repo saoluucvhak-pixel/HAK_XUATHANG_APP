@@ -309,6 +309,8 @@ Thủy chốt 28/09/2026: "1. bỏ Trao đổi KHÔNG đồng bộ lên Google S
 - Khôi phục sao lưu: tự chụp cài đặt + danh mục hiện có trước khi ghi đè; nút "↶ Hoàn tác khôi phục"; không chụp được thì từ chối khôi phục (không đổi gì).
 - Mục "Toàn vẹn danh mục" trong sức khỏe dữ liệu: báo tờ khai mồ côi, khóa trùng, khóa ngoại sai, khoản nộp nhập trùng, hồ sơ gắn chi tiết không còn (chỉ báo, không sửa).
 - HAK_SMART_FILTER cập nhật e99bb7e (kho bộ lọc lỗi / khác phiên bản không bị ghi đè). Ghi chú phát hành kèm SHA-256 bộ cài.
+- Nút "🔄 Kiểm tra bản mới" ở trang Hướng dẫn (chỉ gọi GitHub khi bấm; hiện bản mới + SHA-256 + liên kết tải).
+- CI: thêm ESLint (no-undef…) + package-lock.json, chạy kiểm thử cả Node 18 / 20 / 22; lỗi tải artifact không làm đỏ CI. Sửa lỗi ReferenceError ở thẻ "KL gốc" của Hồ sơ hợp đồng do ESLint phát hiện.
 - Xem docs/QUY_TAC_NGHIEP_VU_CAN_XAC_NHAN.md.
 
 ## v2.16.2 — Rà soát mã nguồn: bảo mật, độ bền, đóng hợp đồng
