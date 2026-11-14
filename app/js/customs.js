@@ -3,7 +3,7 @@
  *  - Bảng cha: tờ khai hải quan. Bảng con: khai bổ sung, giấy nộp tiền. Trạng thái: Đã mở tờ khai → Chờ thông quan → Đã thông quan.
  *  - Nhập tờ khai từ file .xls/.xlsx (bản xác nhận nội dung tờ khai VNACCS) hoặc OCR bản in / ảnh; OCR giấy nộp tiền (mẫu C1-02/NS).
  *  - Dữ liệu nằm trong cùng snapshot Danh mục (data.customs) → đi theo Sao lưu, Lưu trữ năm, đồng bộ như hợp đồng.
- *  - Hợp đồng: Đang thực hiện → Đã hoàn thành khi mọi tờ khai của hợp đồng đã thông quan (contractBadge).
+ *  - Hợp đồng: Đang thực hiện → Đã thông quan đủ tờ khai khi mọi tờ khai của hợp đồng đã thông quan (contractBadge).
  */
 (function (root) {
   'use strict';
@@ -159,7 +159,7 @@
   function notifyContract(d) {
     if (!d || !d.contractId || d.status !== 'cleared') return;
     const s = cstatus(d.contractId);
-    if (s.code === 'done') toast('Hợp đồng ' + ((contractOf(d.contractId) || {}).no || '') + ' đã hoàn thành (mọi tờ khai đã thông quan).', 'success');
+    if (s.code === 'done') toast('Hợp đồng ' + ((contractOf(d.contractId) || {}).no || '') + ' đã thông quan đủ tờ khai (mọi tờ khai đã thông quan).', 'success');
   }
   async function setStatus(id, status) {
     const d = customsList().find((x) => x.id === id); if (!d || d.status === status) return;
@@ -205,6 +205,8 @@
       async onSave(v) {
         await commit((next) => {
           const dd = next.customs.find((x) => x.id === declId), p = CM().newPay(Object.assign({}, cur || {}, v, { id: cur ? cur.id : undefined }));
+          const dup = CM().findSamePayment(dd.payments, p, p.id);
+          if (dup && !confirm('Đã có khoản nộp giống hệt (giấy ' + (dup.receiptNo || dup.refNo || '?') + ', ' + money(dup.amount) + ' đ, cùng loại và mã NDKT/kỳ thuế). Có thể là nhập trùng.\n\nBấm OK nếu đây là khoản nộp KHÁC và vẫn muốn thêm; Hủy để bỏ.')) throw Error('Đã hủy — khoản nộp trùng.');
           const at = (dd.payments || []).findIndex((x) => x.id === p.id); if (at >= 0) dd.payments[at] = p; else (dd.payments = dd.payments || []).push(p);
           dd.revision = (dd.revision || 0) + 1;
         });
@@ -346,11 +348,13 @@
         let n = 0;
         await commit((next) => {
           next.customs = next.customs || [];
+          const pool = new Map();     // các khoản đã có TRƯỚC lần nhập này, mỗi khoản chỉ "khớp" được một dòng → hai dòng giống hệt trong cùng giấy vẫn được giữ cả hai
           picked.forEach((x) => {
             let d = x.target === '__new' ? null : next.customs.find((y) => y.id === x.target);
             if (!d) { d = CM().newDecl({ no: x.no, openDate: x.declDate || '', type: x.declType || '', status: 'opened', note: 'Tạo từ giấy nộp tiền ' + (v.receiptNo || ''), supplements: [], payments: [] }); next.customs.push(d); }
-            const same = (y) => !y.deletedAt && ((y.refNo && v.refNo && y.refNo === CM().digits(v.refNo) && y.amount === x.amount) || (y.receiptNo && y.receiptNo === v.receiptNo && y.amount === x.amount && y.kind === x.kind));
-            if ((d.payments || []).some(same)) return;   // nhập lại cùng giấy → không nhân đôi
+            if (!pool.has(d.id)) pool.set(d.id, CM().active(d.payments).slice());
+            const cand = { receiptNo: v.receiptNo, refNo: v.refNo, kind: x.kind, amount: x.amount, ndkt: x.ndkt, chapter: x.chapter, dbhc: x.dbhc, periodDate: x.periodDate }, left = pool.get(d.id), at = left.findIndex((y) => CM().samePayment(y, cand));
+            if (at >= 0) { left.splice(at, 1); return; }   // nhập lại cùng khoản (kể cả đã nhập tay) → không nhân đôi
             (d.payments = d.payments || []).push(CM().newPay({ receiptNo: v.receiptNo, formCode: v.formCode, refNo: v.refNo, date: v.date, payer: v.payer, kind: x.kind, content: x.content, amount: x.amount, periodDate: x.periodDate, chapter: x.chapter, ndkt: x.ndkt, dbhc: x.dbhc }));
             d.revision = (d.revision || 0) + 1; n++;
           });
@@ -570,7 +574,7 @@
       .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')) || String(a.no || '').localeCompare(String(b.no || '')));
     return list.map((c) => {
       const details = M.active(c), mine = all.filter((d) => d.contractId === c.id), rows = [];
-      const declRow = (x) => { const t = x ? CM().totals(x) : null; return { decl: x || null, payable: t ? t.payable : null, paidTax: t ? t.paidTax : 0, paidFee: t ? t.paidFee : 0, remaining: t ? t.remaining : null }; };
+      const declRow = (x) => { const t = x ? CM().totals(x) : null; return { decl: x || null, payable: t ? t.payable : null, paidTax: t ? t.paidTax : 0, paidFee: t ? t.paidFee : 0, remaining: t ? t.owed : null, over: t ? t.over : 0, undetermined: !!(t && t.undetermined) }; };   // remaining = CÒN NỢ của tờ khai (không bù trừ với tờ khai nộp thừa)
       details.forEach((d) => {
         const ds = mine.filter((x) => x.detailId === d.id), v = M.valuation(c, d);
         (ds.length ? ds : [null]).forEach((x, i) => rows.push(Object.assign({ detail: d, first: i === 0, mt: i === 0 ? d.mt : null, bdmt: i === 0 ? d.bdmt : null, usd: i === 0 ? v.valueUsd : null, vnd: i === 0 ? v.valueVnd : null }, declRow(x))));
@@ -579,7 +583,7 @@
       const st = CM().contractStatus(all, c.id, c), bd = sumOf(details.map((d) => d.bdmt));
       const model = { c, rows, st, tot: {
         details: details.length, certs: details.filter((d) => d.certNo).length, bdmt: bd, mt: sumOf(details.map((d) => d.mt)), usd: sumOf(details.map((d) => M.valuation(c, d).valueUsd)), vnd: sumOf(details.map((d) => M.valuation(c, d).valueVnd)),
-        decls: mine.length, cleared: st.cleared, payable: sumOf(mine.map((x) => CM().totals(x).payable)), paidTax: sumOf(mine.map((x) => CM().totals(x).paidTax)), paidFee: sumOf(mine.map((x) => CM().totals(x).paidFee)), remaining: sumOf(mine.map((x) => CM().totals(x).remaining)),
+        decls: mine.length, cleared: st.cleared, payable: sumOf(mine.map((x) => CM().totals(x).payable)), paidTax: sumOf(mine.map((x) => CM().totals(x).paidTax)), paidFee: sumOf(mine.map((x) => CM().totals(x).paidFee)), remaining: CM().settlement(mine).owed, over: CM().settlement(mine).over, undetermined: CM().settlement(mine).undetermined,
         left: hasNum(c.contractQty) ? Number(c.contractQty) - bd : null, pct: hasNum(c.contractQty) && c.contractQty > 0 ? bd / c.contractQty * 100 : null
       } };
       const t = model.tot;
@@ -591,7 +595,7 @@
   const ctFields = () => { const f = F(), SF = f.core, many = (key, label, options, get) => ({ key, label, type: 'multi', options, match: (r, sel) => (get(r).length ? get(r) : ['']).some((x) => SF.inSet(sel, x)) }); return [
     f.multi('type', 'Hình thức', () => Object.keys(HAK.Catalog.TYPES || {}).map((k) => ({ value: k, label: HAK.Catalog.TYPES[k].label })), (r) => r.type),
     f.multi('buyerId', 'Bên mua', () => core().customers().map((c) => ({ value: c.id, label: c.name })), (r) => r.buyerId),
-    f.multi('status', 'Trạng thái hợp đồng', () => [{ value: 'running', label: 'Đang thực hiện' }, { value: 'done', label: 'Đã hoàn thành' }], (r) => r.status),
+    f.multi('status', 'Trạng thái hợp đồng', () => [{ value: 'running', label: 'Đang thực hiện' }, { value: 'done', label: 'Đã thông quan đủ / đã đóng' }], (r) => r.status),
     many('ship', 'Tàu / chuyến', () => distinct(contracts().flatMap((c) => HAK.ContractModel.active(c).map((d) => d.ship))), (r) => r.ships),
     many('declStatus', 'Trạng thái tờ khai', () => statusOpts().map((o) => ({ value: o[0], label: o[1] })), (r) => r.declStatuses),
     { key: 'owing', label: 'Chỉ hợp đồng còn phải nộp thuế', type: 'bool', match: (r) => r.owing },
@@ -606,8 +610,8 @@
     const v0 = ctView(); if (v0) v0.refresh();
     const model = contractReportList(), g = (k) => sumOf(model.map((m) => m.tot[k]));
     const run = model.filter((m) => m.st.code === 'running').length, done = model.length - run;
-    host.innerHTML = '<div class="row g-2 mb-2">' + card('Hợp đồng', model.length, run + ' đang thực hiện · ' + done + ' đã hoàn thành') + card('KL thực hiện / hợp đồng (BDMT)', money(g('bdmt')) + ' / ' + money(sumOf(model.map((m) => m.c.contractQty))), 'Giá trị: ' + money(g('usd')) + ' USD') +
-      card('Tờ khai', g('decls'), g('cleared') + ' đã thông quan') + card('Thuế XK phải nộp', money(g('payable')) + ' đ', 'Đã nộp ' + money(g('paidTax')) + ' đ · lệ phí ' + money(g('paidFee')) + ' đ') + '</div>' +
+    host.innerHTML = '<div class="row g-2 mb-2">' + card('Hợp đồng', model.length, run + ' đang thực hiện · ' + done + ' đã thông quan đủ / đã đóng') + card('KL thực hiện / hợp đồng (BDMT)', money(g('bdmt')) + ' / ' + money(sumOf(model.map((m) => m.c.contractQty))), 'Giá trị: ' + money(g('usd')) + ' USD') +
+      card('Tờ khai', g('decls'), g('cleared') + ' đã thông quan') + card('Thuế XK phải nộp', money(g('payable')) + ' đ', 'Đã nộp ' + money(g('paidTax')) + ' đ · lệ phí ' + money(g('paidFee')) + ' đ · còn nợ ' + money(g('remaining')) + ' đ' + (g('over') > 0 ? ' · nộp thừa ' + money(g('over')) + ' đ (không bù trừ)' : '') + (g('undetermined') > 0 ? ' · ' + g('undetermined') + ' tờ khai chưa xác định thuế' : '')) + '</div>' +
       '<div class="tbl-wrap"><table class="table table-sm align-middle"><thead><tr><th>Hợp đồng</th><th>Bên mua</th><th class="num">KL hợp đồng</th><th class="num">KL thực hiện</th><th class="num">%</th><th class="num">Còn lại</th><th class="num">Giá trị USD</th><th class="num">Chứng thư</th><th class="num">Tờ khai</th><th class="num">Thuế phải nộp</th><th class="num">Đã nộp thuế</th><th class="num">Lệ phí đã nộp</th><th class="num">Còn phải nộp</th><th>Trạng thái</th></tr></thead><tbody>' +
       (model.length ? model.map((m) => { const c = m.c, t = m.tot; return '<tr class="table-light fw-semibold"><td>' + esc(c.no || c.id) + '<div class="small muted fw-normal">' + esc(typeLabel(c.type)) + (c.date ? ' · ' + esc(vnDate(c.date)) : '') + '</div></td><td>' + esc(custName(c.buyerId)) + '</td><td class="num">' + esc(money(c.contractQty)) + ((c.addenda || []).some((x) => !x.deletedAt) ? '<div class="small muted fw-normal">đã điều chỉnh (gốc ' + esc(money(c.qtyOrig)) + ')</div>' : '') + '</td><td class="num">' + esc(money(t.bdmt)) + '</td><td class="num">' + (t.pct === null ? '' : esc(NF().txt(Math.round(t.pct * 10) / 10, 'dec')) + '%') + '</td><td class="num">' + esc(money(t.left)) + '</td><td class="num">' + esc(money(t.usd)) + '</td><td class="num">' + t.certs + '/' + t.details + '</td><td class="num">' + t.cleared + '/' + t.decls + '</td><td class="num">' + esc(money(t.payable)) + '</td><td class="num">' + esc(money(t.paidTax)) + '</td><td class="num">' + esc(money(t.paidFee)) + '</td><td class="num ' + (t.remaining > 0 ? 'text-danger' : '') + '">' + esc(money(t.remaining)) + '</td><td>' + contractBadge(c.id) + '</td></tr>' +
         m.rows.map((r) => '<tr class="small"><td class="ps-4">' + esc(r.detail ? [r.detail.ship, r.detail.product].filter(Boolean).join(' · ') || 'Đợt thực hiện' : '(tờ khai chưa gắn đợt)') + '</td><td>' + (r.detail && r.detail.certNo ? 'CT ' + esc(r.detail.certNo) + (r.detail.certDate ? ' · ' + esc(vnDate(r.detail.certDate)) : '') : '<span class="muted">chưa có chứng thư</span>') + '</td><td></td><td class="num">' + esc(money(r.bdmt)) + '</td><td></td><td></td><td class="num">' + esc(money(r.usd)) + '</td><td></td><td>' + (r.decl ? '<span class="mono">' + esc(r.decl.no) + '</span> ' + statusBadge(r.decl.status) : '<span class="muted">chưa có tờ khai</span>') + '</td><td class="num">' + esc(money(r.payable)) + '</td><td class="num">' + esc(money(r.paidTax)) + '</td><td class="num">' + esc(money(r.paidFee)) + '</td><td class="num ' + (r.remaining > 0 ? 'text-danger' : '') + '">' + esc(money(r.remaining)) + '</td><td></td></tr>').join(''); }).join('') : '<tr><td colspan="14" class="muted text-center">Chưa có hợp đồng trong khoảng đã chọn.</td></tr>') + '</tbody></table></div>';

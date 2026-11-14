@@ -521,6 +521,11 @@
           if(!ask('⚠ Chưa chọn TỜ KHAI HẢI QUAN cho chứng thư / chi tiết này.\n\nHợp đồng Xuất khẩu / Ủy thác XK phải có tờ khai (thêm ở tab 🛃 Tờ khai hải quan) thì mới gắn được đợt giao hàng và tính thuế.\n\nBấm Hủy để quay lại chọn tờ khai.'))return;
           if(!ask('⚠ Xác nhận lần 2: vẫn LƯU khi chưa có tờ khai hải quan?\n\nChi tiết này sẽ chưa gắn được đợt giao hàng cho tới khi bổ sung tờ khai.'))return;
         }
+        if(HAK.Cert){                                    // v2.17.0: số liệu chứng thư — lỗi thì chặn, lệch công thức thì hỏi xác nhận (chưa có quy tắc nghiệp vụ ấn định sai số)
+          const ck=HAK.Cert.check({mt:fv('mt'),bdmt:fv('bdmt'),moisture:fv('moisture')});
+          if(ck.errors.length)throw Error(ck.errors.join(' '));
+          if(ck.warnings.length&&typeof confirm==='function'&&!confirm('⚠ Số liệu chứng thư cần xác nhận:\n\n'+ck.warnings.join('\n')+'\n\nBấm OK nếu đúng như chứng thư gốc và vẫn lưu; Hủy để sửa lại.'))return;
+        }
         ['product','tkhq','ship','exchangeRate',...EXEC_FIELDS].forEach(k=>{const value=fv(k);d[k]=['exchangeRate','mt','bdmt','moisture'].includes(k)?(value===''?null:Number(value)):value;});d.note=fv('detailNote');d.revision=(d.revision||0)+1;
         for(const key of ['deliverId','receiverId'])if(d[key]==='__new'){const name=String(fv(key+'-newName')).trim(),tax=String(fv(key+'-newTax')).trim();if(!name)throw Error('Chưa nhập tên bên giao / nhận');const match=HAK.ContractParser.matchParty({name,tax},customers());const result=match||ensureCustomer(name,fv(key+'-newAddr'),key==='receiverId'?'ngoai':'trongnuoc').c;if(tax&&!result.tax&&!result.companyId)result.tax=tax;d[key]=result.id;}d.certificateFiles=await HAK.Documents.commit();const i=c.details.findIndex(x=>x.id===d.id);if(i<0)c.details.push(d);else c.details[i]=d;ed.linkTo={contract:c.id,detail:d.id,customs:($('#cf-customsId')||{}).value||'',newNo:(($('#cf-customsId')||{}).value?'':(HAK.CustomsModel?HAK.CustomsModel.digits(($('#cf-tkhq')||{}).value):''))};
         res=upsertContract(c,ed.revision);

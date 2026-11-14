@@ -221,7 +221,8 @@
       <div class="card mb-3"><div class="card-body">
         <div class="sec-title d-flex flex-wrap align-items-center gap-2 mb-2"><span>🧭 BÁO CÁO THỰC HIỆN HỢP ĐỒNG — theo trình tự quy trình</span><span class="ms-auto d-flex gap-2"><button class="btn btn-sm btn-outline-secondary" id="coReload" type="button">↻ Làm mới</button><button class="btn btn-sm btn-success" id="coXls" type="button" disabled>📊 Xuất Excel</button><button class="btn btn-sm btn-outline-primary" id="coGs" type="button" title="Ghi hợp đồng, tờ khai, phụ lục lên Google Sheet (NL_HOPDONG, NL_CHUNGTHU, NL_TOKHAI, NL_PHULUC)">☁ Đồng bộ Google Sheet</button><button class="btn btn-sm btn-outline-primary" id="coPdf" type="button" disabled>🖨 Tải PDF</button></span></div>
         <div id="coSmart" class="mb-2"></div>
-        <div class="form-text mt-0 mb-2">Một bảng cho tất cả hợp đồng, các nhóm cột xếp đúng quy trình: <b>① Hợp đồng + phụ lục → ② Chứng thư → ③ Tờ khai → ④ Khai bổ sung → ⑤ Nộp thuế (còn nợ) → ⑥ Xuất hàng → ⑦ Đối chiếu</b>. Dòng đậm là hợp đồng, dòng nhỏ là từng chi tiết (tàu · chứng thư · tờ khai). Bấm vào dòng hợp đồng để mở <b>Hồ sơ hợp đồng</b>. Kéo ngang để xem hết các cột.</div>
+        <div class="form-text mt-0 mb-2">Một bảng cho tất cả hợp đồng, các nhóm cột xếp đúng quy trình: <b>① Hợp đồng + phụ lục → ② Chứng thư → ③ Tờ khai → ④ Khai bổ sung → ⑤ Nộp thuế (còn nợ) → ⑥ Xuất hàng → ⑦ Đối chiếu</b>. Dòng đậm là hợp đồng, dòng nhỏ là từng chi tiết (tàu · chứng thư · tờ khai). Bấm vào dòng hợp đồng để mở <b>Hồ sơ hợp đồng</b> (chứng thư, tờ khai, đối chiếu). Muốn tra từng phiếu cân / từng xe: <a href="#/contractstatus">📑 Chi tiết xuất hàng theo hợp đồng</a>. Thuế: <b>còn nợ</b> và <b>nộp thừa</b> cộng riêng từng tờ khai (không bù trừ). Kéo ngang để xem hết các cột.</div>
+        <div class="alert alert-warning py-2 small d-none" id="coWeighWarn" role="status"></div>
         <div id="coCards" class="row g-2 mb-2"></div>
         <div class="tbl-wrap" id="coBody" style="max-height:none"></div>
       </div></div>
@@ -250,6 +251,7 @@
           <div class="col-6 col-md-3 d-none"><label for="repType" class="form-label">Loại biên bản</label><select id="repType" class="form-select"><option value="">Tất cả loại</option></select></div>
           <div class="col-12 text-danger small" id="repFilterError" role="alert" hidden></div>
           <div class="col-12 small muted" id="repFilterSummary" role="status" aria-live="polite"></div>
+          <div class="col-12 alert alert-warning py-2 small mb-0 d-none" id="repWeighWarn" role="status"></div>
           <div class="col-6 col-md-3 d-grid"><button class="btn btn-outline-secondary" id="repReset" type="button">Đặt lại chọn hồ sơ</button></div>
           <div class="col-12 d-flex align-items-center gap-2" id="repScopeWrap"></div>
           <div class="col-6 col-md-3 d-grid"><button class="btn btn-success" id="repXls" type="button">📊 Xuất Excel</button></div>
@@ -260,6 +262,7 @@
       <div class="card mb-3" id="repContracts"><div class="card-body">
         <div class="sec-title d-flex flex-wrap align-items-center gap-2 mb-2"><span>📑 Tình hình thực hiện hợp đồng</span><span class="ms-auto d-flex gap-2"><button class="btn btn-sm btn-success" id="repCtXls" type="button">📊 Xuất Excel</button><button class="btn btn-sm btn-outline-primary" id="repCtPdf" type="button">🖨️ Tải PDF</button></span></div>
         <div id="repCtSmart" class="mb-2"></div>
+        <div class="alert alert-info py-1 small mb-2">ℹ Màn hình theo dõi chính theo hợp đồng là <a href="#/contractoverview"><b>🧭 Báo cáo thực hiện hợp đồng</b></a> (đủ 7 bước quy trình, 4 trạng thái riêng, đối chiếu). Bảng dưới giữ lại để xem nhanh và xuất file như trước.</div>
         <div class="form-text mt-0 mb-2">Mỗi hợp đồng: khối lượng thực hiện / hợp đồng, chứng thư, tờ khai hải quan (trạng thái), thuế xuất khẩu phải nộp / đã nộp / còn lại và lệ phí. Dòng nhỏ bên dưới là chi tiết hợp đồng (tàu · chứng thư · tờ khai). Dùng bộ lọc ngay bên trên (tìm kiếm, ngày ký hợp đồng, hình thức, bên mua, trạng thái, tàu…); Excel và PDF xuất đúng phần đang lọc.</div>
         <div id="repCtBody"></div>
       </div></div>
@@ -483,9 +486,11 @@
 <script src="js/word.js"></script>
 <script src="js/exporter.js"></script>
 <script src="js/archive.js"></script>
+<script src="js/weigh-model.js"></script>
 <script src="js/report.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/icons.js"></script>
+<script src="js/cert-model.js"></script>
 <script src="js/pages.js"></script>
 <script src="js/settings.js"></script>
 <script src="js/bkls.js"></script>

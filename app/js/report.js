@@ -50,7 +50,8 @@
   function markDuplicates(recs) {
     const groups = new Map();
     recs.forEach((r) => {
-      const k = r.type + '|' + (r.ship || (r.giao + '>' + r.nhan + '|' + (r.kho || '')));
+      // Cùng loại + cùng công ty + cùng chi tiết hợp đồng + cùng tàu (hoặc cùng bên giao/nhận + kho) mới coi là cùng nhóm; khác công ty / khác chi tiết hợp đồng → giữ cả hai.
+      const k = r.type + '|' + (r.cid || '') + '|' + (r.contract || '') + '|' + (r.ship || (r.giao + '>' + r.nhan + '|' + (r.kho || '')));
       if (!groups.has(k)) groups.set(k, []);
       groups.get(k).push(r);
     });
@@ -75,7 +76,12 @@
     const manual = opt.manual || {};
     const recs = metas.map((m) => Object.assign({}, m, { fromTs: dmyToTs(m.from), toTs: dmyToTs(m.to) || dmyToTs(m.from), month: monthOf(m.from) }));
     recs.forEach((r) => { if (r.toTs === null) r.toTs = r.fromTs; });
-    markDuplicates(recs);
+    // v2.17.0 — chống trùng ở cấp PHIẾU CÂN: cụm hồ sơ giao nhau về ngày mà đã có danh sách phiếu (opt.tickets, xem prepareTickets) → đối soát từng phiếu;
+    // cụm chưa có phiếu (hồ sơ không đọc được / chưa nạp) → lùi về chống trùng nguyên hồ sơ (cùng nhóm, giữ bản mới nhất).
+    const W = HAK.Weigh, tk = opt.tickets || null, byId = new Map(recs.map((r) => [r.id, r]));
+    const tclusters = W && tk ? W.clusters(recs).filter((cl) => cl.every((r) => tk.has(r.id))) : [];
+    const ticketed = new Set(tclusters.flat().map((r) => r.id));
+    markDuplicates(recs.filter((r) => !ticketed.has(r.id)));
     const matching = new Set(filter.filter(recs).rows);
     const inRange = (r) => matching.has(r);
     recs.forEach((r) => {
@@ -84,6 +90,20 @@
       r.retKg = HAS_RET[r.type] ? (r.retKg || 0) : 0; r.retTrips = HAS_RET[r.type] ? (r.retTrips || 0) : 0;
       r.delKg = r.kg - r.retKg;
     });
+    const conflicts = [], dupTickets = { trips: 0, kg: 0 };
+    tclusters.forEach((cl) => {
+      const act = cl.filter((r) => r.inRange && r.include);
+      if (act.length < 2) return;
+      const res = W.resolve(act.map((r) => ({ rec: r, tickets: tk.get(r.id) })));
+      act.forEach((r) => {
+        const e = res.byRec.get(r.id); if (!e) return;
+        r.kgRaw = r.kg; r.tripsRaw = r.trips; r.dupTrips = e.dupTrips; r.dupKg = e.dupKg; r.skipIds = e.skip;
+        r.trips = e.trips; r.kg = e.kg; r.retTrips = HAS_RET[r.type] ? e.retTrips : 0; r.retKg = HAS_RET[r.type] ? e.retKg : 0; r.delKg = r.kg - r.retKg;
+      });
+      res.conflicts.forEach((c) => conflicts.push(Object.assign(c, { type: cl[0].type })));
+      dupTickets.trips += res.dup.trips; dupTickets.kg += res.dup.kg;
+    });
+    const pendingKg = conflicts.reduce((a, c) => a + c.counted.net, 0);
     const used = recs.filter((r) => r.inRange && r.include);
     const byType = {};
     TYPES.forEach(([k]) => { byType[k] = { n: 0, trips: 0, kg: 0, retTrips: 0, retKg: 0, delKg: 0 }; });
@@ -98,13 +118,38 @@
       const yo = years.get(yk); yo[r.type] = (yo[r.type] || 0) + r.delKg;
     });
     const ships = used.filter((r) => HAS_RET[r.type]).sort((a, b) => (a.fromTs || 0) - (b.fromTs || 0));
-    return { filterText: filter.describe(), recs: recs.sort((a, b) => b.updatedAt - a.updatedAt), used, byType, months: Array.from(months.entries()).sort((a, b) => a[0] < b[0] ? -1 : 1), years: Array.from(years.entries()).sort((a, b) => a[0] < b[0] ? -1 : 1), ships };
+    // Tổng thực giao toàn bộ, loại trùng phiếu giữa các loại biên bản (chỉ khi đã có danh sách phiếu của mọi hồ sơ đang tính).
+    let overall = null;
+    if (W && tk && used.length && used.every((r) => tk.has(r.id))) overall = W.overall(used.map((r) => ({ rec: r, tickets: tk.get(r.id) })));
+    return { conflicts, pendingKg, dupTickets, overall, filterText: filter.describe(), recs: recs.sort((a, b) => b.updatedAt - a.updatedAt), used, byType, months: Array.from(months.entries()).sort((a, b) => a[0] < b[0] ? -1 : 1), years: Array.from(years.entries()).sort((a, b) => a[0] < b[0] ? -1 : 1), ships };
+  }
+
+  /**
+   * Đọc phiếu cân của các hồ sơ nằm trong cụm giao nhau về ngày (cần đối soát). Không đọc hồ sơ nào ngoài cụm → nhanh với kho lớn.
+   * @param {object[]} metas  hồ sơ đã ensureStats;  cache: Map id → { u: updatedAt, t: tickets } (dùng lại giữa các lần vẽ)
+   * @returns {Promise<Map<string, object[]>>} id → danh sách phiếu (hồ sơ đọc lỗi thì vắng mặt → lùi về chống trùng nguyên hồ sơ)
+   */
+  const recTickets = (r, p, rows, ret) => HAK.Weigh.ticketsOf(rows, (row) => ret.has(G().retKey(row)), { cid: r.cid || p.giaoId || '', contract: r.contract || p.contractId || '', ship: r.ship });
+  async function prepareTickets(metas, cache) {
+    const W = HAK.Weigh; cache = cache || new Map(); const out = new Map();
+    if (!W) return out;
+    const recs = metas.map((m) => Object.assign({}, m, { fromTs: dmyToTs(m.from), toTs: dmyToTs(m.to) || dmyToTs(m.from) }));
+    for (const r of W.clusters(recs).flat()) {
+      const hit = cache.get(r.id);
+      if (hit && hit.u === r.updatedAt) { out.set(r.id, hit.t); continue; }
+      try {
+        const d = await HAK.Archive.load(r.id), p = d.params || {}, rows = G().filterRows(d.rows || [], p.filter), ret = new Set(HAS_RET[r.type] ? (p.returned || []) : []);
+        const t = recTickets(r, p, rows, ret);
+        cache.set(r.id, { u: r.updatedAt, t }); out.set(r.id, t);
+      } catch (e) { console.warn('Không đọc được phiếu cân của hồ sơ', r.id, e); }
+    }
+    return out;
   }
 
   /* ---------------------------------------------------------------
    * Xuất Excel
    * ------------------------------------------------------------- */
-  const XF = 'Arial', XNF = '#,##0.00', XNI = '#,##0';
+  const XF = 'Arial', XNF = '#,##0.00', XNI = '#,##0', fmtKg = (n) => Math.round(Number(n) || 0).toLocaleString('vi-VN');
   /** Vẽ 1 sheet kiểu báo cáo (tiêu đề + ghi chú + tiêu đề cột + dữ liệu [+ dòng tổng]) — dùng chung cho mọi sheet của toExcel/toExcelCarrier. */
   function buildSheet(wb, name, title, sub, cols, rows, opt) {
     opt = opt || {};
@@ -172,6 +217,12 @@
     sheet('Hồ sơ', 'DANH SÁCH HỒ SƠ ĐƯỢC TÍNH', note,
       [{ h: 'Hồ sơ', w: 34 }, { h: 'Loại', w: 24 }, { h: 'Từ ngày', w: 12 }, { h: 'Đến ngày', w: 12 }, { h: 'Số xe', w: 9, n: NI }, { h: 'Qua cân (tấn)', w: 15, n: NF }, { h: 'Thực giao (tấn)', w: 15, n: NF }],
       model.used.slice().sort((a, b) => (a.fromTs || 0) - (b.fromTs || 0)).map((r) => [r.title, typeName(r.type).replace(/^\S+\s/, ''), r.from, r.to, r.trips, T(r.kg), T(r.delKg)]));
+    // 5. Đối soát phiếu cân giữa các hồ sơ (cùng số liệu với cảnh báo trên màn hình)
+    if ((model.conflicts && model.conflicts.length) || (model.dupTickets && model.dupTickets.trips)) {
+      const rows = (model.conflicts || []).map((c) => [typeName(c.type).replace(/^\S+\s/, ''), c.ticket || '', c.date || '', c.plate || '', c.fields.join(' / '), c.counted.rec.title || c.counted.rec.id, c.counted.net, c.others.map((o) => (o.rec.title || o.rec.id) + ' (' + o.net + ' kg' + (o.ret ? ', xe trả về' : '') + ')').join('; '), 'CHỜ ĐỐI SOÁT']);
+      sheet('Đối soát phiếu cân', 'PHIẾU CÂN TRÙNG / XUNG ĐỘT GIỮA CÁC HỒ SƠ', 'Phiếu trùng (khớp mọi thông tin) đã tính 1 lần: ' + model.dupTickets.trips + ' phiếu · ' + fmtKg(model.dupTickets.kg) + ' kg. Phiếu xung đột tạm tính theo hồ sơ mới nhất — tổng chờ đối soát: ' + fmtKg(model.pendingKg) + ' kg.',
+        [{ h: 'Loại', w: 22 }, { h: 'Số phiếu', w: 14 }, { h: 'Ngày cân', w: 12 }, { h: 'Biển số', w: 12 }, { h: 'Khác nhau ở', w: 24 }, { h: 'Hồ sơ đang tính', w: 34 }, { h: 'KL đang tính (kg)', w: 16, n: XNI }, { h: 'Hồ sơ khác (KL)', w: 50 }, { h: 'Tình trạng', w: 16 }], rows);
+    }
     return wb;
   }
   /** sheetRows: [[tàu/đợt, ngày, ĐVVC, số xe, tấn, xe trả về, tấn trả về], …] (đã gộp theo ngày+ĐVVC, xem aggCarrierDaily). */
@@ -246,9 +297,12 @@
         const ret = new Set(HAS_RET[r.type] ? (p.returned || []) : []);
         const so = (r.modes || []).indexOf('bkls') >= 0 && HAK.Bkls && HAK.Bkls.tripNo ? String(p.bklsSoBkls || '').trim() : '';
         let iM = 0, iT = 0;
-        rows.forEach((row) => {
+        // Phiếu đã bị loại vì trùng / xung đột (xem compute) không đưa vào danh sách chi tiết → Excel khớp tổng trên màn hình.
+        const tix = r.skipIds && r.skipIds.size && HAK.Weigh ? recTickets(r, p, rows, ret) : null;
+        rows.forEach((row, ri) => {
           const isRet = ret.has(G().retKey(row));
           const no = so ? (isRet ? HAK.Bkls.tripNo(so + '-TV', iT++) : HAK.Bkls.tripNo(so, iM++)) : '';
+          if (tix && tix[ri].id && r.skipIds.has(tix[ri].id)) return;      // số BKLS đã cấp theo thứ tự xe gốc nên chỉ bỏ dòng sau khi đã đánh số
           if (no && !isRet) { if (!L.bklsFirst) L.bklsFirst = no; L.bklsLast = no; }
           out.push({ lot: L, rec: r, row, isRet, bkls: no });
         });
@@ -317,11 +371,11 @@
       rows: unlinked.map((r) => [r.title, tl(r.type), r.ship || null, r.from, r.to, r.trips, r.kg / 1000]) });
     return out;
   }
-  async function toExcelXuatHang(lots, trips, unlinked, rangeText) {
+  async function toExcelXuatHang(lots, trips, unlinked, rangeText, weighNote) {
     if (!root.ExcelJS && HAK.UI && HAK.UI.needLib) await HAK.UI.needLib('exceljs');
     const wb = newWorkbook();
     xhSheetRows(lots, trips, unlinked).forEach((sh) => buildTable(wb, sh.name, sh.cols, sh.rows));
-    buildSheet(wb, 'Phạm vi báo cáo', 'THÔNG TIN LẬP BÁO CÁO XUẤT HÀNG', rangeText || 'Toàn bộ thời gian', [{ h: 'Nội dung', w: 30 }, { h: 'Giá trị', w: 90 }], [['Nguồn', 'Hồ sơ Lưu trữ và Danh mục hợp đồng'], ['Phạm vi', rangeText || 'Toàn bộ thời gian'], ['Số lô', lots.length], ['Số phiếu cân', trips.length], ['Hồ sơ chưa gắn hợp đồng', unlinked.length]]);
+    buildSheet(wb, 'Phạm vi báo cáo', 'THÔNG TIN LẬP BÁO CÁO XUẤT HÀNG', rangeText || 'Toàn bộ thời gian', [{ h: 'Nội dung', w: 30 }, { h: 'Giá trị', w: 90 }], [['Nguồn', 'Hồ sơ Lưu trữ và Danh mục hợp đồng'], ['Phạm vi', rangeText || 'Toàn bộ thời gian'], ['Số lô', lots.length], ['Số phiếu cân', trips.length], ['Hồ sơ chưa gắn hợp đồng', unlinked.length]].concat(weighNote ? [['Phiếu cân trùng / xung đột', weighNote]] : []));
     wb.title = 'Báo cáo Xuất hàng — ' + (rangeText || 'toàn bộ thời gian');
     return wb;
   }
@@ -357,7 +411,7 @@
   /* ---------------------------------------------------------------
    * Giao diện
    * ------------------------------------------------------------- */
-  let metas = [], model = null;
+  let metas = [], model = null, ticketMap = null; const ticketCache = new Map();
   const $ = (s) => document.querySelector(s);
   const esc = (s) => HAK.UI.esc(s);
   const ton = (kg) => G().fmtTon(kg);
@@ -450,7 +504,7 @@
       summary:()=>[{label:'Hồ sơ tính vào tổng',value:model?model.used.length:0}]
     });return reportSmart;
   }
-  const opts = () => ({ types: reportSmart ? (reportSmart.getState().sel.type || []) : [], q: $('#repQuery').value, type: $('#repType').value, from: $('#repFrom').value, to: $('#repTo').value, manual: manualGet(), scope: HAK.Auth && HAK.Auth.scopeIds ? HAK.Auth.scopeIds('report') : null });
+  const opts = () => ({ types: reportSmart ? (reportSmart.getState().sel.type || []) : [], q: $('#repQuery').value, type: $('#repType').value, from: $('#repFrom').value, to: $('#repTo').value, manual: manualGet(), tickets: ticketMap, scope: HAK.Auth && HAK.Auth.scopeIds ? HAK.Auth.scopeIds('report') : null });
 
   /** Hậu tố tên file: kỳ báo cáo (Nam2025 / 20250101-20251231 / TatCa) + ngày xuất — để không nhầm file các năm. */
   function fileTag() {
@@ -487,6 +541,8 @@
     ['#repXls', '#repXlsCarrier', '#repXlsXH', '#repGsXH'].forEach((id) => { if ($(id)) $(id).disabled = false; });
     model = compute(scope ? metas.filter((m) => scope.indexOf(HAK.Auth.companyOfMeta(m)) >= 0) : metas, opts()); model.rangeText = rangeText() + ' · ' + model.filterText + ' · Công ty: ' + (scope ? scope.join(', ') : 'tất cả công ty được phép');
     $('#repFilterSummary').textContent = model.used.length + ' hồ sơ đang tính · ' + model.rangeText;
+    { const w = $('#repWeighWarn'), CSx = HAK.ContractStatus, t = CSx && CSx.weighNote ? CSx.weighNote(model) : '';   // phiếu cân trùng / xung đột (cùng câu chữ với các màn hình hợp đồng)
+      if (w) { w.textContent = t; w.classList.toggle('d-none', !t); } }
     if(reportSmart) reportSmart.refresh();
     const empty = !metas.length;
     $('#repEmpty').classList.toggle('d-none', !empty); $('#repMain').classList.toggle('d-none', empty);
@@ -547,6 +603,7 @@
   async function render() {
     if (!$('#page-report')) return;
     try { metas = await HAK.Archive.ensureStats(await HAK.Archive.list()); } catch (e) { console.error(e); metas = []; }
+    try { ticketMap = await prepareTickets(metas, ticketCache); } catch (e) { console.error(e); ticketMap = null; }
     drawYearSelect(); draw();
   }
 
@@ -598,7 +655,7 @@
         Loading.show('Đang đọc phiếu cân từ Lưu trữ…');
         const trips = await xhTrips(lots, (i, n) => Loading.set(Math.round(i / n * 90), 'Đang đọc hồ sơ ' + i + ' / ' + n + '…'));
         Loading.set(95, 'Đang ghi file Excel (' + trips.length.toLocaleString('vi-VN') + ' phiếu)…');
-        const wb = await toExcelXuatHang(lots, trips, unlinked, model.rangeText), buf = await wb.xlsx.writeBuffer();
+        const wb = await toExcelXuatHang(lots, trips, unlinked, model.rangeText, HAK.ContractStatus && HAK.ContractStatus.weighNote ? HAK.ContractStatus.weighNote(model) : ''), buf = await wb.xlsx.writeBuffer();
         const name = 'XuatHang_' + fileTag() + '.xlsx';
         if(!await HAK.Word.Files.saveBlob(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), name))return;
         Loading.hide();
@@ -642,6 +699,6 @@
     });
   }
 
-  HAK.Report = { newWorkbook, buildSheet, compute, toExcel, toExcelCarrier, aggCarrierDaily, render, init, TYPES, xhLots, xhTrips, xhSheetRows, toExcelXuatHang };
+  HAK.Report = { newWorkbook, buildSheet, compute, toExcel, toExcelCarrier, aggCarrierDaily, render, init, TYPES, prepareTickets, xhLots, xhTrips, xhSheetRows, toExcelXuatHang };
   if (typeof module !== 'undefined' && module.exports) module.exports = HAK.Report;
 })(typeof window !== 'undefined' ? window : globalThis);

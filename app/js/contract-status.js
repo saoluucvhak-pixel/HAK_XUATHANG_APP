@@ -17,7 +17,17 @@
   const money = (n) => (hasNum(n) ? HAK.NumFmt.txt(+n, 'num') : '');
   const vnDate = (iso) => (iso && /^\d{4}-\d\d-\d\d/.test(iso) ? iso.slice(8, 10) + '/' + iso.slice(5, 7) + '/' + iso.slice(0, 4) : '');
   const sum = (arr) => arr.reduce((a, x) => a + (Number(x) || 0), 0);
-  const state = { groups: [], loading: false, view: null, detail: null };
+  const state = { groups: [], loading: false, view: null, detail: null, conflicts: [], pendingKg: 0, dupTickets: { trips: 0, kg: 0 }, overall: null };
+  const ticketCache = new Map();
+  /** Câu cảnh báo phiếu cân trùng / xung đột (dùng chung màn hình Chi tiết xuất hàng, Báo cáo thực hiện, Báo cáo tổng hợp). */
+  function weighNote(st) {
+    st = st || state; const cf = st.conflicts || [], d = st.dupTickets || { trips: 0, kg: 0 }, parts = [];
+    if (d.trips) parts.push(d.trips + ' phiếu cân xuất hiện ở nhiều hồ sơ đã tính 1 lần (' + HAK.Generator.fmtTon(d.kg) + ' tấn không cộng trùng)');
+    if (cf.length) parts.push('⚠ ' + cf.length + ' phiếu cân XUNG ĐỘT giữa các hồ sơ (khác ' + Array.from(new Set(cf.flatMap((c) => c.fields))).join(' / ') + ') — tổng đang CHỜ ĐỐI SOÁT, tạm tính ' + HAK.Generator.fmtTon(st.pendingKg) + ' tấn theo hồ sơ mới nhất: ' +
+      cf.slice(0, 5).map((c) => 'phiếu ' + (c.ticket || c.plate || '?') + ' ' + (c.date || '') + ' ở ' + [c.counted.rec].concat(c.others.map((o) => o.rec)).map((r) => '"' + (r.title || r.id) + '"').join(' & ')).join('; ') + (cf.length > 5 ? '; …' : ''));
+    const o = st.overall; if (o && o.sharedTrips) parts.push('Tổng thực giao toàn bộ (đã loại trùng giữa các nghiệp vụ): ' + HAK.Generator.fmtTon(o.delKg) + ' tấn — ' + o.sharedTrips + ' phiếu (' + HAK.Generator.fmtTon(o.sharedKg) + ' tấn) xuất hiện ở nhiều loại biên bản, vd gửi kho → xuất khẩu, nên số theo từng loại KHÔNG cộng chung');
+    return parts.join(' · ');
+  }
 
   const khoName = (id) => { if (!id) return ''; try { const w = HAK.Config.warehouse(id); return (w && (w.short || w.name)) || id; } catch (e) { return id; } };
   const khoOf = (rec) => khoName(String((rec && rec.kho) || '').split('>')[0]);
@@ -29,7 +39,9 @@
     const metas0 = await HAK.Archive.ensureStats(await HAK.Archive.list());
     const scope = HAK.Auth && HAK.Auth.scopeIds ? HAK.Auth.scopeIds('report') : null;
     const metas = scope ? metas0.filter((m) => scope.indexOf(HAK.Auth.companyOfMeta(m)) >= 0) : metas0;
-    const model = HAK.Report.compute(metas, {}), xl = HAK.Report.xhLots(model.used, scope ? { scope } : {});
+    // Chống trùng ở cấp phiếu cân (cùng cách với Báo cáo tổng hợp): hồ sơ cùng tàu giao nhau về ngày giữ các phiếu riêng biệt, phiếu lặp chỉ tính 1 lần.
+    const tickets = await HAK.Report.prepareTickets(metas, ticketCache);
+    const model = HAK.Report.compute(metas, { tickets }), xl = HAK.Report.xhLots(model.used, scope ? { scope } : {});
     const cm = new Map(); if (HAK.Customs && HAK.Customs.contractReportModel) HAK.Customs.contractReportModel().forEach((m) => cm.set(m.c.id, m));
     const groups = new Map();
     xl.lots.forEach((L) => {
@@ -52,6 +64,7 @@
     });
     out.sort((a, b) => String((b.c && b.c.date) || '').localeCompare(String((a.c && a.c.date) || '')) || String(a.f.no).localeCompare(String(b.f.no)));
     state.groups = out; state.unlinked = xl.unlinked;
+    state.conflicts = model.conflicts || []; state.pendingKg = model.pendingKg || 0; state.dupTickets = model.dupTickets || { trips: 0, kg: 0 }; state.overall = model.overall || null;
   }
 
   /* ---------------- Bộ lọc smart ---------------- */
@@ -61,7 +74,7 @@
     return [
       f.multi('type', 'Hình thức', () => Object.keys(K().TYPES || {}).map((k) => ({ value: k, label: K().TYPES[k].label })), (r) => r.type),
       f.multi('buyerId', 'Bên mua / nhận', () => K().customers().map((c) => ({ value: c.id, label: c.name })), (r) => r.buyerId),
-      f.multi('status', 'Trạng thái hợp đồng', () => [{ value: 'running', label: 'Đang thực hiện' }, { value: 'done', label: 'Đã hoàn thành' }], (r) => r.status),
+      f.multi('status', 'Trạng thái hợp đồng', () => [{ value: 'running', label: 'Đang thực hiện' }, { value: 'done', label: 'Đã thông quan đủ / đã đóng' }], (r) => r.status),
       many('kho', 'Kho xuất', () => distinct(state.groups.flatMap((g) => g.khos)), (r) => r.khos),
       many('ship', 'Tàu / chuyến', () => distinct(state.groups.flatMap((g) => g.ships)), (r) => r.ships),
       { key: 'hasTrips', label: 'Chỉ hợp đồng đã có phiếu cân', type: 'bool', match: (r) => r.hasTrips },
@@ -83,7 +96,7 @@
   function draw() {
     const host = $('#csrBody'); if (!host) return;
     const list = filtered(), t = { trips: sum(list.map((g) => g.tot.trips)), kg: sum(list.map((g) => g.tot.kg)), del: sum(list.map((g) => g.tot.delKg)), ret: sum(list.map((g) => g.tot.retTrips)), recs: sum(list.map((g) => g.tot.recs)) };
-    $('#csrCards').innerHTML = card('Hợp đồng', list.length, list.filter((g) => g.f.status === 'done').length + ' đã hoàn thành') + card('Số chuyến xe', int(t.trips), 'Xe trả về: ' + int(t.ret) + ' · ' + t.recs + ' hồ sơ') + card('KL qua cân (tấn)', ton(t.kg)) + card('Thực giao (tấn)', ton(t.del), 'Qua cân − xe trả về') + card('Thuế còn nợ', money(sum(list.map((g) => (g.cust && g.cust.tot.remaining) || 0))) + ' đ', list.filter((g) => g.cust && g.cust.tot.remaining > 0).length + ' hợp đồng còn nợ');
+    $('#csrCards').innerHTML = card('Hợp đồng', list.length, list.filter((g) => g.f.status === 'done').length + ' đã thông quan đủ / đã đóng') + card('Số chuyến xe', int(t.trips), 'Xe trả về: ' + int(t.ret) + ' · ' + t.recs + ' hồ sơ') + card('KL qua cân (tấn)', ton(t.kg)) + card('Thực giao (tấn)', ton(t.del), 'Qua cân − xe trả về') + card('Thuế còn nợ', money(sum(list.map((g) => (g.cust && g.cust.tot.remaining) || 0))) + ' đ', list.filter((g) => g.cust && g.cust.tot.remaining > 0).length + ' hợp đồng còn nợ');
     host.innerHTML = list.length ? list.map((g, gi) => {
       const c = g.c, tot = g.tot, cu = g.cust, tt = cu ? cu.tot : null;
       const head = '<tr class="table-light fw-semibold csr-row" data-csr-g="' + gi + '" style="cursor:pointer"><td>' + esc(g.f.no) + '<div class="small muted fw-normal">' + esc(typeLabel(g.f.type)) + (c && c.date ? ' · ' + esc(vnDate(c.date)) : '') + '</div>' + (c && HAK.ContractFile ? HAK.ContractFile.strip(c.id, state.groups) : '') + '</td><td>' + esc(g.f.buyer) + '</td><td>' + esc(g.khos.join(', ')) + '</td><td>' + esc(g.ships.join(', ')) + '</td>' +
@@ -92,9 +105,9 @@
       const sub = g.lots.map((L, li) => '<tr class="small csr-row" data-csr-g="' + gi + '" data-csr-l="' + li + '" style="cursor:pointer"><td class="ps-4">' + esc(lotLabel(L)) + '</td><td></td><td>' + esc(Array.from(new Set(L.recs.map(khoOf).filter(Boolean))).join(', ')) + '</td><td></td><td class="num">' + int(L.recs.length) + '</td><td class="num">' + (L.recs.length ? int(L.trips) : '') + '</td><td class="num">' + (L.recs.length ? ton(L.kg) : '') + '</td><td class="num">' + (L.recs.length ? int(L.retTrips) : '') + '</td><td class="num">' + (L.recs.length ? ton(L.delKg) : '') + '</td><td class="num">' + esc(L.c && hasNum(L.c.mt) ? dec(L.c.mt) + ' MT' : '') + '</td><td class="num">' + (L.recs.length && L.c && hasNum(L.c.mt) ? dec(L.c.mt - L.delKg / 1000) : '') + '</td><td>' + esc(L.from) + (L.to && L.to !== L.from ? ' → ' + esc(L.to) : '') + '</td><td></td><td></td><td></td><td></td><td>' + (L.recs.length ? '<span class="badge badge-soft">Xem xe ▸</span>' : '<span class="muted">chưa có phiếu cân</span>') + '</td></tr>').join('');
       return head + sub;
     }).join('') : '<tr><td colspan="17" class="muted text-center py-4">Chưa có hợp đồng / hồ sơ cân khớp bộ lọc. Phiếu cân lấy từ các hồ sơ đã xuất trong 🗄️ Lưu trữ (Xuất khẩu, Ủy thác, Xuất bán, Trao đổi) có gắn hợp đồng.</td></tr>';
-    const un = (state.unlinked || []).length;
-    $('#csrWarn').innerHTML = un ? '⚠ ' + un + ' hồ sơ cân chưa gắn được hợp đồng (lập biên bản không chọn hợp đồng và tên tàu không khớp) — hiện ở các dòng "(chưa gắn hợp đồng)".' : '';
-    $('#csrWarn').classList.toggle('d-none', !un);
+    const un = (state.unlinked || []).length, wn = weighNote();
+    $('#csrWarn').innerHTML = (wn ? esc(wn) + (un ? '<br>' : '') : '') + (un ? '⚠ ' + un + ' hồ sơ cân chưa gắn được hợp đồng (lập biên bản không chọn hợp đồng và tên tàu không khớp) — hiện ở các dòng "(chưa gắn hợp đồng)".' : '');
+    $('#csrWarn').classList.toggle('d-none', !un && !wn);
     drawUnlinked();
     ['#csrXls', '#csrPdf'].forEach((s) => { const b = $(s); if (b) b.disabled = !list.length; });
   }
@@ -212,7 +225,7 @@
   }
 
   /* ---------------- Excel / PDF ---------------- */
-  const stamp = () => { const v = state.view; return v ? ' · Bộ lọc: ' + v.describe() : ''; };
+  const stamp = () => { const v = state.view, w = weighNote ? weighNote() : ''; return (v ? ' · Bộ lọc: ' + v.describe() : '') + (w ? ' · ' + w : ''); };   // cảnh báo phiếu cân trùng / xung đột đi cùng mọi bản xuất
   async function exportSummary() {
     const list = filtered(); if (!list.length) return;
     if (!root.ExcelJS && HAK.UI.needLib) await HAK.UI.needLib('exceljs');
@@ -279,5 +292,5 @@
     document.addEventListener('click', (e) => { const u = e.target.closest('[data-csr-un]'); if (u) HAK.UI.confirmClick(u, () => unassign(u.dataset.csrUn).catch((x) => toast(x.message || String(x), 'error')), 'Gỡ?'); });
     root.addEventListener('hak:catalog', () => { if (!host.hidden) render(); });
   }
-  HAK.ContractStatus = { render, init, load, state, khoOf };
+  HAK.ContractStatus = { render, init, load, state, khoOf, weighNote };
 })(window);

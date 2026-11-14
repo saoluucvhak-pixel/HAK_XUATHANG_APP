@@ -159,7 +159,8 @@
           { id: 'certDate', label: 'Ngày chứng thư', type: 'date', col: 6 },
           { id: 'certWet', label: 'KL giám định — tấn tươi', type: 'text', ph: '13.010,81', col: 4, num: 'num' },
           { id: 'certDry', label: 'KL giám định — tấn khô', type: 'text', ph: 'Để trống = tự tính', col: 4, num: 'num' },
-          { id: 'moisture', label: 'Độ ẩm (%)', type: 'text', ph: '49,9818', col: 4, num: 'dec' } ] },
+          { id: 'moisture', label: 'Độ ẩm (%)', type: 'text', ph: '49,9818', col: 4, num: 'dec' },
+          { id: 'certReason', label: 'Lý do điều chỉnh số liệu chứng thư (chỉ khi KHÁC Danh mục)', type: 'text', ph: 'Vd: theo chứng thư bổ sung số …', col: 12 } ] },
         { title: 'Thông tin biên bản', zone: 'doc', fields: [
           { id: 'returnWh', label: 'Kho nhận xe trả về', type: 'text', def: 'Kho Hoàng Anh Khôi Đà Nẵng', col: 6 },
           { id: 'period', label: 'Đợt tháng (MM/YYYY)', type: 'text', ph: 'Tự động', col: 3 },
@@ -688,6 +689,7 @@
       else conflicts.push({ f, cur, nv });
     });
     HAK.Store.set(ctFillKey(type), last);
+    if (done.length && fieldDef(type, 'certReason')) setField(type, fieldDef(type, 'certReason'), '');   // đổi số liệu theo hợp đồng mới → lý do điều chỉnh cũ không còn đúng
     const flt = applyContractFilter(type, filter);
     saveForm(type); updateSummary(type);
     ST[type].ctPending = conflicts.length ? conflicts : null;
@@ -756,6 +758,12 @@
       p.docDate = p.qdDate;
     }
     const linked = ST[type].snapshotParams?null:selectedContract(type);
+    // v2.17.0 — bản chụp số liệu chứng thư dùng để lập chứng từ (nguồn Danh mục / điều chỉnh riêng + lý do); mở lại hồ sơ cũ KHÔNG đọc lại Danh mục.
+    if (HAK.Cert && fieldDef(type, 'certNo')) {
+      const old = ST[type].snapshotParams && ST[type].snapshotParams.certSnap;
+      const det = linked ? Object.assign({}, linked, { id: linked.detailId || linked.id }) : old ? { id: old.detailId, certNo: old.catalog.certNo, certDate: old.catalog.certDate, mt: old.catalog.certWet, bdmt: old.catalog.certDry, moisture: old.catalog.moisture } : null;
+      if (det) p.certSnap = HAK.Cert.snapshot(det, p, p.certReason, old && old.at && !linked ? old.at : undefined);
+    }
     if (linked) { p.product = linked.product || '';p.contractNo=p.contractNo||linked.no||''; p.tkhq = linked.tkhq || ''; p.parentContractId = linked.parentId; p.contractDetailId = linked.detailId; }
     return ST[type].snapshotParams?Object.assign({},ST[type].snapshotParams,p):p;
   }
@@ -816,7 +824,25 @@
     return G().filterRows(ds.rows, p.filter);
   }
 
+  /** Kiểm tra số liệu chứng thư ngay trên form: lỗi, lệch công thức, ô khác Danh mục (cần lý do). */
+  function certCheck(type) {
+    const el = $('#' + fid(type, 'moisture')); if (!el || !HAK.Cert) return;
+    let box = $('#certCk-' + type);
+    if (!box) { box = document.createElement('div'); box.id = 'certCk-' + type; box.className = 'col-12 small'; const col = el.closest('[class*="col-"]') || el.parentElement; (col.parentElement || col).appendChild(box); }
+    const v = (id) => fieldValue(type, fieldDef(type, id)), ck = HAK.Cert.check({ mt: v('certWet'), bdmt: v('certDry'), moisture: v('moisture') }), linked = ST[type].snapshotParams ? null : selectedContract(type), html = [];
+    ck.errors.forEach((e) => html.push('<div class="text-danger">⛔ ' + esc(e) + '</div>'));
+    ck.warnings.forEach((w) => html.push('<div class="text-warning-emphasis">⚠ ' + esc(w) + '</div>'));
+    ck.notes.forEach((w) => html.push('<div class="muted">ℹ Thiếu số liệu đối chiếu: ' + esc(w) + '</div>'));
+    if (linked) {
+      const used = {}; HAK.Cert.FIELDS.forEach(([id]) => { used[id] = v(id); });
+      const ov = HAK.Cert.overrides(HAK.Cert.fromDetail(linked), used);
+      if (ov.length) html.push('<div class="text-info-emphasis">✎ Khác Danh mục (nguồn: Chi tiết hợp đồng → Chứng thư): ' + ov.map((o) => esc(o.label) + ' — Danh mục <b>' + esc(o.catalog === '' || o.catalog === null ? '(trống)' : o.catalog) + '</b>, chứng từ <b>' + esc(o.used === '' || o.used === null ? '(trống)' : o.used) + '</b>').join('; ') +
+        (v('certReason') ? '' : ' — nhập <b>lý do điều chỉnh</b> bên dưới (hoặc sửa ở Danh mục để mọi chứng từ dùng chung).') + '</div>');
+    }
+    box.innerHTML = html.join('');
+  }
   function updateSummary(type) {
+    certCheck(type);
     if (pageBkls(type)) bklsHint(type);
     const ds = getDs(type);
     const list = $('#sumList-' + type);

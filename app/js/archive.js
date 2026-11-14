@@ -145,6 +145,8 @@
         size: old ? old.size : 0
       });
       if (!meta.contract && old && old.contract) meta.contract = old.contract;
+      // v2.17.0: chứng từ lập với số liệu chứng thư KHÁC Danh mục → ghi rõ giá trị Danh mục / giá trị dùng / lý do ngay ở tóm tắt hồ sơ.
+      if (params.certSnap && params.certSnap.overrides && params.certSnap.overrides.length && HAK.Cert) meta.summary = Object.assign({}, meta.summary, { 'Số liệu chứng thư khác Danh mục': HAK.Cert.describe(params.certSnap) });
       // v2.6.1: người lập (đăng nhập) — createdBy giữ người lập đầu tiên, by = người thao tác gần nhất
       const who = HAK.Auth && HAK.Auth.who ? HAK.Auth.who() : '';
       meta.by = who || (old && old.by) || ''; meta.createdBy = (old && old.createdBy) || who || '';   // lập lại mà không chọn hợp đồng → giữ hợp đồng đã gắn trước đó

@@ -2,7 +2,8 @@
  * customs-model.js — Tờ khai hải quan (v2.14.0). Hàm thuần, không DOM → kiểm thử trong Node.
  *  - Bảng CHA: tờ khai hải quan (data.customs[]). Bảng CON: khai bổ sung (supplements[]) và giấy nộp tiền (payments[]).
  *  - Trạng thái tờ khai: opened (Đã mở tờ khai) → waiting (Chờ thông quan) → cleared (Đã thông quan).
- *  - Hợp đồng "Đang thực hiện" tự chuyển "Đã hoàn thành" khi mọi tờ khai đang dùng của hợp đồng đã thông quan.
+ *  - Hợp đồng có 4 trạng thái RIÊNG (v2.17.0): tiến độ thực hiện · thông quan · thuế · thực giao (xem axes). Tài liệu nghiệp vụ (HUONG_DAN_2.14.0) chỉ định nghĩa
+ *    điều kiện THÔNG QUAN: mọi tờ khai đang dùng đã thông quan → code 'done', nhãn "Đã thông quan đủ tờ khai"; "Đã hoàn thành" thật sự (đủ KL + đủ thuế + đã đóng) CHƯA được định nghĩa → chỉ có "Đã đóng hợp đồng" do người dùng bấm.
  *  - Thuế xuất khẩu phải nộp = thuế của khai bổ sung mới nhất (nếu có), ngược lại là thuế của tờ khai gốc.
  */
 (function (root) {
@@ -46,19 +47,97 @@
     if (v.deletedAt) p.deletedAt = v.deletedAt;
     return p;
   }
+  /** Chuẩn hóa số giấy nộp tiền: chữ hoa, bỏ khoảng trắng / dấu ("dn 0206/26" ≡ "DN0206/26"). */
+  const recKey = (v) => String(v == null ? '' : v).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  /**
+   * Hai dòng nộp tiền có phải CÙNG MỘT khoản (nhập tay rồi nhập lại từ OCR) không?
+   * Cần: cùng giấy (số giấy hoặc số tham chiếu khớp, khi cả hai bên đều có số khác nhau thì KHÔNG trùng) + cùng loại + cùng số tiền,
+   * và các mã phân biệt khoản (NDKT, chương, ĐBHC, kỳ thuế) không được khác nhau khi cả hai bên đều có.
+   * Hai khoản cùng số tiền nhưng khác NDKT / kỳ thuế là hai khoản nộp khác nhau → giữ cả hai.
+   */
+  function samePayment(a, b) {
+    if (!a || !b) return false;
+    const ra = recKey(a.receiptNo), rb = recKey(b.receiptNo), fa = digits(a.refNo), fb = digits(b.refNo);
+    const sameDoc = (ra && rb && ra === rb) || (fa && fb && fa === fb);
+    if (!sameDoc) return false;
+    if (ra && rb && ra !== rb) return false;
+    if (fa && fb && fa !== fb) return false;
+    if ((a.kind === 'fee' ? 'fee' : 'tax') !== (b.kind === 'fee' ? 'fee' : 'tax')) return false;
+    if (numOrNull(a.amount) !== numOrNull(b.amount)) return false;
+    return ['ndkt', 'chapter', 'dbhc', 'periodDate'].every((k) => { const x = String(a[k] || '').trim(), y = String(b[k] || '').trim(); return !x || !y || x === y; });
+  }
+  /** Tìm khoản đã có giống p trong danh sách (bỏ qua dòng đã xóa và dòng skipId). */
+  const findSamePayment = (list, p, skipId) => (list || []).find((x) => !x.deletedAt && x.id !== skipId && samePayment(x, p)) || null;
   const act = (list) => (list || []).filter((x) => !x.deletedAt);
   const sum = (list, key) => act(list).reduce((a, x) => a + (Number(x[key]) || 0), 0);
 
   /** Thuế phải nộp / đã nộp / còn lại của 1 tờ khai. */
   function totals(d) {
-    const supp = act(d.supplements).filter((s) => s.taxVnd != null).sort((a, b) => (a.round - b.round) || String(a.date).localeCompare(String(b.date)));
+    const byOrder = (a, b) => (a.round - b.round) || String(a.date).localeCompare(String(b.date));
+    const supp = act(d.supplements).filter((s) => s.taxVnd != null).sort(byOrder);
     const last = supp[supp.length - 1] || null;
+    // Lần khai bổ sung MỚI NHẤT (kể cả chưa nhập số thuế): nếu nó mới hơn lần có số thuế → thuế phải nộp đang theo lần cũ, cần nhập thuế lần mới nhất.
+    const newest = act(d.supplements).slice().sort(byOrder).pop() || null, stale = !!(newest && newest.taxVnd == null && (!last || byOrder(newest, last) > 0));
     const base = d.taxVnd == null ? null : Number(d.taxVnd);
     const payable = last ? Number(last.taxVnd) : base;
     const paidTax = act(d.payments).filter((p) => p.kind === 'tax').reduce((a, p) => a + (Number(p.amount) || 0), 0);
     const paidFee = act(d.payments).filter((p) => p.kind === 'fee').reduce((a, p) => a + (Number(p.amount) || 0), 0);
-    return { base, payable, extra: last && base != null ? Number(last.taxVnd) - base : null, paidTax, paidFee, remaining: payable == null ? null : payable - paidTax, lastSupplement: last };
+    const remaining = payable == null ? null : payable - paidTax;
+    // owed = còn nợ (≥ 0), over = nộp thừa (≥ 0), undetermined = chưa xác định nghĩa vụ thuế (không có thuế gốc / bổ sung) → không được bù trừ giữa các tờ khai.
+    return { base, payable, extra: last && base != null ? Number(last.taxVnd) - base : null, paidTax, paidFee, remaining, owed: remaining != null && remaining > 0 ? remaining : 0, over: remaining != null && remaining < 0 ? -remaining : 0, undetermined: payable == null, staleSupplement: stale, lastSupplement: last };
   }
+  /**
+   * Tổng hợp thuế của nhiều tờ khai — KHÔNG bù trừ: còn nợ và nộp thừa cộng riêng từng tờ khai.
+   * net = Σ (phải nộp − đã nộp) của các tờ khai đã xác định nghĩa vụ (chỉ để tham khảo, tên chỉ tiêu: "Số dư ròng").
+   * @returns {{payable, paidTax, paidFee, owed, over, net, undetermined, paidUndetermined, nOwing, nOver, nSettled, nDecl}}
+   */
+  function settlement(decls) {
+    const o = { payable: 0, paidTax: 0, paidFee: 0, owed: 0, over: 0, net: 0, undetermined: 0, paidUndetermined: 0, nOwing: 0, nOver: 0, nSettled: 0, nDecl: 0, nStale: 0 };
+    act(decls).forEach((d) => {
+      const t = totals(d); o.nDecl++; o.paidTax += t.paidTax; o.paidFee += t.paidFee; if (t.staleSupplement) o.nStale++;
+      if (t.undetermined) { o.undetermined++; o.paidUndetermined += t.paidTax; return; }
+      o.payable += t.payable; o.net += t.remaining; o.owed += t.owed; o.over += t.over;
+      if (t.owed > 0) o.nOwing++; else if (t.over > 0) o.nOver++; else o.nSettled++;
+    });
+    return o;
+  }
+  const mny = (n) => Math.round(Number(n) || 0).toLocaleString('vi-VN');
+  /** Câu mô tả thuế đúng với từng khoản (còn nợ / nộp thừa / chưa xác định). */
+  function taxText(st) {
+    if (!st.nDecl) return 'Chưa có tờ khai';
+    const p = [];
+    if (st.owed > 0) p.push('Còn nợ ' + mny(st.owed) + ' đ (' + st.nOwing + ' tờ khai)');
+    if (st.over > 0) p.push('Nộp thừa ' + mny(st.over) + ' đ (' + st.nOver + ' tờ khai)');
+    if (st.undetermined) p.push(st.undetermined + ' tờ khai chưa xác định nghĩa vụ thuế' + (st.paidUndetermined ? ' (đã nộp ' + mny(st.paidUndetermined) + ' đ)' : ''));
+    if (!p.length) p.push(st.payable > 0 || st.paidTax > 0 ? 'Đã nộp đủ thuế' : 'Chưa có thuế phát sinh');
+    if (st.nStale) p.push('⚠ ' + st.nStale + ' tờ khai có khai bổ sung mới nhất chưa nhập số thuế (đang tính theo lần trước)');
+    return p.join(' · ');
+  }
+  /**
+   * 4 trạng thái riêng của hợp đồng. ctx = { delKg, trips, certBdmt }.
+   * progress: tiến độ thực hiện (đóng thủ công / đủ KL chứng thư / đang thực hiện / chưa thực hiện) · customs: thông quan · tax: thuế · delivery: thực giao.
+   */
+  function axes(contract, customs, ctx) {
+    const c = contract || {}, x = ctx || {}, list = act(customs).filter((d) => d.contractId === c.id), cleared = list.filter((d) => d.status === 'cleared').length;
+    const qty = Number(c.contractQty) || 0, got = x.certBdmt != null ? Number(x.certBdmt) : (c.details || []).filter((d) => !d.deletedAt).reduce((a, d) => a + (Number(d.bdmt) || 0), 0);
+    const need = c.type === 'xuatkhau' || c.type === 'uythac';
+    const progress = c.closedAt ? { code: 'closed', label: 'Đã đóng hợp đồng', text: 'Đóng ngày ' + c.closedAt }
+      : qty > 0 && got + 0.005 >= qty ? { code: 'full', label: 'Đã thực hiện đủ KL', text: nfm(got) + ' / ' + nfm(qty) + ' BDMT theo chứng thư' }
+      : got > 0 || x.trips > 0 ? { code: 'running', label: 'Đang thực hiện', text: nfm(got) + (qty > 0 ? ' / ' + nfm(qty) : '') + ' BDMT theo chứng thư' }
+      : { code: 'none', label: 'Chưa thực hiện', text: 'Chưa có chứng thư / phiếu cân' };
+    const customsAx = !list.length ? { code: 'none', label: need ? 'Chưa có tờ khai' : 'Không có tờ khai', text: need ? 'Hợp đồng này cần tờ khai hải quan' : 'Hình thức này không bắt buộc tờ khai' }
+      : cleared === list.length ? { code: 'cleared', label: 'Đã thông quan đủ', text: cleared + '/' + list.length + ' tờ khai đã thông quan' }
+      : { code: 'partial', label: 'Chưa thông quan đủ', text: cleared + '/' + list.length + ' tờ khai đã thông quan' };
+    const st = settlement(list);
+    const taxAx = !list.length ? { code: 'none', label: 'Chưa có tờ khai', text: '' }
+      : st.owed > 0 ? { code: 'owing', label: 'Còn nợ thuế', text: taxText(st) }
+      : st.undetermined ? { code: 'undetermined', label: 'Chưa xác định nghĩa vụ', text: taxText(st) }
+      : st.over > 0 ? { code: 'over', label: 'Nộp thừa', text: taxText(st) }
+      : { code: 'paid', label: st.payable > 0 || st.paidTax > 0 ? 'Đã nộp đủ' : 'Chưa có thuế', text: taxText(st) };
+    const delivery = x.trips > 0 ? { code: 'shipped', label: 'Đã có thực giao', text: x.trips + ' chuyến · ' + nfm((x.delKg || 0) / 1000) + ' tấn thực giao' } : { code: 'none', label: 'Chưa có phiếu cân', text: '' };
+    return { progress, customs: customsAx, tax: taxAx, delivery, settlement: st };
+  }
+  const nfm = (n) => (Math.round((Number(n) || 0) * 100) / 100).toLocaleString('vi-VN');
   function setStatus(d, status, at, by) {
     if (!STATUS[status]) throw Error('Trạng thái tờ khai không hợp lệ.');
     if (d.status === status) return d;
@@ -74,9 +153,10 @@
     const list = act(customs).filter((d) => d.contractId === contractId);
     const cleared = list.filter((d) => d.status === 'cleared').length;
     // Đóng thủ công (hợp đồng Xuất bán / Trao đổi không có tờ khai, hoặc đã giao đủ): contract.closedAt = ngày đóng.
-    if (contract && contract.closedAt) return { code: 'done', label: 'Đã hoàn thành', total: list.length, cleared, manual: true, closedAt: contract.closedAt };
+    if (contract && contract.closedAt) return { code: 'done', label: 'Đã đóng hợp đồng', total: list.length, cleared, manual: true, closedAt: contract.closedAt };
     const done = list.length > 0 && cleared === list.length;
-    return { code: done ? 'done' : 'running', label: done ? 'Đã hoàn thành' : 'Đang thực hiện', total: list.length, cleared };
+    // 'done' (tự động) CHỈ nghĩa là mọi tờ khai đã thông quan — không bao hàm đủ KL, đã nộp thuế hay đã giao hết (xem axes).
+    return { code: done ? 'done' : 'running', label: done ? 'Đã thông quan đủ tờ khai' : 'Đang thực hiện', total: list.length, cleared };
   }
   /**
    * Gợi ý ĐÓNG hợp đồng: đã thực hiện đủ khối lượng hiện hành (Σ KL khô chứng thư ≥ KL hợp đồng) và — với Xuất khẩu / Ủy thác XK — mọi tờ khai đã thông quan.
@@ -145,6 +225,6 @@
     if (!act(customs).some((x) => x.contractId === c.id && (!x.detailId || x.detailId === d.id))) missing.push('tờ khai hải quan');
     return { ok: !missing.length, missing };
   }
-  HAK.CustomsModel = { closeHint, detailReady, readiness, STATUS, STATUS_ORDER, PAY_KIND, newDecl, newSupp, newPay, active: act, sum, totals, setStatus, statusDate, contractStatus, validate, upsert, merge, copy, digits };
+  HAK.CustomsModel = { samePayment, findSamePayment, axes, settlement, taxText, closeHint, detailReady, readiness, STATUS, STATUS_ORDER, PAY_KIND, newDecl, newSupp, newPay, active: act, sum, totals, setStatus, statusDate, contractStatus, validate, upsert, merge, copy, digits };
   if (typeof module === 'object' && module.exports) module.exports = HAK.CustomsModel;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -21,7 +21,7 @@
     { k: 'cert', b: 1, h: 'Số chứng thư', w: 24 }, { k: 'certBdmt', b: 1, h: 'KL khô thực hiện (BDMT)', n: 'dec', sum: 1, w: 16 }, { k: 'pct', b: 1, h: '% / còn lại so với HĐ', w: 22 },
     { k: 'declNo', b: 2, h: 'Số tờ khai', w: 18 }, { k: 'openDate', b: 2, h: 'Ngày mở', w: 11 }, { k: 'declStatus', b: 2, h: 'Trạng thái', w: 22 },
     { k: 'supps', b: 3, h: 'Số lần', w: 10 }, { k: 'extra', b: 3, h: 'Thuế tăng / giảm (đ)', n: 'int', sum: 1, w: 16 },
-    { k: 'payable', b: 4, h: 'Thuế phải nộp (đ)', n: 'int', sum: 1, w: 16 }, { k: 'paid', b: 4, h: 'Đã nộp (đ)', n: 'int', sum: 1, w: 16 }, { k: 'owing', b: 4, h: 'CÒN NỢ (đ)', n: 'int', sum: 1, w: 16 },
+    { k: 'payable', b: 4, h: 'Thuế phải nộp (đ)', n: 'int', sum: 1, w: 16 }, { k: 'paid', b: 4, h: 'Đã nộp (đ)', n: 'int', sum: 1, w: 16 }, { k: 'owing', b: 4, h: 'CÒN NỢ (đ)', n: 'int', sum: 1, w: 16 }, { k: 'over', b: 4, h: 'NỘP THỪA (đ)', n: 'int', sum: 1, w: 16 }, { k: 'undet', b: 4, h: 'Tờ khai chưa xác định thuế', n: 'int', sum: 1, w: 14 },
     { k: 'kho', b: 5, h: 'Kho xuất', w: 22 }, { k: 'trips', b: 5, h: 'Chuyến xe', n: 'int', sum: 1, w: 9 }, { k: 'tons', b: 5, h: 'Thực giao (tấn)', n: 'dec', sum: 1, w: 13 }, { k: 'time', b: 5, h: 'Thời gian cân', w: 22 },
     { k: 'tkct', b: 6, h: 'Tờ khai ↔ chứng thư', w: 30 }, { k: 'cthd', b: 6, h: 'Chứng thư ↔ hợp đồng', w: 34 }, { k: 'ctgv', b: 6, h: 'Chứng thư ↔ thực giao', w: 20 }
   ];
@@ -45,14 +45,14 @@
     const { g, m } = it, c = m.c, CMm = CM(), out = [];
     const label = [c.no || c.id, CF().TYPES[c.type] || '', vn(c.date), g.f.buyer].filter(Boolean).join(' · ');
     const pct = m.qty ? Math.round(m.certBdmt / m.qty * 1000) / 10 : null, over = m.qty != null && m.certBdmt > m.qty + 0.005;
-    const nBad = m.rows.filter((r) => r.tkct.s === 'warn').length, lots = m.rows.filter((r) => r.cttt.s !== 'none'), nLot = lots.filter((r) => r.cttt.s === 'warn').length;
+    const nBad = m.rows.filter((r) => r.tkct.s === 'warn').length, lots = m.rows.filter((r) => r.cttt.s !== 'none'), nLot = lots.filter((r) => r.cttt.s === 'warn').length, nMiss = m.rows.filter((r) => r.tkct.s === 'info').length, nLotMiss = lots.filter((r) => r.cttt.s === 'info').length;
     out.push({ cls: 'main', t: [], c: [label, nf(c.qtyOrig != null ? c.qtyOrig : c.contractQty), m.addenda.length ? m.addenda.map((a) => (a.no || 'PL') + ': ' + nf(a.qty)).join(' ; ') : '—', nf(c.contractQty),
       m.withCert + '/' + m.rows.length + ' chứng thư', nf(m.certBdmt), pct == null ? '' : nf(pct) + '% · ' + (over ? 'VƯỢT ' + nf(m.certBdmt - m.qty) : 'còn ' + nf(m.qty - m.certBdmt)),
       (m.T.length || 'chưa có') + ' tờ khai', '', m.cleared + '/' + m.T.length + ' thông quan',
-      m.supps + ' lần', nf(sum(m.T.map((x) => x.t.extra))), nf(m.tax.payable), nf(m.tax.paid), nf(m.tax.remaining),
+      m.supps + ' lần', nf(sum(m.T.map((x) => x.t.extra))), nf(m.tax.payable), nf(m.tax.paid), nf(m.tax.owed), nf(m.tax.over), m.tax.undetermined ? String(m.tax.undetermined) : '',
       g.khos.join(', '), m.trips ? String(m.trips) : '', m.trips ? nf(m.delKg / 1000) : '', g.from ? g.from + (g.to && g.to !== g.from ? ' → ' + g.to : '') : '',
-      !m.rows.length ? '' : nBad ? '⚠ ' + nBad + '/' + m.rows.length + ' chi tiết lệch' : '✔ Khớp', m.hd ? (m.hd.ok ? '✔ ' : '⚠ ') + m.hd.note : '', !lots.length ? '—' : nLot ? '⚠ ' + nLot + ' lệch' : '✔ Khớp'] });
-    const declCells = (x) => { if (!x) return ['(chưa có tờ khai)', '', '', '', '', '', '', '']; const t = CMm.totals(x), clr = CMm.statusDate(x, 'cleared'); return [x.no + (x.round > 1 ? ' (lần ' + x.round + ')' : ''), vn(x.openDate), CMm.STATUS[x.status] + (x.status === 'cleared' && clr ? ' ' + vn(clr) : ''), String(CMm.active(x.supplements).length), t.extra != null ? nf(t.extra) : '', nf(t.payable), nf(t.paidTax), nf(t.remaining)]; };
+      !m.rows.length ? '' : nBad ? '⚠ ' + nBad + '/' + m.rows.length + ' chi tiết lệch' : nMiss ? 'Thiếu số liệu đối chiếu (' + nMiss + '/' + m.rows.length + ' chi tiết)' : '✔ Khớp', m.hd ? (m.hd.ok ? '✔ ' : '⚠ ') + m.hd.note : '', !lots.length ? '—' : nLot ? '⚠ ' + nLot + ' lệch' : nLotMiss ? 'Thiếu số liệu đối chiếu' : '✔ Khớp'] });
+    const declCells = (x) => { if (!x) return ['(chưa có tờ khai)', '', '', '', '', '', '', '', '', '']; const t = CMm.totals(x), clr = CMm.statusDate(x, 'cleared'); return [x.no + (x.round > 1 ? ' (lần ' + x.round + ')' : ''), vn(x.openDate), CMm.STATUS[x.status] + (x.status === 'cleared' && clr ? ' ' + vn(clr) : ''), String(CMm.active(x.supplements).length), t.extra != null ? nf(t.extra) : '', t.undetermined ? 'Chưa xác định' : nf(t.payable), nf(t.paidTax), t.undetermined ? '' : nf(t.owed), t.undetermined ? '' : nf(t.over), t.undetermined ? '1' : '']; };
     m.rows.forEach((r) => {
       const d = r.d, dc = declCells(r.decl), L = r.lot;
       out.push({ cls: 'sub', c: ['   ' + (d.ship || '(chưa có tàu)'), '', '', '', d.certNo || '(chưa có chứng thư)', nf(d.bdmt), ''].concat(dc, [L && L.recs.length ? Array.from(new Set(L.recs.map(HAK.ContractStatus.khoOf).filter(Boolean))).join(', ') : '', L && L.trips ? String(L.trips) : '', L && L.trips ? nf(L.delKg / 1000) : '', L && L.from ? L.from + (L.to && L.to !== L.from ? ' → ' + L.to : '') : '', r.tkct.t, '', r.cttt.t]) });
@@ -60,7 +60,7 @@
     m.loose.forEach((x) => out.push({ cls: 'sub', c: ['   (tờ khai chưa gắn chi tiết hợp đồng)', '', '', '', '', '', ''].concat(declCells(x), ['', '', '', '', '⚠ Chưa gắn chi tiết', '', '']) }));
     return out;
   }
-  const tone = (v, i) => { v = String(v); if (i === IX.owing && v && v !== '0') return 'text-danger fw-semibold'; if (i >= IX.tkct) return v.charAt(0) === '⚠' ? 'text-danger' : v.charAt(0) === '✔' ? 'text-success' : ''; return ''; };
+  const tone = (v, i) => { v = String(v); if (i === IX.owing && v && v !== '0') return 'text-danger fw-semibold'; if (i >= IX.tkct) return v.charAt(0) === '⚠' ? 'text-danger' : v.charAt(0) === '✔' ? 'text-success' : /^Thiếu số liệu/.test(v) ? 'text-warning fw-semibold' : ''; return ''; };
 
   /* ---------- Bộ lọc smart ---------- */
   function fields() {
@@ -68,7 +68,7 @@
     return [
       f.multi('type', 'Hình thức', () => Object.keys(K().TYPES || {}).map((k) => ({ value: k, label: K().TYPES[k].label })), (r) => r.type),
       f.multi('buyerId', 'Bên mua / nhận', () => K().customers().map((c) => ({ value: c.id, label: c.name })), (r) => r.buyerId),
-      f.multi('status', 'Trạng thái hợp đồng', () => [{ value: 'running', label: 'Đang thực hiện' }, { value: 'done', label: 'Đã hoàn thành' }], (r) => r.status),
+      f.multi('status', 'Trạng thái hợp đồng', () => [{ value: 'running', label: 'Đang thực hiện' }, { value: 'done', label: 'Đã thông quan đủ / đã đóng' }], (r) => r.status),
       { key: 'owing', label: 'Chỉ hợp đồng còn nợ thuế', type: 'bool', match: (r) => r.owing },
       { key: 'mismatch', label: 'Chỉ hợp đồng có lệch đối chiếu', type: 'bool', match: (r) => r.mismatch },
       { key: 'missing', label: 'Chỉ hợp đồng còn thiếu bước (chứng thư, tờ khai, thông quan, nộp thuế)', type: 'bool', match: (r) => r.missing }
@@ -82,16 +82,17 @@
     return state.view;
   }
   function filtered() { const v = smart(); if (!v) return state.items; const ids = new Set(v.filter(state.items.map((i) => i.f)).rows.map((r) => r.id)); return state.items.filter((i) => ids.has(i.f.id)); }
-  const stamp = () => { const v = state.view; return v ? ' · Bộ lọc: ' + v.describe() : ''; };
+  const stamp = () => { const v = state.view, w = HAK.ContractStatus.weighNote ? HAK.ContractStatus.weighNote() : ''; return (v ? ' · Bộ lọc: ' + v.describe() : '') + (w ? ' · ' + w : ''); };   // cảnh báo phiếu cân trùng / xung đột đi cùng mọi bản xuất
 
   /* ---------- Hiển thị ---------- */
   const card = (l, v, s) => '<div class="col-6 col-md-3 col-xl"><div class="border rounded p-2 h-100"><div class="small muted">' + l + '</div><div class="fw-semibold fs-5">' + v + '</div>' + (s ? '<div class="small muted">' + s + '</div>' : '') + '</div></div>';
   function draw() {
     const host = $('#coBody'); if (!host) return;
     const list = filtered(), T = (k) => sum(list.map((i) => i.m.tax[k])), nDecl = sum(list.map((i) => i.m.T.length)), nClr = sum(list.map((i) => i.m.cleared));
-    $('#coCards').innerHTML = card('Hợp đồng', list.length, list.filter((i) => i.m.status.code === 'done').length + ' đã hoàn thành') +
+    { const w = $('#coWeighWarn'), t = HAK.ContractStatus.weighNote ? HAK.ContractStatus.weighNote() : ''; if (w) { w.textContent = t; w.classList.toggle('d-none', !t); } }
+    $('#coCards').innerHTML = card('Hợp đồng', list.length, list.filter((i) => i.m.status.code === 'done').length + ' đã thông quan đủ / đã đóng') +
       card('KL hợp đồng hiện hành', nf(sum(list.map((i) => i.m.qty))) + ' BDMT', 'chứng thư: ' + nf(sum(list.map((i) => i.m.certBdmt)))) + card('Tờ khai', nDecl, nClr + ' đã thông quan') +
-      card('Thuế phải nộp', nf(T('payable')) + ' đ', 'đã nộp ' + nf(T('paid'))) + card('Thuế CÒN NỢ', '<span class="' + (T('remaining') > 0 ? 'text-danger' : 'text-success') + '">' + nf(T('remaining')) + ' đ</span>', list.filter((i) => i.f.owing).length + ' hợp đồng còn nợ') +
+      card('Thuế phải nộp', nf(T('payable')) + ' đ', 'đã nộp ' + nf(T('paid'))) + card('Thuế CÒN NỢ', '<span class="' + (T('owed') > 0 ? 'text-danger' : 'text-success') + '">' + nf(T('owed')) + ' đ</span>', list.filter((i) => i.f.owing).length + ' hợp đồng còn nợ' + (T('over') > 0 ? ' · nộp thừa ' + nf(T('over')) + ' đ (không bù trừ)' : '') + (T('undetermined') > 0 ? ' · ' + T('undetermined') + ' tờ khai chưa xác định thuế' : '')) +
       card('Có lệch đối chiếu', list.filter((i) => i.f.mismatch).length, 'hợp đồng cần kiểm tra');
     const head = '<thead><tr class="text-center">' + BANDS.map((b, k) => '<th colspan="' + bandSpan(k) + '" class="text-bg-' + b[1] + '">' + b[0] + '</th>').join('') + '</tr><tr>' + COLS.map((c, i) => '<th class="' + (c.n ? 'num ' : '') + (i === 0 ? 'co-first' : '') + '">' + esc(c.h) + '</th>').join('') + '</tr></thead>';
     const body = list.length ? list.map((it) => rowsOf(it).map((r) => '<tr class="' + (r.cls === 'main' ? 'table-light fw-semibold co-main' : 'small') + '"' + (r.cls === 'main' ? ' data-co-file="' + esc(it.f.id) + '" style="cursor:pointer" title="Bấm để mở Hồ sơ hợp đồng"' : '') + '>' +

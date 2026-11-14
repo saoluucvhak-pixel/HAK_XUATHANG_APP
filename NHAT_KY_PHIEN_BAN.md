@@ -291,6 +291,14 @@ Thủy chốt 28/09/2026: "1. bỏ Trao đổi KHÔNG đồng bộ lên Google S
 - pages.js generateBkls: không chặn khi thiếu Số BKLS / hệ số / tên bên mua — tự điền hoặc để trống + cảnh báo.
 - tests/parse-num.test.cjs, tests/numfmt.test.cjs.
 
+## (Chưa phát hành — đang chờ duyệt) Rà soát logic nghiệp vụ: phiếu cân, trạng thái, thuế, chứng thư
+- Phiếu cân: chống trùng ở cấp PHIẾU (hồ sơ cùng tàu / chi tiết hợp đồng giao nhau về ngày giữ các phiếu riêng, phiếu lặp tính 1 lần); khác khối lượng / xe trả về / liên kết → báo XUNG ĐỘT + tổng chờ đối soát; chống trùng nguyên hồ sơ nay xét thêm công ty + chi tiết hợp đồng (weigh-model.js, Report.prepareTickets). Excel Báo cáo Xuất hàng bỏ đúng các phiếu trùng; thêm sheet "Đối soát phiếu cân".
+- Hợp đồng có 4 trạng thái riêng (tiến độ · thông quan · thuế · thực giao); "Đã hoàn thành" đổi thành "Đã thông quan đủ tờ khai" / "Đã đóng hợp đồng" (tài liệu chỉ định nghĩa thông quan).
+- Thuế: còn nợ / nộp thừa cộng riêng từng tờ khai (không bù trừ), tờ khai chưa xác định nghĩa vụ, lệ phí tách riêng; cột mới NỘP THỪA, "Tờ khai chưa xác định thuế"; khai bổ sung mới nhất chưa có số thuế → cảnh báo. Giấy nộp tiền: nhận ra cùng khoản khi nhập tay rồi OCR (chuẩn hóa số giấy, so NDKT / kỳ thuế), giữ các dòng cùng số tiền nhưng khác khoản; nhập tay trùng → hỏi xác nhận.
+- Đối chiếu: thiếu dữ liệu (số chứng thư, đơn giá, tỷ giá, MT) hiển thị "Thiếu số liệu đối chiếu" thay vì "Khớp".
+- Chứng thư: kiểm tra số âm / BDMT > MT / độ ẩm / công thức BDMT ≈ MT × (1 − độ ẩm) (cert-model.js); lưu bản chụp số liệu + ô khác Danh mục + lý do vào hồ sơ Lưu trữ; ô "Lý do điều chỉnh" ở form lập biên bản.
+- Xem docs/QUY_TAC_NGHIEP_VU_CAN_XAC_NHAN.md.
+
 ## v2.16.2 — Rà soát mã nguồn: bảo mật, độ bền, đóng hợp đồng
 - Google Sheet: ô văn bản bắt đầu bằng = + - @ được ghi kèm dấu ' (chặn chèn công thức); Code.gs lên VERSION 2 — cần dán lại Code.gs mới vào Apps Script.
 - Hợp đồng chưa gán công ty không còn bị gửi về Sheet của mọi công ty.

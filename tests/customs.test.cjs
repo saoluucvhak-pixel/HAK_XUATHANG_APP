@@ -72,10 +72,10 @@ test('thuế phải nộp theo khai bổ sung mới nhất; còn phải nộp = 
   assert.equal(t.payable,563502948);assert.equal(t.extra,11806308);assert.equal(t.paidTax,551696640);assert.equal(t.paidFee,20000);assert.equal(t.remaining,11806308);
   d.supplements[0].deletedAt='x';assert.equal(M.totals(d).payable,551696640);assert.equal(M.totals(d).remaining,0);
 });
-test('hợp đồng chuyển Đã hoàn thành khi mọi tờ khai đã thông quan',()=>{
+test('hợp đồng chuyển "Đã thông quan đủ tờ khai" khi mọi tờ khai đã thông quan',()=>{
   const a=M.newDecl({no:'111111111111',contractId:'c1',status:'cleared'}),b=M.newDecl({no:'222222222222',contractId:'c1',status:'waiting'}),other=M.newDecl({no:'333333333333',contractId:'c2'});
   assert.equal(M.contractStatus([a,b,other],'c1').code,'running');assert.equal(M.contractStatus([a,b,other],'c1').cleared,1);
-  M.setStatus(b,'cleared','2026-06-30');assert.equal(M.contractStatus([a,b,other],'c1').code,'done');assert.equal(M.contractStatus([a,b,other],'c1').label,'Đã hoàn thành');
+  M.setStatus(b,'cleared','2026-06-30');assert.equal(M.contractStatus([a,b,other],'c1').code,'done');assert.equal(M.contractStatus([a,b,other],'c1').label,'Đã thông quan đủ tờ khai');
   assert.equal(M.contractStatus([a,b,other],'c3').code,'running','hợp đồng chưa có tờ khai vẫn Đang thực hiện');
   b.deletedAt='x';assert.equal(M.contractStatus([a,b],'c1').code,'done','tờ khai đã xóa không tính');
   assert.equal(M.statusDate(b,'cleared'),'2026-06-30');assert.throws(()=>M.setStatus(b,'xyz'));
@@ -185,11 +185,11 @@ test('hồ sơ hợp đồng: đối chiếu và thuế còn nợ', () => {
   const all = m.checks.find((k) => k.who === 'Cả hợp đồng'); assert.equal(all.ok, false); assert.match(all.note, /VƯỢT/);
 });
 
-test('đóng hợp đồng thủ công: trạng thái Đã hoàn thành dù chưa có tờ khai; mở lại thì về Đang thực hiện', () => {
+test('đóng hợp đồng thủ công: trạng thái "Đã đóng hợp đồng" dù chưa có tờ khai; mở lại thì về Đang thực hiện', () => {
   const c = { id: 'c1', type: 'xuatban', contractQty: 1000, details: [] };
   assert.equal(M.contractStatus([], 'c1', c).code, 'running');
   const closed = Object.assign({}, c, { closedAt: '2026-10-30' });
-  const st = M.contractStatus([], 'c1', closed); assert.equal(st.code, 'done'); assert.equal(st.manual, true); assert.equal(st.label, 'Đã hoàn thành');
+  const st = M.contractStatus([], 'c1', closed); assert.equal(st.code, 'done'); assert.equal(st.manual, true); assert.equal(st.label, 'Đã đóng hợp đồng');
   assert.equal(M.contractStatus([{ id: 'x', contractId: 'c1', status: 'opened' }], 'c1', closed).code, 'done');   // đóng thủ công ưu tiên
   assert.equal(M.contractStatus([{ id: 'x', contractId: 'c1', status: 'cleared' }], 'c1').code, 'done');          // tự động như cũ (không truyền hợp đồng)
 });
@@ -217,4 +217,44 @@ test('phụ lục: KL hiện hành theo ngày ký; cùng ngày theo thứ tự n
   assert.equal(c.contractQty, 999);
   const seqs = c.addenda.map((a) => a.seq); assert.equal(new Set(seqs).size, seqs.length); assert.ok(seqs.every((x) => x > 0));
   c.addenda = c.addenda.slice().reverse(); CMo.applyAddenda(c); assert.equal(c.contractQty, 999, 'đảo thứ tự lưu không đổi kết quả');
+});
+
+test('thuế: tờ khai còn nợ 20 và tờ khai nộp thừa 20 hiển thị đủ cả hai dù số dư ròng = 0; tờ khai chưa xác định nghĩa vụ tách riêng', () => {
+  const mk = (no, tax, paid, kind) => M.newDecl({ no, contractId: 'c1', status: 'cleared', taxVnd: tax, payments: paid == null ? [] : [{ amount: paid, kind: kind || 'tax', receiptNo: 'N' + no }] });
+  const owing = mk('308629701001', 100, 80), over = mk('308629701002', 100, 120), none = mk('308629701003', null, 50), fee = mk('308629701004', 0, 30, 'fee');
+  const s = M.settlement([owing, over]);
+  assert.equal(s.owed, 20); assert.equal(s.over, 20); assert.equal(s.net, 0); assert.equal(s.nOwing, 1); assert.equal(s.nOver, 1);
+  assert.equal(M.taxText(s), 'Còn nợ 20 đ (1 tờ khai) · Nộp thừa 20 đ (1 tờ khai)');
+  const s2 = M.settlement([owing, over, none, fee]);
+  assert.equal(s2.undetermined, 1); assert.equal(s2.paidUndetermined, 50); assert.equal(s2.paidFee, 30); assert.equal(s2.owed, 20); assert.equal(s2.over, 20);
+  assert.match(M.taxText(s2), /1 tờ khai chưa xác định nghĩa vụ thuế \(đã nộp 50 đ\)/);
+  const t = M.totals(over); assert.equal(t.over, 20); assert.equal(t.owed, 0); assert.equal(t.remaining, -20);
+  assert.equal(M.taxText(M.settlement([])), 'Chưa có tờ khai');
+});
+test('4 trạng thái riêng: tiến độ · thông quan · thuế · thực giao; "thông quan đủ" không đồng nghĩa hoàn thành', () => {
+  const c = { id: 'c1', type: 'xuatkhau', contractQty: 1000, details: [{ id: 'd1', bdmt: 400 }] };
+  const decls = [M.newDecl({ no: '308629701001', contractId: 'c1', status: 'cleared', taxVnd: 100, payments: [{ amount: 100, kind: 'tax' }] }), M.newDecl({ no: '308629701002', contractId: 'c1', status: 'waiting', taxVnd: 50 })];
+  const a = M.axes(c, decls, { trips: 0, delKg: 0 });
+  assert.equal(a.progress.code, 'running'); assert.equal(a.customs.label, 'Chưa thông quan đủ'); assert.equal(a.customs.text, '1/2 tờ khai đã thông quan');
+  assert.equal(a.tax.code, 'owing'); assert.equal(a.delivery.code, 'none');
+  decls[1].status = 'cleared'; assert.equal(M.axes(c, decls, {}).customs.label, 'Đã thông quan đủ'); assert.equal(M.axes(c, decls, {}).progress.code, 'running', 'đã thông quan đủ nhưng mới 400/1000 BDMT');
+  assert.equal(M.axes(Object.assign({}, c, { closedAt: '2026-11-01' }), decls, {}).progress.label, 'Đã đóng hợp đồng');
+  assert.equal(M.axes({ id: 'x', type: 'xuatban', contractQty: 10, details: [] }, [], {}).customs.label, 'Không có tờ khai');
+});
+
+test('giấy nộp tiền nhập tay rồi nhập lại từ OCR: nhận ra cùng khoản, vẫn giữ các dòng cùng số tiền nhưng khác khoản', () => {
+  const manual = { receiptNo: 'dn 0206/26', amount: 100, kind: 'tax' }, ocr = { receiptNo: 'DN0206/26', refNo: '123456789', amount: 100, kind: 'tax', ndkt: '1901', periodDate: '2026-06-01' };
+  assert.equal(M.samePayment(manual, ocr), true, 'khác cách gõ số giấy + thiếu mã NDKT vẫn là cùng khoản');
+  assert.equal(M.samePayment(ocr, Object.assign({}, ocr, { ndkt: '1902' })), false, 'cùng số tiền nhưng khác NDKT → khoản khác');
+  assert.equal(M.samePayment(ocr, Object.assign({}, ocr, { periodDate: '2026-07-01' })), false, 'khác kỳ thuế → khoản khác');
+  assert.equal(M.samePayment(ocr, Object.assign({}, ocr, { kind: 'fee' })), false, 'cùng giấy, cùng số tiền, khác loại (thuế / lệ phí) → khác');
+  assert.equal(M.samePayment(ocr, Object.assign({}, ocr, { receiptNo: 'DN0207/26', refNo: '' })), false, 'khác số giấy');
+  assert.equal(M.samePayment({ amount: 100, kind: 'tax' }, { amount: 100, kind: 'tax' }), false, 'không có số giấy / tham chiếu thì không dám coi là trùng');
+  assert.equal(M.findSamePayment([{ id: 'a', deletedAt: 'x', receiptNo: 'DN1', amount: 5 }], { receiptNo: 'DN1', amount: 5 }), null, 'dòng đã xóa không tính');
+});
+test('khai bổ sung mới nhất chưa có số thuế → đánh dấu để nhập, thuế phải nộp vẫn theo lần có số', () => {
+  const d = M.newDecl({ no: '308629701001', taxVnd: 100, supplements: [{ round: 2, date: '2026-06-01', taxVnd: 120 }, { round: 3, date: '2026-06-10' }] });
+  const t = M.totals(d); assert.equal(t.payable, 120); assert.equal(t.staleSupplement, true);
+  assert.match(M.taxText(M.settlement([d])), /khai bổ sung mới nhất chưa nhập số thuế/);
+  d.supplements[1].taxVnd = 130; assert.equal(M.totals(d).payable, 130); assert.equal(M.totals(d).staleSupplement, false);
 });
