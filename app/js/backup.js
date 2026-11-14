@@ -524,6 +524,31 @@
     if (b3) b3.addEventListener('click', async () => { toast((await HAK.DB.requestPersist()) ? 'Trình duyệt đã đồng ý giữ dữ liệu.' : 'Trình duyệt chưa đồng ý (thường tự đồng ý khi bạn dùng app đều đặn hoặc thêm vào trang chủ).', 'info'); render(); });
   }
 
+  /* ---------------- v2.16.2 — Dải nhắc sao lưu ở mọi trang: có dữ liệu mà > 7 ngày (hoặc chưa lần nào) chưa sao lưu toàn bộ ---------------- */
+  const BK_OLD_DAYS = 7, SNOOZE_KEY = 'hak.backup.snooze';
+  /** Thuần: có nên nhắc không? last = mốc sao lưu gần nhất (ms, 0 = chưa), snooze = mốc đã bấm "để sau". */
+  function backupNag(hasData, last, now, snooze) {
+    if (!hasData || (snooze && now - snooze < 864e5)) return null;
+    if (!last) return { days: null, text: 'Chưa sao lưu toàn bộ lần nào' };
+    const days = Math.floor((now - last) / 864e5);
+    return days > BK_OLD_DAYS ? { days, text: 'Đã ' + days + ' ngày chưa sao lưu toàn bộ' } : null;
+  }
+  async function bkBanner() {
+    let el = document.getElementById('bkNag');
+    let has = !!(HAK.Issued && HAK.Issued.list && HAK.Issued.list.length);
+    try { if (!has && HAK.Archive) has = (await HAK.Archive.list()).length > 0; } catch (e) { /* bỏ qua */ }
+    try { if (!has && HAK.Catalog && HAK.Catalog.core) has = (HAK.Catalog.core.get().contracts || []).length > 0; } catch (e) { /* bỏ qua */ }
+    const n = backupNag(has, HAK.Store.get(LAST_KEY, 0), Date.now(), HAK.Store.get(SNOOZE_KEY, 0));
+    if (!n) { if (el) el.remove(); return; }
+    if (!el) {
+      const top = document.querySelector('.content > .topbar'); if (!top) return;
+      el = document.createElement('div'); el.id = 'bkNag'; el.className = 'alert alert-warning d-flex align-items-center gap-2 flex-wrap py-2 px-3 mb-0 rounded-0 small'; el.setAttribute('role', 'alert');
+      top.insertAdjacentElement('afterend', el);
+    }
+    el.innerHTML = '<span>💾 <b>' + n.text + '</b> — nếu trình duyệt bị xóa hoặc hỏng, file sao lưu là đường lấy lại dữ liệu.</span>' +
+      '<span class="ms-auto d-flex gap-2"><a class="btn btn-sm btn-warning" href="#/settings" data-bknag="go">Sao lưu ngay</a><button class="btn btn-sm btn-outline-secondary" type="button" data-bknag="later">Để sau 1 ngày</button></span>';
+  }
+
   /* ---------------- Khởi tạo ---------------- */
   let lastWarn = 0;
   function init() {
@@ -544,9 +569,15 @@
     document.addEventListener('click', (e) => { const b = e.target.closest('[data-autobk-allow]'); if (b) { e.preventDefault(); autoAllowAndRun(b); } });
     autoPerm(false).then(() => { if (autoCfg().on) notify(); }).catch(() => { /* bỏ qua */ });
     setTimeout(() => { autoTick(); setInterval(autoTick, 30 * 60e3); }, 20e3);
+    document.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-bknag]'); if (!b) return;
+      if (b.dataset.bknag === 'later') { HAK.Store.set(SNOOZE_KEY, Date.now()); bkBanner(); }
+    });
+    setTimeout(bkBanner, 3000); setInterval(bkBanner, 10 * 60e3);
+    root.addEventListener('hashchange', () => setTimeout(bkBanner, 300));
   }
 
   HAK.Backup = { boot, init, render, saveAll, restoreFile, collect, dirPickerSupported, getSavedDir, pickDefaultDir, setSavedDir, saveBackupBlob,
-    readJson, buildFull, zipParts, health, autoStatus, autoRun, autoTick, autoAllowAndRun, autoList, autoPick,
+    backupNag, bkBanner, readJson, buildFull, zipParts, health, autoStatus, autoRun, autoTick, autoAllowAndRun, autoList, autoPick,
     packBuild, packExport, packRead, packSummaryHtml, packApply, packMsg };
 })(window);

@@ -291,6 +291,20 @@ Thủy chốt 28/09/2026: "1. bỏ Trao đổi KHÔNG đồng bộ lên Google S
 - pages.js generateBkls: không chặn khi thiếu Số BKLS / hệ số / tên bên mua — tự điền hoặc để trống + cảnh báo.
 - tests/parse-num.test.cjs, tests/numfmt.test.cjs.
 
+## v2.16.2 — Rà soát mã nguồn: bảo mật, độ bền, đóng hợp đồng
+- Google Sheet: ô văn bản bắt đầu bằng = + - @ được ghi kèm dấu ' (chặn chèn công thức); Code.gs lên VERSION 2 — cần dán lại Code.gs mới vào Apps Script.
+- Hợp đồng chưa gán công ty không còn bị gửi về Sheet của mọi công ty.
+- HAKDocs.exe: mọi yêu cầu OCR / lưu file / mở thư mục phải kèm mã bảo vệ (X-HAK-Token, file native/hakdocs-token.js do HAKDocs tạo mỗi lần chạy) — chặn trang web ngoài gọi qua Origin "null". CI smoke test: thiếu / sai mã → 403.
+- Thư viện: SheetJS 0.20.3, jsPDF 4.2.1 (bản cũ có lỗ hổng đã công bố); đã so kết quả đọc tờ khai .xls, PXK và PDF tiếng Việt với bản cũ — giống nhau.
+- Lưu trữ (archive.js): lỗi đồng bộ khi mở giao dịch IndexedDB giờ báo lỗi thay vì treo vô hạn.
+- Lập PXK: tách hàm thuần pxk-model.js + bộ test; sửa làm tròn kg→tấn sai ở 286 / 60.000 mức kg tận cùng 5.
+- Đóng hợp đồng thủ công (✔ Đóng hợp đồng / Mở lại) cho hợp đồng không có tờ khai; trạng thái "Đã hoàn thành".
+- Phụ lục hợp đồng: thứ tự theo ngày, cùng ngày / không ngày theo thứ tự nhập (seq).
+- Báo cáo thực hiện hợp đồng: cột có tên khóa (IX) thay cho số thứ tự; test độ dài dòng = số cột.
+- Mật khẩu: băm mới PBKDF2-SHA-256 210.000 vòng; tài khoản cũ đăng nhập bình thường và được nâng cấp tự động ở lần đăng nhập đúng kế tiếp (cả mã khôi phục khi đặt lại). Gói cấu hình xuất từ bản này sang máy dùng bản cũ: Nhân viên đăng nhập bằng gói đó sẽ không khớp mật khẩu → cập nhật máy trạm lên 2.16.2.
+- Dải nhắc sao lưu ở mọi trang khi có dữ liệu mà > 7 ngày (hoặc chưa lần nào) chưa sao lưu toàn bộ; nút "Để sau 1 ngày".
+- Dọn mã chết (CONTRACT_FIELDS, INFO_FIELDS, whName...). Bộ test: 186 test (thêm gsync, pxk, overview, auth-hash).
+
 ## v2.16.1 — Giao diện gọn, đồng bộ Google Sheet cho hợp đồng
 - Trang "Chi tiết xuất hàng theo hợp đồng": bỏ khung cuộn lồng nhau, bảng vừa khung (không thanh trượt ở màn hình ≥ 1600px); Báo cáo thực hiện hợp đồng bỏ khung cuộn dọc.
 - Menu bên trái rộng 288px, tên mục dài tự xuống dòng — không bị che chữ.

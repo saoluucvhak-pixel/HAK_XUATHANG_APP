@@ -3,7 +3,7 @@
  * mỗi người được gán công ty được làm (dùng ở Phase C — chọn công ty xuất).
  *
  * LƯU Ý: app chạy offline trong trình duyệt → đây là CHỐT CỬA (chặn người lạ mở app, ghi "người lập"), KHÔNG phải bảo mật máy chủ:
- * ai vào được tài khoản Windows của máy vẫn đọc được dữ liệu trình duyệt nếu cố ý. Mật khẩu chỉ lưu dạng băm (SHA-256 × 2.000 vòng + muối).
+ * ai vào được tài khoản Windows của máy vẫn đọc được dữ liệu trình duyệt nếu cố ý. Mật khẩu chỉ lưu dạng băm (PBKDF2-SHA-256 210.000 vòng + muối; bản ghi cũ SHA-256 × 2.000 vòng tự nâng cấp khi đăng nhập).
  * Dữ liệu: HAK.Store 'hak.auth.v1' = { v, users:[{ id, username, name, role:'admin'|'staff', companies:[companyId], disabled, salt, hash, createdAt }], rec:{ salt, hash } }
  *          (nằm trong Sao lưu toàn bộ). Phiên: sessionStorage 'hak.session' → giữ đăng nhập tới khi đóng trình duyệt.
  * Quyền Nhân viên (ẩn bằng lớp body.role-staff — xem style.css): không vào Cài đặt (trừ tab 👤 Tài khoản), Danh mục: được thêm / sửa / xóa hợp đồng, chi tiết hợp đồng (chứng thư), tờ khai hải quan (không nhập hàng loạt từ file), không xóa hồ sơ Lưu trữ / dòng nhật ký, không khôi phục sao lưu.
@@ -78,10 +78,28 @@
   const sessSet = (v) => { try { if (v) root.sessionStorage.setItem(SKEY, JSON.stringify(v)); else root.sessionStorage.removeItem(SKEY); } catch (e) { /* bị chặn */ } };
   const activeAdmins = (list) => list.filter((u) => u.role === 'admin' && !u.disabled);
 
-  function setPassword(u, pw) { u.salt = rand(16); u.hash = hashPw(pw, u.salt); }
-  function checkPw(u, pw) { return !!(u && u.salt && hashPw(pw, u.salt) === u.hash); }
+  /* v2.16.2: băm mới = PBKDF2-SHA-256 (WebCrypto, 210.000 vòng) → { alg:'p2', iter, salt, hash }. Bản ghi cũ (SHA-256 × 2.000 vòng, không có alg) vẫn đăng nhập được
+   * và được băm lại sang PBKDF2 ngay lần đăng nhập đúng kế tiếp. Trình duyệt không có WebCrypto → rơi về băm cũ (vẫn dùng được). */
+  const PW_ITER = 210000, subtleHas = () => !!(root.crypto && root.crypto.subtle && root.TextEncoder);
+  async function pbkdf2hex(secret, salt, iter) {
+    const enc = new TextEncoder(), key = await root.crypto.subtle.importKey('raw', enc.encode(secret), 'PBKDF2', false, ['deriveBits']);
+    const bits = await root.crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: enc.encode(salt), iterations: iter }, key, 256);
+    return Array.from(new Uint8Array(bits), (b) => b.toString(16).padStart(2, '0')).join('');
+  }
+  async function hashRec(secret) {
+    const salt = rand(16);
+    return subtleHas() ? { alg: 'p2', iter: PW_ITER, salt, hash: await pbkdf2hex(secret, salt, PW_ITER) } : { salt, hash: hashPw(secret, salt) };
+  }
+  async function verifyRec(rec, secret) {
+    if (!rec || !rec.salt || !rec.hash) return false;
+    if (rec.alg === 'p2') return subtleHas() && (await pbkdf2hex(secret, rec.salt, rec.iter || PW_ITER)) === rec.hash;
+    return hashPw(secret, rec.salt) === rec.hash;
+  }
+  const isLegacy = (rec) => !!(rec && rec.salt && rec.alg !== 'p2');
+  async function setPassword(u, pw) { delete u.alg; delete u.iter; Object.assign(u, await hashRec(pw)); }
+  const checkPw = (u, pw) => verifyRec(u, pw);
   function pwProblem(pw) { return String(pw || '').length < 6 ? 'Mật khẩu tối thiểu 6 ký tự.' : ''; }
-  function setRecovery(d) { const code = newRecoveryCode(), salt = rand(16); d.rec = { salt, hash: hashPw(normCode(code), salt) }; return code; }
+  async function setRecovery(d) { const code = newRecoveryCode(); d.rec = await hashRec(normCode(code)); return code; }
 
   /* ---------------- v2.6.4 D3 — Khóa khôi phục của nhóm (công cụ HAK_KhoiPhucQuanTri.exe, ECDSA P-256) ----------------
    * d.groupPub = { key: base64 65 byte (khóa công khai thô), fp, at }; d.chal = { c: mã yêu cầu 12 ký tự, at } — giữ tới khi dùng xong / tạo mới.
@@ -149,7 +167,7 @@
       const f = e.target.files[0]; e.target.value = ''; if (!f) return;
       try { screenPack(await HAK.Backup.packRead(f), f.name); } catch (x) { err(x.message || String(x)); }
     });
-    gate.querySelector('#authForm').addEventListener('submit', (e) => {
+    gate.querySelector('#authForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const name = $('#auName').value.trim(), un = normUser($('#auUser').value), pw = $('#auPw').value;
       if (!name || !un) return err('Nhập họ tên và tên đăng nhập.');
@@ -158,8 +176,8 @@
       if (pw !== $('#auPw2').value) return err('Hai lần nhập mật khẩu không khớp.');
       const d = data();
       const u = { id: 'u' + Date.now().toString(36), username: un, name, role: 'admin', companies: station() || allCompanyIds(), disabled: false, createdAt: Date.now() };
-      setPassword(u, pw); d.users.push(u);
-      const code = setRecovery(d); save(d);
+      await setPassword(u, pw); d.users.push(u);
+      const code = await setRecovery(d); save(d);
       screenRecovery(code, () => login(u), !!(d.groupPub || d.master));
     });
   }
@@ -191,16 +209,21 @@
       '<div class="auth-err text-danger small mb-2">' + esc(msg || '') + '</div><button class="btn btn-primary w-100" type="submit">Đăng nhập</button></form>' +
       '<div class="text-center mt-3"><a href="#" class="small" id="auForgot">Quên mật khẩu Quản trị?</a></div>' +
       '<div class="small muted mt-2 text-center">Nhân viên quên mật khẩu: nhờ Quản trị đặt lại ở Cài đặt → 👤 Tài khoản.</div>');
-    gate.querySelector('#authForm').addEventListener('submit', (e) => {
+    gate.querySelector('#authForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       if (Date.now() < lockUntil) return err('Sai nhiều lần — thử lại sau ' + Math.ceil((lockUntil - Date.now()) / 1000) + ' giây.');
-      const u = users().find((x) => x.username === normUser($('#auUser').value));
-      if (!u || !checkPw(u, $('#auPw').value)) {
+      const u = users().find((x) => x.username === normUser($('#auUser').value)), pwIn = $('#auPw').value;
+      const btn = gate.querySelector('button[type=submit]'); btn.disabled = true;
+      let good = false; try { good = !!u && await checkPw(u, pwIn); } catch (x) { good = false; }
+      btn.disabled = false;
+      if (!good) {
         fails++; if (fails >= 5) { lockUntil = Date.now() + 30000; fails = 0; }
         $('#auPw').value = ''; return err('Sai tên đăng nhập hoặc mật khẩu.');
       }
       if (u.disabled) return err('Tài khoản đang bị khóa — liên hệ Quản trị.');
-      fails = 0; login(u);
+      fails = 0;
+      if (isLegacy(u) && subtleHas()) { try { const d = data(), x = d.users.find((y) => y.id === u.id); if (x) { await setPassword(x, pwIn); save(d); } } catch (x2) { /* giữ băm cũ, lần sau thử lại */ } }
+      login(data().users.find((y) => y.id === u.id) || u);
     });
     $('#auForgot').addEventListener('click', (e) => { e.preventDefault(); screenForgot(); });
   }
@@ -215,19 +238,19 @@
     $('#auBack').addEventListener('click', (e) => { e.preventDefault(); screenLogin(); });
     const tl = $('#auTool'); if (tl) tl.addEventListener('click', (e) => { e.preventDefault(); screenForgotTool(); });
     const mb = $('#auMaster'); if (mb) mb.addEventListener('click', () => screenForgotMaster());
-    gate.querySelector('#authForm').addEventListener('submit', (e) => {
+    gate.querySelector('#authForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       if (Date.now() < lockUntil) return err('Sai nhiều lần — thử lại sau ' + Math.ceil((lockUntil - Date.now()) / 1000) + ' giây.');
       const d = data(), u = d.users.find((x) => x.username === normUser($('#auUser').value) && x.role === 'admin');
-      if (!d.rec || hashPw(normCode($('#auCode').value), d.rec.salt) !== d.rec.hash || !u) {
+      if (!d.rec || !u || !(await verifyRec(d.rec, normCode($('#auCode').value)))) {
         fails++; if (fails >= 5) { lockUntil = Date.now() + 30000; fails = 0; }
         return err('Mã khôi phục hoặc tên đăng nhập Quản trị không đúng.');
       }
       const pw = $('#auPw').value;
       if (pwProblem(pw)) return err(pwProblem(pw));
       if (pw !== $('#auPw2').value) return err('Hai lần nhập mật khẩu không khớp.');
-      setPassword(u, pw); u.disabled = false;
-      const code = setRecovery(d); save(d);               // mã cũ đã dùng → cấp mã mới
+      await setPassword(u, pw); u.disabled = false;
+      const code = await setRecovery(d); save(d);               // mã cũ đã dùng → cấp mã mới
       screenRecovery(code, () => login(u));
     });
   }
@@ -257,7 +280,7 @@
       try { ok = !!u && await checkMaster(d2.master, $('#auMp').value); } catch (x) { ok = false; }
       btn.disabled = false;
       if (!ok) { fails++; if (fails >= 5) { lockUntil = Date.now() + 30000; fails = 0; } $('#auMp').value = ''; return err('Mật khẩu chủ hoặc tên đăng nhập Quản trị không đúng.'); }
-      fails = 0; setPassword(u, pw); u.disabled = false; save(d2);
+      fails = 0; await setPassword(u, pw); u.disabled = false; save(d2);
       HAK.UI.toast('Đã đặt lại mật khẩu Quản trị ' + u.username + ' bằng mật khẩu chủ.', 'success');
       login(u);
     });
@@ -297,7 +320,7 @@
       catch (x) { why = 'Không kiểm tra được mã phản hồi: ' + (x.message || x); }
       btn.disabled = false;
       if (why) { fails++; if (fails >= 5) { lockUntil = Date.now() + 30000; fails = 0; } return err(why); }
-      fails = 0; setPassword(u, pw); u.disabled = false; delete d2.chal; save(d2);   // mã yêu cầu đã dùng → hết hiệu lực
+      fails = 0; await setPassword(u, pw); u.disabled = false; delete d2.chal; save(d2);   // mã yêu cầu đã dùng → hết hiệu lực
       HAK.UI.toast('Đã đặt lại mật khẩu Quản trị ' + u.username + '.', 'success');
       login(u);
     });
@@ -391,8 +414,8 @@
     $('#acSave').addEventListener('click', saveMine);
     if (cur.role === 'admin') {
       $('#usAdd').addEventListener('click', () => { editing = ''; renderUserForm(); });
-      $('#usRec').addEventListener('click', (e) => HAK.UI.confirmClick(e.currentTarget, () => {
-        const d = data(), code = setRecovery(d); save(d);
+      $('#usRec').addEventListener('click', (e) => HAK.UI.confirmClick(e.currentTarget, async () => {
+        const d = data(); const code = await setRecovery(d); save(d);
         const m = $('#usForm'); m.innerHTML = '<div class="alert alert-warning">Mã khôi phục mới (chỉ hiện 1 lần — chép / in cất đi): <b class="mono fs-5 ms-2">' + esc(code) + '</b></div>';
       }, 'Bấm lần nữa để tạo mã mới'));
       $('#usBody').addEventListener('click', onUserAction);
@@ -425,14 +448,14 @@
       const a = $('#mpNew').value, b = $('#mpNew2').value, me = data().users.find((u) => u.id === cur.id);
       if (masterProblem(a)) return msg(masterProblem(a));
       if (normMaster(a) !== normMaster(b)) return msg('Hai lần nhập mật khẩu chủ không khớp.');
-      if (!checkPw(me, $('#mpMe').value)) return msg('Mật khẩu đăng nhập của bạn không đúng.');
+      if (!(await checkPw(me, $('#mpMe').value))) return msg('Mật khẩu đăng nhập của bạn không đúng.');
       if (!subtleOk()) return msg('Trình duyệt không hỗ trợ — dùng Chrome / Edge.');
       e.currentTarget.disabled = true; msg('Đang mã hóa…', true);
       try { const mm = await makeMaster(a), d = data(); d.master = mm; save(d); renderMaster(); HAK.UI.toast('Đã lưu mật khẩu chủ của nhóm — dấu vân tay ' + mm.fp + '. Xuất lại Gói cấu hình để cài cho các máy khác.', 'success'); }
       catch (x) { msg('Không lưu được: ' + (x.message || x)); }
     });
-    const del = $('#mpDel'); if (del) del.addEventListener('click', (e) => HAK.UI.confirmClick(e.currentTarget, () => {
-      if (!checkPw(data().users.find((u) => u.id === cur.id), $('#mpMe').value)) return msg('Nhập mật khẩu đăng nhập của bạn ở ô xác nhận trước khi gỡ.');
+    const del = $('#mpDel'); if (del) del.addEventListener('click', (e) => HAK.UI.confirmClick(e.currentTarget, async () => {
+      if (!(await checkPw(data().users.find((u) => u.id === cur.id), $('#mpMe').value))) return msg('Nhập mật khẩu đăng nhập của bạn ở ô xác nhận trước khi gỡ.');
       const d = data(); delete d.master; save(d); renderMaster(); HAK.UI.toast('Đã gỡ mật khẩu chủ trên máy này.', 'info');
     }, 'Bấm lần nữa để gỡ'));
   }
@@ -487,16 +510,16 @@
       const d = data(); delete d.groupPub; delete d.chal; save(d); renderGroupKey(); HAK.UI.toast('Đã gỡ khóa khôi phục của nhóm.', 'info');
     }, 'Bấm lần nữa để gỡ'));
   }
-  function saveMine() {
+  async function saveMine() {
     const d = data(), me = d.users.find((u) => u.id === cur.id), msg = $('#acMsg');
     const say = (t, ok) => { msg.className = 'small ' + (ok ? 'text-success' : 'text-danger'); msg.textContent = t; };
     const name = $('#acName').value.trim(); if (!name) return say('Họ tên không được trống.');
     const o = $('#acOld').value, n = $('#acNew').value, n2 = $('#acNew2').value;
     if (o || n || n2) {
-      if (!checkPw(me, o)) return say('Mật khẩu hiện tại không đúng.');
+      if (!(await checkPw(me, o))) return say('Mật khẩu hiện tại không đúng.');
       if (pwProblem(n)) return say(pwProblem(n));
       if (n !== n2) return say('Hai lần nhập mật khẩu mới không khớp.');
-      setPassword(me, n);
+      await setPassword(me, n);
     }
     me.name = name; save(d); cur = me; applyRole();
     ['#acOld', '#acNew', '#acNew2'].forEach((s) => { $(s).value = ''; });
@@ -527,7 +550,7 @@
     $('#usSave').addEventListener('click', saveUser);
     $('#usName').focus();
   }
-  function saveUser() {
+  async function saveUser() {
     const d = data(), e = (t) => { $('#usErr').textContent = t; };
     const un = normUser($('#usUser').value), name = $('#usName').value.trim(), role = $('#usRole').value, pw = $('#usPw').value;
     const companies = Array.from(document.querySelectorAll('#usForm [data-co]:checked')).map((x) => x.dataset.co);
@@ -537,13 +560,13 @@
     if (editing) {
       u = d.users.find((x) => x.id === editing);
       if (u.role === 'admin' && role !== 'admin' && activeAdmins(d.users).length <= 1 && !u.disabled) return e('Phải còn ít nhất 1 Quản trị đang dùng.');
-      if (pw) { if (pwProblem(pw)) return e(pwProblem(pw)); setPassword(u, pw); }
+      if (pw) { if (pwProblem(pw)) return e(pwProblem(pw)); await setPassword(u, pw); }
     } else {
       if (!/^[a-z0-9._-]{2,32}$/.test(un)) return e('Tên đăng nhập chỉ gồm chữ không dấu, số, dấu chấm / gạch (2–32 ký tự).');
       if (d.users.some((x) => x.username === un)) return e('Tên đăng nhập "' + un + '" đã có.');
       if (pwProblem(pw)) return e(pwProblem(pw));
       u = { id: 'u' + Date.now().toString(36) + rand(3), username: un, disabled: false, createdAt: Date.now() };
-      setPassword(u, pw); d.users.push(u);
+      await setPassword(u, pw); d.users.push(u);
     }
     Object.assign(u, { name, role, companies });
     save(d);
@@ -612,7 +635,7 @@
       if (!pu || pu.role === 'admin' || !pu.username || !pu.salt || !pu.hash) return;
       const un = normUser(pu.username), loc = d.users.find((x) => x.username === un);
       if (loc && loc.role === 'admin') { r.skipped.push(un); return; }
-      const v = { username: un, name: pu.name || un, role: 'staff', companies: Array.isArray(pu.companies) ? pu.companies.slice() : [], disabled: !!pu.disabled, salt: pu.salt, hash: pu.hash };
+      const v = { username: un, name: pu.name || un, role: 'staff', companies: Array.isArray(pu.companies) ? pu.companies.slice() : [], disabled: !!pu.disabled, salt: pu.salt, hash: pu.hash, alg: pu.alg === 'p2' ? 'p2' : undefined, iter: pu.alg === 'p2' ? (+pu.iter || PW_ITER) : undefined };
       if (loc) { Object.assign(loc, v); r.updated++; }
       else { const id = pu.id && !d.users.some((x) => x.id === pu.id) ? pu.id : 'u' + Date.now().toString(36) + rand(3); d.users.push(Object.assign({ id, createdAt: pu.createdAt || Date.now() }, v)); r.added++; }
     });
@@ -638,6 +661,6 @@
     scopeIds, scopeSwitch, companyOfMeta, packOut, packIn,
     /** Máy trạm: danh sách công ty của máy; null = máy chính. */
     stationCos: station, _checkReset: checkReset, _fp: fpOf,
-    _sha256: sha256hex, _hash: hashPw
+    _sha256: sha256hex, _hash: hashPw, _hashRec: hashRec, _verifyRec: verifyRec, _isLegacy: isLegacy
   };
 })(window);
