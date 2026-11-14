@@ -74,6 +74,7 @@ jobs:
           Get-FileHash "HAK_QuanLyXuatHang_Setup_v$ver.exe" -Algorithm SHA256 | Format-List
           "SETUP=HAK_QuanLyXuatHang_Setup_v$ver.exe" | Out-File -FilePath $env:GITHUB_ENV -Append
       - uses: actions/upload-artifact@v4
+        continue-on-error: true   # hết dung lượng artifact của GitHub không được chặn việc đăng bản phát hành (file cài đặt vẫn đính kèm ở Release)
         with:
           name: HAK_QuanLyXuatHang_Setup
           path: HAK_QuanLyXuatHang_Setup_v*.exe
