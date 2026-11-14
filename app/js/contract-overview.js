@@ -68,7 +68,7 @@
     return [
       f.multi('type', 'Hình thức', () => Object.keys(K().TYPES || {}).map((k) => ({ value: k, label: K().TYPES[k].label })), (r) => r.type),
       f.multi('buyerId', 'Bên mua / nhận', () => K().customers().map((c) => ({ value: c.id, label: c.name })), (r) => r.buyerId),
-      f.multi('status', 'Trạng thái hợp đồng', () => [{ value: 'running', label: 'Đang thực hiện' }, { value: 'done', label: 'Đã thông quan đủ / đã đóng' }], (r) => r.status),
+      f.multi('status', 'Trạng thái hợp đồng', () => [{ value: 'running', label: 'Đang thực hiện' }, { value: 'done', label: 'Đã hoàn thành (thông quan đủ / đã đóng)' }], (r) => r.status),
       { key: 'owing', label: 'Chỉ hợp đồng còn nợ thuế', type: 'bool', match: (r) => r.owing },
       { key: 'mismatch', label: 'Chỉ hợp đồng có lệch đối chiếu', type: 'bool', match: (r) => r.mismatch },
       { key: 'missing', label: 'Chỉ hợp đồng còn thiếu bước (chứng thư, tờ khai, thông quan, nộp thuế)', type: 'bool', match: (r) => r.missing }
@@ -90,7 +90,7 @@
     const host = $('#coBody'); if (!host) return;
     const list = filtered(), T = (k) => sum(list.map((i) => i.m.tax[k])), nDecl = sum(list.map((i) => i.m.T.length)), nClr = sum(list.map((i) => i.m.cleared));
     { const w = $('#coWeighWarn'), t = HAK.ContractStatus.weighNote ? HAK.ContractStatus.weighNote() : ''; if (w) { w.textContent = t; w.classList.toggle('d-none', !t); } }
-    $('#coCards').innerHTML = card('Hợp đồng', list.length, list.filter((i) => i.m.status.code === 'done').length + ' đã thông quan đủ / đã đóng') +
+    $('#coCards').innerHTML = card('Hợp đồng', list.length, list.filter((i) => i.m.status.code === 'done').length + ' đã hoàn thành') +
       card('KL hợp đồng hiện hành', nf(sum(list.map((i) => i.m.qty))) + ' BDMT', 'chứng thư: ' + nf(sum(list.map((i) => i.m.certBdmt)))) + card('Tờ khai', nDecl, nClr + ' đã thông quan') +
       card('Thuế phải nộp', nf(T('payable')) + ' đ', 'đã nộp ' + nf(T('paid'))) + card('Thuế CÒN NỢ', '<span class="' + (T('owed') > 0 ? 'text-danger' : 'text-success') + '">' + nf(T('owed')) + ' đ</span>', list.filter((i) => i.f.owing).length + ' hợp đồng còn nợ' + (T('over') > 0 ? ' · nộp thừa ' + nf(T('over')) + ' đ (không bù trừ)' : '') + (T('undetermined') > 0 ? ' · ' + T('undetermined') + ' tờ khai chưa xác định thuế' : '')) +
       card('Có lệch đối chiếu', list.filter((i) => i.f.mismatch).length, 'hợp đồng cần kiểm tra');

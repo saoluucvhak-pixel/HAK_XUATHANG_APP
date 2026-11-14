@@ -72,10 +72,10 @@ test('thuế phải nộp theo khai bổ sung mới nhất; còn phải nộp = 
   assert.equal(t.payable,563502948);assert.equal(t.extra,11806308);assert.equal(t.paidTax,551696640);assert.equal(t.paidFee,20000);assert.equal(t.remaining,11806308);
   d.supplements[0].deletedAt='x';assert.equal(M.totals(d).payable,551696640);assert.equal(M.totals(d).remaining,0);
 });
-test('hợp đồng chuyển "Đã thông quan đủ tờ khai" khi mọi tờ khai đã thông quan',()=>{
+test('hợp đồng chuyển "Đã hoàn thành" (điều kiện: mọi tờ khai đã thông quan) khi mọi tờ khai đã thông quan',()=>{
   const a=M.newDecl({no:'111111111111',contractId:'c1',status:'cleared'}),b=M.newDecl({no:'222222222222',contractId:'c1',status:'waiting'}),other=M.newDecl({no:'333333333333',contractId:'c2'});
   assert.equal(M.contractStatus([a,b,other],'c1').code,'running');assert.equal(M.contractStatus([a,b,other],'c1').cleared,1);
-  M.setStatus(b,'cleared','2026-06-30');assert.equal(M.contractStatus([a,b,other],'c1').code,'done');assert.equal(M.contractStatus([a,b,other],'c1').label,'Đã thông quan đủ tờ khai');
+  M.setStatus(b,'cleared','2026-06-30');assert.equal(M.contractStatus([a,b,other],'c1').code,'done');assert.equal(M.contractStatus([a,b,other],'c1').label,'Đã hoàn thành');assert.equal(M.contractStatus([a,b,other],'c1').basis,'Mọi tờ khai đã thông quan');
   assert.equal(M.contractStatus([a,b,other],'c3').code,'running','hợp đồng chưa có tờ khai vẫn Đang thực hiện');
   b.deletedAt='x';assert.equal(M.contractStatus([a,b],'c1').code,'done','tờ khai đã xóa không tính');
   assert.equal(M.statusDate(b,'cleared'),'2026-06-30');assert.throws(()=>M.setStatus(b,'xyz'));

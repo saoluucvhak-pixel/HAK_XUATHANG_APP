@@ -74,7 +74,7 @@
     return [
       f.multi('type', 'Hình thức', () => Object.keys(K().TYPES || {}).map((k) => ({ value: k, label: K().TYPES[k].label })), (r) => r.type),
       f.multi('buyerId', 'Bên mua / nhận', () => K().customers().map((c) => ({ value: c.id, label: c.name })), (r) => r.buyerId),
-      f.multi('status', 'Trạng thái hợp đồng', () => [{ value: 'running', label: 'Đang thực hiện' }, { value: 'done', label: 'Đã thông quan đủ / đã đóng' }], (r) => r.status),
+      f.multi('status', 'Trạng thái hợp đồng', () => [{ value: 'running', label: 'Đang thực hiện' }, { value: 'done', label: 'Đã hoàn thành (thông quan đủ / đã đóng)' }], (r) => r.status),
       many('kho', 'Kho xuất', () => distinct(state.groups.flatMap((g) => g.khos)), (r) => r.khos),
       many('ship', 'Tàu / chuyến', () => distinct(state.groups.flatMap((g) => g.ships)), (r) => r.ships),
       { key: 'hasTrips', label: 'Chỉ hợp đồng đã có phiếu cân', type: 'bool', match: (r) => r.hasTrips },
@@ -96,7 +96,7 @@
   function draw() {
     const host = $('#csrBody'); if (!host) return;
     const list = filtered(), t = { trips: sum(list.map((g) => g.tot.trips)), kg: sum(list.map((g) => g.tot.kg)), del: sum(list.map((g) => g.tot.delKg)), ret: sum(list.map((g) => g.tot.retTrips)), recs: sum(list.map((g) => g.tot.recs)) };
-    $('#csrCards').innerHTML = card('Hợp đồng', list.length, list.filter((g) => g.f.status === 'done').length + ' đã thông quan đủ / đã đóng') + card('Số chuyến xe', int(t.trips), 'Xe trả về: ' + int(t.ret) + ' · ' + t.recs + ' hồ sơ') + card('KL qua cân (tấn)', ton(t.kg)) + card('Thực giao (tấn)', ton(t.del), 'Qua cân − xe trả về') + card('Thuế còn nợ', money(sum(list.map((g) => (g.cust && g.cust.tot.remaining) || 0))) + ' đ', list.filter((g) => g.cust && g.cust.tot.remaining > 0).length + ' hợp đồng còn nợ');
+    $('#csrCards').innerHTML = card('Hợp đồng', list.length, list.filter((g) => g.f.status === 'done').length + ' đã hoàn thành') + card('Số chuyến xe', int(t.trips), 'Xe trả về: ' + int(t.ret) + ' · ' + t.recs + ' hồ sơ') + card('KL qua cân (tấn)', ton(t.kg)) + card('Thực giao (tấn)', ton(t.del), 'Qua cân − xe trả về') + card('Thuế còn nợ', money(sum(list.map((g) => (g.cust && g.cust.tot.remaining) || 0))) + ' đ', list.filter((g) => g.cust && g.cust.tot.remaining > 0).length + ' hợp đồng còn nợ');
     host.innerHTML = list.length ? list.map((g, gi) => {
       const c = g.c, tot = g.tot, cu = g.cust, tt = cu ? cu.tot : null;
       const head = '<tr class="table-light fw-semibold csr-row" data-csr-g="' + gi + '" style="cursor:pointer"><td>' + esc(g.f.no) + '<div class="small muted fw-normal">' + esc(typeLabel(g.f.type)) + (c && c.date ? ' · ' + esc(vnDate(c.date)) : '') + '</div>' + (c && HAK.ContractFile ? HAK.ContractFile.strip(c.id, state.groups) : '') + '</td><td>' + esc(g.f.buyer) + '</td><td>' + esc(g.khos.join(', ')) + '</td><td>' + esc(g.ships.join(', ')) + '</td>' +

@@ -168,8 +168,8 @@
     // Đóng thủ công (hợp đồng Xuất bán / Trao đổi không có tờ khai, hoặc đã giao đủ): contract.closedAt = ngày đóng.
     if (contract && contract.closedAt) return { code: 'done', label: 'Đã đóng hợp đồng', total: list.length, cleared, manual: true, closedAt: contract.closedAt };
     const done = list.length > 0 && cleared === list.length;
-    // 'done' (tự động) CHỈ nghĩa là mọi tờ khai đã thông quan — không bao hàm đủ KL, đã nộp thuế hay đã giao hết (xem axes).
-    return { code: done ? 'done' : 'running', label: done ? 'Đã thông quan đủ tờ khai' : 'Đang thực hiện', total: list.length, cleared };
+    // Quy tắc nghiệp vụ ĐÃ XÁC NHẬN (14/11/2026): hợp đồng "Đã hoàn thành" khi mọi tờ khai đã thông quan. Không bao hàm đủ KL / đã nộp thuế / đã giao hết — các chỉ tiêu đó hiển thị riêng (axes).
+    return { code: done ? 'done' : 'running', label: done ? 'Đã hoàn thành' : 'Đang thực hiện', basis: done ? 'Mọi tờ khai đã thông quan' : '', total: list.length, cleared };
   }
   /**
    * Gợi ý ĐÓNG hợp đồng: đã thực hiện đủ khối lượng hiện hành (Σ KL khô chứng thư ≥ KL hợp đồng) và — với Xuất khẩu / Ủy thác XK — mọi tờ khai đã thông quan.

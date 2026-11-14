@@ -293,7 +293,7 @@ Thủy chốt 28/09/2026: "1. bỏ Trao đổi KHÔNG đồng bộ lên Google S
 
 ## (Chưa phát hành — đang chờ duyệt) Rà soát logic nghiệp vụ: phiếu cân, trạng thái, thuế, chứng thư
 - Phiếu cân: chống trùng ở cấp PHIẾU (hồ sơ cùng tàu / chi tiết hợp đồng giao nhau về ngày giữ các phiếu riêng, phiếu lặp tính 1 lần); khác khối lượng / xe trả về / liên kết → báo XUNG ĐỘT + tổng chờ đối soát; chống trùng nguyên hồ sơ nay xét thêm công ty + chi tiết hợp đồng (weigh-model.js, Report.prepareTickets). Excel Báo cáo Xuất hàng bỏ đúng các phiếu trùng; thêm sheet "Đối soát phiếu cân".
-- Hợp đồng có 4 trạng thái riêng (tiến độ · thông quan · thuế · thực giao); "Đã hoàn thành" đổi thành "Đã thông quan đủ tờ khai" / "Đã đóng hợp đồng" (tài liệu chỉ định nghĩa thông quan).
+- Hợp đồng có 4 chỉ tiêu riêng (tiến độ · thông quan · thuế · thực giao). Quy tắc đã xác nhận: hợp đồng "Đã hoàn thành" khi mọi tờ khai đã thông quan (kèm lý do); đóng thủ công hiện "Đã đóng hợp đồng".
 - Thuế: còn nợ / nộp thừa cộng riêng từng tờ khai (không bù trừ), tờ khai chưa xác định nghĩa vụ, lệ phí tách riêng; cột mới NỘP THỪA, "Tờ khai chưa xác định thuế"; khai bổ sung mới nhất chưa có số thuế → cảnh báo. Giấy nộp tiền: nhận ra cùng khoản khi nhập tay rồi OCR (chuẩn hóa số giấy, so NDKT / kỳ thuế), giữ các dòng cùng số tiền nhưng khác khoản; nhập tay trùng → hỏi xác nhận.
 - Đối chiếu: thiếu dữ liệu (số chứng thư, đơn giá, tỷ giá, MT) hiển thị "Thiếu số liệu đối chiếu" thay vì "Khớp".
 - Chứng thư: kiểm tra số âm / BDMT > MT / độ ẩm / công thức BDMT ≈ MT × (1 − độ ẩm) (cert-model.js); lưu bản chụp số liệu + ô khác Danh mục + lý do vào hồ sơ Lưu trữ; ô "Lý do điều chỉnh" ở form lập biên bản.
@@ -301,7 +301,7 @@ Thủy chốt 28/09/2026: "1. bỏ Trao đổi KHÔNG đồng bộ lên Google S
 - In PDF: lỗi dựng bảng / hộp thoại in được báo và giao diện trở về bình thường (trước đây kẹt chế độ in); nút PDF trong Hồ sơ hợp đồng không còn nuốt lỗi.
 - Mở liên tiếp hai hồ sơ cũ: ô không có trong hồ sơ sau được đưa về mặc định (không mang dữ liệu hồ sơ trước); lưu lại giữ liên kết chi tiết hợp đồng.
 - KL hợp đồng gốc để trống + phụ lục: giữ trống qua nhiều lần tính (trước đây lần tính thứ 2 ghi KL phụ lục vào KL gốc); ngừng dùng phụ lục cuối → KL hiện hành trống; form / báo cáo / Excel / PDF / Google Sheet dùng chung originalQty; hồ sơ nghi ghi nhầm (gốc = phụ lục đầu) gắn cờ "cần đối chiếu", không tự sửa.
-- Google Sheet NL_HOPDONG / NL_TOKHAI: thêm cột Ở CUỐI (nộp thừa, chưa xác định thuế, số dư ròng, 4 trạng thái); cột cũ giữ vị trí. Lưu ý: cột "Trạng thái hợp đồng" nay là "Đã thông quan đủ tờ khai" / "Đã đóng hợp đồng" thay "Đã hoàn thành".
+- Google Sheet NL_HOPDONG / NL_TOKHAI: thêm cột Ở CUỐI (nộp thừa, chưa xác định thuế, số dư ròng, 4 trạng thái); cột cũ giữ vị trí. Cột "Trạng thái hợp đồng" vẫn là "Đang thực hiện" / "Đã hoàn thành"; chỉ hợp đồng đóng thủ công nay hiện "Đã đóng hợp đồng".
 - Giấy nộp tiền: khoản nhập tay thiếu số giấy mà cùng số tiền với dòng OCR → hỏi đối soát thay vì tự thêm / tự gộp.
 - Đóng / mở lại hợp đồng + gộp bản sao lưu (Gói cấu hình): thêm SỐ PHIÊN BẢN ĐÓNG closeRev (mỗi lần đóng hoặc mở lại +1, bản cao hơn thắng; bản đã phát hành chưa có closeRev: có closedAt = 1, không có = 0). Trước đây bản mở lại (không còn closedAt) gộp với bản đóng cũ vẫn ra "đã đóng". Xung đột cùng phiên bản → bản có mốc ngày muộn hơn.
 - Xem docs/QUY_TAC_NGHIEP_VU_CAN_XAC_NHAN.md.

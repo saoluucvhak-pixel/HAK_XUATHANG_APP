@@ -3,7 +3,7 @@
  *  - Bảng cha: tờ khai hải quan. Bảng con: khai bổ sung, giấy nộp tiền. Trạng thái: Đã mở tờ khai → Chờ thông quan → Đã thông quan.
  *  - Nhập tờ khai từ file .xls/.xlsx (bản xác nhận nội dung tờ khai VNACCS) hoặc OCR bản in / ảnh; OCR giấy nộp tiền (mẫu C1-02/NS).
  *  - Dữ liệu nằm trong cùng snapshot Danh mục (data.customs) → đi theo Sao lưu, Lưu trữ năm, đồng bộ như hợp đồng.
- *  - Hợp đồng: Đang thực hiện → Đã thông quan đủ tờ khai khi mọi tờ khai của hợp đồng đã thông quan (contractBadge).
+ *  - Hợp đồng: Đang thực hiện → Đã hoàn thành khi mọi tờ khai của hợp đồng đã thông quan (contractBadge).
  */
 (function (root) {
   'use strict';
@@ -159,7 +159,7 @@
   function notifyContract(d) {
     if (!d || !d.contractId || d.status !== 'cleared') return;
     const s = cstatus(d.contractId);
-    if (s.code === 'done') toast('Hợp đồng ' + ((contractOf(d.contractId) || {}).no || '') + ' đã thông quan đủ tờ khai (mọi tờ khai đã thông quan).', 'success');
+    if (s.code === 'done') toast('Hợp đồng ' + ((contractOf(d.contractId) || {}).no || '') + ' đã hoàn thành (mọi tờ khai đã thông quan).', 'success');
   }
   async function setStatus(id, status) {
     const d = customsList().find((x) => x.id === id); if (!d || d.status === status) return;
@@ -602,7 +602,7 @@
   const ctFields = () => { const f = F(), SF = f.core, many = (key, label, options, get) => ({ key, label, type: 'multi', options, match: (r, sel) => (get(r).length ? get(r) : ['']).some((x) => SF.inSet(sel, x)) }); return [
     f.multi('type', 'Hình thức', () => Object.keys(HAK.Catalog.TYPES || {}).map((k) => ({ value: k, label: HAK.Catalog.TYPES[k].label })), (r) => r.type),
     f.multi('buyerId', 'Bên mua', () => core().customers().map((c) => ({ value: c.id, label: c.name })), (r) => r.buyerId),
-    f.multi('status', 'Trạng thái hợp đồng', () => [{ value: 'running', label: 'Đang thực hiện' }, { value: 'done', label: 'Đã thông quan đủ / đã đóng' }], (r) => r.status),
+    f.multi('status', 'Trạng thái hợp đồng', () => [{ value: 'running', label: 'Đang thực hiện' }, { value: 'done', label: 'Đã hoàn thành (thông quan đủ / đã đóng)' }], (r) => r.status),
     many('ship', 'Tàu / chuyến', () => distinct(contracts().flatMap((c) => HAK.ContractModel.active(c).map((d) => d.ship))), (r) => r.ships),
     many('declStatus', 'Trạng thái tờ khai', () => statusOpts().map((o) => ({ value: o[0], label: o[1] })), (r) => r.declStatuses),
     { key: 'owing', label: 'Chỉ hợp đồng còn phải nộp thuế', type: 'bool', match: (r) => r.owing },
@@ -617,7 +617,7 @@
     const v0 = ctView(); if (v0) v0.refresh();
     const model = contractReportList(), g = (k) => sumOf(model.map((m) => m.tot[k]));
     const run = model.filter((m) => m.st.code === 'running').length, done = model.length - run;
-    host.innerHTML = '<div class="row g-2 mb-2">' + card('Hợp đồng', model.length, run + ' đang thực hiện · ' + done + ' đã thông quan đủ / đã đóng') + card('KL thực hiện / hợp đồng (BDMT)', money(g('bdmt')) + ' / ' + money(sumOf(model.map((m) => m.c.contractQty))), 'Giá trị: ' + money(g('usd')) + ' USD') +
+    host.innerHTML = '<div class="row g-2 mb-2">' + card('Hợp đồng', model.length, run + ' đang thực hiện · ' + done + ' đã hoàn thành') + card('KL thực hiện / hợp đồng (BDMT)', money(g('bdmt')) + ' / ' + money(sumOf(model.map((m) => m.c.contractQty))), 'Giá trị: ' + money(g('usd')) + ' USD') +
       card('Tờ khai', g('decls'), g('cleared') + ' đã thông quan') + card('Thuế XK phải nộp', money(g('payable')) + ' đ', 'Đã nộp ' + money(g('paidTax')) + ' đ · lệ phí ' + money(g('paidFee')) + ' đ · còn nợ ' + money(g('remaining')) + ' đ' + (g('over') > 0 ? ' · nộp thừa ' + money(g('over')) + ' đ (không bù trừ)' : '') + (g('undetermined') > 0 ? ' · ' + g('undetermined') + ' tờ khai chưa xác định thuế' : '')) + '</div>' +
       '<div class="tbl-wrap"><table class="table table-sm align-middle"><thead><tr><th>Hợp đồng</th><th>Bên mua</th><th class="num">KL hợp đồng</th><th class="num">KL thực hiện</th><th class="num">%</th><th class="num">Còn lại</th><th class="num">Giá trị USD</th><th class="num">Chứng thư</th><th class="num">Tờ khai</th><th class="num">Thuế phải nộp</th><th class="num">Đã nộp thuế</th><th class="num">Lệ phí đã nộp</th><th class="num">Còn phải nộp</th><th>Trạng thái</th></tr></thead><tbody>' +
       (model.length ? model.map((m) => { const c = m.c, t = m.tot; return '<tr class="table-light fw-semibold"><td>' + esc(c.no || c.id) + '<div class="small muted fw-normal">' + esc(typeLabel(c.type)) + (c.date ? ' · ' + esc(vnDate(c.date)) : '') + '</div></td><td>' + esc(custName(c.buyerId)) + '</td><td class="num">' + esc(money(c.contractQty)) + ((c.addenda || []).some((x) => !x.deletedAt) ? '<div class="small muted fw-normal">đã điều chỉnh (gốc ' + esc(money(c.qtyOrig)) + ')</div>' : '') + '</td><td class="num">' + esc(money(t.bdmt)) + '</td><td class="num">' + (t.pct === null ? '' : esc(NF().txt(Math.round(t.pct * 10) / 10, 'dec')) + '%') + '</td><td class="num">' + esc(money(t.left)) + '</td><td class="num">' + esc(money(t.usd)) + '</td><td class="num">' + t.certs + '/' + t.details + '</td><td class="num">' + t.cleared + '/' + t.decls + '</td><td class="num">' + esc(money(t.payable)) + '</td><td class="num">' + esc(money(t.paidTax)) + '</td><td class="num">' + esc(money(t.paidFee)) + '</td><td class="num ' + (t.remaining > 0 ? 'text-danger' : '') + '">' + esc(money(t.remaining)) + '</td><td>' + contractBadge(c.id) + '</td></tr>' +
