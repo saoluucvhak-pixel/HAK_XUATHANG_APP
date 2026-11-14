@@ -73,6 +73,7 @@ jobs:
           Move-Item installer/HAK_QuanLyXuatHang_Setup.exe "HAK_QuanLyXuatHang_Setup_v$ver.exe"
           Get-FileHash "HAK_QuanLyXuatHang_Setup_v$ver.exe" -Algorithm SHA256 | Format-List
           "SETUP=HAK_QuanLyXuatHang_Setup_v$ver.exe" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "SHA256=$((Get-FileHash "HAK_QuanLyXuatHang_Setup_v$ver.exe" -Algorithm SHA256).Hash.ToLower())" | Out-File -FilePath $env:GITHUB_ENV -Append   # ghi vào ghi chú phát hành để đối chiếu toàn vẹn file tải về
       - uses: actions/upload-artifact@v4
         continue-on-error: true   # hết dung lượng artifact của GitHub không được chặn việc đăng bản phát hành (file cài đặt vẫn đính kèm ở Release)
         with:
@@ -88,6 +89,7 @@ jobs:
           body: |
             Bộ cài Windows **v${{ env.VERSION }}** — dựng tự động từ commit ${{ github.sha }}.
             Tải file `HAK_QuanLyXuatHang_Setup_v${{ env.VERSION }}.exe`, chạy để cài / cập nhật (giữ nguyên đường dẫn cài mặc định để không mất dữ liệu).
+            SHA-256: `${{ env.SHA256 }}` (PowerShell: `Get-FileHash .\HAK_QuanLyXuatHang_Setup_v${{ env.VERSION }}.exe`).
             Bộ cài chưa ký số: Windows có thể hiện cảnh báo SmartScreen. Chi tiết thay đổi: NHAT_KY_PHIEN_BAN.md.
           files: HAK_QuanLyXuatHang_Setup_v*.exe
           fail_on_unmatched_files: true

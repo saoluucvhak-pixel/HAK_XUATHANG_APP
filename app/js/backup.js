@@ -440,7 +440,8 @@
   function lsSize() { let b = 0; try { HAK.Store.keys().forEach((k) => { const v = root.localStorage.getItem(k); if (v) b += (k.length + v.length) * 2; }); } catch (e) { /* bị chặn */ } return b; }
   async function health() {
     const st = await HAK.DB.status(), ls = lsSize();
-    let nArch = 0; try { nArch = HAK.Archive ? (await HAK.Archive.list()).length : 0; } catch (e) { /* bỏ qua */ }
+    let nArch = 0, archMetas = []; try { archMetas = HAK.Archive ? await HAK.Archive.list() : []; nArch = archMetas.length; } catch (e) { /* bỏ qua */ }
+    let integ = []; try { if (HAK.Integrity && HAK.Catalog && HAK.Catalog.core) integ = HAK.Integrity.audit(HAK.Catalog.core.get(), archMetas); } catch (e) { /* bỏ qua */ }
     const soft = (HAK.Archive && HAK.Archive.SOFT_WARN) || 1500;
     await autoPerm(false);
     const a = autoStatus(), last = HAK.Store.get(LAST_KEY, 0), days = last ? Math.floor((Date.now() - last) / 864e5) : null;
@@ -452,6 +453,7 @@
         hint: st.backend !== 'idb' ? 'Dữ liệu mất khi đóng trang' : st.persisted === false ? 'Trình duyệt chưa cam kết giữ dữ liệu' + (autoOk ? ' — đã có tự sao lưu' : ' → bật Tự sao lưu') : 'Bền' },
       { k: 'ls', label: 'Cài đặt (localStorage)', val: fmtBytes(ls) + ' / 5 MB', lvl: lsPct > 85 ? 2 : lsPct > 60 ? 1 : 0, hint: lsPct > 60 ? 'Gần đầy — bớt mẫu Word tải lên' : 'Còn rộng' },
       { k: 'arch', label: 'Lưu trữ', val: nArch.toLocaleString('vi-VN') + ' hồ sơ', lvl: nArch > soft ? 1 : 0, hint: nArch > soft ? 'Nên 📦 Xuất & dọn hồ sơ cũ' : 'Không tự xóa' },
+      { k: 'integ', label: 'Toàn vẹn danh mục', val: integ.length ? integ.length + ' vấn đề' : 'Không phát hiện', lvl: integ.some((x) => x.level === 'error') ? 2 : integ.length ? 1 : 0, hint: integ.length ? integ.slice(0, 3).map((x) => x.msg).join(' · ') + (integ.length > 3 ? ' · …' : '') : 'Khóa, quan hệ hợp đồng — chi tiết — tờ khai khớp nhau' },
       { k: 'bk', label: 'Sao lưu toàn bộ gần nhất', val: last ? (days === 0 ? 'Hôm nay' : days + ' ngày trước') : 'Chưa có', lvl: !last || days > 14 ? 2 : days > 7 ? 1 : 0, hint: last ? fmtDT(last) : 'Bấm ⬇ Sao lưu toàn bộ' },
       { k: 'auto', label: 'Tự sao lưu', val: a.perm === 'unsupported' ? 'Không hỗ trợ' : !a.dir ? 'Chưa bật' : !a.on ? 'Đang tắt' : a.last && a.last.ok === false ? 'Lỗi' : a.perm !== 'granted' ? 'Chờ cho phép' : 'Đang bật',
         lvl: a.on && a.dir && a.last && a.last.ok === false ? 2 : a.on && a.dir && a.perm === 'granted' ? 0 : 1,
