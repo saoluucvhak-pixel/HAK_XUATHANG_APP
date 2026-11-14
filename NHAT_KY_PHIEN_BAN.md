@@ -303,6 +303,7 @@ Thủy chốt 28/09/2026: "1. bỏ Trao đổi KHÔNG đồng bộ lên Google S
 - KL hợp đồng gốc để trống + phụ lục: giữ trống qua nhiều lần tính (trước đây lần tính thứ 2 ghi KL phụ lục vào KL gốc); ngừng dùng phụ lục cuối → KL hiện hành trống; form / báo cáo / Excel / PDF / Google Sheet dùng chung originalQty; hồ sơ nghi ghi nhầm (gốc = phụ lục đầu) gắn cờ "cần đối chiếu", không tự sửa.
 - Google Sheet NL_HOPDONG / NL_TOKHAI: thêm cột Ở CUỐI (nộp thừa, chưa xác định thuế, số dư ròng, 4 trạng thái); cột cũ giữ vị trí. Lưu ý: cột "Trạng thái hợp đồng" nay là "Đã thông quan đủ tờ khai" / "Đã đóng hợp đồng" thay "Đã hoàn thành".
 - Giấy nộp tiền: khoản nhập tay thiếu số giấy mà cùng số tiền với dòng OCR → hỏi đối soát thay vì tự thêm / tự gộp.
+- Đóng / mở lại hợp đồng + gộp bản sao lưu (Gói cấu hình): thêm SỐ PHIÊN BẢN ĐÓNG closeRev (mỗi lần đóng hoặc mở lại +1, bản cao hơn thắng; bản đã phát hành chưa có closeRev: có closedAt = 1, không có = 0). Trước đây bản mở lại (không còn closedAt) gộp với bản đóng cũ vẫn ra "đã đóng". Xung đột cùng phiên bản → bản có mốc ngày muộn hơn.
 - Xem docs/QUY_TAC_NGHIEP_VU_CAN_XAC_NHAN.md.
 
 ## v2.16.2 — Rà soát mã nguồn: bảo mật, độ bền, đóng hợp đồng

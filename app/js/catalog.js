@@ -546,8 +546,8 @@
 
     const master=e.target.closest('[data-master]');if(master){state.selectedParent=master.dataset.master;renderRows();return;}
     const cf=e.target.closest('[data-cfile]');if(cf){HAK.ContractFile.open(cf.dataset.cfile).catch(err=>HAK.UI.toast(err.message||String(err),'error'));return;}
-    const clo=e.target.closest('[data-close]');if(clo){HAK.UI.confirmClick(clo,()=>saveAddenda(clo.dataset.close,n=>{n.closedAt=HAK.UI.todayISO();}).then(()=>HAK.UI.toast('Đã đóng hợp đồng — trạng thái Đã hoàn thành.','success')).catch(err=>HAK.UI.toast(err.message,'error')),'Bấm lần nữa để đóng');return;}
-    const reo=e.target.closest('[data-reopen]');if(reo){saveAddenda(reo.dataset.reopen,n=>{delete n.closedAt;}).then(()=>HAK.UI.toast('Đã mở lại hợp đồng.','success')).catch(err=>HAK.UI.toast(err.message,'error'));return;}
+    const clo=e.target.closest('[data-close]');if(clo){HAK.UI.confirmClick(clo,()=>saveAddenda(clo.dataset.close,n=>{M.closeContract(n,HAK.UI.todayISO());}).then(()=>HAK.UI.toast('Đã đóng hợp đồng — trạng thái Đã hoàn thành.','success')).catch(err=>HAK.UI.toast(err.message,'error')),'Bấm lần nữa để đóng');return;}
+    const reo=e.target.closest('[data-reopen]');if(reo){saveAddenda(reo.dataset.reopen,n=>{M.reopenContract(n,HAK.UI.todayISO());}).then(()=>HAK.UI.toast('Đã mở lại hợp đồng.','success')).catch(err=>HAK.UI.toast(err.message,'error'));return;}
     const adN=e.target.closest('[data-add-new]');if(adN){openAddendum(adN.dataset.addNew);return;}
     const adE=e.target.closest('[data-add-edit]');if(adE){openAddendum(adE.dataset.parent,adE.dataset.addEdit);return;}
     const adD=e.target.closest('[data-add-del]');if(adD){if(!confirm('Xóa phụ lục này? Khối lượng hiện hành sẽ tính lại theo phụ lục còn lại (hoặc về KL gốc).'))return;

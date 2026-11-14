@@ -14,3 +14,4 @@ Các quy tắc dưới đây đã được **suy ra từ mã nguồn / tài li�
    Cần xác nhận: nộp thừa của tờ khai này có được bù cho tờ khai khác của cùng hợp đồng / doanh nghiệp không (nếu có thì cần số liệu bù trừ chính thức từ cơ quan thuế).
 7. **Giấy nộp tiền trùng.** Cùng giấy (số giấy hoặc số tham chiếu) + cùng loại + cùng số tiền + không khác NDKT / chương / ĐBHC / kỳ thuế → coi là cùng khoản. Cần xác nhận mã nào bắt buộc để phân biệt hai khoản cùng số tiền trong một giấy.
 8. **Chứng từ cũ.** Bản chụp số liệu chứng thư lưu trong hồ sơ Lưu trữ (params.certSnap); mở / in lại chứng từ dùng giá trị đã lưu, không đọc lại Danh mục.
+9. **Gộp trạng thái đóng hợp đồng.** Phiên bản đóng (closeRev) cao hơn thắng; cùng phiên bản mà khác trạng thái (hai máy cùng sửa) → lấy bản có ngày đóng / mở lại muộn hơn, hòa thì giữ bản trên máy nhận. Cần xác nhận cách xử lý xung đột này.

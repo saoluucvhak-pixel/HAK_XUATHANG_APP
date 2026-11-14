@@ -53,6 +53,7 @@ test('thuế: còn nợ 20 và nộp thừa 20 hiển thị riêng dù ròng = 0
   assert.equal(m.tax.text, 'Còn nợ 20 đ (1 tờ khai) · Nộp thừa 20 đ (1 tờ khai)');
   const rows = O.rowsOf(fx2()), main = rows[0].c;
   assert.equal(main[O.IX.owing], '20'); assert.equal(main[O.IX.over], '20'); assert.equal(main[O.IX.payable], '200'); assert.equal(main[O.IX.paid], '200');
+  assert.ok(m.tax.remaining > 0, 'bộ lọc "Còn nợ thuế" (f.owing = tax.remaining > 0) vẫn tìm thấy hợp đồng dù số dư ròng = 0');
   assert.deepEqual(rows.length === 0, false); assert.equal(m.axes.tax.code, 'owing'); assert.equal(m.axes.customs.label, 'Đã thông quan đủ');
   assert.equal(m.axes.progress.code, 'running', 'thông quan đủ không có nghĩa hoàn thành: mới 4000/6000 BDMT');
 });

@@ -37,18 +37,27 @@ function validate(c,catalog){if(c.priceUsd!=null&&(!Number.isFinite(c.priceUsd)|
  if(!c.deletedAt&&(catalog.contracts||[]).some(x=>!x.deletedAt&&x.id!==c.id&&x.type===c.type&&x.no&&x.no===c.no))return 'Số hợp đồng đã tồn tại trong cùng hình thức.';return '';}
 function upsert(catalog,value,expectedRevision){const next=copy(catalog),index=next.contracts.findIndex(c=>c.id===value.id),old=next.contracts[index];if(old&&expectedRevision!==undefined&&old.revision!==expectedRevision)throw Error('Hợp đồng đã thay đổi. Mở lại trước khi lưu.');const c=parent(value);const error=validate(c,next);if(error)throw Error(error);for(const row of c.details)Object.assign(row,valuation(c,row));ensureGoods(next,c.contractProduct);for(const row of c.details)ensureGoods(next,row.product);c.revision=(old?old.revision:0)+1;if(index<0)next.contracts.push(c);else next.contracts[index]=c;return {data:next,record:c};}
 function archiveChild(c,detailId){const result=copy(c),d=result.details.find(x=>x.id===detailId);if(!d)throw Error('Không tìm thấy chi tiết');d.deletedAt=new Date().toISOString();d.revision=(d.revision||0)+1;return result;}
+/* Đóng / mở lại hợp đồng THỦ CÔNG — có SỐ PHIÊN BẢN ĐÓNG (closeRev) để gộp bản sao lưu phân biệt được "đã mở lại" với "dữ liệu cũ thiếu trường":
+ * mỗi lần đóng hoặc mở lại tăng closeRev; bản có closeRev cao hơn thắng. Bản đã phát hành (v2.16.2) chưa có closeRev: có closedAt → coi là 1, không có → 0. */
+function closeRevOf(c){const n=Number(c&&c.closeRev);return Number.isFinite(n)&&n>0?Math.floor(n):(c&&c.closedAt?1:0);}
+function closeContract(c,date){c.closeRev=closeRevOf(c)+1;c.closedAt=date;delete c.reopenedAt;return c;}
+function reopenContract(c,date){c.closeRev=closeRevOf(c)+1;delete c.closedAt;c.reopenedAt=date||'';return c;}
+/** Gộp trạng thái đóng của 2 bản cùng 1 hợp đồng vào combined: closeRev cao hơn thắng; bằng nhau mà khác trạng thái (xung đột) → bản có mốc ngày muộn hơn, hòa → giữ bản trên máy này. */
+function mergeClosure(old,inc,combined){const ro=closeRevOf(old),ri=closeRevOf(inc);let win=old;if(ri>ro)win=inc;else if(ri===ro&&!!inc.closedAt!==!!old.closedAt){const so=String(old.closedAt||old.reopenedAt||''),si=String(inc.closedAt||inc.reopenedAt||'');if(si>so)win=inc;}
+ const rev=Math.max(ro,ri);if(rev>0)combined.closeRev=rev;else delete combined.closeRev;
+ if(win.closedAt){combined.closedAt=win.closedAt;delete combined.reopenedAt;}else{delete combined.closedAt;if(win.reopenedAt)combined.reopenedAt=win.reopenedAt;else delete combined.reopenedAt;}}
 function mergeCatalog(local,incoming){
  const a=migrate(local||{v:3,customers:[],contracts:[]}).data,b=migrate(incoming).data;
  const nonempty=(old,value)=>{const result=Object.assign({},old);for(const key of Object.keys(value)){const v=value[key];if(v!==null&&v!==undefined&&v!=='')result[key]=copy(v);}return result;};
  for(const customer of b.customers||[]){const index=a.customers.findIndex(x=>x.id===customer.id);if(index<0)a.customers.push(copy(customer));else a.customers[index]=nonempty(a.customers[index],customer);}
  for(const product of b.products||[]){const at=(a.products||[]).findIndex(x=>x.id===product.id);if(at>=0)a.products[at]=Object.assign({},a.products[at],product);else if(!(a.products||[]).some(x=>goodsKey(x.name)===goodsKey(product.name)))a.products.push(copy(product));}
- for(const value of b.contracts){const index=a.contracts.findIndex(x=>x.id===value.id);if(index<0){a.contracts.push(copy(value));continue;}const old=a.contracts[index],combined=nonempty(old,value);combined.contractFiles=Array.from(new Set([...(old.contractFiles||[]),...(value.contractFiles||[])]));combined.details=copy(old.details||[]);
+ for(const value of b.contracts){const index=a.contracts.findIndex(x=>x.id===value.id);if(index<0){a.contracts.push(copy(value));continue;}const old=a.contracts[index],combined=nonempty(old,value);mergeClosure(old,value,combined);combined.contractFiles=Array.from(new Set([...(old.contractFiles||[]),...(value.contractFiles||[])]));combined.details=copy(old.details||[]);
   for(const d of value.details||[]){const at=combined.details.findIndex(x=>x.id===d.id);if(at<0)combined.details.push(copy(d));else{const previous=combined.details[at];combined.details[at]=nonempty(previous,d);combined.details[at].certificateFiles=Array.from(new Set([...(previous.certificateFiles||[]),...(d.certificateFiles||[])]));}}
   const before=copy(old),after=copy(combined);delete before.revision;delete after.revision;combined.revision=JSON.stringify(before)===JSON.stringify(after)?old.revision:Math.max(old.revision||0,value.revision||0)+1;a.contracts[index]=combined;
  }
  if(HAK.CustomsModel&&(a.customs||b.customs))a.customs=HAK.CustomsModel.merge(a.customs||[],b.customs||[]);
  for(const c of a.contracts){const error=validate(c,a);if(error)throw Error(error);}return a;
 }
-HAK.ContractModel={originalQty,auditOriginal,newAddendum,addendaOf,applyAddenda,valuation,ensureGoods,upsertGoods,goodsKey,childFields,child,parent,migrate,active,sum,roles,projection,choices,resolve,validate,upsert,archiveChild,mergeCatalog,copy};
+HAK.ContractModel={closeRevOf,closeContract,reopenContract,originalQty,auditOriginal,newAddendum,addendaOf,applyAddenda,valuation,ensureGoods,upsertGoods,goodsKey,childFields,child,parent,migrate,active,sum,roles,projection,choices,resolve,validate,upsert,archiveChild,mergeCatalog,copy};
 if(typeof module==='object'&&module.exports)module.exports=HAK.ContractModel;
 })(typeof window!=='undefined'?window:globalThis);
