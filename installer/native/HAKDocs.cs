@@ -108,6 +108,7 @@ class HAKDocs {
    if(method=="OPTIONS"){await Reply(stream,200,new{ok=true},origin=="null");return;}
    if(method=="GET"&&path=="/status"){await Reply(stream,200,Status(),origin=="null");return;}
    if(method!="POST"||(path!="/ocr"&&path!="/downloads"&&path!="/save-download"&&path!="/download-files"&&path!="/verify-download")||!headers.ContainsKey("X-HAK-Client")||headers["X-HAK-Client"]!="documents-v1"){await Reply(stream,403,new{error="Invalid local OCR request."},origin=="null");return;}
+   if(!headers.ContainsKey("X-HAK-Token")||!TokenOk(headers["X-HAK-Token"])){await Reply(stream,403,new{error="Thiếu hoặc sai mã bảo vệ của app. Hãy mở app bằng lối tắt HAK (không mở trực tiếp file index.html)."},origin=="null");return;}
    int length;if(!headers.ContainsKey("Content-Length")||!Int32.TryParse(headers["Content-Length"],out length)||length<1||length>36*1024*1024){int declared;if(headers.ContainsKey("Content-Length")&&Int32.TryParse(headers["Content-Length"],out declared)&&declared>0){var sink=new byte[65536];long left=Math.Min((long)declared,256L*1024*1024);try{while(left>0){int got=await stream.ReadAsync(sink,0,(int)Math.Min((long)sink.Length,left));if(got<=0)break;left-=got;}}catch{}}await Reply(stream,413,new{error="Request is too large (limit 36 MB)."},origin=="null");return;}
    var gate=path=="/ocr"?Busy:FileBusy;
    if(path=="/ocr"){if(!await gate.WaitAsync(0)){await Reply(stream,409,new{error="OCR is processing another document. Please wait."},origin=="null");return;}}
@@ -126,12 +127,26 @@ class HAKDocs {
    await Reply(stream,responseCode,response,origin=="null");
   }
  }
- static async Task Reply(Stream s,int code,object data,bool cors){var bytes=Encoding.UTF8.GetBytes(Json.Serialize(data));var head="HTTP/1.1 "+code+" "+(code==200?"OK":"Error")+"\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-store\r\nConnection: close\r\nContent-Length: "+bytes.Length+"\r\n"+(cors?"Access-Control-Allow-Origin: null\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type, X-HAK-Client\r\nAccess-Control-Allow-Private-Network: true\r\n":"")+"\r\n";var h=Encoding.ASCII.GetBytes(head);await s.WriteAsync(h,0,h.Length);await s.WriteAsync(bytes,0,bytes.Length);}
- static void Serve(){using(var single=new Mutex(false,"Local\\HAK.WindowsOCR.31879")){if(!single.WaitOne(0))return;try{var listener=new TcpListener(IPAddress.Loopback,Port);listener.Start();DateTime last=DateTime.UtcNow;while(DateTime.UtcNow-last<TimeSpan.FromHours(24)){if(!listener.Pending()){Thread.Sleep(200);continue;}var c=listener.AcceptTcpClient();last=DateTime.UtcNow;Task.Run(async()=>{try{await Handle(c);}catch{c.Close();}});}listener.Stop();}finally{single.ReleaseMutex();}}}
+ /* Mã bảo vệ: HAKDocs ghi vào native\hakdocs-token.js (app nạp bằng thẻ script). Trang web bên ngoài (iframe sandbox cũng có Origin "null") không đọc được file này nên không gọi được OCR / hộp Lưu / mở thư mục. */
+ static string TokenFile {get{return Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"hakdocs-token.js");}}
+ static string cachedToken=null;
+ static bool tokenFileOk=false;   // false = không ghi được file mã (vd cài trong Program Files) → không bắt buộc mã, để app vẫn dùng được
+ static string EnsureToken(){
+  if(cachedToken!=null)return cachedToken;
+  try{if(File.Exists(TokenFile)){var m=System.Text.RegularExpressions.Regex.Match(File.ReadAllText(TokenFile),"HAK_DOCS_TOKEN='([0-9a-f]{32})'");if(m.Success){cachedToken=m.Groups[1].Value;tokenFileOk=true;return cachedToken;}}}catch{}
+  var bytes=new byte[16];using(var rng=System.Security.Cryptography.RandomNumberGenerator.Create())rng.GetBytes(bytes);
+  var t=BitConverter.ToString(bytes).Replace("-","").ToLowerInvariant();
+  try{File.WriteAllText(TokenFile,"window.HAK_DOCS_TOKEN='"+t+"';\r\n",new UTF8Encoding(false));tokenFileOk=true;}catch{tokenFileOk=false;}
+  cachedToken=t;return t;
+ }
+ static bool TokenOk(string given){var want=EnsureToken();if(!tokenFileOk)return true;if(given==null||given.Length!=want.Length)return false;int diff=0;for(int i=0;i<want.Length;i++)diff|=want[i]^given[i];return diff==0;}
+ static async Task Reply(Stream s,int code,object data,bool cors){var bytes=Encoding.UTF8.GetBytes(Json.Serialize(data));var head="HTTP/1.1 "+code+" "+(code==200?"OK":"Error")+"\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-store\r\nConnection: close\r\nContent-Length: "+bytes.Length+"\r\n"+(cors?"Access-Control-Allow-Origin: null\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type, X-HAK-Client, X-HAK-Token\r\nAccess-Control-Allow-Private-Network: true\r\n":"")+"\r\n";var h=Encoding.ASCII.GetBytes(head);await s.WriteAsync(h,0,h.Length);await s.WriteAsync(bytes,0,bytes.Length);}
+ static void Serve(){EnsureToken();using(var single=new Mutex(false,"Local\\HAK.WindowsOCR.31879")){if(!single.WaitOne(0))return;try{var listener=new TcpListener(IPAddress.Loopback,Port);listener.Start();DateTime last=DateTime.UtcNow;while(DateTime.UtcNow-last<TimeSpan.FromHours(24)){if(!listener.Pending()){Thread.Sleep(200);continue;}var c=listener.AcceptTcpClient();last=DateTime.UtcNow;Task.Run(async()=>{try{await Handle(c);}catch{c.Close();}});}listener.Stop();}finally{single.ReleaseMutex();}}}
  [STAThread]static int Main(string[] args){try{
   if(args.Length>0&&args[0]=="--status"){Console.WriteLine(Json.Serialize(Status()));return 0;}
   if(args.Length>=3&&args[0]=="--ocr"){var result=Read(ParseFile(args[1]),args.Length>3?Int32.Parse(args[3]):1,args.Length>4?Int32.Parse(args[4]):0,"",args.Length>5?args[5]:"document").GetAwaiter().GetResult();File.WriteAllText(args[2],Json.Serialize(result),new UTF8Encoding(false));return 0;}
   if(args.Length>0&&args[0]=="--serve"){Serve();return 0;}
+  EnsureToken();
   Process.Start(new ProcessStartInfo(Process.GetCurrentProcess().MainModule.FileName,"--serve"){UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden});
   Process.Start(new ProcessStartInfo(Path.Combine(Root,"index.html")){UseShellExecute=true});return 0;
  }catch(Exception e){if(args.Length>=3&&args[0]=="--ocr")try{File.WriteAllText(args[2],Json.Serialize(new{error=e.ToString()}),new UTF8Encoding(false));}catch{}Console.Error.WriteLine(e.ToString());return 1;}}

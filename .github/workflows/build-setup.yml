@@ -37,7 +37,14 @@ jobs:
             }
             if (-not $ok) { throw 'HAKDocs --serve did not answer /status' }
             Write-Host "status: $($r.Content)"
-            $h = @{ 'X-HAK-Client' = 'documents-v1'; 'Content-Type' = 'application/json' }
+            # mã bảo vệ do HAKDocs ghi ra (native/hakdocs-token.js): thiếu mã → 403, đúng mã → chạy
+            $tok = [regex]::Match((Get-Content app/native/hakdocs-token.js -Raw), "HAK_DOCS_TOKEN='([0-9a-f]{32})'").Groups[1].Value
+            if (-not $tok) { throw 'HAKDocs did not write hakdocs-token.js' }
+            $nt = Invoke-WebRequest -Uri http://127.0.0.1:31879/download-files -Method Post -Headers @{ 'X-HAK-Client' = 'documents-v1'; 'Content-Type' = 'application/json' } -Body '{"action":"list"}' -UseBasicParsing -SkipHttpErrorCheck
+            if ($nt.StatusCode -ne 403) { throw "request without token returned $($nt.StatusCode), expected 403" }
+            $wt = Invoke-WebRequest -Uri http://127.0.0.1:31879/download-files -Method Post -Headers @{ 'X-HAK-Client' = 'documents-v1'; 'X-HAK-Token' = 'deadbeefdeadbeefdeadbeefdeadbeef'; 'Content-Type' = 'application/json' } -Body '{"action":"list"}' -UseBasicParsing -SkipHttpErrorCheck
+            if ($wt.StatusCode -ne 403) { throw "request with wrong token returned $($wt.StatusCode), expected 403" }
+            $h = @{ 'X-HAK-Client' = 'documents-v1'; 'X-HAK-Token' = $tok; 'Content-Type' = 'application/json' }
             # file operations answer normally (list saved downloads)
             $l = Invoke-WebRequest -Uri http://127.0.0.1:31879/download-files -Method Post -Headers $h -Body '{"action":"list"}' -UseBasicParsing
             if ($l.StatusCode -ne 200) { throw "download-files list returned $($l.StatusCode)" }
@@ -51,6 +58,8 @@ jobs:
         shell: pwsh
         run: |
           Copy-Item app installer/app -Recurse
+          # KHÔNG đóng mã bảo vệ sinh trong CI vào bộ cài: mỗi máy tự sinh mã riêng ở lần chạy đầu
+          Set-Content -Path installer/app/native/hakdocs-token.js -Value "window.HAK_DOCS_TOKEN='';" -Encoding ascii
           Copy-Item installer/icon/app.ico installer/app/app.ico
           Remove-Item installer/app/MoKhoa_1Lan*.html, installer/app/XoaSach_DuLieu*.html -ErrorAction SilentlyContinue
           $ver = (Select-String -Path installer/setup.nsi -Pattern '!define VERSION "([^"]+)"').Matches[0].Groups[1].Value

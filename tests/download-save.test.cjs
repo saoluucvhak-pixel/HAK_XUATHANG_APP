@@ -43,3 +43,15 @@ test('user cancelling the Windows Save dialog does not trigger a download',async
  const t=withBrowser(async()=>({ok:true,status:200,json:async()=>({canceled:true})}));
  assert.equal(await t.files.saveBlob(new Blob(['x']),'d.docx'),false);assert.deepEqual(t.saved,[]);
 });
+
+test('các nơi gọi HAKDocs đều gửi mã bảo vệ X-HAK-Token (HAKDocs từ chối yêu cầu thiếu mã)', () => {
+  const fs = require('node:fs');
+  for (const f of ['document-import.js', 'download-folders.js', 'word.js', 'year-close.js']) {
+    const src = fs.readFileSync(require('node:path').join(__dirname, '../app/js', f), 'utf8');
+    assert.ok(/X-HAK-Client'\s*:\s*'documents-v1'\s*,\s*'X-HAK-Token'\s*:\s*window\.HAK_DOCS_TOKEN/.test(src), f + ' thiếu X-HAK-Token');
+  }
+  const html = fs.readFileSync(require('node:path').join(__dirname, '../app/index.html'), 'utf8');
+  assert.ok(html.indexOf('native/hakdocs-token.js') >= 0 && html.indexOf('native/hakdocs-token.js') < html.indexOf('js/version.js'), 'index.html phải nạp mã bảo vệ trước các script app');
+  const cs = fs.readFileSync(require('node:path').join(__dirname, '../installer/native/HAKDocs.cs'), 'utf8');
+  assert.ok(/Allow-Headers: Content-Type, X-HAK-Client, X-HAK-Token/.test(cs) && /TokenOk\(headers\["X-HAK-Token"\]\)/.test(cs));
+});
