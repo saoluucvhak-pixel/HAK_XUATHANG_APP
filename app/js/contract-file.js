@@ -95,7 +95,7 @@
     const khoOf = HAK.ContractStatus && HAK.ContractStatus.khoOf ? HAK.ContractStatus.khoOf : () => '';
     const xh = rows.filter((r) => r.lot && r.lot.trips > 0).map((r) => ({ ship: r.d.ship || '', kho: Array.from(new Set((r.lot.recs || []).map(khoOf).filter(Boolean))).join(', '), trips: r.lot.trips, ton: r.lot.delKg / 1000, from: r.lot.from || '', to: r.lot.to || '', mt: r.d.mt }));
     const hd = checks.find((k) => k.who === 'Cả hợp đồng') || null;
-    return { xh, rows, loose, supps, cleared, withCert, hd, c, cust, steps, checks, ev, T, tax, certBdmt, qty, delKg, trips, status: CM.contractStatus(data.customs, cid), addenda };
+    return { xh, rows, loose, supps, cleared, withCert, hd, c, cust, steps, checks, ev, T, tax, certBdmt, qty, delKg, trips, status: CM.contractStatus(data.customs, cid, c), addenda };
   }
 
   function specOf(m) {

@@ -25,6 +25,7 @@
   const contracts = () => (data().contracts || []).filter((c) => !c.deletedAt);
   const contractOf = (id) => (data().contracts || []).find((c) => c.id === id) || null;
   const custName = (id) => { const c = core().customers().find((x) => x.id === id); return c ? c.name : ''; };
+  const cstatus = (id) => CM().contractStatus(customsList(), id, contractOf(id));
   const contractLabel = (c) => (c ? (c.no || c.id) + (custName(c.buyerId) ? ' · ' + custName(c.buyerId) : '') : '');
   const detailOf = (c, id) => (c && (c.details || []).find((d) => d.id === id)) || null;
 
@@ -157,7 +158,7 @@
   const toast = (m, t) => HAK.UI.toast(m, t || 'info');
   function notifyContract(d) {
     if (!d || !d.contractId || d.status !== 'cleared') return;
-    const s = CM().contractStatus(customsList(), d.contractId);
+    const s = cstatus(d.contractId);
     if (s.code === 'done') toast('Hợp đồng ' + ((contractOf(d.contractId) || {}).no || '') + ' đã hoàn thành (mọi tờ khai đã thông quan).', 'success');
   }
   async function setStatus(id, status) {
@@ -365,7 +366,7 @@
   const statusBadge = (s) => '<span class="badge ' + (badgeCls[s] || 'text-bg-secondary') + '">' + esc(CM().STATUS[s] || s) + '</span>';
   /** Nhãn trạng thái hợp đồng (cột "Trạng thái" ở bảng hợp đồng). */
   function contractBadge(contractId) {
-    const s = CM().contractStatus(customsList(), contractId);
+    const s = cstatus(contractId);
     return '<span class="badge ' + (s.code === 'done' ? 'text-bg-success' : 'text-bg-primary') + '" title="' + (s.total ? s.cleared + '/' + s.total + ' tờ khai đã thông quan' : 'Chưa có tờ khai hải quan') + '">' + s.label + '</span>';
   }
   /** 4 ô cho bảng "Bảng chi tiết hợp đồng": ngày mở tờ khai · lần khai · thuế XK phải nộp · trạng thái. */
@@ -535,7 +536,7 @@
   function drawReport() {
     const host = $('#repCsBody'); if (!host || !root.HAK.Catalog || !HAK.Catalog.core) return;
     const v0 = csRepView(); if (v0) v0.refresh(); const rows = reportList(), s = sums(rows);
-    const cc = (d) => { const c = contractOf(d.contractId); return c ? CM().contractStatus(customsList(), c.id).label : ''; };
+    const cc = (d) => { const c = contractOf(d.contractId); return c ? cstatus(c.id).label : ''; };
     host.innerHTML = '<div class="row g-2 mb-2">' + card('Tờ khai', rows.length, s.opened + ' đã mở · ' + s.waiting + ' chờ thông quan · ' + s.cleared + ' đã thông quan') + card('Thuế XK phải nộp', money(s.payable) + ' đ') + card('Đã nộp thuế', money(s.paid) + ' đ', 'Lệ phí đã nộp: ' + money(s.fee) + ' đ') + card('Còn phải nộp', '<span class="' + (s.remaining > 0 ? 'text-danger' : 'text-success') + '">' + money(s.remaining) + ' đ</span>') + '</div>' +
       '<div class="tbl-wrap"><table class="table table-sm"><thead><tr><th>Số tờ khai</th><th>Ngày mở</th><th class="num">Lần</th><th>Hợp đồng</th><th>Tàu</th><th>Trạng thái</th><th>Ngày thông quan</th><th class="num">Thuế phải nộp</th><th class="num">Đã nộp thuế</th><th class="num">Còn phải nộp</th><th class="num">Khai bổ sung</th><th>Hợp đồng</th></tr></thead><tbody>' +
       (rows.length ? rows.map((d) => { const t = CM().totals(d), c = contractOf(d.contractId); return '<tr><td class="mono">' + esc(d.no) + '</td><td>' + esc(vnDate(d.openDate)) + '</td><td class="num">' + esc(d.round || 1) + '</td><td>' + esc(c ? c.no : '') + '</td><td>' + esc(d.ship || '') + '</td><td>' + statusBadge(d.status) + '</td><td>' + esc(vnDate(CM().statusDate(d, 'cleared'))) + '</td><td class="num">' + esc(money(t.payable)) + '</td><td class="num">' + esc(money(t.paidTax)) + '</td><td class="num ' + (t.remaining > 0 ? 'text-danger' : '') + '">' + esc(money(t.remaining)) + '</td><td class="num">' + CM().active(d.supplements).length + '</td><td>' + esc(cc(d)) + '</td></tr>'; }).join('') : '<tr><td colspan="12" class="muted text-center">Chưa có tờ khai hải quan trong khoảng đã chọn. Thêm ở Danh mục → 🛃 Tờ khai hải quan.</td></tr>') + '</tbody></table></div>';
@@ -549,7 +550,7 @@
     const sub = 'Nguồn: tab Tờ khai hải quan trong Danh mục' + (view ? ' · Bộ lọc: ' + view.describe() : '') + '. Thuế phải nộp lấy theo lần khai bổ sung mới nhất (nếu có).';
     R.buildSheet(wb, 'Tờ khai', 'TÌNH HÌNH KHAI HẢI QUAN VÀ NỘP THUẾ', sub,
       [{ h: 'Số tờ khai', w: 16 }, { h: 'Ngày mở', w: 12 }, { h: 'Lần khai', w: 8, n: NI }, { h: 'Loại hình', w: 9 }, { h: 'Hợp đồng', w: 20 }, { h: 'Trạng thái hợp đồng', w: 16 }, { h: 'Tàu', w: 24 }, { h: 'Hàng hóa', w: 28 }, { h: 'KL (BDMT)', w: 12, n: ND }, { h: 'Trạng thái tờ khai', w: 16 }, { h: 'Ngày thông quan', w: 14 }, { h: 'Thuế XK phải nộp (đ)', w: 18, n: NI }, { h: 'Đã nộp thuế (đ)', w: 16, n: NI }, { h: 'Còn phải nộp (đ)', w: 16, n: NI }, { h: 'Lệ phí đã nộp (đ)', w: 16, n: NI }],
-      rows.map((d) => { const t = CM().totals(d), c = contractOf(d.contractId); return [d.no, vnDate(d.openDate), d.round || 1, d.type || '', c ? c.no : '', c ? CM().contractStatus(customsList(), c.id).label : '', d.ship || '', d.goods || '', d.qtyBdmt, CM().STATUS[d.status], vnDate(CM().statusDate(d, 'cleared')), t.payable, t.paidTax, t.remaining, t.paidFee]; }), { total: true });
+      rows.map((d) => { const t = CM().totals(d), c = contractOf(d.contractId); return [d.no, vnDate(d.openDate), d.round || 1, d.type || '', c ? c.no : '', c ? cstatus(c.id).label : '', d.ship || '', d.goods || '', d.qtyBdmt, CM().STATUS[d.status], vnDate(CM().statusDate(d, 'cleared')), t.payable, t.paidTax, t.remaining, t.paidFee]; }), { total: true });
     R.buildSheet(wb, 'Khai bổ sung', 'KHAI BỔ SUNG', sub, [{ h: 'Tờ khai gốc', w: 16 }, { h: 'Số tờ khai bổ sung', w: 18 }, { h: 'Ngày', w: 12 }, { h: 'Lần', w: 8, n: NI }, { h: 'Lý do', w: 40 }, { h: 'KL (BDMT)', w: 12, n: ND }, { h: 'Thuế XK sau bổ sung (đ)', w: 20, n: NI }],
       rows.flatMap((d) => CM().active(d.supplements).map((x) => [d.no, x.no, vnDate(x.date), x.round, x.reason, x.qtyBdmt, x.taxVnd])));
     R.buildSheet(wb, 'Giấy nộp tiền', 'GIẤY NỘP TIỀN VÀO NGÂN SÁCH NHÀ NƯỚC', sub, [{ h: 'Tờ khai', w: 16 }, { h: 'Số giấy nộp tiền', w: 16 }, { h: 'Mã hiệu', w: 14 }, { h: 'Số tham chiếu', w: 24 }, { h: 'Ngày nộp', w: 12 }, { h: 'Kỳ thuế / ngày quyết định', w: 14 }, { h: 'Loại', w: 16 }, { h: 'Nội dung', w: 30 }, { h: 'Mã chương', w: 10 }, { h: 'Mã NDKT', w: 10 }, { h: 'Mã ĐBHC', w: 10 }, { h: 'Số tiền VND', w: 16, n: NI }],
@@ -575,7 +576,7 @@
         (ds.length ? ds : [null]).forEach((x, i) => rows.push(Object.assign({ detail: d, first: i === 0, mt: i === 0 ? d.mt : null, bdmt: i === 0 ? d.bdmt : null, usd: i === 0 ? v.valueUsd : null, vnd: i === 0 ? v.valueVnd : null }, declRow(x))));
       });
       mine.filter((x) => !x.detailId || !details.some((d) => d.id === x.detailId)).forEach((x) => rows.push(Object.assign({ detail: null, first: false, mt: null, bdmt: null, usd: null, vnd: null }, declRow(x))));
-      const st = CM().contractStatus(all, c.id), bd = sumOf(details.map((d) => d.bdmt));
+      const st = CM().contractStatus(all, c.id, c), bd = sumOf(details.map((d) => d.bdmt));
       const model = { c, rows, st, tot: {
         details: details.length, certs: details.filter((d) => d.certNo).length, bdmt: bd, mt: sumOf(details.map((d) => d.mt)), usd: sumOf(details.map((d) => M.valuation(c, d).valueUsd)), vnd: sumOf(details.map((d) => M.valuation(c, d).valueVnd)),
         decls: mine.length, cleared: st.cleared, payable: sumOf(mine.map((x) => CM().totals(x).payable)), paidTax: sumOf(mine.map((x) => CM().totals(x).paidTax)), paidFee: sumOf(mine.map((x) => CM().totals(x).paidFee)), remaining: sumOf(mine.map((x) => CM().totals(x).remaining)),
@@ -666,7 +667,7 @@
   }
   function customsPdfSpec() {
     const rows = reportList(), view = csRepView(), g = sums(rows), N = true;
-    const main = rows.map((d) => { const t = CM().totals(d), c = contractOf(d.contractId); return { c: [d.no, vnDate(d.openDate), d.round || 1, d.type || '', c ? c.no : '', c ? CM().contractStatus(customsList(), c.id).label : '', d.ship || '', CM().STATUS[d.status], vnDate(CM().statusDate(d, 'cleared')), m0(t.payable), m0(t.paidTax), m0(t.remaining), m0(t.paidFee)] }; });
+    const main = rows.map((d) => { const t = CM().totals(d), c = contractOf(d.contractId); return { c: [d.no, vnDate(d.openDate), d.round || 1, d.type || '', c ? c.no : '', c ? cstatus(c.id).label : '', d.ship || '', CM().STATUS[d.status], vnDate(CM().statusDate(d, 'cleared')), m0(t.payable), m0(t.paidTax), m0(t.remaining), m0(t.paidFee)] }; });
     main.push({ cls: 'total', c: ['TỔNG CỘNG (' + rows.length + ' tờ khai)', '', '', '', '', '', '', '', '', m0(g.payable), m0(g.paid), m0(g.remaining), m0(g.fee)] });
     const supp = rows.flatMap((d) => CM().active(d.supplements).map((x) => ({ c: [d.no, x.no || '(trên tờ khai gốc)', vnDate(x.date), x.round, x.reason, m0(x.qtyBdmt), m0(x.taxVnd)] })));
     const pays = rows.flatMap((d) => CM().active(d.payments).map((x) => ({ c: [d.no, x.receiptNo, x.formCode, x.refNo, vnDate(x.date), vnDate(x.periodDate), CM().PAY_KIND[x.kind], x.content, x.chapter, x.ndkt, m0(x.amount)] })));

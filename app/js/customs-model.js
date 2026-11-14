@@ -70,11 +70,25 @@
   const statusDate = (d, status) => { const hit = (d.statusLog || []).filter((x) => x.status === status).pop(); return hit ? hit.at : ''; };
 
   /** Hợp đồng: running (Đang thực hiện) → done (Đã hoàn thành) khi có tờ khai và tất cả đã thông quan. */
-  function contractStatus(customs, contractId) {
+  function contractStatus(customs, contractId, contract) {
     const list = act(customs).filter((d) => d.contractId === contractId);
     const cleared = list.filter((d) => d.status === 'cleared').length;
+    // Đóng thủ công (hợp đồng Xuất bán / Trao đổi không có tờ khai, hoặc đã giao đủ): contract.closedAt = ngày đóng.
+    if (contract && contract.closedAt) return { code: 'done', label: 'Đã hoàn thành', total: list.length, cleared, manual: true, closedAt: contract.closedAt };
     const done = list.length > 0 && cleared === list.length;
     return { code: done ? 'done' : 'running', label: done ? 'Đã hoàn thành' : 'Đang thực hiện', total: list.length, cleared };
+  }
+  /**
+   * Gợi ý ĐÓNG hợp đồng: đã thực hiện đủ khối lượng hiện hành (Σ KL khô chứng thư ≥ KL hợp đồng) và — với Xuất khẩu / Ủy thác XK — mọi tờ khai đã thông quan.
+   * @returns {string} lý do gợi ý, '' nếu chưa nên đóng / đã đóng.
+   */
+  function closeHint(contract, customs) {
+    const c = contract || {}; if (!c.id || c.closedAt || c.deletedAt) return '';
+    const qty = Number(c.contractQty) || 0; if (!(qty > 0)) return '';
+    const got = (c.details || []).filter((d) => !d.deletedAt).reduce((a, d) => a + (Number(d.bdmt) || 0), 0);
+    if (got + 0.005 < qty) return '';
+    if ((c.type === 'xuatkhau' || c.type === 'uythac') && contractStatus(customs, c.id).code !== 'done') return '';
+    return 'Đã thực hiện ' + Math.round(got * 100) / 100 + ' / ' + qty + ' BDMT' + ((c.type === 'xuatkhau' || c.type === 'uythac') ? ' và mọi tờ khai đã thông quan' : '') + ' — có thể đóng hợp đồng.';
   }
   function validate(d, data) {
     if (!d.no) return 'Chưa nhập số tờ khai.';
@@ -131,6 +145,6 @@
     if (!act(customs).some((x) => x.contractId === c.id && (!x.detailId || x.detailId === d.id))) missing.push('tờ khai hải quan');
     return { ok: !missing.length, missing };
   }
-  HAK.CustomsModel = { detailReady, readiness, STATUS, STATUS_ORDER, PAY_KIND, newDecl, newSupp, newPay, active: act, sum, totals, setStatus, statusDate, contractStatus, validate, upsert, merge, copy, digits };
+  HAK.CustomsModel = { closeHint, detailReady, readiness, STATUS, STATUS_ORDER, PAY_KIND, newDecl, newSupp, newPay, active: act, sum, totals, setStatus, statusDate, contractStatus, validate, upsert, merge, copy, digits };
   if (typeof module === 'object' && module.exports) module.exports = HAK.CustomsModel;
 })(typeof window !== 'undefined' ? window : globalThis);

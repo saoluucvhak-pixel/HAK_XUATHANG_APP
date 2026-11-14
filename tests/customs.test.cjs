@@ -184,3 +184,37 @@ test('hồ sơ hợp đồng: đối chiếu và thuế còn nợ', () => {
   assert.ok(m.checks.filter((k) => k.what === 'Tên tàu' || k.what === 'Số chứng thư').every((k) => k.ok));
   const all = m.checks.find((k) => k.who === 'Cả hợp đồng'); assert.equal(all.ok, false); assert.match(all.note, /VƯỢT/);
 });
+
+test('đóng hợp đồng thủ công: trạng thái Đã hoàn thành dù chưa có tờ khai; mở lại thì về Đang thực hiện', () => {
+  const c = { id: 'c1', type: 'xuatban', contractQty: 1000, details: [] };
+  assert.equal(M.contractStatus([], 'c1', c).code, 'running');
+  const closed = Object.assign({}, c, { closedAt: '2026-10-30' });
+  const st = M.contractStatus([], 'c1', closed); assert.equal(st.code, 'done'); assert.equal(st.manual, true); assert.equal(st.label, 'Đã hoàn thành');
+  assert.equal(M.contractStatus([{ id: 'x', contractId: 'c1', status: 'opened' }], 'c1', closed).code, 'done');   // đóng thủ công ưu tiên
+  assert.equal(M.contractStatus([{ id: 'x', contractId: 'c1', status: 'cleared' }], 'c1').code, 'done');          // tự động như cũ (không truyền hợp đồng)
+});
+
+test('gợi ý đóng hợp đồng: đủ KL; Xuất khẩu / Ủy thác còn cần mọi tờ khai thông quan; đã đóng thì không gợi ý', () => {
+  const mk = (type, got, extra) => Object.assign({ id: 'c1', type, contractQty: 1000, details: [{ bdmt: got }] }, extra);
+  assert.match(M.closeHint(mk('xuatban', 1000), []), /có thể đóng hợp đồng/);
+  assert.equal(M.closeHint(mk('xuatban', 900), []), '');
+  assert.equal(M.closeHint(mk('xuatkhau', 1000), []), '');                                               // chưa có tờ khai thông quan
+  assert.equal(M.closeHint(mk('xuatkhau', 1000), [{ id: 'd', contractId: 'c1', status: 'waiting' }]), '');
+  assert.match(M.closeHint(mk('xuatkhau', 1000), [{ id: 'd', contractId: 'c1', status: 'cleared' }]), /thông quan/);
+  assert.equal(M.closeHint(mk('xuatban', 1000, { closedAt: '2026-10-30' }), []), '');
+  assert.equal(M.closeHint(mk('xuatban', 1000, { contractQty: 0 }), []), '');
+  assert.equal(M.closeHint(mk('xuatban', 999.996), []) !== '', true, 'sai số nhỏ (< 0,005) vẫn coi là đủ');
+});
+
+test('phụ lục: KL hiện hành theo ngày ký; cùng ngày theo thứ tự nhập; phụ lục chưa có ngày xếp sau cùng', () => {
+  const CMo = require('../app/js/contract-model.js');
+  const c = CMo.parent({ type: 'xuatban', no: 'H', contractQty: 100, details: [] });
+  c.addenda = [{ no: 'B', date: '2026-02-01', qty: 300 }, { no: 'A', date: '2026-01-01', qty: 200 }];
+  CMo.applyAddenda(c); assert.equal(c.contractQty, 300); assert.equal(c.qtyOrig, 100);
+  c.addenda.push({ no: 'C', date: '2026-02-01', qty: 350 }); CMo.applyAddenda(c);       // cùng ngày với B nhưng nhập sau → hiệu lực sau
+  assert.equal(c.contractQty, 350);
+  c.addenda.push({ no: 'D', qty: 999 }); CMo.applyAddenda(c);                           // chưa có ngày → xếp sau cùng
+  assert.equal(c.contractQty, 999);
+  const seqs = c.addenda.map((a) => a.seq); assert.equal(new Set(seqs).size, seqs.length); assert.ok(seqs.every((x) => x > 0));
+  c.addenda = c.addenda.slice().reverse(); CMo.applyAddenda(c); assert.equal(c.contractQty, 999, 'đảo thứ tự lưu không đổi kết quả');
+});

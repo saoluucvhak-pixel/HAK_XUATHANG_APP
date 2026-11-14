@@ -14,18 +14,21 @@
   const toast = (m, t) => { if (HAK.UI && HAK.UI.toast) HAK.UI.toast(m, t); };
   const state = { items: [], view: null, loading: false };
 
-  /* Các cột theo trình tự quy trình. band = nhóm; n = cột số. */
-  const BANDS = [['① HỢP ĐỒNG + PHỤ LỤC', 4, 'primary'], ['② CHỨNG THƯ', 3, 'success'], ['③ TỜ KHAI HẢI QUAN', 3, 'info'], ['④ KHAI BỔ SUNG', 2, 'warning'], ['⑤ NỘP THUẾ', 3, 'danger'], ['⑥ XUẤT HÀNG', 4, 'secondary'], ['⑦ ĐỐI CHIẾU', 3, 'dark']];
+  /* Các cột theo trình tự quy trình — MỘT nơi định nghĩa: k = khóa, b = nhóm (chỉ số trong BANDS), n = cột số ('int' | 'dec'), sum = cộng ở dòng tổng (chỉ dòng hợp đồng). */
+  const BANDS = [['① HỢP ĐỒNG + PHỤ LỤC', 'primary'], ['② CHỨNG THƯ', 'success'], ['③ TỜ KHAI HẢI QUAN', 'info'], ['④ KHAI BỔ SUNG', 'warning'], ['⑤ NỘP THUẾ', 'danger'], ['⑥ XUẤT HÀNG', 'secondary'], ['⑦ ĐỐI CHIẾU', 'dark']];
   const COLS = [
-    { h: 'Hợp đồng / chi tiết (tàu)', w: 40 }, { h: 'KL gốc (BDMT)', n: 1, w: 14 }, { h: 'Phụ lục', w: 26 }, { h: 'KL hiện hành (BDMT)', n: 1, w: 16 },
-    { h: 'Số chứng thư', w: 24 }, { h: 'KL khô thực hiện (BDMT)', n: 1, w: 16 }, { h: '% / còn lại so với HĐ', w: 22 },
-    { h: 'Số tờ khai', w: 18 }, { h: 'Ngày mở', w: 11 }, { h: 'Trạng thái', w: 22 },
-    { h: 'Số lần', w: 10 }, { h: 'Thuế tăng / giảm (đ)', n: 1, w: 16 },
-    { h: 'Thuế phải nộp (đ)', n: 1, w: 16 }, { h: 'Đã nộp (đ)', n: 1, w: 16 }, { h: 'CÒN NỢ (đ)', n: 1, w: 16 },
-    { h: 'Kho xuất', w: 22 }, { h: 'Chuyến xe', n: 1, w: 9 }, { h: 'Thực giao (tấn)', n: 1, w: 13 }, { h: 'Thời gian cân', w: 22 },
-    { h: 'Tờ khai ↔ chứng thư', w: 30 }, { h: 'Chứng thư ↔ hợp đồng', w: 34 }, { h: 'Chứng thư ↔ thực giao', w: 20 }
+    { k: 'label', b: 0, h: 'Hợp đồng / chi tiết (tàu)', w: 40 }, { k: 'qtyOrig', b: 0, h: 'KL gốc (BDMT)', n: 'dec', sum: 1, w: 14 }, { k: 'addenda', b: 0, h: 'Phụ lục', w: 26 }, { k: 'qtyNow', b: 0, h: 'KL hiện hành (BDMT)', n: 'dec', sum: 1, w: 16 },
+    { k: 'cert', b: 1, h: 'Số chứng thư', w: 24 }, { k: 'certBdmt', b: 1, h: 'KL khô thực hiện (BDMT)', n: 'dec', sum: 1, w: 16 }, { k: 'pct', b: 1, h: '% / còn lại so với HĐ', w: 22 },
+    { k: 'declNo', b: 2, h: 'Số tờ khai', w: 18 }, { k: 'openDate', b: 2, h: 'Ngày mở', w: 11 }, { k: 'declStatus', b: 2, h: 'Trạng thái', w: 22 },
+    { k: 'supps', b: 3, h: 'Số lần', w: 10 }, { k: 'extra', b: 3, h: 'Thuế tăng / giảm (đ)', n: 'int', sum: 1, w: 16 },
+    { k: 'payable', b: 4, h: 'Thuế phải nộp (đ)', n: 'int', sum: 1, w: 16 }, { k: 'paid', b: 4, h: 'Đã nộp (đ)', n: 'int', sum: 1, w: 16 }, { k: 'owing', b: 4, h: 'CÒN NỢ (đ)', n: 'int', sum: 1, w: 16 },
+    { k: 'kho', b: 5, h: 'Kho xuất', w: 22 }, { k: 'trips', b: 5, h: 'Chuyến xe', n: 'int', sum: 1, w: 9 }, { k: 'tons', b: 5, h: 'Thực giao (tấn)', n: 'dec', sum: 1, w: 13 }, { k: 'time', b: 5, h: 'Thời gian cân', w: 22 },
+    { k: 'tkct', b: 6, h: 'Tờ khai ↔ chứng thư', w: 30 }, { k: 'cthd', b: 6, h: 'Chứng thư ↔ hợp đồng', w: 34 }, { k: 'ctgv', b: 6, h: 'Chứng thư ↔ thực giao', w: 20 }
   ];
+  const IX = {}; COLS.forEach((c, i) => { IX[c.k] = i; });
   const NUM = new Set(COLS.map((c, i) => (c.n ? i : -1)).filter((i) => i >= 0));
+  const bandSpan = (k) => COLS.filter((c) => c.b === k).length;
+  const numFmt = (i) => (COLS[i].n === 'dec' ? '#,##0.00' : '#,##0');
 
   async function load() {
     const CS = HAK.ContractStatus; await CS.load();
@@ -57,7 +60,7 @@
     m.loose.forEach((x) => out.push({ cls: 'sub', c: ['   (tờ khai chưa gắn chi tiết hợp đồng)', '', '', '', '', '', ''].concat(declCells(x), ['', '', '', '', '⚠ Chưa gắn chi tiết', '', '']) }));
     return out;
   }
-  const tone = (v, i) => { v = String(v); if (i === 14 && v && v !== '0') return 'text-danger fw-semibold'; if (i >= 19) return v.charAt(0) === '⚠' ? 'text-danger' : v.charAt(0) === '✔' ? 'text-success' : ''; return ''; };
+  const tone = (v, i) => { v = String(v); if (i === IX.owing && v && v !== '0') return 'text-danger fw-semibold'; if (i >= IX.tkct) return v.charAt(0) === '⚠' ? 'text-danger' : v.charAt(0) === '✔' ? 'text-success' : ''; return ''; };
 
   /* ---------- Bộ lọc smart ---------- */
   function fields() {
@@ -90,7 +93,7 @@
       card('KL hợp đồng hiện hành', nf(sum(list.map((i) => i.m.qty))) + ' BDMT', 'chứng thư: ' + nf(sum(list.map((i) => i.m.certBdmt)))) + card('Tờ khai', nDecl, nClr + ' đã thông quan') +
       card('Thuế phải nộp', nf(T('payable')) + ' đ', 'đã nộp ' + nf(T('paid'))) + card('Thuế CÒN NỢ', '<span class="' + (T('remaining') > 0 ? 'text-danger' : 'text-success') + '">' + nf(T('remaining')) + ' đ</span>', list.filter((i) => i.f.owing).length + ' hợp đồng còn nợ') +
       card('Có lệch đối chiếu', list.filter((i) => i.f.mismatch).length, 'hợp đồng cần kiểm tra');
-    const head = '<thead><tr class="text-center">' + BANDS.map((b) => '<th colspan="' + b[1] + '" class="text-bg-' + b[2] + '">' + b[0] + '</th>').join('') + '</tr><tr>' + COLS.map((c, i) => '<th class="' + (c.n ? 'num ' : '') + (i === 0 ? 'co-first' : '') + '">' + esc(c.h) + '</th>').join('') + '</tr></thead>';
+    const head = '<thead><tr class="text-center">' + BANDS.map((b, k) => '<th colspan="' + bandSpan(k) + '" class="text-bg-' + b[1] + '">' + b[0] + '</th>').join('') + '</tr><tr>' + COLS.map((c, i) => '<th class="' + (c.n ? 'num ' : '') + (i === 0 ? 'co-first' : '') + '">' + esc(c.h) + '</th>').join('') + '</tr></thead>';
     const body = list.length ? list.map((it) => rowsOf(it).map((r) => '<tr class="' + (r.cls === 'main' ? 'table-light fw-semibold co-main' : 'small') + '"' + (r.cls === 'main' ? ' data-co-file="' + esc(it.f.id) + '" style="cursor:pointer" title="Bấm để mở Hồ sơ hợp đồng"' : '') + '>' +
       r.c.map((v, i) => '<td class="' + (COLS[i].n ? 'num text-nowrap ' : '') + (i === 0 ? 'co-first ' : '') + tone(v, i) + '"' + ' style="' + (COLS[i].n ? '' : 'white-space:normal;word-break:break-word;') + (i === 0 ? 'width:300px;min-width:300px;max-width:300px;' : 'min-width:' + (COLS[i].n ? 112 : 120) + 'px;') + (i === 0 && r.cls === 'sub' ? 'padding-left:1.4rem' : '') + '">' + esc(v) + '</td>').join('') + '</tr>').join('')).join('')
       : '<tr><td colspan="' + COLS.length + '" class="muted text-center py-4">Chưa có hợp đồng khớp bộ lọc.</td></tr>';
@@ -130,10 +133,11 @@
     ws.getRow(2).height = 30;
     let col = 1;                                                           // hàng 4: nhóm quy trình (gộp ô); hàng 5: tên cột
     BANDS.forEach((bd, k) => {
-      if (bd[1] > 1) ws.mergeCells(4, col, 4, col + bd[1] - 1);
+      const span = bandSpan(k);
+      if (span > 1) ws.mergeCells(4, col, 4, col + span - 1);
       Object.assign(ws.getCell(4, col), { value: bd[0], font: { name: XF, size: 10, bold: true, color: { argb: 'FFFFFFFF' } }, alignment: { horizontal: 'center', vertical: 'middle' } });
-      for (let i = col; i < col + bd[1]; i++) { ws.getCell(4, i).fill = fill(BAND_ARGB[k]); ws.getCell(4, i).border = B; ws.getCell(5, i).fill = fill(BAND_ARGB[k]); }
-      col += bd[1];
+      for (let i = col; i < col + span; i++) { ws.getCell(4, i).fill = fill(BAND_ARGB[k]); ws.getCell(4, i).border = B; ws.getCell(5, i).fill = fill(BAND_ARGB[k]); }
+      col += span;
     });
     COLS.forEach((c, i) => Object.assign(ws.getCell(5, i + 1), { value: c.h, font: { name: XF, size: 9, bold: true, color: { argb: 'FFFFFFFF' } }, border: B, alignment: { horizontal: 'center', vertical: 'middle', wrapText: true } }));
     ws.getRow(4).height = 20; ws.getRow(5).height = 42;
@@ -146,7 +150,7 @@
         const t = tone(v, i), red = /danger/.test(t), grn = /success/.test(t);
         cell.font = { name: XF, size: 9, bold: isMain || /fw-semibold/.test(t), color: { argb: red ? 'FFC00000' : grn ? 'FF2E7D32' : 'FF000000' } };
         if (isMain) cell.fill = fill('FFEAF1FB');
-        if (COLS[i].n) { cell.numFmt = i === 16 ? '#,##0' : i === 17 || i === 5 || i === 1 || i === 3 ? '#,##0.00' : '#,##0'; cell.alignment = { horizontal: 'right', vertical: 'top' }; }
+        if (COLS[i].n) { cell.numFmt = numFmt(i); cell.alignment = { horizontal: 'right', vertical: 'top' }; }
         else cell.alignment = { wrapText: true, vertical: 'top', indent: i === 0 && !isMain ? 2 : 0 };
       });
       rr++;
@@ -154,9 +158,9 @@
     const tot = rr; ws.getCell(tot, 1).value = 'TỔNG CỘNG (' + list.length + ' hợp đồng)';
     COLS.forEach((c, i) => {
       const cell = ws.getCell(tot, i + 1); cell.fill = fill('FFD9E2F3'); cell.font = { name: XF, size: 9, bold: true }; cell.border = { top: { style: 'double', color: { argb: 'FF808080' } }, bottom: { style: 'double', color: { argb: 'FF808080' } }, left: thin, right: thin };
-      if (c.n && [1, 3, 5, 11, 12, 13, 14, 16, 17].indexOf(i) >= 0) {       // chỉ cộng dòng hợp đồng (dòng chi tiết không cộng lại)
+      if (c.n && c.sum) {       // chỉ cộng dòng hợp đồng (dòng chi tiết không cộng lại)
         const L = String.fromCharCode(65 + i); cell.value = { formula: mains.map((m) => L + m).join('+'), result: mains.reduce((a, m) => a + (+ws.getCell(m, i + 1).value || 0), 0) };
-        cell.numFmt = i === 16 ? '#,##0' : i === 17 || i === 5 || i === 1 || i === 3 ? '#,##0.00' : '#,##0'; cell.alignment = { horizontal: 'right' };
+        cell.numFmt = numFmt(i); cell.alignment = { horizontal: 'right' };
       }
     });
     ws.views = [{ state: 'frozen', xSplit: 1, ySplit: 5 }];
@@ -168,7 +172,7 @@
     toast('Đã xuất Báo cáo thực hiện hợp đồng.', 'success');
   }
   /** PDF chia 2 phần (A4 ngang không đủ chỗ cho 21 cột): phần 1 = ①–④ (đến khai bổ sung), phần 2 = ⑤–⑦ (nộp thuế, xuất hàng, đối chiếu); cột đầu lặp lại để đối chiếu dòng. */
-  const PART1 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], PART2 = [0, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21];
+  const PART1 = COLS.map((c, i) => i).filter((i) => COLS[i].b <= 3), PART2 = [0].concat(COLS.map((c, i) => i).filter((i) => COLS[i].b >= 4));
   async function exportPdf() {
     const list = filtered(); if (!list.length) return;
     const all = list.flatMap((it) => rowsOf(it)), pick = (idx) => ({ cols: idx.map((i) => ({ h: COLS[i].h, n: !!COLS[i].n })), rows: all.map((r) => ({ cls: r.cls, c: idx.map((i) => r.c[i]) })) });
@@ -197,6 +201,7 @@
       else if (e.target.closest('#coReload')) render();
     });
   }
-  HAK.ContractOverview = { render, init, rowsOf, COLS, BANDS };
+  HAK.ContractOverview = { render, init, rowsOf, COLS, BANDS, IX, PART1, PART2 };
+  if (typeof module === 'object' && module.exports) module.exports = HAK.ContractOverview;
   if (typeof module === 'object' && module.exports) module.exports = HAK.ContractOverview;
 })(typeof window !== 'undefined' ? window : globalThis);
