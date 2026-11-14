@@ -244,6 +244,7 @@
       <div class="card mb-3"><div class="card-body">
         <div id="repSmartFilter"></div>
         <div class="row g-2 align-items-end">
+          <div class="col-6 col-md-3"><label for="repBasis" class="form-label">Kỳ báo cáo tính theo</label><select id="repBasis" class="form-select"><option value="start">Ngày bắt đầu hồ sơ (cách đọc cũ)</option><option value="weigh">Ngày cân từng phiếu</option></select></div>
           <div class="col-6 col-md-3"><label for="repYear" class="form-label">Năm</label><select id="repYear" class="form-select"><option value="">Tất cả năm</option></select></div>
           <div class="col-6 col-md-3 d-none"><label for="repFrom" class="form-label">Từ ngày</label><input type="date" class="form-control" id="repFrom" aria-describedby="repFilterError"></div>
           <div class="col-6 col-md-3 d-none"><label for="repTo" class="form-label">Đến ngày</label><input type="date" class="form-control" id="repTo" aria-describedby="repFilterError"></div>
@@ -256,7 +257,7 @@
           <div class="col-12 d-flex align-items-center gap-2" id="repScopeWrap"></div>
           <div class="col-6 col-md-3 d-grid"><button class="btn btn-success" id="repXls" type="button">📊 Xuất Excel</button></div>
         </div>
-        <div class="form-text">Số liệu lấy từ các hồ sơ trong 🗄️ Lưu trữ; lọc theo <b>ngày bắt đầu</b> của hồ sơ. Bỏ trống ngày = tất cả.</div>
+        <div class="form-text">Số liệu lấy từ các hồ sơ trong 🗄️ Lưu trữ; lọc theo <b>ngày bắt đầu</b> của hồ sơ (mặc định — đúng cách đọc của các báo cáo cũ) hoặc theo <b>ngày cân từng phiếu</b> (chọn ở ô "Kỳ báo cáo tính theo": hồ sơ cân qua tháng / năm được chia từng phiếu về đúng tháng / năm). Bỏ trống ngày = tất cả.</div>
       </div></div>
       <div class="card mb-3" id="repEmpty"><div class="card-body text-center muted py-4">Chưa có hồ sơ nào trong Lưu trữ. Hãy xuất biên bản (Word / PDF / Excel) — app tự lưu và báo cáo sẽ hiện ở đây.</div></div>
       <div class="card mb-3" id="repContracts"><div class="card-body">

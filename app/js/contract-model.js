@@ -46,14 +46,30 @@ function reopenContract(c,date){c.closeRev=closeRevOf(c)+1;delete c.closedAt;c.r
 function mergeClosure(old,inc,combined){const ro=closeRevOf(old),ri=closeRevOf(inc);let win=old;if(ri>ro)win=inc;else if(ri===ro&&!!inc.closedAt!==!!old.closedAt){const so=String(old.closedAt||old.reopenedAt||''),si=String(inc.closedAt||inc.reopenedAt||'');if(si>so)win=inc;}
  const rev=Math.max(ro,ri);if(rev>0)combined.closeRev=rev;else delete combined.closeRev;
  if(win.closedAt){combined.closedAt=win.closedAt;delete combined.reopenedAt;}else{delete combined.closedAt;if(win.reopenedAt)combined.reopenedAt=win.reopenedAt;else delete combined.reopenedAt;}}
+/* Gộp 2 bản ghi CÙNG id theo PHIÊN BẢN (revision): bản có revision cao hơn thắng từng trường CÓ giá trị; trường trống không xóa dữ liệu bên kia (giữ chính sách cũ);
+ * bản thiếu revision = 0 (cũ nhất); bằng nhau → bản trên máy này thắng, nếu nội dung khác thì ghi XUNG ĐỘT. deletedAt (ngừng dùng) theo đúng bản thắng,
+ * nên bản cũ mang dữ liệu đã ngừng dùng không "sống lại" và bản mới khôi phục thì bỏ được dấu ngừng dùng. */
+/** JSON ổn định (không phụ thuộc thứ tự khóa) để so sánh nội dung hai bản ghi. */
+const stable=v=>JSON.stringify(v,(k,x)=>x&&typeof x==='object'&&!Array.isArray(x)?Object.keys(x).sort().reduce((r,key)=>{r[key]=x[key];return r;},{}):x);
+const revOf=x=>Number(x&&x.revision)||0;
+const overlay=(base,top)=>{const r=Object.assign({},base);for(const k of Object.keys(top)){const v=top[k];if(v!==null&&v!==undefined&&v!=='')r[k]=copy(v);}return r;};
+function diffKeys(a,b){const keys=new Set([...Object.keys(a),...Object.keys(b)]);return Array.from(keys).filter(k=>!['revision','details','addenda','customs'].includes(k)&&stable(a[k])!==stable(b[k]));}
+function mergeVersioned(old,inc){const ro=revOf(old),ri=revOf(inc),incWins=ri>ro,win=incWins?inc:old,lose=incWins?old:inc;const r=overlay(lose,win);if(win.deletedAt)r.deletedAt=win.deletedAt;else delete r.deletedAt;
+ const conflict=ri===ro?diffKeys(old,inc):[];return {rec:r,incWins,conflict};}
+function mergeById(local,incoming,incWins){const out=copy(local||[]);for(const x of incoming||[]){const at=out.findIndex(y=>y.id===x.id);if(at<0)out.push(copy(x));else{const m=incWins?overlay(out[at],x):overlay(x,out[at]);const win=incWins?x:out[at];if(win.deletedAt)m.deletedAt=win.deletedAt;else delete m.deletedAt;out[at]=m;}}return out;}
 function mergeCatalog(local,incoming){
- const a=migrate(local||{v:3,customers:[],contracts:[]}).data,b=migrate(incoming).data;
- const nonempty=(old,value)=>{const result=Object.assign({},old);for(const key of Object.keys(value)){const v=value[key];if(v!==null&&v!==undefined&&v!=='')result[key]=copy(v);}return result;};
- for(const customer of b.customers||[]){const index=a.customers.findIndex(x=>x.id===customer.id);if(index<0)a.customers.push(copy(customer));else a.customers[index]=nonempty(a.customers[index],customer);}
+ const a=migrate(local||{v:3,customers:[],contracts:[]}).data,b=migrate(incoming).data,report={conflicts:[],kept:[]};mergeCatalog.report=report;
+ for(const customer of b.customers||[]){const index=a.customers.findIndex(x=>x.id===customer.id);if(index<0)a.customers.push(copy(customer));else a.customers[index]=revOf(a.customers[index])||revOf(customer)?mergeVersioned(a.customers[index],customer).rec:overlay(a.customers[index],customer);}   // khách hàng chưa có phiên bản: giữ cách gộp cũ (bản nhập bổ sung / ghi đè ô có giá trị)
  for(const product of b.products||[]){const at=(a.products||[]).findIndex(x=>x.id===product.id);if(at>=0)a.products[at]=Object.assign({},a.products[at],product);else if(!(a.products||[]).some(x=>goodsKey(x.name)===goodsKey(product.name)))a.products.push(copy(product));}
- for(const value of b.contracts){const index=a.contracts.findIndex(x=>x.id===value.id);if(index<0){a.contracts.push(copy(value));continue;}const old=a.contracts[index],combined=nonempty(old,value);mergeClosure(old,value,combined);combined.contractFiles=Array.from(new Set([...(old.contractFiles||[]),...(value.contractFiles||[])]));combined.details=copy(old.details||[]);
-  for(const d of value.details||[]){const at=combined.details.findIndex(x=>x.id===d.id);if(at<0)combined.details.push(copy(d));else{const previous=combined.details[at];combined.details[at]=nonempty(previous,d);combined.details[at].certificateFiles=Array.from(new Set([...(previous.certificateFiles||[]),...(d.certificateFiles||[])]));}}
-  const before=copy(old),after=copy(combined);delete before.revision;delete after.revision;combined.revision=JSON.stringify(before)===JSON.stringify(after)?old.revision:Math.max(old.revision||0,value.revision||0)+1;a.contracts[index]=combined;
+ for(const value of b.contracts){const index=a.contracts.findIndex(x=>x.id===value.id);if(index<0){a.contracts.push(copy(value));continue;}const old=a.contracts[index],mv=mergeVersioned(old,value),combined=mv.rec;
+  mergeClosure(old,value,combined);
+  if(mv.conflict.length)report.conflicts.push({id:old.id,no:old.no||'',fields:mv.conflict});else if(!mv.incWins&&revOf(old)>revOf(value)&&diffKeys(old,value).length)report.kept.push({id:old.id,no:old.no||'',localRevision:revOf(old),incomingRevision:revOf(value)});
+  combined.contractFiles=Array.from(new Set([...(old.contractFiles||[]),...(value.contractFiles||[])]));
+  {const ad=mergeById(old.addenda,value.addenda,mv.incWins);if(ad.length||old.addenda!==undefined)combined.addenda=ad;else delete combined.addenda;}
+  combined.details=copy(old.details||[]);
+  for(const d of value.details||[]){const at=combined.details.findIndex(x=>x.id===d.id);if(at<0)combined.details.push(copy(d));else{const previous=combined.details[at],dm=mergeVersioned(previous,d);combined.details[at]=dm.rec;combined.details[at].certificateFiles=Array.from(new Set([...(previous.certificateFiles||[]),...(d.certificateFiles||[])]));if(dm.conflict.length)report.conflicts.push({id:old.id,no:old.no||'',detail:d.id,fields:dm.conflict});}}
+  applyAddenda(combined);if(old.addenda===undefined&&!combined.addenda.length)delete combined.addenda;if(old.contractFiles===undefined&&!combined.contractFiles.length)delete combined.contractFiles;
+  const before=copy(old),after=copy(combined);delete before.revision;delete after.revision;combined.revision=stable(before)===stable(after)?old.revision:Math.max(revOf(old),revOf(value))+1;a.contracts[index]=combined;
  }
  if(HAK.CustomsModel&&(a.customs||b.customs))a.customs=HAK.CustomsModel.merge(a.customs||[],b.customs||[]);
  for(const c of a.contracts){const error=validate(c,a);if(error)throw Error(error);}return a;

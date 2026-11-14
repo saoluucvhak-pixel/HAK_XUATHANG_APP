@@ -28,3 +28,11 @@ test('lưu lại hồ sơ cũ vẫn giữ liên kết chi tiết hợp đồng �
   H.Pages.openSnapshot(rec({ ship: 'TÀU B' }));
   assert.equal(H.Pages._collect('xuatkhau').contractId || '', '', 'hồ sơ thứ hai không có liên kết → không mượn liên kết của hồ sơ trước');
 });
+test('mở liên tiếp hai hồ sơ có trường thiếu KHÁC NHAU: mỗi lần chỉ còn đúng giá trị của hồ sơ đang mở; lưu lại giữ liên kết riêng của từng hồ sơ', () => {
+  const { H, nodes } = boot(), v = (k) => nodes.get('#f-xuatkhau-' + k).value, chk = () => nodes.get('#f-xuatkhau-bklsNgayLapXe').checked;
+  const r1 = rec({ ship: 'TÀU 1', bklsNgayLapXe: false, contractId: 'detail-1', contractDetailId: 'detail-1' });                       // thiếu docDate
+  const r2 = rec({ docDate: '2025-12-01', contractId: 'detail-2', contractDetailId: 'detail-2' });                                      // thiếu ship và bklsNgayLapXe
+  H.Pages.openSnapshot(r1); assert.deepEqual([v('ship'), v('docDate'), chk()], ['TÀU 1', '', false]); assert.equal(H.Pages._collect('xuatkhau').contractId, 'detail-1');
+  H.Pages.openSnapshot(r2); assert.deepEqual([v('ship'), v('docDate'), chk()], ['', '2025-12-01', true], 'ship + ô tick của hồ sơ 1 phải được xóa / về mặc định'); assert.equal(H.Pages._collect('xuatkhau').contractId, 'detail-2');
+  H.Pages.openSnapshot(r1); assert.deepEqual([v('ship'), v('docDate'), chk()], ['TÀU 1', '', false], 'docDate của hồ sơ 2 phải được xóa'); assert.equal(H.Pages._collect('xuatkhau').contractDetailId, 'detail-1');
+});

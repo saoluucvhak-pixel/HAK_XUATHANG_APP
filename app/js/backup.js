@@ -236,7 +236,7 @@
     HAK.Store.set(CFG_KEY, j.config);
     Object.keys(j.tpl || {}).forEach((k) => { if (k.indexOf('hak.tpl.') === 0 && j.tpl[k]) { HAK.Store.set(k, j.tpl[k]); r.tpl++; } });
     if (j.catalog && Array.isArray(j.catalog.customers) && Array.isArray(j.catalog.contracts)) {
-      if (mergedCatalog) { HAK.Store.set(CAT_KEY, mergedCatalog); r.cat=(j.catalog.customers||[]).length+(j.catalog.contracts||[]).length; }
+      if (mergedCatalog) { HAK.Store.set(CAT_KEY, mergedCatalog); r.cat=(j.catalog.customers||[]).length+(j.catalog.contracts||[]).length; const rp = (HAK.ContractModel.mergeCatalog && HAK.ContractModel.mergeCatalog.report) || {}; r.keptNewer = (rp.kept || []).length; r.conflicts = (rp.conflicts || []).length; }
       else throw new Error('Thiếu mô hình dữ liệu hợp đồng.');
     }
     const gsIn = j.gsync || {}, gs = HAK.Store.get(GS_KEY, null) || { cos: {} };
@@ -249,7 +249,7 @@
     return r;
   }
   const packMsg = (r) => 'Đã nhập gói cấu hình: ' + r.tpl + ' mẫu Word, ' + r.cat + ' mục danh mục, ' + r.gs + ' Google Sheet, nhân viên thêm ' + r.users.added + ' / cập nhật ' + r.users.updated +
-    (r.users.master ? ', mật khẩu chủ của nhóm' : '') + (r.users.station ? ' — máy trạm (' + r.users.station.length + ' công ty)' : '') + '. Trang sẽ tải lại…';
+    (r.users.master ? ', mật khẩu chủ của nhóm' : '') + (r.users.station ? ' — máy trạm (' + r.users.station.length + ' công ty)' : '') + (r.keptNewer ? ' · giữ nguyên ' + r.keptNewer + ' hợp đồng trên máy này vì mới hơn bản trong gói' : '') + (r.conflicts ? ' · ⚠ ' + r.conflicts + ' mục cùng phiên bản nhưng khác nội dung — đã giữ bản trên máy này, cần đối chiếu' : '') + '. Trang sẽ tải lại…';
   /** Ô chọn công ty của gói. Tick đủ mọi công ty (máy chính) = gói đầy đủ; tick 1 phần = gói máy trạm. */
   function pkCosHtml() {
     const st = HAK.Auth && HAK.Auth.stationCos ? HAK.Auth.stationCos() : null;

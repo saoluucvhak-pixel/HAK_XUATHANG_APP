@@ -72,7 +72,9 @@
   function compute(metas, opt) {
     opt = opt || {};
     validateRange(opt);
-    const filter = recordFilter(opt);
+    // Kỳ báo cáo: 'start' (mặc định, cách đọc của mọi báo cáo lịch sử) = theo NGÀY BẮT ĐẦU của hồ sơ; 'weigh' = theo NGÀY CÂN của từng phiếu (cần opt.tickets của mọi hồ sơ).
+    const basis = opt.basis === 'weigh' && opt.tickets ? 'weigh' : 'start';
+    const filter = recordFilter(basis === 'weigh' ? Object.assign({}, opt, { from: '', to: '' }) : opt);
     const manual = opt.manual || {};
     const recs = metas.map((m) => Object.assign({}, m, { fromTs: dmyToTs(m.from), toTs: dmyToTs(m.to) || dmyToTs(m.from), month: monthOf(m.from) }));
     recs.forEach((r) => { if (r.toTs === null) r.toTs = r.fromTs; });
@@ -97,13 +99,31 @@
       const res = W.resolve(act.map((r) => ({ rec: r, tickets: tk.get(r.id) })));
       act.forEach((r) => {
         const e = res.byRec.get(r.id); if (!e) return;
-        r.kgRaw = r.kg; r.tripsRaw = r.trips; r.dupTrips = e.dupTrips; r.dupKg = e.dupKg; r.skipIds = e.skip;
+        r.kgRaw = r.kg; r.tripsRaw = r.trips; r.dupTrips = e.dupTrips; r.dupKg = e.dupKg; r.skipIdx = e.skip;
         r.trips = e.trips; r.kg = e.kg; r.retTrips = HAS_RET[r.type] ? e.retTrips : 0; r.retKg = HAS_RET[r.type] ? e.retKg : 0; r.delKg = r.kg - r.retKg;
       });
       res.conflicts.forEach((c) => conflicts.push(Object.assign(c, { type: cl[0].type })));
       dupTickets.trips += res.dup.trips; dupTickets.kg += res.dup.kg;
     });
     const pendingKg = conflicts.reduce((a, c) => a + c.counted.net, 0);
+    // Theo ngày cân: mỗi phiếu (chưa bị loại vì trùng / xung đột) rơi vào ngày cân của nó; chỉ phiếu trong [từ, đến] được tính; tháng / năm phân bổ từ từng phiếu.
+    const fromTs = isoToTs(opt.from), toTs = isoToTs(opt.to), inWin = (ts) => ts !== null && (fromTs === null || ts >= fromTs) && (toTs === null || ts <= toTs);
+    if (basis === 'weigh') recs.forEach((r) => {
+      if (!r.inRange || !r.include) return;
+      const list = tk.get(r.id);
+      if (!list) { r.inRange = r.fromTs !== null && inWin(r.fromTs); return; }                 // không đọc được phiếu → lùi về ngày bắt đầu hồ sơ
+      const skip = r.skipIdx ? new Set(r.skipIdx) : new Set(), ret = HAS_RET[r.type], mine = [];
+      list.forEach((t) => {
+        if (skip.has(t.i)) return;
+        const ts = dmyToTs(t.date) !== null ? dmyToTs(t.date) : r.fromTs;                       // phiếu thiếu ngày → ngày bắt đầu hồ sơ
+        if (inWin(ts)) mine.push({ t, ts }); else skip.add(t.i);
+      });
+      r.kgRaw = r.kgRaw === undefined ? r.kg : r.kgRaw; r.tripsRaw = r.tripsRaw === undefined ? r.trips : r.tripsRaw;
+      r.skipIdx = skip; r.wTickets = mine.map((x) => x.t); r.days = mine;
+      r.trips = mine.length; r.kg = mine.reduce((a, x) => a + x.t.net, 0);
+      r.retTrips = ret ? mine.filter((x) => x.t.ret).length : 0; r.retKg = ret ? mine.filter((x) => x.t.ret).reduce((a, x) => a + x.t.net, 0) : 0; r.delKg = r.kg - r.retKg;
+      r.inRange = mine.length > 0;
+    });
     const used = recs.filter((r) => r.inRange && r.include);
     const byType = {};
     TYPES.forEach(([k]) => { byType[k] = { n: 0, trips: 0, kg: 0, retTrips: 0, retKg: 0, delKg: 0 }; });
@@ -111,17 +131,21 @@
     used.forEach((r) => {
       const b = byType[r.type] || (byType[r.type] = { n: 0, trips: 0, kg: 0, retTrips: 0, retKg: 0, delKg: 0 });
       b.n++; b.trips += r.trips; b.kg += r.kg; b.retTrips += r.retTrips; b.retKg += r.retKg; b.delKg += r.delKg;
-      if (!months.has(r.month)) months.set(r.month, {});
-      const mo = months.get(r.month); mo[r.type] = (mo[r.type] || 0) + r.delKg;
-      const yk = r.month.slice(0, 4);
-      if (!years.has(yk)) years.set(yk, {});
-      const yo = years.get(yk); yo[r.type] = (yo[r.type] || 0) + r.delKg;
+      // Tháng / năm: theo ngày bắt đầu hồ sơ (cách đọc cũ) hoặc phân bổ từ từng phiếu theo ngày cân.
+      const parts = r.days ? r.days.map((x) => ({ month: new Date(x.ts).toISOString().slice(0, 7), kg: x.t.ret && HAS_RET[r.type] ? 0 : x.t.net })) : [{ month: r.month, kg: r.delKg }];
+      parts.forEach((pt) => {
+        if (!months.has(pt.month)) months.set(pt.month, {});
+        const mo = months.get(pt.month); mo[r.type] = (mo[r.type] || 0) + pt.kg;
+        const yk = pt.month.slice(0, 4);
+        if (!years.has(yk)) years.set(yk, {});
+        const yo = years.get(yk); yo[r.type] = (yo[r.type] || 0) + pt.kg;
+      });
     });
     const ships = used.filter((r) => HAS_RET[r.type]).sort((a, b) => (a.fromTs || 0) - (b.fromTs || 0));
     // Tổng thực giao toàn bộ, loại trùng phiếu giữa các loại biên bản (chỉ khi đã có danh sách phiếu của mọi hồ sơ đang tính).
     let overall = null;
-    if (W && tk && used.length && used.every((r) => tk.has(r.id))) overall = W.overall(used.map((r) => ({ rec: r, tickets: tk.get(r.id) })));
-    return { conflicts, pendingKg, dupTickets, overall, filterText: filter.describe(), recs: recs.sort((a, b) => b.updatedAt - a.updatedAt), used, byType, months: Array.from(months.entries()).sort((a, b) => a[0] < b[0] ? -1 : 1), years: Array.from(years.entries()).sort((a, b) => a[0] < b[0] ? -1 : 1), ships };
+    if (W && tk && used.length && used.every((r) => tk.has(r.id))) overall = W.overall(used.map((r) => ({ rec: r, tickets: r.wTickets || tk.get(r.id) })));
+    return { basis, conflicts, pendingKg, dupTickets, overall, filterText: filter.describe(), recs: recs.sort((a, b) => b.updatedAt - a.updatedAt), used, byType, months: Array.from(months.entries()).sort((a, b) => a[0] < b[0] ? -1 : 1), years: Array.from(years.entries()).sort((a, b) => a[0] < b[0] ? -1 : 1), ships };
   }
 
   /**
@@ -130,11 +154,12 @@
    * @returns {Promise<Map<string, object[]>>} id → danh sách phiếu (hồ sơ đọc lỗi thì vắng mặt → lùi về chống trùng nguyên hồ sơ)
    */
   const recTickets = (r, p, rows, ret) => HAK.Weigh.ticketsOf(rows, (row) => ret.has(G().retKey(row)), { cid: r.cid || p.giaoId || '', contract: r.contract || p.contractId || '', ship: r.ship });
-  async function prepareTickets(metas, cache) {
+  async function prepareTickets(metas, cache, all) {
     const W = HAK.Weigh; cache = cache || new Map(); const out = new Map();
     if (!W) return out;
     const recs = metas.map((m) => Object.assign({}, m, { fromTs: dmyToTs(m.from), toTs: dmyToTs(m.to) || dmyToTs(m.from) }));
-    for (const r of W.clusters(recs).flat()) {
+    // all = true (kỳ theo ngày cân): đọc phiếu của MỌI hồ sơ để phân bổ từng phiếu theo ngày; mặc định chỉ hồ sơ trong cụm giao nhau cần đối soát.
+    for (const r of (all ? recs : W.clusters(recs).flat())) {
       const hit = cache.get(r.id);
       if (hit && hit.u === r.updatedAt) { out.set(r.id, hit.t); continue; }
       try {
@@ -202,11 +227,11 @@
       [{ h: 'Loại biên bản', w: 30 }, { h: 'Số hồ sơ', w: 10, n: NI }, { h: 'Số xe', w: 10, n: NI }, { h: 'Qua cân (tấn)', w: 16, n: NF }, { h: 'Xe trả về', w: 10, n: NI }, { h: 'Xe trả về (tấn)', w: 16, n: NF }, { h: 'Thực giao (tấn)', w: 16, n: NF }],
       TYPES.map(([k, ic, nm]) => { const b = model.byType[k]; return [nm, b.n, b.trips, T(b.kg), b.retTrips, T(b.retKg), T(b.delKg)]; }));
     // 1b. Theo năm
-    sheet('Theo năm', 'BÁO CÁO THEO NĂM (TẤN THỰC GIAO)', note + ' Năm tính theo ngày bắt đầu của hồ sơ.',
+    sheet('Theo năm', 'BÁO CÁO THEO NĂM (TẤN THỰC GIAO)', note + (model.basis === 'weigh' ? ' Năm tính theo NGÀY CÂN của từng phiếu.' : ' Năm tính theo ngày bắt đầu của hồ sơ (cách đọc của các báo cáo cũ).'),
       [{ h: 'Năm', w: 12 }].concat(TYPES.map(([k, ic, nm]) => ({ h: nm, w: 20, n: NF }))),
       (model.years || []).map(([y, v]) => [y].concat(TYPES.map(([k]) => T(v[k] || 0)))), { total: true });
     // 2. Theo tháng
-    sheet('Theo tháng', 'BÁO CÁO THEO THÁNG (TẤN THỰC GIAO)', note + ' Tháng tính theo ngày bắt đầu của hồ sơ.',
+    sheet('Theo tháng', 'BÁO CÁO THEO THÁNG (TẤN THỰC GIAO)', note + (model.basis === 'weigh' ? ' Tháng tính theo NGÀY CÂN của từng phiếu.' : ' Tháng tính theo ngày bắt đầu của hồ sơ (cách đọc của các báo cáo cũ).'),
       [{ h: 'Tháng', w: 12 }].concat(TYPES.map(([k, ic, nm]) => ({ h: nm, w: 20, n: NF }))),
       model.months.map(([mo, v]) => [mo.split('-').reverse().join('/')].concat(TYPES.map(([k]) => T(v[k] || 0)))), { total: true });
     // 3. Theo tàu
@@ -298,11 +323,11 @@
         const so = (r.modes || []).indexOf('bkls') >= 0 && HAK.Bkls && HAK.Bkls.tripNo ? String(p.bklsSoBkls || '').trim() : '';
         let iM = 0, iT = 0;
         // Phiếu đã bị loại vì trùng / xung đột (xem compute) không đưa vào danh sách chi tiết → Excel khớp tổng trên màn hình.
-        const tix = r.skipIds && r.skipIds.size && HAK.Weigh ? recTickets(r, p, rows, ret) : null;
+        const skipIdx = r.skipIdx && r.skipIdx.size ? r.skipIdx : null;
         rows.forEach((row, ri) => {
           const isRet = ret.has(G().retKey(row));
           const no = so ? (isRet ? HAK.Bkls.tripNo(so + '-TV', iT++) : HAK.Bkls.tripNo(so, iM++)) : '';
-          if (tix && tix[ri].id && r.skipIds.has(tix[ri].id)) return;      // số BKLS đã cấp theo thứ tự xe gốc nên chỉ bỏ dòng sau khi đã đánh số
+          if (skipIdx && skipIdx.has(ri)) return;      // số BKLS đã cấp theo thứ tự xe gốc nên chỉ bỏ dòng sau khi đã đánh số
           if (no && !isRet) { if (!L.bklsFirst) L.bklsFirst = no; L.bklsLast = no; }
           out.push({ lot: L, rec: r, row, isRet, bkls: no });
         });
@@ -411,7 +436,7 @@
   /* ---------------------------------------------------------------
    * Giao diện
    * ------------------------------------------------------------- */
-  let metas = [], model = null, ticketMap = null; const ticketCache = new Map();
+  let metas = [], model = null, ticketMap = null, ticketMapAll = null; const ticketCache = new Map();
   const $ = (s) => document.querySelector(s);
   const esc = (s) => HAK.UI.esc(s);
   const ton = (kg) => G().fmtTon(kg);
@@ -504,7 +529,7 @@
       summary:()=>[{label:'Hồ sơ tính vào tổng',value:model?model.used.length:0}]
     });return reportSmart;
   }
-  const opts = () => ({ types: reportSmart ? (reportSmart.getState().sel.type || []) : [], q: $('#repQuery').value, type: $('#repType').value, from: $('#repFrom').value, to: $('#repTo').value, manual: manualGet(), tickets: ticketMap, scope: HAK.Auth && HAK.Auth.scopeIds ? HAK.Auth.scopeIds('report') : null });
+  const opts = () => ({ types: reportSmart ? (reportSmart.getState().sel.type || []) : [], q: $('#repQuery').value, type: $('#repType').value, from: $('#repFrom').value, to: $('#repTo').value, manual: manualGet(), basis: basisNow(), tickets: basisNow() === 'weigh' && ticketMapAll ? ticketMapAll : ticketMap, scope: HAK.Auth && HAK.Auth.scopeIds ? HAK.Auth.scopeIds('report') : null });
 
   /** Hậu tố tên file: kỳ báo cáo (Nam2025 / 20250101-20251231 / TatCa) + ngày xuất — để không nhầm file các năm. */
   function fileTag() {
@@ -519,9 +544,11 @@
     sel.innerHTML = '<option value="">Tất cả năm</option>' + ys.map((y) => '<option value="' + y + '">' + y + '</option>').join('');
     sel.value = ys.indexOf(+cur) >= 0 ? cur : '';
   }
+  const basisNow = () => ($('#repBasis') && $('#repBasis').value === 'weigh' ? 'weigh' : 'start');
+  const BASIS_TEXT = { start: 'kỳ tính theo ngày BẮT ĐẦU của hồ sơ', weigh: 'kỳ tính theo NGÀY CÂN của từng phiếu' };
   function rangeText() {
     const a = $('#repFrom').value, b = $('#repTo').value, v = (s) => s.split('-').reverse().join('/');
-    return a || b ? 'từ ' + (a ? v(a) : '…') + ' đến ' + (b ? v(b) : '…') : 'toàn bộ thời gian';
+    return (basisNow() === 'weigh' ? '[' + BASIS_TEXT.weigh + '] ' : '') + (a || b ? 'từ ' + (a ? v(a) : '…') + ' đến ' + (b ? v(b) : '…') : 'toàn bộ thời gian');
   }
 
   function draw() {
@@ -603,7 +630,9 @@
   async function render() {
     if (!$('#page-report')) return;
     try { metas = await HAK.Archive.ensureStats(await HAK.Archive.list()); } catch (e) { console.error(e); metas = []; }
+    ticketMapAll = null;
     try { ticketMap = await prepareTickets(metas, ticketCache); } catch (e) { console.error(e); ticketMap = null; }
+    if (basisNow() === 'weigh') { try { ticketMapAll = await prepareTickets(metas, ticketCache, true); } catch (e) { ticketMapAll = null; } }
     drawYearSelect(); draw();
   }
 
@@ -612,6 +641,10 @@
     if (HAK.Customs && HAK.Customs.initReport) HAK.Customs.initReport();
     $('#repType').innerHTML += TYPES.map(([key, , name]) => '<option value="' + key + '">' + esc(name) + '</option>').join('');
     ['#repFrom', '#repTo', '#repType'].forEach((s) => $(s).addEventListener('change', draw));
+    $('#repBasis').addEventListener('change', async () => {
+      if (basisNow() === 'weigh' && !ticketMapAll) { HAK.UI.toast('Đang đọc phiếu cân của các hồ sơ để chia theo ngày cân…', 'info'); try { ticketMapAll = await prepareTickets(metas, ticketCache, true); } catch (e) { console.error(e); ticketMapAll = null; HAK.UI.toast('Không đọc được phiếu cân — giữ cách tính theo ngày bắt đầu hồ sơ.', 'error'); $('#repBasis').value = 'start'; } }
+      draw();
+    });
     $('#repYear').addEventListener('change', (e) => { const y = e.target.value; $('#repFrom').value = y ? y + '-01-01' : ''; $('#repTo').value = y ? y + '-12-31' : ''; draw(); });
     $('#repQuery').addEventListener('input', HAK.UI.debounce(draw, 150));
     if ($('#repScopeWrap') && HAK.Auth && HAK.Auth.scopeSwitch) $('#repScopeWrap').innerHTML = HAK.Auth.scopeSwitch('report');

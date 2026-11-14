@@ -30,11 +30,11 @@
    */
   function ticketsOf(rows, isRet, meta) {
     const m = meta || {}, seen = new Map(), link = norm(m.contract) + '|' + norm(m.ship);
-    return (rows || []).map((row) => {
+    return (rows || []).map((row, i) => {
       const base = identity(row, m.cid);
       let id = null;
       if (base) { const n = (seen.get(base) || 0) + 1; seen.set(base, n); id = base + '#' + n; }
-      return { id, ticket: String(row.ticket == null ? '' : row.ticket).trim(), date: row.dateStr || '', plate: String(row.plate || '').trim(), net: Number(row.net) || 0, ret: !!(isRet && isRet(row)), link };
+      return { i, id, ticket: String(row.ticket == null ? '' : row.ticket).trim(), date: row.dateStr || '', plate: String(row.plate || '').trim(), net: Number(row.net) || 0, ret: !!(isRet && isRet(row)), link };
     });
   }
   /** Nhóm hồ sơ giao nhau về ngày cân trong cùng loại + công ty → các cụm ≥ 2 hồ sơ cần đối soát. */
@@ -75,8 +75,8 @@
         if (!o) { owner.set(t.id, { rec, t }); count(e, t); return; }
         if (o.rec.id === rec.id) { count(e, t); return; }
         const same = kgKey(o.t.net) === kgKey(t.net) && o.t.ret === t.ret && o.t.link === t.link;
-        if (same) { e.dupTrips++; e.dupKg += t.net; dupTrips++; dupKg += t.net; e.skip.add(t.id); return; }
-        e.skip.add(t.id);
+        if (same) { e.dupTrips++; e.dupKg += t.net; dupTrips++; dupKg += t.net; e.skip.add(t.i); return; }
+        e.skip.add(t.i);
         let c = conflictOf.get(t.id);
         if (!c) { c = { id: t.id.replace(/#\d+$/, ''), ticket: o.t.ticket, date: o.t.date, plate: o.t.plate, counted: { rec: o.rec, net: o.t.net, ret: o.t.ret, link: o.t.link }, others: [] }; conflictOf.set(t.id, c); }
         c.others.push({ rec, net: t.net, ret: t.ret, link: t.link });

@@ -304,6 +304,8 @@ Thủy chốt 28/09/2026: "1. bỏ Trao đổi KHÔNG đồng bộ lên Google S
 - Google Sheet NL_HOPDONG / NL_TOKHAI: thêm cột Ở CUỐI (nộp thừa, chưa xác định thuế, số dư ròng, 4 trạng thái); cột cũ giữ vị trí. Cột "Trạng thái hợp đồng" vẫn là "Đang thực hiện" / "Đã hoàn thành"; chỉ hợp đồng đóng thủ công nay hiện "Đã đóng hợp đồng".
 - Giấy nộp tiền: khoản nhập tay thiếu số giấy mà cùng số tiền với dòng OCR → hỏi đối soát thay vì tự thêm / tự gộp.
 - Đóng / mở lại hợp đồng + gộp bản sao lưu (Gói cấu hình): thêm SỐ PHIÊN BẢN ĐÓNG closeRev (mỗi lần đóng hoặc mở lại +1, bản cao hơn thắng; bản đã phát hành chưa có closeRev: có closedAt = 1, không có = 0). Trước đây bản mở lại (không còn closedAt) gộp với bản đóng cũ vẫn ra "đã đóng". Xung đột cùng phiên bản → bản có mốc ngày muộn hơn.
+- Gộp bản sao lưu / Gói cấu hình theo PHIÊN BẢN (revision): bản cũ không còn ghi đè hợp đồng / chi tiết / phụ lục / tờ khai đã sửa ở phiên bản mới hơn (vd máy 700 BDMT phiên bản 4 nhập bản 500 BDMT phiên bản 2 → giữ 700, phiên bản không tăng); bản thiếu phiên bản = 0; cùng phiên bản khác nội dung = xung đột (giữ bản trên máy, báo khi nhập gói); dữ liệu đã ngừng dùng (deletedAt) ở bản mới không sống lại; tệp đính kèm là hợp; nhập lặp lại ổn định.
+- Báo cáo tổng hợp: thêm ô "Kỳ báo cáo tính theo" — Ngày bắt đầu hồ sơ (mặc định, đúng cách đọc của các báo cáo lịch sử) hoặc Ngày cân từng phiếu (hồ sơ qua tháng / năm chia từng phiếu về đúng tháng / năm; lọc ngày theo ngày cân; Excel ghi rõ cách tính).
 - Xem docs/QUY_TAC_NGHIEP_VU_CAN_XAC_NHAN.md.
 
 ## v2.16.2 — Rà soát mã nguồn: bảo mật, độ bền, đóng hợp đồng

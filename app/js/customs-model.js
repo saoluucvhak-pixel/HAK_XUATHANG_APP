@@ -200,14 +200,18 @@
   function merge(local, incoming) {
     const out = copy(local || []);
     const keep = (old, v) => { const r = Object.assign({}, old); Object.keys(v).forEach((k) => { const x = v[k]; if (x !== null && x !== undefined && x !== '' && !Array.isArray(x)) r[k] = copy(x); }); return r; };
-    const byId = (a, b) => { const r = a.slice(); (b || []).forEach((x) => { const i = r.findIndex((y) => y.id === x.id); if (i < 0) r.push(copy(x)); else r[i] = keep(r[i], x); }); return r; };
+    const rev = (x) => Number(x && x.revision) || 0;
+    // Bản ghi cùng id: bản có revision CAO HƠN thắng từng ô có giá trị (bản cũ nhập lại không ghi đè); bằng nhau → bản trên máy này thắng. deletedAt theo bản thắng.
+    const pick = (a, b, incWins) => { const m = incWins ? keep(a, b) : keep(b, a), w = incWins ? b : a; if (w.deletedAt) m.deletedAt = w.deletedAt; else delete m.deletedAt; return m; };
+    const byId = (a, b, incWins) => { const r = a.slice(); (b || []).forEach((x) => { const i = r.findIndex((y) => y.id === x.id); if (i < 0) r.push(copy(x)); else r[i] = pick(r[i], x, incWins); }); return r; };
     (incoming || []).forEach((d) => {
       const i = out.findIndex((x) => x.id === d.id || (x.no && x.no === d.no && !x.deletedAt && !d.deletedAt));
       if (i < 0) { out.push(copy(d)); return; }
-      const old = out[i], m = keep(old, d);
-      m.supplements = byId(old.supplements || [], d.supplements);
-      m.payments = byId(old.payments || [], d.payments);
+      const old = out[i], incWins = rev(d) > rev(old), m = pick(old, d, incWins);
+      m.supplements = byId(old.supplements || [], d.supplements, incWins);
+      m.payments = byId(old.payments || [], d.payments, incWins);
       m.statusLog = (old.statusLog || []).length >= (d.statusLog || []).length ? old.statusLog : d.statusLog;
+      if (Math.max(rev(old), rev(d)) > 0) m.revision = Math.max(rev(old), rev(d));
       out[i] = m;
     });
     return out;
