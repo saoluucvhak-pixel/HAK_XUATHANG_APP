@@ -44,11 +44,18 @@
     return [{ name: 'NL_HOPDONG', rows: hd }, { name: 'NL_CHUNGTHU', rows: ct }, { name: 'NL_TOKHAI', rows: tk }, { name: 'NL_PHULUC', rows: pl }].map((s) => ({ name: s.name, keyCol: KEYCOL[s.name], cols: cols(s.name), rows: s.rows }));
   }
 
+  /**
+   * Hợp đồng nào gửi về Sheet của công ty `cid`: hợp đồng có gán công ty nội bộ → chỉ gửi cho đúng các công ty đó;
+   * hợp đồng CHƯA gán công ty nội bộ nào → chỉ gửi cho công ty đang làm việc (không đổ sang Sheet của mọi công ty).
+   */
+  function pickForCompany(contracts, cid, curCid, companyIdsOf) {
+    return contracts.filter((c) => { const ids = companyIdsOf(c); return ids.length ? ids.indexOf(cid) >= 0 : cid === curCid; });
+  }
   /** Đọc dữ liệu thật của 1 công ty (hợp đồng liên quan + phiếu cân gắn hợp đồng) → 3 sheet. */
   async function collect(cid) {
     const CS = HAK.ContractStatus; if (CS && CS.load) await CS.load();
     const groups = CS && CS.state ? CS.state.groups : [], K = HAK.Catalog, F = HAK.ContractFile;
-    const list = K.parents().filter((c) => !c.deletedAt && (!K.relatedTo || K.relatedTo(c, [cid])));
+    const list = pickForCompany(K.parents().filter((c) => !c.deletedAt), cid, (HAK.Auth && HAK.Auth.company && HAK.Auth.company()) || cid, K.companyIdsOf);
     const items = list.map((c) => { const cu = K.customer(c.buyerId); return { c, buyer: cu ? cu.name : '', m: F.build(c.id, groups) }; });
     const types = {}; Object.keys(K.TYPES || {}).forEach((k) => { types[k] = K.TYPES[k].label; });
     return buildSheets(items, { types });
@@ -68,6 +75,6 @@
     }
     return out;
   }
-  HAK.GSyncContracts = { buildSheets, collect, pushAll, COLS, KEYCOL };
+  HAK.GSyncContracts = { pickForCompany, buildSheets, collect, pushAll, COLS, KEYCOL };
   if (typeof module === 'object' && module.exports) module.exports = HAK.GSyncContracts;
 })(typeof window !== 'undefined' ? window : globalThis);

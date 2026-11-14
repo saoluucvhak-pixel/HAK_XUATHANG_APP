@@ -8,7 +8,6 @@
   const HAK = (root.HAK = root.HAK || {});
   const $ = (s) => document.querySelector(s);
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const hasNum = (v) => v !== null && v !== undefined && v !== '' && isFinite(+v);
   const CF = () => HAK.ContractFile, CM = () => HAK.CustomsModel, F = () => HAK.Filters;
   const nf = (n) => CF().nf(n), vn = (d) => CF().vn(d);
   const sum = (a) => a.reduce((x, y) => x + (Number(y) || 0), 0);
@@ -168,7 +167,6 @@
     if (!await HAK.Word.Files.saveBlob(blob, 'BaoCaoThucHienHopDong.xlsx')) return;
     toast('Đã xuất Báo cáo thực hiện hợp đồng.', 'success');
   }
-  const BANDS_OF = BANDS.flatMap((b) => Array(b[1]).fill(b[0].replace(/^[^\s]+\s/, '')));
   /** PDF chia 2 phần (A4 ngang không đủ chỗ cho 21 cột): phần 1 = ①–④ (đến khai bổ sung), phần 2 = ⑤–⑦ (nộp thuế, xuất hàng, đối chiếu); cột đầu lặp lại để đối chiếu dòng. */
   const PART1 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11], PART2 = [0, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21];
   async function exportPdf() {

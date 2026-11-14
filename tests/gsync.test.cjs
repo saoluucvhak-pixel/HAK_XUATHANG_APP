@@ -101,3 +101,19 @@ test('buildSheets: số liệu hợp đồng / tờ khai / phụ lục đúng (K
   assert.equal(pl[0][5], 1500); assert.equal(pl[0][4], 7500);
   sheets.forEach((s) => s.rows.forEach((r) => assert.equal(r.length, s.cols.length)));
 });
+
+test('Code.gs: chữ bắt đầu bằng = + - @ không bị Google Sheet chạy như công thức', () => {
+  const S = makeScript('t');
+  S.post({ token: 't', action: 'push', keys: [], sheets: [{ name: 'NL_HOPDONG', keyCol: 'Mã HĐ (app)', cols: [{ h: 'Mã HĐ (app)' }, { h: 'Bên mua' }, { h: 'Số' }], rows: [['a', '=HYPERLINK("http://x","bấm")', -5], ['b', '+84912345678', '@SUM(1)'], ['c', 'Công ty -A', 7]] }] });
+  const t = table(S.ss, 'NL_HOPDONG');
+  assert.equal(t[1][1], "'=HYPERLINK(\"http://x\",\"bấm\")"); assert.equal(t[2][1], "'+84912345678"); assert.equal(t[2][2], "'@SUM(1)");
+  assert.equal(t[1][2], -5);                       // số âm thật vẫn là số
+  assert.equal(t[3][1], 'Công ty -A');             // chữ bình thường giữ nguyên
+});
+
+test('pickForCompany: hợp đồng chưa gán công ty chỉ đi về công ty đang làm', () => {
+  const ids = { c1: ['hak'], c2: ['dh'], c3: ['hak', 'dh'], c4: [] };
+  const list = Object.keys(ids).map((id) => ({ id })), of = (c) => ids[c.id];
+  assert.deepEqual(GC.pickForCompany(list, 'hak', 'dh', of).map((c) => c.id), ['c1', 'c3']);
+  assert.deepEqual(GC.pickForCompany(list, 'dh', 'dh', of).map((c) => c.id), ['c2', 'c3', 'c4']);
+});

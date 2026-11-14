@@ -38,27 +38,25 @@
   const reqP = (rq) => new Promise((ok, no) => { rq.onsuccess = () => ok(rq.result); rq.onerror = () => no(rq.error); });
   const getAll = async (store) => { const db = await openDb(); if (!db) return Array.from(mem[store].values()); return reqP(db.transaction(store, 'readonly').objectStore(store).getAll()); };
   const getOne = async (store, k) => { const db = await openDb(); if (!db) return mem[store].get(k); return reqP(db.transaction(store, 'readonly').objectStore(store).get(k)); };
-  const putBoth = (meta, data) => new Promise(async (ok, no) => {
+  /**
+   * Giao dịch ghi vào 2 kho meta + data. Lỗi ĐỒNG BỘ (cơ sở dữ liệu đang đóng do cửa sổ khác nâng cấp, dữ liệu không sao chép được…)
+   * cũng được trả về như lỗi (reject) — trước đây nằm trong executor async nên Promise treo vĩnh viễn, app "đang lưu" mãi không báo lỗi.
+   */
+  async function writeTx(work, memWork) {
     const db = await openDb();
-    if (!db) { mem.meta.set(meta.id, meta); if (data !== undefined) mem.data.set(meta.id, data); return ok(); }
-    const tx = db.transaction(['meta', 'data'], 'readwrite');
-    tx.objectStore('meta').put(meta); if (data !== undefined) tx.objectStore('data').put(data, meta.id);
-    tx.oncomplete = () => ok(); tx.onerror = tx.onabort = () => no(tx.error || new Error('Không ghi được dữ liệu lưu trữ'));
-  });
-  const delOne = (id) => new Promise(async (ok, no) => {
-    const db = await openDb();
-    if (!db) { mem.meta.delete(id); mem.data.delete(id); return ok(); }
-    const tx = db.transaction(['meta', 'data'], 'readwrite');
-    tx.objectStore('meta').delete(id); tx.objectStore('data').delete(id);
-    tx.oncomplete = () => ok(); tx.onerror = tx.onabort = () => no(tx.error);
-  });
-  const clearAll = () => new Promise(async (ok, no) => {
-    const db = await openDb();
-    if (!db) { mem.meta.clear(); mem.data.clear(); return ok(); }
-    const tx = db.transaction(['meta', 'data'], 'readwrite');
-    tx.objectStore('meta').clear(); tx.objectStore('data').clear();
-    tx.oncomplete = () => ok(); tx.onerror = tx.onabort = () => no(tx.error);
-  });
+    if (!db) { memWork(); return; }
+    return new Promise((ok, no) => {
+      try {
+        const tx = db.transaction(['meta', 'data'], 'readwrite');
+        work(tx);
+        tx.oncomplete = () => ok(); tx.onerror = tx.onabort = () => no(tx.error || new Error('Không ghi được dữ liệu lưu trữ'));
+      } catch (e) { no(e); }
+    });
+  }
+  const putBoth = (meta, data) => writeTx((tx) => { tx.objectStore('meta').put(meta); if (data !== undefined) tx.objectStore('data').put(data, meta.id); },
+    () => { mem.meta.set(meta.id, meta); if (data !== undefined) mem.data.set(meta.id, data); });
+  const delOne = (id) => writeTx((tx) => { tx.objectStore('meta').delete(id); tx.objectStore('data').delete(id); }, () => { mem.meta.delete(id); mem.data.delete(id); });
+  const clearAll = () => writeTx((tx) => { tx.objectStore('meta').clear(); tx.objectStore('data').clear(); }, () => { mem.meta.clear(); mem.data.clear(); });
 
   /* ---------------------------------------------------------------
    * 2. Nén / giải nén (gzip → base64; không hỗ trợ thì lưu thẳng JSON)

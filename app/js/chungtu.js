@@ -8,7 +8,7 @@
 (function (root) {
   'use strict';
   const HAK = (root.HAK = root.HAK || {});
-  const { $, $$, esc, toast, debounce, Loading } = HAK.UI;
+  const { $, $$, esc, toast, debounce } = HAK.UI;
   const G = HAK.Generator;
   const C = () => HAK.Config;
   const KEY = 'hak.form.chungtu';

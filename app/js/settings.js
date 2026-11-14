@@ -6,7 +6,7 @@
 (function (root) {
   'use strict';
   const HAK = (root.HAK = root.HAK || {});
-  const { $, $$, esc, toast, confirmClick, debounce } = HAK.UI;
+  const { $, $$, esc, toast, confirmClick } = HAK.UI;
   const C = () => HAK.Config;
 
   const WH_TYPES = ['Kho xuất', 'Kho nhận', 'Kho gửi', 'Cảng', 'Kho khác'];
@@ -17,13 +17,6 @@
     ['email', 'Email', 6], ['phone', 'Số điện thoại', 6],
     ['cua', 'Tên ghi trên chứng từ xuất hàng (cột "Của" PXK / chủ lâm sản BKLS)', 12]
   ];
-
-  const changed = debounce(() => {
-    const ok = C().save();
-    if (HAK.Pages) HAK.Pages.refreshSelects();
-    const el = $('#savedTick');
-    if (el) { el.textContent = ok ? '✓ Đã lưu' : '⚠ Không lưu được — bộ nhớ trình duyệt đầy hoặc bị chặn'; el.classList.toggle('text-danger', !ok); setTimeout(() => { el.textContent = ''; }, ok ? 1500 : 6000); }
-  }, 250);
 
   /* ===============================================================
    * v2.6.9 (Thủy chốt 29/09/2026: 1A · 2 chặn hẳn · 3 thêm "Kho xuất mặc định")

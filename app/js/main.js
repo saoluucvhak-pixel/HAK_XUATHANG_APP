@@ -6,7 +6,7 @@
 (function (root) {
   'use strict';
   const HAK = (root.HAK = root.HAK || {});
-  const { $, $$, esc, toast, Loading, setTheme, toggleTheme, debounce, confirmClick } = HAK.UI;
+  const { $, $$, esc, toast, Loading, toggleTheme, debounce, confirmClick } = HAK.UI;
   const X = HAK.Excel, G = HAK.Generator;
   const fmtInt = (n) => G.fmtInt(n);
 

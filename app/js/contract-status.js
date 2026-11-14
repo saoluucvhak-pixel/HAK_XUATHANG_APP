@@ -10,7 +10,6 @@
   const esc = (s) => HAK.UI.esc(s);
   const toast = (m, t) => HAK.UI.toast(m, t || 'info');
   const G = () => HAK.Generator, F = () => HAK.Filters, K = () => HAK.Catalog;
-  const fold = (s) => String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[đĐ]/g, 'd').toLowerCase();
   const hasNum = (v) => v !== null && v !== undefined && v !== '' && isFinite(+v);
   const int = (n) => (hasNum(n) ? Math.round(+n).toLocaleString('vi-VN') : '');
   const ton = (kg) => (hasNum(kg) ? G().fmtTon(+kg) : '');

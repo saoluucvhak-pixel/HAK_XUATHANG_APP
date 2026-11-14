@@ -98,7 +98,6 @@
     return { xh, rows, loose, supps, cleared, withCert, hd, c, cust, steps, checks, ev, T, tax, certBdmt, qty, delKg, trips, status: CM.contractStatus(data.customs, cid), addenda };
   }
 
-  const tonOf = (k) => (k === 'ok' ? 'ok' : k === 'warn' ? 'warn' : '');
   function specOf(m) {
     const c = m.c, CM = HAK.CustomsModel, label = (c.no || c.id) + ' · ' + (TYPES[c.type] || '') + (m.cust ? ' · ' + m.cust.name : '');
     const tables = [
@@ -117,7 +116,7 @@
   }
 
   function html(m, spec) {
-    const c = m.c, CM = HAK.CustomsModel;
+    const c = m.c;
     const stepper = '<div class="d-flex flex-wrap gap-2 mb-3">' + m.steps.map((s) => '<div class="border rounded p-2 flex-fill ' + (s.s === 'warn' ? 'border-warning bg-warning-subtle' : s.s === 'ok' ? 'border-success-subtle' : '') + '" style="min-width:150px"><div class="small muted">Bước ' + s.n + '</div><div class="fw-semibold">' + ICON[s.s] + ' ' + esc(s.t) + '</div><div class="small">' + esc(s.x) + '</div></div>').join('') + '</div>';
     const cards = '<div class="row g-2 mb-3">' + [['KL hợp đồng hiện hành', nf(m.qty) + ' BDMT', m.addenda.length ? 'gốc ' + nf(c.qtyOrig) + ' · ' + m.addenda.length + ' phụ lục' : 'chưa có phụ lục'], ['Σ KL khô chứng thư', nf(m.certBdmt) + ' BDMT', m.qty != null ? 'còn lại ' + nf(m.qty - m.certBdmt) : ''], ['Thực giao (qua cân)', nf(m.delKg / 1000) + ' tấn', m.trips + ' chuyến'], ['Thuế còn nợ', '<span class="' + (m.tax.remaining > 0 ? 'text-danger' : 'text-success') + '">' + nf(m.tax.remaining) + ' đ</span>', 'phải nộp ' + nf(m.tax.payable) + ' · đã nộp ' + nf(m.tax.paid)]]
       .map((x) => '<div class="col-6 col-md-3"><div class="border rounded p-2 h-100"><div class="small muted">' + x[0] + '</div><div class="fs-5 fw-semibold">' + x[1] + '</div><div class="small muted">' + esc(x[2]) + '</div></div></div>').join('') + '</div>';

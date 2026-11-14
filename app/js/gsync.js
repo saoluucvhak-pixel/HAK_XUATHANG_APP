@@ -112,6 +112,7 @@
       '  function conv(v) {',
       '    if (v === null || v === undefined) return \'\';',
       '    if (typeof v === \'string\') { var m = v.match(/^(\\d{4})-(\\d{2})-(\\d{2})T00:00:00(\\.000)?Z$/); if (m) return new Date(+m[1], +m[2] - 1, +m[3]); }',
+      '    if (typeof v === \'string\' && /^[=+\\-@]/.test(v)) return "\'" + v;   // chữ bắt đầu = + - @ → thêm dấu \' để Google Sheet coi là văn bản, không chạy như công thức',
       '    return v;',
       '  }',
       '  function toRow(r, base) {',

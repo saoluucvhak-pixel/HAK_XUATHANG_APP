@@ -96,9 +96,13 @@
    * v2.6.2: hợp đồng "liên quan" các công ty `ids` khi bên bán/giao, bên mua/nhận hoặc bên giao hàng là công ty nội bộ thuộc `ids`.
    * Hợp đồng chưa gán bên nội bộ nào (vd nhập từ XUATHANG_DN chưa có bên bán) → coi là liên quan mọi công ty (không bị ẩn).
    */
+  /** Mã các công ty nội bộ liên quan tới hợp đồng (bên bán / giao / mua / nhận). [] = chưa gán công ty nội bộ nào. */
+  function companyIdsOf(c) {
+    return [c.exporterId, c.principalId, c.buyerId, c.sellerId, c.customerId, c.deliverId, ...(c.details || []).map(d => d.deliverId)].map((id) => { const cu = customer(id); return cu && cu.companyId; }).filter(Boolean);
+  }
   function relatedTo(c, ids) {
     if (!ids) return true;
-    const cos = [c.exporterId, c.principalId, c.buyerId, c.sellerId, c.customerId, c.deliverId, ...(c.details || []).map(d => d.deliverId)].map((id) => { const cu = customer(id); return cu && cu.companyId; }).filter(Boolean);
+    const cos = companyIdsOf(c);
     return !cos.length || cos.some((x) => ids.indexOf(x) >= 0);
   }
   const byDateDesc = (a, b) => (b.date || '').localeCompare(a.date || '') || (b.tkhq || '').localeCompare(a.tkhq || '');
@@ -152,11 +156,8 @@
     state.data.customers = customers().filter((x) => x.id !== id); save(); return {};
   }
 
-  const CONTRACT_FIELDS = ['type', 'date', 'no', 'tkhq', 'ship', 'sellerId', 'customerId', 'product', 'priceUsd', 'currency', 'qty', 'dryFactory',
-    'certNo', 'certDate', 'mt', 'bdmt', 'moisture', 'deliverId', 'receiverId', 'whId', 'fromDate', 'toDate', 'filterTrips', 'note'];
   /** Ô "Chi tiết thực hiện" (chứng thư) — nhập ở biểu mẫu riêng (tab 🧪); biểu mẫu hợp đồng chỉ gồm các ô còn lại. */
   const EXEC_FIELDS = ['certNo', 'certDate', 'mt', 'bdmt', 'moisture', 'deliverId', 'receiverId', 'whId', 'fromDate', 'toDate', 'filterTrips'];
-  const INFO_FIELDS = CONTRACT_FIELDS.filter((k) => EXEC_FIELDS.indexOf(k) < 0);
   function cleanContract(o) {
     const r = M.parent(o);
     r.type = TYPES[r.type] ? r.type : 'xuatkhau'; r.date = isoOf(o.date) || '';
@@ -273,7 +274,6 @@
   const $ = (s) => document.querySelector(s);
   const esc = (s) => HAK.UI.esc(s);
   const custName = (id) => { const c = customer(id); return c ? c.name : ''; };
-  const whName = (id) => { const w = id ? (HAK.Config.data.warehouses || []).find((x) => x.id === id) : null; return w ? (w.short || w.name) : ''; };
   function build() {
     const host = $('#catalogRoot'); if (!host || state.built) return;
     host.innerHTML =
@@ -585,7 +585,7 @@
   load();   // có dữ liệu ngay khi các module khác cần (trước cả init)
   HAK.Catalog = {
     TYPES, init, render, load, save:persist, persist, syncCompanies,
-    customers, contracts: (type) => M.choices(state.data,type), parents: contracts, customer, contract: (id,opts) => M.resolve(state.data,id,opts), parent: contract, byCompany, label, dryActual, relatedTo,
+    customers, companyIdsOf, contracts: (type) => M.choices(state.data,type), parents: contracts, customer, contract: (id,opts) => M.resolve(state.data,id,opts), parent: contract, byCompany, label, dryActual, relatedTo,
     products:()=>state.data.products||[],upsertProduct,upsertCustomer, removeCustomer, upsertContract, removeContract, importWorkbook,
     util: { tkhqOf, isoOf, vnDate },
     core: { get: () => state.data, set: (d) => { state.data = d; }, persist, changed: () => changed(), render: () => renderRows(), customers }

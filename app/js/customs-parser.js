@@ -24,7 +24,6 @@
     if (/^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(t)) return Number(t.replace(/,/g, ''));
     const n = Number(t.replace(/\./g, '').replace(',', '.')); return isFinite(n) ? n : null;
   }
-  const money = (s) => { const m = /(\d{1,3}(?:[.,]\d{3})+|\d{4,})/.exec(String(s || '')); return m ? vn(m[1]) : null; };
   const vessel = (s) => { const t = clean(s).replace(/^M\s*\/?\s*V\.?\s*/i, ''); return t ? 'M/V ' + t.toUpperCase() : ''; };
 
   /** rows: mảng các dòng, mỗi dòng là mảng ô. Từ chữ OCR: mỗi dòng tách ở " : " (rowsText của HAKDocs). */

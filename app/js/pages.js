@@ -572,7 +572,6 @@
   function pickCompany(kind) { return cfg().companies.find((c) => c.kind === kind) || cfg().companies[0]; }
   function applyDirection(type) {
     const dir = $('#' + fid(type, 'direction')).value;
-    const byKind = (k, pref) => (cfg().companies.find((c) => c.id === pref) || pickCompany(k)).id;
     const whBy = (id) => (cfg().warehouses.find((w) => w.id === id) || cfg().warehouses[0]).id;
     // Kho đi lấy từ nhóm "Xuất kho tại", kho đến lấy từ nhóm "Nhập kho tại"
     const kg = $('#' + fid(type, 'khoGiaoId')), kn = $('#' + fid(type, 'khoNhanId'));

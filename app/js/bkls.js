@@ -693,7 +693,7 @@
     if (want.totalPdf) { step('BKLS tổng (PDF)…', pct(0)); add('totalPdf', 'BKLS TỔNG (PDF)', baseName + '_tong.docx', await getTotal()); done++; }
     if (want.tripDocx) {
       for (let pi = 0; pi < ranges.length; pi++) {
-        const [a, b] = ranges[pi], tag = split ? ' phần ' + (pi + 1) + '/' + ranges.length : '';
+        const [a, b] = ranges[pi];
         add('tripDocx', 'BKLS TỪNG XE' + partLabel(pi, a, b) + ' (Word)', partName(pi, '.docx'),
           await getTrip(pi,a,b));
       }
@@ -701,7 +701,7 @@
     }
     if (want.tripPdf) {
       for (let pi = 0; pi < ranges.length; pi++) {
-        const [a, b] = ranges[pi], tag = split ? ' phần ' + (pi + 1) + '/' + ranges.length : '';
+        const [a, b] = ranges[pi];
         add('tripPdf', 'BKLS TỪNG XE' + partLabel(pi, a, b) + ' (PDF)', partName(pi, '.docx'),
           await getTrip(pi,a,b));
       }
