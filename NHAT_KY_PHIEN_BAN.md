@@ -291,7 +291,7 @@ Thủy chốt 28/09/2026: "1. bỏ Trao đổi KHÔNG đồng bộ lên Google S
 - pages.js generateBkls: không chặn khi thiếu Số BKLS / hệ số / tên bên mua — tự điền hoặc để trống + cảnh báo.
 - tests/parse-num.test.cjs, tests/numfmt.test.cjs.
 
-## (Chưa phát hành) Hộp chọn phiếu có cột "Đã gán cho hồ sơ / tàu"
+## v2.18.1 — Hộp chọn phiếu có cột "Đã gán cho hồ sơ / tàu"
 - Mỗi phiếu hiện nhãn tàu của hồ sơ Lưu trữ khác (cùng công ty, ngày cân giao nhau) đã lấy phiếu đó; "— chưa gán" nếu chưa; "?" nếu thiếu số phiếu / giờ / biển số để nhận diện — tránh gán trùng một phiếu cho hai tàu.
 
 ## v2.18.0 — Tách phiếu cân trong cùng ngày (1 ngày chạy 2 tàu) + BKLS nhiều xe
