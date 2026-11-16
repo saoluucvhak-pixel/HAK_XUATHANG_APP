@@ -458,7 +458,7 @@
     window.addEventListener('hak:flush', () => saveForm(type));
     const upd = debounce(() => updateSummary(type), 120);
     sec.addEventListener('input', (e) => { if (e.target.closest('.card-body') && e.target.id && e.target.id.indexOf('f-') === 0) { save(); upd(); } });
-    sec.addEventListener('click',async(e)=>{try{if(e.target.hasAttribute('data-year-save')){e.target.disabled=true;await HAK.Yearbook.save(type);$('#year-note-'+type).textContent='Đã lưu năm '+HAK.Yearbook.year;}if(e.target.hasAttribute('data-year-list'))await HAK.Yearbook.show();if(e.target.hasAttribute('data-year-new')){if(!confirm('Tạo hồ sơ mới? Thông tin chưa lưu trên biểu mẫu sẽ bỏ qua.'))return;HAK.Pages.readOnly(type,false);HAK.Yearbook.clear(type);const contractSelect=$('#'+fid(type,'contractId'));if(contractSelect)contractSelect.disabled=false;delete ST[type].savedDs;delete ST[type].snapshotParams;DOCS[type].groups.forEach(g=>g.fields.forEach(f=>{if(f.type!=='company'&&f.type!=='warehouse')setField(type,f,f.type==='check'?false:f.def||'');}));ST[type].filter={groups:null,from:'',to:''};ST[type].returned.clear();$('#year-note-'+type).textContent='Hồ sơ mới — năm '+HAK.Yearbook.year;renderFilter(type);updateSummary(type);}}catch(err){toast(err.message,'error');}finally{if(e.target.hasAttribute('data-year-save'))e.target.disabled=false;}});
+    sec.addEventListener('click',async(e)=>{try{if(e.target.hasAttribute('data-year-save')){e.target.disabled=true;if(!await confirmPickConflicts(type))return;await HAK.Yearbook.save(type);markClean(type);$('#year-note-'+type).textContent='Đã lưu năm '+HAK.Yearbook.year;}if(e.target.hasAttribute('data-year-list'))await HAK.Yearbook.show();if(e.target.hasAttribute('data-year-new')){await newRecord(type);}}catch(err){toast(err.message,'error');}finally{if(e.target.hasAttribute('data-year-save'))e.target.disabled=false;}});
     sec.addEventListener('change', (e) => {
       if (e.target.id === fid(type, 'direction')) applyDirection(type);
       if (e.target.dataset && e.target.dataset.kind === 'warehouse') toggleCustomWh(e.target);
@@ -562,6 +562,66 @@
       '. Bấm "Đặt lại bộ lọc" để lấy toàn bộ dữ liệu của trang này.</div>';
   }
 
+  /* ---------------------------------------------------------------
+   * v2.19.0 — KHỞI TẠO / CHUYỂN HỒ SƠ dùng chung: mọi đường tạo mới (nút "Thêm mới", nạp dữ liệu Excel mới, bỏ hồ sơ đang xem) đều qua resetRecordState,
+   * nên không còn sót trạng thái của hồ sơ trước: phiếu chọn riêng, phiếu bỏ, xe trả về, lọc ngày / giờ / số phiếu, liên kết hợp đồng, bản chụp.
+   * Chỉ giữ công ty và kho mặc định (chủ đích: người dùng thường lập nhiều hồ sơ liên tiếp cho cùng công ty / kho).
+   * Có thay đổi chưa lưu → guardLeave hỏi: Lưu rồi tiếp tục · Bỏ thay đổi · Quay lại (Hủy giữ nguyên form đang làm).
+   * ------------------------------------------------------------- */
+  function resetRecordState(type, opt) {
+    opt = opt || {};
+    const st = ST[type];
+    if (HAK.Pages && st.ro) HAK.Pages.readOnly(type, false);
+    if (HAK.Yearbook) HAK.Yearbook.clear(type);
+    const sel = $('#' + fid(type, 'contractId')); if (sel) sel.disabled = false;
+    delete st.savedDs; delete st.snapshotParams;
+    if (opt.fields !== false) DOCS[type].groups.forEach((g) => g.fields.forEach((f) => { if (f.type !== 'company' && f.type !== 'warehouse') setField(type, f, f.type === 'check' ? !!f.def : (f.def !== undefined ? f.def : '')); }));
+    st.filter = { groups: null, from: '', to: '' }; st.returned.clear(); st.omit.clear();
+    st.ctPending = null; st.bklsDupKey = '';
+    const box = $('#ctMsg-' + type); if (box) box.innerHTML = '';
+    const note = $('#year-note-' + type); if (note && HAK.Yearbook) note.textContent = 'Hồ sơ mới — năm ' + HAK.Yearbook.year;
+    renderFilter(type); updateSummary(type); markClean(type);
+  }
+  /** Chữ ký trạng thái đang làm (giá trị ô + phạm vi + phiếu chọn / bỏ / trả về) để biết có thay đổi chưa lưu. */
+  function sigOf(type) {
+    const vals = []; DOCS[type].groups.forEach((g) => g.fields.forEach((f) => { const el = $('#' + fid(type, f.id)); if (el) vals.push([f.id, f.type === 'check' ? el.checked : el.value]); }));
+    const f = ST[type].filter;
+    return JSON.stringify([vals, f.from, f.to, f.timeFrom || '', f.timeTo || '', f.ticketFrom || '', f.ticketTo || '', f.pick || [], f.files || null, Array.from(ST[type].omit.keys()).sort(), Array.from(ST[type].returned).sort()]);
+  }
+  function markClean(type) { ST[type].baseSig = sigOf(type); }
+  const isDirty = (type) => ST[type].baseSig !== undefined && !ST[type].ro && sigOf(type) !== ST[type].baseSig;
+  /** Hộp 3 lựa chọn (Lưu / Bỏ / Quay lại). HAK.Pages._choose để kiểm thử thay thế. */
+  function choose3(message) {
+    if (HAK.Pages && HAK.Pages._choose) return Promise.resolve(HAK.Pages._choose(message));
+    return new Promise((ok) => {
+      let m = $('#leaveModal');
+      if (!m) {
+        m = document.createElement('div'); m.className = 'modal fade'; m.id = 'leaveModal'; m.tabIndex = -1;
+        m.innerHTML = '<div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Có thay đổi chưa lưu</h5></div><div class="modal-body" id="leaveMsg"></div>' +
+          '<div class="modal-footer"><button class="btn btn-primary" data-choice="save" type="button">💾 Lưu rồi tiếp tục</button><button class="btn btn-outline-danger" data-choice="discard" type="button">Bỏ thay đổi</button><button class="btn btn-outline-secondary" data-choice="back" type="button">Quay lại</button></div></div></div>';
+        document.body.appendChild(m);
+      }
+      $('#leaveMsg').textContent = message;
+      const inst = bootstrap.Modal.getOrCreateInstance(m, { backdrop: 'static', keyboard: false });
+      const onClick = (e) => { const b = e.target.closest('[data-choice]'); if (!b) return; m.removeEventListener('click', onClick); inst.hide(); ok(b.dataset.choice); };
+      m.addEventListener('click', onClick); inst.show();
+    });
+  }
+  /** true = được phép chuyển hồ sơ (đã lưu hoặc chọn bỏ); false = ở lại (Quay lại / lưu lỗi). */
+  async function guardLeave(type) {
+    if (!isDirty(type)) return true;
+    const c = await choose3('Biểu mẫu "' + DOCS[type].title + '" có thay đổi chưa lưu (phiếu chọn / bỏ, xe trả về, phạm vi lọc hoặc thông tin đã nhập). Làm gì trước khi chuyển hồ sơ?');
+    if (c === 'discard') return true;
+    if (c === 'save') {
+      try { await HAK.Yearbook.save(type); markClean(type); return true; }
+      catch (err) { toast('Chưa lưu được hồ sơ nên chưa chuyển: ' + (err.message || err), 'error'); return false; }
+    }
+    return false;                                           // Quay lại / Hủy: giữ nguyên form đang làm
+  }
+  async function newRecord(type) {
+    if (!await guardLeave(type)) return false;
+    resetRecordState(type); return true;
+  }
   function resetFilter(type) {
     const ds = getDs(type);
     ST[type].filter = { groups: null, from: '', to: '' };
@@ -1216,76 +1276,148 @@
     return { n: hit.length, kg: hit.reduce((a, r) => a + (+r.net || 0), 0) };
   }
   /* ---- Chọn phiếu cân của tàu này (khi 2 tàu cân xen kẽ trong ngày): hồ sơ chỉ gồm các phiếu đã tick ---- */
-  let pickType = null, pickAssigned = new Map(), pickLoading = false;
+  const PICK_PAGE = 300;
+  let pickType = null, pickAssigned = new Map(), pickState = 'loading', pickToken = 0, pickAmb = [];
   const pickCache = new Map();
   /**
-   * Phiếu nào đã nằm trong hồ sơ Lưu trữ khác (cùng công ty, ngày cân giao nhau) → nhãn "TÀU · tên hồ sơ" để khỏi gán trùng.
-   * Nhận diện theo cùng khóa với đối soát phiếu cân (công ty + số phiếu + ngày + biển số, hoặc công ty + ngày + giờ + biển số).
+   * Phiếu nào đã nằm trong hồ sơ Lưu trữ khác (cùng công ty, ngày cân giao nhau) → nhãn tàu / hồ sơ để khỏi gán trùng.
+   * Trạng thái: loading (đang kiểm tra) · ok (đọc xong: có / chưa gán) · error (chưa xác minh được — KHÔNG được coi là "chưa gán").
+   * token chống kết quả tải chậm của hộp chọn TRƯỚC cập nhật nhầm vào hộp chọn HIỆN TẠI.
    */
-  async function loadPickAssigned(type) {
-    pickAssigned = new Map();
-    if (!HAK.Archive || !HAK.Report || !HAK.Weigh) return;
+  async function loadPickAssigned(type, token) {
+    const map = new Map();
+    if (!HAK.Archive || !HAK.Report || !HAK.Weigh) return map;
     const p = collect(type), rows = rowsForPick(type), tss = rows.map((r) => r.ts1).filter((x) => x !== null && x !== undefined);
-    if (!tss.length) return;
+    if (!tss.length) return map;
     const lo = Math.min.apply(null, tss), hi = Math.max.apply(null, tss) + 86400000, dmy = (s) => { const m = String(s || '').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/); return m ? Date.UTC(+m[3], +m[2] - 1, +m[1]) : null; };
     const metas = (await HAK.Archive.list()).filter((m) => (m.cid || '') === (p.giaoId || '') && dmy(m.from) !== null && dmy(m.from) <= hi && (dmy(m.to) === null ? dmy(m.from) : dmy(m.to)) + 86399999 >= lo);
-    if (!metas.length) return;
+    if (!metas.length || token !== pickToken) return map;
     const tk = await HAK.Report.prepareTickets(metas, pickCache, true);
-    metas.forEach((m) => (tk.get(m.id) || []).forEach((t) => {
-      if (!t.id) return; const k = t.id.replace(/#\d+$/, ''), arr = pickAssigned.get(k) || []; arr.push({ ship: m.ship || '', title: m.title || m.id, id: m.id }); pickAssigned.set(k, arr);
-    }));
+    metas.forEach((m) => {
+      if (!tk.has(m.id)) { map.set('__failed__' + m.id, [{ ship: m.ship || '', title: m.title || m.id, id: m.id }]); return; }   // hồ sơ không đọc được phiếu → chưa xác minh được
+      tk.get(m.id).forEach((t) => {
+        if (!t.id) return; const k = t.id.replace(/#\d+$/, ''), arr = map.get(k) || []; arr.push({ ship: m.ship || '', title: m.title || m.id, id: m.id }); map.set(k, arr);
+      });
+    });
+    return map;
   }
-  const assignedLabel = (r) => {
-    const cid = (collect(pickType) || {}).giaoId || '', k = HAK.Weigh && HAK.Weigh.identity(r, cid), a = k ? pickAssigned.get(k) : null;
-    if (!a || !a.length) return k ? '<span class="muted">— chưa gán</span>' : '<span class="muted" title="Thiếu số phiếu / giờ / biển số để nhận diện">?</span>';
-    return a.map((x) => '<span class="badge text-bg-warning" title="' + esc(x.title) + '">' + esc(x.ship || 'không rõ tàu') + '</span>').join(' ');
+  const identOf = (r) => { const cid = (collect(pickType) || {}).giaoId || ''; return HAK.Weigh ? HAK.Weigh.identity(r, cid) : null; };
+  const pickChips = (r) => {
+    if (pickState === 'loading') return '<span class="badge text-bg-secondary">Đang kiểm tra…</span>';
+    const k = identOf(r), a = k ? pickAssigned.get(k) : null;
+    if (a && a.length) return a.map((x) => '<a href="#" class="badge text-bg-warning text-decoration-none" data-open-src="' + esc(x.id) + '" title="Mở hồ sơ nguồn: ' + esc(x.title) + '">Đã gán · ' + esc(x.ship || 'không rõ tàu') + '</a>').join(' ');
+    if (pickState === 'error') return '<span class="badge text-bg-danger" title="Không đọc được các hồ sơ đã lưu — chưa biết phiếu này đã gán chưa">⚠ Chưa xác minh được</span>';
+    if (!k) return '<span class="badge text-bg-light border" title="Thiếu số phiếu / giờ / biển số để nhận diện">Chưa xác minh được</span>';
+    if (Array.from(pickAssigned.keys()).some((x) => x.indexOf('__failed__') === 0)) return '<span class="badge text-bg-light border" title="Có hồ sơ đã lưu không đọc được phiếu">Chưa gán (chưa đủ chắc)</span>';
+    return '<span class="badge text-bg-light border">Chưa gán</span>';
   };
   function rowsForPick(type) {
     const ds = getDs(type); if (!ds) return [];
     const p = collect(type), f = Object.assign({}, p.filter); delete f.pick;
     return G().filterRows(ds.rows, f);
   }
+  const pickMatch = (r, q) => !q || String(r.ticket || '').toLowerCase().includes(q) || String(r.plate || '').toLowerCase().includes(q);
+  /** Các dòng ĐANG hiển thị trong bảng (đã lọc tìm kiếm, tối đa PICK_PAGE dòng đầu) và toàn bộ kết quả. */
+  function pickView() {
+    const q = $('#pickSearch').value.trim().toLowerCase(), all = rowsForPick(pickType).filter((r) => pickMatch(r, q));
+    return { all, shown: all.slice(0, PICK_PAGE) };
+  }
+  /** Phân giải một số phiếu dán vào: khớp ĐẦY ĐỦ trước; chỉ khớp đuôi khi có đúng MỘT kết quả; nhiều kết quả → để người dùng xác nhận. */
+  function resolveTicket(rows, token) {
+    const t = String(token).trim().toLowerCase(); if (!t) return { kind: 'none', hits: [] };
+    const exact = rows.filter((r) => String(r.ticket || '').trim().toLowerCase() === t);
+    if (exact.length === 1) return { kind: 'one', hits: exact };
+    if (exact.length > 1) return { kind: 'many', hits: exact };
+    const tail = rows.filter((r) => String(r.ticket || '').toLowerCase().endsWith(t));
+    if (tail.length === 1) return { kind: 'one', hits: tail };
+    return { kind: tail.length ? 'many' : 'none', hits: tail };
+  }
   function ensurePickModal() {
     if ($('#pickModal')) return;
     const m = document.createElement('div'); m.className = 'modal fade'; m.id = 'pickModal'; m.tabIndex = -1;
     m.innerHTML = '<div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Chọn phiếu cân của tàu này</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button></div>' +
       '<div class="modal-body"><p class="small muted">Tick các phiếu <b>thuộc tàu này</b>. Hồ sơ chỉ gồm các phiếu đã chọn (không tick gì = lấy theo phạm vi ngày / giờ / số phiếu). Các phiếu còn lại dành cho hồ sơ của tàu kia. Danh sách chỉ hiện phiếu nằm trong phạm vi ngày / giờ / số phiếu đang đặt ở trên — muốn chọn trong cả ngày thì để trống giờ và số phiếu.</p>' +
-      '<div class="row g-2 mb-2"><div class="col-md-5"><input id="pickSearch" class="form-control form-control-sm" placeholder="Tìm số phiếu / biển số…" autocomplete="off"></div>' +
-      '<div class="col-md-7 d-flex gap-2"><button class="btn btn-sm btn-outline-primary" id="pickAllShown" type="button">Chọn các phiếu đang hiển thị</button><button class="btn btn-sm btn-outline-secondary" id="pickNone" type="button">Bỏ chọn hết</button></div></div>' +
-      '<div class="mb-2"><textarea id="pickPaste" class="form-control form-control-sm" rows="2" placeholder="Hoặc dán danh sách số phiếu của tàu này (cách nhau bằng dấu cách / phẩy / xuống dòng)"></textarea><button class="btn btn-sm btn-outline-primary mt-1" id="pickApply" type="button">Chọn theo danh sách đã dán</button> <span class="small" id="pickPasteMsg"></span></div>' +
-      '<div class="tbl-wrap"><table class="table table-sm"><thead><tr><th>Chọn</th><th>Số phiếu</th><th>Giờ cân 1</th><th>Biển số</th><th class="num">KL (kg)</th><th>Đã gán cho hồ sơ / tàu</th></tr></thead><tbody id="pickBody"></tbody></table></div><div class="small muted" id="pickInfo"></div></div>' +
+      '<div class="alert alert-warning py-1 small d-none" id="pickWarn"></div>' +
+      '<div class="row g-2 mb-2"><div class="col-md-4"><input id="pickSearch" class="form-control form-control-sm" placeholder="Tìm số phiếu / biển số…" autocomplete="off"></div>' +
+      '<div class="col-md-8 d-flex flex-wrap gap-2"><button class="btn btn-sm btn-outline-primary" id="pickAllShown" type="button">Chọn các dòng đang hiển thị</button><button class="btn btn-sm btn-outline-primary d-none" id="pickAllResults" type="button">Chọn tất cả kết quả</button><button class="btn btn-sm btn-outline-secondary" id="pickNone" type="button">Bỏ chọn hết</button></div></div>' +
+      '<div class="mb-2"><textarea id="pickPaste" class="form-control form-control-sm" rows="2" placeholder="Hoặc dán danh sách số phiếu của tàu này (cách nhau bằng dấu cách / phẩy / xuống dòng)"></textarea><button class="btn btn-sm btn-outline-primary mt-1" id="pickApply" type="button">Chọn theo danh sách đã dán</button> <span class="small" id="pickPasteMsg"></span><div id="pickAmb" class="mt-2"></div></div>' +
+      '<div class="tbl-wrap"><table class="table table-sm"><thead><tr><th>Chọn</th><th>Số phiếu</th><th>Giờ cân 1</th><th>Biển số</th><th class="num">KL (kg)</th><th>Trạng thái gán</th></tr></thead><tbody id="pickBody"></tbody></table></div><div class="small muted" id="pickInfo"></div></div>' +
       '<div class="modal-footer"><span class="me-auto small" id="pickCount"></span><button class="btn btn-primary" data-bs-dismiss="modal" type="button">Xong</button></div></div></div>';
     document.body.appendChild(m);
     const cur = () => (ST[pickType].filter.pick || []);
     const setPick = (arr) => { ST[pickType].filter.pick = arr; renderPickList(); updateSummary(pickType); };
+    const addKeys = (rows) => { const s = new Set(cur()), K = G().omitKey; let n = 0; rows.forEach((r) => { if (!s.has(K(r))) { s.add(K(r)); n++; } }); setPick(Array.from(s)); return n; };
     $('#pickSearch').addEventListener('input', debounce(renderPickList, 150));
     $('#pickBody').addEventListener('change', (e) => {
       const cb = e.target.closest('input[data-key]'); if (!cb) return;
       const s = new Set(cur()); if (cb.checked) s.add(cb.dataset.key); else s.delete(cb.dataset.key); setPick(Array.from(s));
     });
+    $('#pickBody').addEventListener('click', (e) => { const a = e.target.closest('[data-open-src]'); if (a) { e.preventDefault(); openPickSource(a.dataset.openSrc); } });
     $('#pickNone').addEventListener('click', () => setPick([]));
-    $('#pickAllShown').addEventListener('click', () => { const s = new Set(cur()), K = G().omitKey, q = $('#pickSearch').value.trim().toLowerCase(); rowsForPick(pickType).filter((r) => !q || String(r.ticket || '').toLowerCase().includes(q) || String(r.plate || '').toLowerCase().includes(q)).forEach((r) => s.add(K(r))); setPick(Array.from(s)); });
+    $('#pickAllShown').addEventListener('click', () => { const v = pickView(), n = addKeys(v.shown); $('#pickPasteMsg').innerHTML = '<span class="text-success">Đã chọn ' + n + ' / ' + v.shown.length + ' dòng đang hiển thị.</span>'; });
+    $('#pickAllResults').addEventListener('click', () => { const v = pickView(), n = addKeys(v.all); $('#pickPasteMsg').innerHTML = '<span class="text-success">Đã chọn ' + n + ' phiếu (toàn bộ ' + v.all.length + ' kết quả).</span>'; });
     $('#pickApply').addEventListener('click', () => {
-      const tokens = $('#pickPaste').value.split(/[\s,;]+/).filter(Boolean), rows = rowsForPick(pickType), s = new Set(cur()), miss = [], K = G().omitKey; let add = 0;
-      tokens.forEach((t) => { const hit = rows.filter((r) => String(r.ticket || '') === t || String(r.ticket || '').endsWith(t)); if (!hit.length) miss.push(t); else hit.forEach((r) => { if (!s.has(K(r))) { s.add(K(r)); add++; } }); });
-      $('#pickPasteMsg').innerHTML = '<span class="' + (miss.length ? 'text-warning' : 'text-success') + '">Đã chọn thêm ' + add + ' phiếu' + (miss.length ? '; không tìm thấy: ' + esc(miss.join(', ')) : '') + '</span>';
-      setPick(Array.from(s));
+      const tokens = $('#pickPaste').value.split(/[\s,;]+/).filter(Boolean), rows = rowsForPick(pickType); let auto = [], miss = []; pickAmb = [];
+      tokens.forEach((t) => { const r = resolveTicket(rows, t); if (r.kind === 'one') auto = auto.concat(r.hits); else if (r.kind === 'many') pickAmb.push({ token: t, hits: r.hits }); else miss.push(t); });
+      const added = addKeys(auto);
+      $('#pickPasteMsg').innerHTML = '<span class="' + (miss.length || pickAmb.length ? 'text-warning' : 'text-success') + '">Đã chọn ' + added + ' phiếu' + (miss.length ? '; không tìm thấy: ' + esc(miss.join(', ')) : '') + (pickAmb.length ? '; ' + pickAmb.length + ' số khớp NHIỀU phiếu — xác nhận bên dưới' : '') + '</span>';
+      renderPickAmb();
+    });
+    $('#pickAmb').addEventListener('click', (e) => {
+      if (!e.target.closest('#pickAmbOk')) return;
+      const keys = new Set(Array.from(document.querySelectorAll('#pickAmb input[data-key]:checked')).map((x) => x.dataset.key)), K = G().omitKey;
+      const rows = pickAmb.flatMap((a) => a.hits).filter((r) => keys.has(K(r))); const n = addKeys(rows); pickAmb = []; renderPickAmb(); $('#pickPasteMsg').innerHTML = '<span class="text-success">Đã chọn thêm ' + n + ' phiếu theo xác nhận.</span>';
     });
   }
+  function renderPickAmb() {
+    const box = $('#pickAmb'); if (!box) return;
+    if (!pickAmb.length) { box.innerHTML = ''; return; }
+    box.innerHTML = '<div class="border rounded p-2 small"><b>Số phiếu khớp nhiều dòng — tick đúng phiếu của tàu này rồi bấm Xác nhận:</b><table class="table table-sm mb-1"><tbody>' +
+      pickAmb.map((a) => '<tr class="table-light"><td colspan="5">Số dán: <b>' + esc(a.token) + '</b></td></tr>' + a.hits.map((r) => '<tr><td><input class="form-check-input" type="checkbox" data-key="' + esc(G().omitKey(r)) + '"></td><td class="mono">' + esc(r.ticket) + '</td><td>' + esc(r.time1) + '</td><td>' + esc(r.plate) + '</td><td>' + pickChips(r) + '</td></tr>').join('')).join('') +
+      '</tbody></table><button class="btn btn-sm btn-primary" id="pickAmbOk" type="button">Xác nhận các phiếu đã tick</button></div>';
+  }
   function renderPickList() {
-    const rows = rowsForPick(pickType), q = $('#pickSearch').value.trim().toLowerCase(), on = new Set(ST[pickType].filter.pick || []), K = G().omitKey;
-    const shown = rows.filter((r) => !q || String(r.ticket || '').toLowerCase().includes(q) || String(r.plate || '').toLowerCase().includes(q)), page = shown.slice(0, 300);
-    $('#pickBody').innerHTML = page.map((r) => '<tr' + (on.has(K(r)) ? ' class="table-success"' : '') + '><td><input class="form-check-input" type="checkbox" data-key="' + esc(K(r)) + '"' + (on.has(K(r)) ? ' checked' : '') + '></td><td class="mono">' + esc(r.ticket || '(dòng ' + r.idx + ')') + '</td><td>' + esc(r.time1) + '</td><td>' + esc(r.plate) + '</td><td class="num">' + fmtInt(r.net) + '</td><td class="small">' + (pickLoading ? '<span class="muted">đang đọc…</span>' : assignedLabel(r)) + '</td></tr>').join('');
-    $('#pickInfo').textContent = 'Hiển thị ' + page.length + ' / ' + shown.length + ' phiếu trong phạm vi' + (shown.length > 300 ? ' — gõ tìm kiếm để thu hẹp.' : '.');
+    const v = pickView(), rows = rowsForPick(pickType), on = new Set(ST[pickType].filter.pick || []), K = G().omitKey;
+    $('#pickBody').innerHTML = v.shown.map((r) => '<tr' + (on.has(K(r)) ? ' class="table-success"' : '') + '><td><input class="form-check-input" type="checkbox" data-key="' + esc(K(r)) + '"' + (on.has(K(r)) ? ' checked' : '') + '></td><td class="mono">' + esc(r.ticket || '(dòng ' + r.idx + ')') + '</td><td>' + esc(r.time1) + '</td><td>' + esc(r.plate) + '</td><td class="num">' + fmtInt(r.net) + '</td><td class="small">' + pickChips(r) + '</td></tr>').join('');
+    const more = v.all.length > v.shown.length;
+    $('#pickInfo').textContent = 'Hiển thị ' + v.shown.length + ' / ' + v.all.length + ' phiếu trong phạm vi' + (more ? ' — gõ tìm kiếm để thu hẹp, hoặc bấm "Chọn tất cả kết quả".' : '.');
+    $('#pickAllResults').classList.toggle('d-none', !more); $('#pickAllResults').textContent = 'Chọn tất cả ' + v.all.length + ' kết quả';
+    $('#pickAllShown').textContent = 'Chọn ' + v.shown.length + ' dòng đang hiển thị';
     const kg = rows.filter((r) => on.has(K(r))).reduce((a, r) => a + (+r.net || 0), 0);
     $('#pickCount').textContent = on.size ? 'Đã chọn ' + on.size + ' phiếu · ' + G().fmtTon(kg) + ' tấn' : 'Chưa chọn phiếu nào';
+    // Phiếu đã chọn nhưng đã có ở hồ sơ khác → cảnh báo ngay trong hộp chọn
+    const dup = pickDupCount(); const w = $('#pickWarn');
+    w.classList.toggle('d-none', !dup); w.textContent = dup ? '⚠ ' + dup + ' phiếu đã chọn đang thuộc hồ sơ khác (nhãn vàng) — bấm nhãn để mở hồ sơ nguồn. Nếu lưu, phiếu sẽ bị tính ở cả hai hồ sơ cho tới khi xử lý.' : '';
+  }
+  /** Số phiếu ĐANG CHỌN mà hồ sơ khác đã có (dùng để cảnh báo trước khi lưu). */
+  function pickDupCount() {
+    if (pickState !== 'ok' || !ST[pickType]) return 0;
+    const on = new Set(ST[pickType].filter.pick || []), K = G().omitKey; let n = 0;
+    rowsForPick(pickType).forEach((r) => { if (on.has(K(r))) { const k = identOf(r); if (k && (pickAssigned.get(k) || []).length) n++; } });
+    return n;
+  }
+  function openPickSource(id) {
+    const m = $('#pickModal'); if (m && window.bootstrap) bootstrap.Modal.getOrCreateInstance(m).hide();
+    if (HAK.Archive && HAK.Archive.focus) HAK.Archive.focus(id); else location.hash = '#/archive';
   }
   function openPickModal(type) {
     if (!getDs(type)) { toast('Chưa có dữ liệu Excel.', 'error'); return; }
     if (ST[type].ro) { toast('Hồ sơ đang ở chế độ chỉ xem, không chọn phiếu được.', 'warning'); return; }
-    ensurePickModal(); pickType = type; $('#pickSearch').value = ''; $('#pickPasteMsg').textContent = '';
-    pickLoading = true; renderPickList(); bootstrap.Modal.getOrCreateInstance($('#pickModal')).show();
-    loadPickAssigned(type).catch((e) => console.warn('Không đọc được các hồ sơ đã gán phiếu', e)).finally(() => { pickLoading = false; if (pickType === type) renderPickList(); });
+    ensurePickModal(); pickType = type; pickAmb = []; const token = ++pickToken;      // mỗi lần mở hộp chọn = một phiên kiểm tra mới
+    pickAssigned = new Map(); pickState = 'loading';
+    $('#pickSearch').value = ''; $('#pickPasteMsg').textContent = ''; $('#pickPaste').value = ''; renderPickAmb();
+    renderPickList(); bootstrap.Modal.getOrCreateInstance($('#pickModal')).show();
+    loadPickAssigned(type, token).then((map) => { if (token !== pickToken || pickType !== type) return; pickAssigned = map; pickState = 'ok'; })
+      .catch((e) => { console.warn('Không đọc được các hồ sơ đã gán phiếu', e); if (token === pickToken) pickState = 'error'; })
+      .finally(() => { if (token === pickToken && pickType === type) renderPickList(); });
+  }
+  /** Trước khi lưu hồ sơ: có phiếu chọn riêng đang thuộc hồ sơ khác → hỏi xác nhận (true = tiếp tục). */
+  async function confirmPickConflicts(type) {
+    const pk = ST[type].filter.pick || []; if (!pk.length || !HAK.Archive || !HAK.Weigh) return true;
+    let map; try { pickType = type; map = await loadPickAssigned(type, pickToken); } catch (e) { return true; }
+    pickAssigned = map; pickState = 'ok';
+    const n = pickDupCount(); if (!n) return true;
+    return confirm('⚠ ' + n + ' phiếu bạn đã chọn đang thuộc hồ sơ khác trong Lưu trữ.\n\nNếu lưu, các phiếu này sẽ được tính ở cả hai hồ sơ (báo cáo sẽ cảnh báo trùng).\n\nBấm OK để vẫn lưu; Hủy để quay lại chỉnh phiếu.');
   }
   let omitType = null;
   function ensureOmitModal() {
@@ -1413,18 +1545,19 @@
     onData(only) {
       Object.keys(DOCS).forEach((t) => {
         if ((!only || only === t) && ST[t].built) {
-          const select=$('#'+fid(t,'contractId'));if(select)select.disabled=false;delete ST[t].savedDs;delete ST[t].snapshotParams;if(HAK.Yearbook)HAK.Yearbook.clear(t);ST[t].filter = { groups: null, from: '', to: '' }; ST[t].returned.clear(); renderFilter(t);
+          resetRecordState(t, { fields: false });          // dữ liệu Excel đổi: dùng chung logic khởi tạo (xóa phiếu chọn / bỏ / trả về / lọc), giữ các ô đã nhập
           const c = selectedContract(t);                   // hợp đồng đang chọn có "lọc theo khoảng ngày cân" → giữ khoảng ngày đó cho dữ liệu mới
           if (c) applyContractFilter(t, contractValues(t, c).filter);
-          updateSummary(t);
+          updateSummary(t); markClean(t);
         }
       });
     },
-    show(type) { if (ST[type].built) { refreshContracts(type); renderFilter(type); updateSummary(type); } },
-    unloadSnapshot(type){delete ST[type].savedDs;delete ST[type].snapshotParams;ST[type].filter={groups:null,from:'',to:''};ST[type].returned.clear();ST[type].omit.clear();HAK.Pages.readOnly(type,false);renderFilter(type);updateSummary(type);},
+    show(type) { if (ST[type].built) { refreshContracts(type); renderFilter(type); updateSummary(type); if (ST[type].baseSig === undefined) markClean(type); } },
+    unloadSnapshot(type){resetRecordState(type,{fields:false});},
+    newRecord, guardLeave, markClean, isDirty, _st: (t) => ST[t], _pick: { resolveTicket, view: () => pickView(), PICK_PAGE },
     readOnly(type,on){ST[type].ro=!!on;$$('#page-'+type+' input,#page-'+type+' select,#page-'+type+' textarea').forEach(n=>n.disabled=on);if(on)$('#year-note-'+type).textContent='Chỉ xem năm đã đóng · Không ghi vào kho làm việc. Dùng Khôi phục năm nếu cần sửa.';},
     snapshot(type){const ds=getDs(type);if(!ds)throw Error('Chưa có dữ liệu cân.');const params=collect(type);return {params,rows:JSON.parse(JSON.stringify(G().filterRows(ds.rows,params.filter)))};},
-    openSnapshot(record){const type=record.type;if(!DOCS[type])throw Error('Loại hồ sơ không hỗ trợ.');const rows=JSON.parse(JSON.stringify(record.rows));ST[type].savedDs={ok:true,rows,stats:HAK.Excel.computeStats(rows)};ST[type].snapshotParams=JSON.parse(JSON.stringify(record.params));ST[type].filter=Object.assign({groups:null,from:'',to:''},record.params.filter||{});if(ST[type].filter.groups)ST[type].filter.groups=new Set(ST[type].filter.groups);ST[type].returned=new Set(record.params.returned||[]);ST[type].omit=new Map(((record.params.filter||{}).omitLog||[]).map(e=>[e.key,e]));Object.assign(HAK.Config.custom,record.context&&record.context.custom||{});DOCS[type].groups.forEach(g=>g.fields.forEach(f=>{const node=$('#'+fid(type,f.id)),value=record.params[f.id];if(!node)return;if(node.tagName==='SELECT'&&value!=null&&!Array.from(node.options).some(o=>o.value===value)){const option=document.createElement('option');option.value=value;option.textContent=value+' (đã lưu)';node.append(option);}if(f.type==='contract')return;if(value!=null)setField(type,f,value);else resetField(type,f,node);}));const contract=$('#'+fid(type,'contractId'));if(contract){contract.value='';contract.disabled=true;contract.title='Hồ sơ dùng thông tin hợp đồng đã lưu; chọn Thêm mới để dùng hợp đồng khác.';}renderFilter(type);updateSummary(type);$('#year-note-'+type).textContent='Đang sửa hồ sơ năm '+record.year+' · phiên bản '+record.revision+' · Lưu hồ sơ để ghi thay đổi';},
+    openSnapshot(record){const type=record.type;if(!DOCS[type])throw Error('Loại hồ sơ không hỗ trợ.');const rows=JSON.parse(JSON.stringify(record.rows));ST[type].savedDs={ok:true,rows,stats:HAK.Excel.computeStats(rows)};ST[type].snapshotParams=JSON.parse(JSON.stringify(record.params));ST[type].filter=Object.assign({groups:null,from:'',to:''},record.params.filter||{});if(ST[type].filter.groups)ST[type].filter.groups=new Set(ST[type].filter.groups);ST[type].returned=new Set(record.params.returned||[]);ST[type].omit=new Map(((record.params.filter||{}).omitLog||[]).map(e=>[e.key,e]));Object.assign(HAK.Config.custom,record.context&&record.context.custom||{});DOCS[type].groups.forEach(g=>g.fields.forEach(f=>{const node=$('#'+fid(type,f.id)),value=record.params[f.id];if(!node)return;if(node.tagName==='SELECT'&&value!=null&&!Array.from(node.options).some(o=>o.value===value)){const option=document.createElement('option');option.value=value;option.textContent=value+' (đã lưu)';node.append(option);}if(f.type==='contract')return;if(value!=null)setField(type,f,value);else resetField(type,f,node);}));const contract=$('#'+fid(type,'contractId'));if(contract){contract.value='';contract.disabled=true;contract.title='Hồ sơ dùng thông tin hợp đồng đã lưu; chọn Thêm mới để dùng hợp đồng khác.';}renderFilter(type);updateSummary(type);$('#year-note-'+type).textContent='Đang sửa hồ sơ năm '+record.year+' · phiên bản '+record.revision+' · Lưu hồ sơ để ghi thay đổi';markClean(type);},
     refreshSelects, generate, generateBkls, _printInBatches: (f, w) => printInBatches(f, w),
     /** Loại biên bản có lập BKLS hay không (dùng ở Lưu trữ). */
     hasBkls: (t) => pageBkls(t),

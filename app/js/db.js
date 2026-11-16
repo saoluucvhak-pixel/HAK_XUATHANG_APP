@@ -87,6 +87,31 @@
     const tx = db.transaction(store, 'readwrite'); tx.objectStore(store).clear(); return txDone(tx);
   }
 
+  /**
+   * Ghi NHIỀU kho trong MỘT giao dịch có kiểm tra phiên bản (rev) của bản ghi chốt:
+   *   check(cur) → chuỗi lỗi (xung đột) hoặc null; apply(tx) ghi bằng tx.objectStore(kho).put / delete.
+   * Giao dịch hỏng / bị hủy → KHÔNG ghi gì (không còn tình trạng có file gốc mà thiếu thông số, hoặc ngược lại). Không có IndexedDB → ghi vào RAM.
+   * Lỗi xung đột (cửa sổ khác đã đổi bản ghi) có e.conflict = true.
+   */
+  async function guarded(stores, guardStore, guardKey, check, apply) {
+    const db = await open();
+    if (!db) {
+      const err = check(mem(guardStore).get(guardKey)); if (err) throw Object.assign(new Error(err), { conflict: true });
+      apply({ objectStore: (st) => ({ put: (val, key) => mem(st).set(key !== undefined ? key : val[STORES[st].keyPath], val), delete: (key) => mem(st).delete(key) }) });
+      return;
+    }
+    return new Promise((ok, no) => {
+      let tx, conflict = null;
+      try {
+        tx = db.transaction(stores, 'readwrite');
+        const g = tx.objectStore(guardStore).get(guardKey);
+        g.onsuccess = () => { const err = check(g.result); if (err) { conflict = err; try { tx.abort(); } catch (e) { /* đã hủy */ } } else { try { apply(tx); } catch (e) { try { tx.abort(); } catch (e2) { /* đã hủy */ } } } };
+        tx.oncomplete = () => ok();
+        tx.onabort = tx.onerror = () => no(conflict ? Object.assign(new Error(conflict), { conflict: true }) : (tx.error || new Error('Không ghi được IndexedDB')));
+      } catch (e) { no(e); }
+    });
+  }
+
   /** Tình trạng bộ nhớ trình duyệt (để hiện ở Cài đặt). */
   async function status() {
     const out = { backend: state.backend, persisted: null, usage: null, quota: null };
@@ -99,5 +124,5 @@
     try { return !!(navigator.storage && navigator.storage.persist && await navigator.storage.persist()); } catch (e) { return false; }
   }
 
-  HAK.DB = { open, kvPut, kvDel, kvAll, kvClear, put, get, getAll, del, clear, status, requestPersist, usable: () => state.backend === 'idb', get backend() { return state.backend; } };
+  HAK.DB = { guarded, open, kvPut, kvDel, kvAll, kvClear, put, get, getAll, del, clear, status, requestPersist, usable: () => state.backend === 'idb', get backend() { return state.backend; } };
 })(window);

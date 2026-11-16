@@ -12,29 +12,42 @@
 
   /* ======================= Các đợt Excel ======================= */
   const bid = (type, fileName) => type + '|' + fileName;
+  const metaOf = (type, b, rev) => ({ id: bid(type, b.fileName), type, fileName: b.fileName, size: b.size, sheet: b.sheet, mapping: b.mapping || {}, headerRow: b.headerRow || null, addedAt: b.addedAt || Date.now(), updatedAt: Date.now(), conv: b.conv || null, from: b.from || null, veh: b.veh || null, rev });   // conv = đã chuyển sang hình thức; from = chép từ hình thức; veh = danh sách xe riêng của đợt; rev = phiên bản (phát hiện sửa đồng thời ở 2 cửa sổ)
   const Batches = {
     /** Lưu (hoặc thay) 1 đợt: thông số + file gốc. bytes = ArrayBuffer của file. */
     async save(type, b, bytes) {
+      // v2.19.0: file gốc + thông số ghi trong MỘT giao dịch IndexedDB (có kiểm tra phiên bản rev) → hoặc cả hai, hoặc không gì; chỉ đánh dấu "đã lưu" khi giao dịch HOÀN TẤT.
       try {
         if (!b.addedAt) b.addedAt = Date.now();
-        await DB().put('batchdata', bytes, bid(type, b.fileName));
-        await this.saveMeta(type, b);
-        b.saved = true;
+        const id = bid(type, b.fileName), expected = b.rev || 0, meta = metaOf(type, b, expected + 1);
+        await DB().guarded(['batches', 'batchdata'], 'batches', id, (cur) => ((cur ? cur.rev || 0 : 0) !== expected ? 'Đợt "' + b.fileName + '" đã được lưu / thay ở cửa sổ khác.' : null),
+          (tx) => { tx.objectStore('batchdata').put(bytes, id); tx.objectStore('batches').put(meta); });
+        b.saved = true; b.rev = meta.rev; b.saveError = ''; b.pendingBytes = null;
         return true;
-      } catch (e) { console.warn('Không lưu được đợt:', e); warn('Không lưu được đợt "' + b.fileName + '" vào bộ nhớ trình duyệt — đợt chỉ tồn tại đến khi đóng trang.'); return false; }
+      } catch (e) {
+        b.saved = false; b.saveError = e && e.conflict ? e.message + ' Tải lại trang rồi nạp lại file.' : (e && e.message) || String(e); b.pendingBytes = bytes; console.warn('Không lưu được đợt:', e); warn('Không lưu được đợt "' + b.fileName + '" vào bộ nhớ trình duyệt — đợt chỉ tồn tại đến khi đóng trang.'); return false; }
     },
     /** Cập nhật thông số (sheet / ánh xạ cột) của đợt đã lưu. */
     async saveMeta(type, b) {
-      if (!b.saved && !b.addedAt) return;
+      if (!b.saved && !b.addedAt) return true;
       try {
-        await DB().put('batches', { id: bid(type, b.fileName), type, fileName: b.fileName, size: b.size, sheet: b.sheet, mapping: b.mapping || {}, headerRow: b.headerRow || null, addedAt: b.addedAt || Date.now(), updatedAt: Date.now(), conv: b.conv || null, from: b.from || null, veh: b.veh || null });   // v2.6.7: conv = đã chuyển sang hình thức; from = chép từ hình thức · v2.7.2 veh = danh sách xe riêng của đợt
-      } catch (e) { console.warn('Không cập nhật được thông số đợt:', e); }
+        const id = bid(type, b.fileName), expected = b.rev || 0, meta = metaOf(type, b, expected + 1);
+        await DB().guarded(['batches'], 'batches', id, (cur) => ((cur ? cur.rev || 0 : 0) !== expected ? 'Đợt "' + b.fileName + '" đã đổi ở cửa sổ khác.' : null), (tx) => { tx.objectStore('batches').put(meta); });
+        b.rev = meta.rev; return true;
+      } catch (e) { console.warn('Không cập nhật được thông số đợt:', e); warn('Không cập nhật được thông số đợt "' + b.fileName + '": ' + ((e && e.message) || e)); return false; }
     },
+    /** Thử lưu lại đợt chưa lưu được (giữ file gốc trong RAM tới khi lưu xong). */
+    async retry(type, b) { return b && b.pendingBytes ? this.save(type, b, b.pendingBytes) : this.saveMeta(type, b); },
     /** v2.6.7: file gốc (ArrayBuffer) của 1 đợt đã lưu — dùng khi chép đợt sang hình thức khác. */
     async bytes(type, fileName) { return DB().get('batchdata', bid(type, fileName)); },
-    async remove(type, fileName) {
-      try { await DB().del('batches', bid(type, fileName)); await DB().del('batchdata', bid(type, fileName)); }
-      catch (e) { console.warn('Không xóa được đợt đã lưu:', e); }
+    /** Xóa file gốc + thông số trong MỘT giao dịch. rev = phiên bản đang giữ (null = không kiểm tra). Trả { ok, error, conflict }. */
+    async remove(type, fileName, rev) {
+      const id = bid(type, fileName);
+      try {
+        await DB().guarded(['batches', 'batchdata'], 'batches', id, (cur) => (rev != null && cur && (cur.rev || 0) !== rev ? 'Đợt "' + fileName + '" đã đổi ở cửa sổ khác — tải lại trang trước khi xóa.' : null),
+          (tx) => { tx.objectStore('batches').delete(id); tx.objectStore('batchdata').delete(id); });
+        return { ok: true };
+      } catch (e) { console.warn('Không xóa được đợt đã lưu:', e); return { ok: false, error: (e && e.message) || String(e), conflict: !!(e && e.conflict) }; }
     },
     /** Toàn bộ đợt đã lưu, cũ → mới: [{ meta, bytes }]. */
     async loadAll() {

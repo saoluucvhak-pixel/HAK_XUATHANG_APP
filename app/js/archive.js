@@ -410,5 +410,11 @@
     updateBadge();
   }
 
-  HAK.Archive = { get lastError() { return lastError; }, setContract, closeVerified,decode:unpack,SOFT_WARN, save, list, load, ensureStats, regenerate, exportAll, importFile, collectItems, importItems, render, init, updateBadge, get state() { return state; } };
+  /** Mở trang Lưu trữ và lọc đúng hồ sơ id (dùng khi bấm nhãn "Đã gán" ở hộp chọn phiếu để xem hồ sơ nguồn). */
+  async function focus(id) {
+    const m = await getOne('meta', id); location.hash = '#/archive';
+    setTimeout(() => { try { if (archiveSmart && m) archiveSmart.setState(Object.assign({}, HAK.Filters.core.empty(), { q: m.title || '' }), true); } catch (e) { console.warn('Không lọc được hồ sơ nguồn', e); } }, 350);
+    return !!m;
+  }
+  HAK.Archive = { focus, get lastError() { return lastError; }, setContract, closeVerified,decode:unpack,SOFT_WARN, save, list, load, ensureStats, regenerate, exportAll, importFile, collectItems, importItems, render, init, updateBadge, get state() { return state; } };
 })(typeof window !== 'undefined' ? window : globalThis);

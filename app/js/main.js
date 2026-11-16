@@ -161,12 +161,14 @@
     $('#batchBody').innerHTML = sl.batches.map((b, i) => {
       const ok = b.ds && b.ds.ok, st = ok ? b.ds.stats : null;
       const D = HAK.Pages.DOCS, tag = (b.conv && D[b.conv.to] ? ' <span class="badge text-bg-info">➡ đã chuyển sang ' + esc(D[b.conv.to].title) + '</span>' : '') +
-        (b.from && D[b.from.type] ? ' <span class="badge badge-soft">⬅ chép từ ' + esc(D[b.from.type].title) + '</span>' : '');
+        (b.from && D[b.from.type] ? ' <span class="badge badge-soft">⬅ chép từ ' + esc(D[b.from.type].title) + '</span>' : '') +
+        (b.saveError ? ' <span class="badge text-bg-danger" title="' + esc(b.saveError) + '">⚠ Chưa lưu bền</span> <button class="btn btn-sm btn-outline-danger py-0" data-retry-batch="' + esc(b.fileName) + '" type="button">Thử lưu lại</button>'
+          : b.saved ? ' <span class="badge text-bg-success" title="File gốc + thông số đã ghi vào bộ nhớ trình duyệt">✔ Đã lưu</span>' : '');
       return '<tr class="' + (i === sl.sel ? 'table-active' : '') + '" data-bi="' + i + '" style="cursor:pointer"><td>' + (i + 1) + '</td><td class="text-break">' + esc(b.fileName) + tag + '</td>' +
         (ok ? '<td class="num">' + fmtInt(st.trips) + '</td><td class="num">' + G.fmtTon(st.kg) + '</td><td>' + esc(st.from) + (st.to && st.to !== st.from ? ' → ' + esc(st.to) : '') + '</td>'
             : '<td colspan="3" class="text-danger small">' + esc((b.ds && b.ds.errors && b.ds.errors[0]) || 'Không đọc được dữ liệu') + '</td>') +
         '<td class="text-nowrap">' + vehCell(b) + '</td>' +
-        '<td class="text-end text-nowrap"><button class="btn btn-sm btn-outline-secondary me-1" data-view-batch="' + i + '" type="button">Xem</button><button class="btn btn-sm btn-outline-danger" data-del-batch="' + i + '" type="button">Xóa</button></td></tr>';
+        '<td class="text-end text-nowrap"><button class="btn btn-sm btn-outline-secondary me-1" data-view-batch="' + i + '" type="button">Xem</button><button class="btn btn-sm btn-outline-danger" data-del-batch="' + esc(b.fileName) + '" type="button">Xóa</button></td></tr>';
     }).join('');
     const ds = sl.ds;
     $('#batchSummary').innerHTML = ds && ds.ok
@@ -193,18 +195,36 @@
       toast('Đang xem đợt "' + sl.batches[i].fileName + '"' + (st ? ': ' + fmtInt(st.trips) + ' xe · ' + G.fmtTon(st.kg) + ' tấn' : '') + ' — xem bảng chi tiết bên dưới.', 'info');
     }
   }
-  function deleteBatch(i) {
-    const sl = App.slot(); if (!sl || !sl.batches[i]) return;
-    if (HAK.Batches) HAK.Batches.remove(App.type, sl.batches[i].fileName);
-    const fr = sl.batches[i].from;                          // xóa đợt đã chép sang → đợt gốc được chuyển lại (sang hình thức khác nếu cần)
+  /** Thử lưu lại đợt chưa ghi được vào IndexedDB (file gốc còn giữ trong RAM). */
+  async function retryBatch(fileName) {
+    const sl = App.slot(), b = sl && sl.batches.find((x) => x.fileName === fileName); if (!b || !HAK.Batches) return;
+    const ok = await HAK.Batches.retry(App.type, b);
+    toast(ok ? 'Đã lưu đợt "' + fileName + '" vào bộ nhớ trình duyệt.' : 'Vẫn chưa lưu được đợt "' + fileName + '": ' + (b.saveError || 'lỗi không rõ') + '.', ok ? 'success' : 'error');
+    renderBatches();
+  }
+  /** Xóa đợt theo TÊN FILE (mã đợt ổn định) — không dùng số thứ tự vì danh sách có thể đã đổi (đợt khác bị xóa / thêm, cửa sổ khác). */
+  async function deleteBatch(fileName) {
+    const sl = App.slot(); if (!sl) return;
+    const i = sl.batches.findIndex((x) => x.fileName === fileName); if (i < 0) { toast('Đợt "' + fileName + '" không còn trong danh sách.', 'warning'); renderBatches(); return; }
+    const D = HAK.Pages.DOCS, cur = sl.batches[i];
+    // Điểm tham chiếu: đợt đã chép sang hình thức khác (đợt đích có bản sao độc lập — vẫn giữ)
+    const dests = cur.conv && App.slots[cur.conv.to] ? App.slots[cur.conv.to].batches.filter((x) => x.from && x.from.type === App.type && x.from.fileName === cur.fileName) : [];
+    if (dests.length && !confirm('Đợt "' + cur.fileName + '" đã được chuyển sang ' + (D[cur.conv.to] ? D[cur.conv.to].title : cur.conv.to) + '.\n\nXóa đợt gốc: đợt ở ' + (D[cur.conv.to] ? D[cur.conv.to].title : '') + ' VẪN GIỮ (bản sao độc lập) nhưng mất dấu "chép từ".\n\nBấm OK để xóa; Hủy để giữ lại.')) return;
+    if (HAK.Batches && cur.saved) {                         // xóa file gốc + thông số trong MỘT giao dịch; lỗi → giữ nguyên đợt và báo rõ
+      const r = await HAK.Batches.remove(App.type, cur.fileName, cur.rev || 0);
+      if (!r.ok) { toast('Không xóa được đợt "' + cur.fileName + '": ' + r.error + ' Đợt vẫn còn nguyên — thử lại.', 'error'); return; }
+    }
+    const j = sl.batches.findIndex((x) => x.fileName === fileName); if (j < 0) return;
+    dests.forEach((x) => { x.from = null; if (x.saved && HAK.Batches) HAK.Batches.saveMeta(cur.conv.to, x); });
+    const fr = sl.batches[j].from;                          // xóa đợt đã chép sang → đợt gốc được chuyển lại (sang hình thức khác nếu cần)
     if (fr && App.slots[fr.type]) App.slots[fr.type].batches.forEach((b) => { if (b.fileName === fr.fileName && b.conv && b.conv.to === App.type) { b.conv = null; if (b.saved && HAK.Batches) HAK.Batches.saveMeta(fr.type, b); } });
-    sl.batches.splice(i, 1);
-    sl.sel = Math.min(sl.sel >= i ? sl.sel - 1 : sl.sel, sl.batches.length - 1); if (sl.sel < 0 && sl.batches.length) sl.sel = 0;
+    sl.batches.splice(j, 1);
+    sl.sel = Math.min(sl.sel >= j ? sl.sel - 1 : sl.sel, sl.batches.length - 1); if (sl.sel < 0 && sl.batches.length) sl.sel = 0;
     mergeSlot(sl);
     renderTypePicker(); renderFile(); renderVehicles(); updateChips();
     HAK.Pages.onData(App.type);
     if (location.hash === '#/home' || !location.hash) renderHome();
-    toast('Đã xóa đợt khỏi dữ liệu của loại này.', 'info');
+    toast('Đã xóa đợt "' + fileName + '" khỏi dữ liệu của loại này (file gốc và thông số đã xóa khỏi bộ nhớ trình duyệt).', 'info');
   }
   /* ---- v2.12.1: phiếu trùng giữa các đợt nhưng khác khối lượng → chọn đợt trước / đợt sau ---- */
   function ensureConflictModal() {
@@ -262,10 +282,20 @@
       const bytes = HAK.Batches ? await file.arrayBuffer() : null;          // file gốc → lưu bền để mở lại app vẫn còn
       const sl = App.slot();
       let bi = sl.batches.findIndex((b) => b.fileName === file.name), replaced = bi >= 0;
+      if (replaced) {                                       // nạp file trùng tên = THAY đợt cũ: nói rõ đợt nào sẽ bị thay
+        const old = sl.batches[bi], os = old.ds && old.ds.ok ? old.ds.stats : null, D = HAK.Pages.DOCS;
+        Loading.hide();
+        const ok = confirm('Đã có đợt cùng tên "' + file.name + '" ở ' + D[App.type].title + (os ? ' (' + fmtInt(os.trips) + ' phiếu cân, ' + G.fmtTon(os.kg) + ' tấn)' : '') +
+          (old.conv && D[old.conv.to] ? '\nĐợt này đã chuyển sang ' + D[old.conv.to].title + ' (bản đã chuyển giữ nguyên, không đổi theo).' : '') + '.\n\nBấm OK để THAY bằng file mới; Hủy để giữ đợt cũ.');
+        if (!ok) { toast('Đã giữ đợt cũ "' + file.name + '" — chưa thay.', 'info'); return; }
+        Loading.show('Đang đọc file "' + file.name + '"…');
+      }
+      const keepRev = replaced ? sl.batches[bi].rev || 0 : 0;
       const keepAdded = replaced ? sl.batches[bi].addedAt : 0, keepConv = replaced ? sl.batches[bi].conv : null, keepFrom = replaced ? sl.batches[bi].from : null;
       const keepVeh = replaced ? sl.batches[bi].veh : null;
       if (!replaced) { sl.batches.push(newBatch()); bi = sl.batches.length - 1; } else sl.batches[bi] = newBatch();
       if (keepAdded) sl.batches[bi].addedAt = keepAdded;
+      if (keepRev) sl.batches[bi].rev = keepRev;
       if (keepConv) sl.batches[bi].conv = keepConv;            // nạp lại file cùng tên: vẫn giữ dấu "đã chuyển sang" (mỗi đợt 1 hình thức)
       if (keepFrom) sl.batches[bi].from = keepFrom;
       sl.sel = bi;
@@ -279,8 +309,10 @@
       const fv = HAK.Vehicles.fromWorkbook(info.workbook, file.name, pick);
       App.cur().veh = fv || keepVeh || null;
       parseCurrent(true);
-      if (App.ds.ok && bytes) await HAK.Batches.save(App.type, App.cur(), bytes);
-      if (App.ds.ok) toast((replaced ? 'Đã thay đợt "' + file.name + '": ' : 'Đã thêm đợt: ') + fmtInt(App.ds.stats.trips) + ' phiếu cân — ' + G.fmtTon(App.ds.stats.kg) + ' tấn.' +
+      let savedOk = true;
+      if (App.ds.ok && bytes) savedOk = await HAK.Batches.save(App.type, App.cur(), bytes);     // true chỉ khi giao dịch IndexedDB đã hoàn tất
+      if (App.ds.ok && !savedOk) toast('⚠ Đã đọc "' + file.name + '" (' + fmtInt(App.ds.stats.trips) + ' phiếu) nhưng CHƯA lưu được vào bộ nhớ trình duyệt: ' + (App.cur().saveError || 'lỗi không rõ') + ' — đợt chỉ tồn tại đến khi đóng trang. Bấm "Thử lưu lại" ở dòng đợt.', 'error');
+      else if (App.ds.ok) toast((replaced ? 'Đã thay đợt "' + file.name + '": ' : 'Đã thêm đợt: ') + fmtInt(App.ds.stats.trips) + ' phiếu cân — ' + G.fmtTon(App.ds.stats.kg) + ' tấn.' +
         (fv ? ' Danh sách xe của đợt: ' + fv.count + ' xe (sheet "' + fv.sheet + '").' : App.cur().veh ? ' Giữ danh sách xe đã gắn cho đợt.' : ' Đợt chưa có danh sách xe — bấm 🚚 ở dòng đợt để gắn.'), fv || App.cur().veh ? 'success' : 'warning');
       else toast(App.ds.errors[0] || 'Không đọc được dữ liệu.', 'error');
       const cf = App.slot() && App.slot().ds && App.slot().ds.conflicts;
@@ -338,7 +370,7 @@
       let i = sl.batches.findIndex((x) => x.fileName === b.fileName);
       const nb = newBatch();
       Object.assign(nb, { wb, fileName: b.fileName, size: b.size, sheet: b.sheet, mapping: Object.assign({}, b.mapping || {}), headerRow: b.headerRow || null,
-        addedAt: i >= 0 ? sl.batches[i].addedAt : 0, from: { type: src, fileName: b.fileName, at: Date.now() },
+        addedAt: i >= 0 ? sl.batches[i].addedAt : 0, rev: i >= 0 ? sl.batches[i].rev || 0 : 0, from: { type: src, fileName: b.fileName, at: Date.now() },
         veh: b.veh ? Object.assign({}, b.veh) : null });           // v2.7.2: cùng lô hàng → mang theo danh sách xe của đợt gốc
       if (i >= 0) sl.batches[i] = nb; else { sl.batches.push(nb); i = sl.batches.length - 1; }
       parseSlot(nb);
@@ -373,7 +405,7 @@
           const b = newBatch();
           b.wb = info.workbook; b.fileName = m.fileName; b.size = m.size || 0;
           b.sheet = info.sheetNames.indexOf(m.sheet) >= 0 ? m.sheet : info.sheetNames[0];
-          b.mapping = m.mapping || {}; b.headerRow = m.headerRow || null; b.addedAt = m.addedAt; b.saved = true;
+          b.mapping = m.mapping || {}; b.headerRow = m.headerRow || null; b.addedAt = m.addedAt; b.saved = true; b.rev = m.rev || 0;
           b.conv = m.conv || null; b.from = m.from || null;
           b.veh = m.veh || null;
           if (m.veh === undefined && legacyVeh) { b.veh = Object.assign({}, legacyVeh); migrated.push([m.type, b]); }   // đợt lưu từ bản cũ: gắn danh sách chung đang dùng (1 lần)
@@ -601,7 +633,9 @@
     $('#batchSummary').addEventListener('click', (e) => { if (e.target.closest('#btnConflicts')) openConflicts(); });
     $('#batchBody').addEventListener('click', (e) => {
       const d = e.target.closest('[data-del-batch]');
-      if (d) { confirmClick(d, () => deleteBatch(+d.dataset.delBatch), 'Bấm lần nữa để xóa'); return; }
+      const rt = e.target.closest('[data-retry-batch]');
+      if (rt) { retryBatch(rt.dataset.retryBatch); return; }
+      if (d) { confirmClick(d, () => deleteBatch(d.dataset.delBatch), 'Bấm lần nữa để xóa'); return; }
       const tr = e.target.closest('[data-bi]'); if (tr) viewBatch(+tr.dataset.bi);
     });
     ['dragenter', 'dragover'].forEach((ev) => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.add('drag'); }));
