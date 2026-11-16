@@ -351,6 +351,12 @@
       '<div class="col-6 col-md-4"><label class="form-label">Đến ngày</label><input type="date" class="form-control" id="to-' + type + '"></div>' +
       '<div class="col-12 col-md-4 d-grid"><button class="btn btn-outline-secondary" id="resetFlt-' + type + '" type="button">Đặt lại bộ lọc</button></div></div>' +
       '<div class="form-text">Bỏ trống ngày = lấy toàn bộ dữ liệu trong file Excel.</div>' +
+      '<div class="border rounded p-2 mt-2"><div class="small fw-semibold mb-1">🚢 Tách phiếu cân trong cùng ngày <span class="muted fw-normal">— 1 ngày chạy 2 tàu: mỗi tàu một hồ sơ, lọc theo GIỜ cân hoặc dãy SỐ PHIẾU của tàu đó</span></div>' +
+      '<div class="row g-2 align-items-end"><div class="col-6 col-md-3"><label class="form-label small mb-0" for="tf-' + type + '">Giờ cân từ</label><input type="time" class="form-control form-control-sm" id="tf-' + type + '"></div>' +
+      '<div class="col-6 col-md-3"><label class="form-label small mb-0" for="tt-' + type + '">Giờ cân đến</label><input type="time" class="form-control form-control-sm" id="tt-' + type + '"></div>' +
+      '<div class="col-6 col-md-3"><label class="form-label small mb-0" for="kf-' + type + '">Số phiếu từ</label><input type="text" class="form-control form-control-sm" id="kf-' + type + '" inputmode="numeric" autocomplete="off"></div>' +
+      '<div class="col-6 col-md-3"><label class="form-label small mb-0" for="kt-' + type + '">Số phiếu đến</label><input type="text" class="form-control form-control-sm" id="kt-' + type + '" inputmode="numeric" autocomplete="off"></div></div>' +
+      '<div class="form-text mt-1" id="splitNote-' + type + '">Để trống = không tách. Ca qua nửa đêm: giờ từ lớn hơn giờ đến (vd 22:00 → 02:00). Số phiếu so theo dãy số cuối (PC-000123 → 123).</div></div>' +
       '<div class="d-flex flex-wrap align-items-center gap-2 mt-2"><button class="btn btn-outline-danger btn-sm" id="btnOmit-' + type + '" type="button">🚫 Bỏ phiếu cân…</button><span id="omitSummary-' + type + '" class="muted small">Chưa bỏ phiếu nào.</span></div>' +
       '<div class="form-text">Phiếu bị bỏ coi như không có: không tính vào tổng, biên bản, BKLS, báo cáo. Có thể khôi phục bất cứ lúc nào trước khi lưu hồ sơ.</div><div id="convNote-' + type + '"></div></div></div>';
     // ---- v2.7.0: chia vùng nhập liệu thành tab (vùng không có nhóm nào thì bỏ tab) ----
@@ -466,6 +472,9 @@
     });
     $('#from-' + type).addEventListener('change', (e) => { ST[type].filter.from = e.target.value; updateSummary(type); });
     $('#to-' + type).addEventListener('change', (e) => { ST[type].filter.to = e.target.value; updateSummary(type); });
+    [['tf', 'timeFrom'], ['tt', 'timeTo'], ['kf', 'ticketFrom'], ['kt', 'ticketTo']].forEach(([pre, key]) => {
+      const el = $('#' + pre + '-' + type); if (el) el.addEventListener('input', (e) => { ST[type].filter[key] = e.target.value.trim(); updateSummary(type); });
+    });
     $('#resetFlt-' + type).addEventListener('click', () => { resetFilter(type); });
     $('#gen-' + type).addEventListener('click', () => generate(type));
     $('#pdf-' + type).addEventListener('click', () => generate(type, 'pdf'));
@@ -642,7 +651,7 @@
       if (c.currency === 'VND') own('unitPrice', numTxt(c.priceUsd));
       else notes.push('Đơn giá hợp đồng tính ' + (c.currency || 'USD') + ' — biên bản in đồng/tấn nên không điền ô Đơn giá.');
     }
-    const filter = c.filterTrips && (c.fromDate || c.toDate) ? { from: c.fromDate || '', to: c.toDate || '' } : null;
+    const filter = c.filterTrips && (c.fromDate || c.toDate || c.fromTime || c.toTime || c.ticketFrom || c.ticketTo) ? { from: c.fromDate || '', to: c.toDate || '', timeFrom: c.fromTime || '', timeTo: c.toTime || '', ticketFrom: c.ticketFrom || '', ticketTo: c.ticketTo || '' } : null;
     return { v, notes, filter };
   }
   /** Giá trị hiện tại / gán giá trị cho 1 ô form theo kiểu ô. */
@@ -673,6 +682,7 @@
     if (!flt) return false;
     ST[type].filter.from = flt.from; ST[type].filter.to = flt.to;
     $('#from-' + type).value = flt.from; $('#to-' + type).value = flt.to;
+    [['tf', 'timeFrom'], ['tt', 'timeTo'], ['kf', 'ticketFrom'], ['kt', 'ticketTo']].forEach(([pre, key]) => { ST[type].filter[key] = flt[key] || ''; const el = $('#' + pre + '-' + type); if (el) el.value = flt[key] || ''; });   // chi tiết hợp đồng (tàu) nào lọc theo giờ / số phiếu riêng thì điền luôn
     return true;
   }
   function selectedContract(type) {
@@ -751,6 +761,7 @@
     const allLabels = ds ? ds.stats.groups.map((g) => g.label) : [];
     const sel = stt.filter.groups;
     p.filter = { groups: sel && sel.size < allLabels.length ? Array.from(sel) : null, from: stt.filter.from, to: stt.filter.to };
+    ['timeFrom', 'timeTo', 'ticketFrom', 'ticketTo'].forEach((k) => { if (stt.filter[k]) p.filter[k] = stt.filter[k]; });          // tách phiếu cân trong cùng ngày
     if (stt.filter.smart) p.filter.smart = Object.assign(JSON.parse(JSON.stringify(stt.filter.smart)), {tu: stt.filter.from || "", den: stt.filter.to || ""});
     if (stt.filter.files && stt.filter.files.length) p.filter.files = stt.filter.files.slice();          // v2.6.7: phạm vi chuyển từ kho gửi
     if (stt.filter.exclude && stt.filter.exclude.length) p.filter.exclude = stt.filter.exclude.slice();
@@ -828,6 +839,7 @@
       el.value = ST[type].filter[k] || '';
       if (ds.stats.minTs !== null) { el.min = iso(ds.stats.minTs); el.max = iso(ds.stats.maxTs); }
     });
+    [['tf', 'timeFrom'], ['tt', 'timeTo'], ['kf', 'ticketFrom'], ['kt', 'ticketTo']].forEach(([pre, key]) => { const el = $('#' + pre + '-' + type); if (el) el.value = ST[type].filter[key] || ''; });   // tách phiếu trong ngày
   }
 
   function currentRows(type) {

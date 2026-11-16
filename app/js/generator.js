@@ -62,6 +62,13 @@
   }
   /** Khóa nhận diện 1 phiếu để bỏ tay: số phiếu | biển số | giờ cân vào (cùng khóa khử trùng đợt) — bền khi nạp lại file đổi thứ tự dòng. */
   const omitKey = (r) => (r.ticket || '') + '|' + r.plate + '|' + (r.ts1 !== null && r.ts1 !== undefined ? r.ts1 : r.time1) + (r.ticket ? '' : '|' + r.net);
+  /** Mô tả phần lọc "tách trong ngày" ('' nếu không dùng) — ghi vào tóm tắt hồ sơ / Excel để biết phiếu của tàu nào. */
+  function filterSplitText(f) {
+    f = f || {}; const p = [];
+    if (f.timeFrom || f.timeTo) p.push('giờ cân ' + (f.timeFrom || '00:00') + ' → ' + (f.timeTo || '23:59'));
+    if (f.ticketFrom || f.ticketTo) p.push('số phiếu ' + (f.ticketFrom || '…') + ' → ' + (f.ticketTo || '…'));
+    return p.join(' · ');
+  }
   function filterRows(rows, filter) {
     filter = filter || {};
     const groups = filter.groups ? new Set(filter.groups) : null;
@@ -71,7 +78,20 @@
     const excl = filter.exclude && filter.exclude.length ? new Set(filter.exclude) : null;
     const omit = filter.omit && filter.omit.length ? new Set(filter.omit) : null;   // phiếu bị bỏ tay → coi như không có
     const fileOf = (r) => { const u = r.uid === undefined ? '' : String(r.uid), i = u.lastIndexOf('#'); return i < 0 ? '' : u.slice(0, i); };
+    // v2.18.0 — TÁCH PHIẾU CÂN TRONG CÙNG NGÀY (1 ngày chạy 2 tàu): ngoài khoảng ngày còn lọc theo GIỜ CÂN (từ–đến, qua nửa đêm được) và SỐ PHIẾU (từ–đến, lấy dãy số cuối của số phiếu).
+    const tmin = (s) => { const m = String(s || '').match(/^(\d{1,2}):(\d{2})$/); return m && +m[1] < 24 && +m[2] < 60 ? +m[1] * 60 + +m[2] : null; };
+    const tnum = (s) => { const m = String(s == null ? '' : s).match(/(\d+)\D*$/); return m ? Number(m[1]) : null; };
+    const tf = tmin(filter.timeFrom), tt = tmin(filter.timeTo), kf = tnum(filter.ticketFrom), kt = tnum(filter.ticketTo);
+    const inTime = (r) => {
+      if (tf === null && tt === null) return true;
+      if (r.ts1 === null || r.ts1 === undefined) return false;
+      const d = new Date(r.ts1), m = d.getUTCHours() * 60 + d.getUTCMinutes();
+      if (tf !== null && tt !== null && tf > tt) return m >= tf || m <= tt;                 // ca qua nửa đêm (vd 22:00 → 02:00)
+      return (tf === null || m >= tf) && (tt === null || m <= tt);
+    };
+    const inTicket = (r) => { if (kf === null && kt === null) return true; const n = tnum(r.ticket); return n !== null && (kf === null || n >= kf) && (kt === null || n <= kt); };
     const selected = rows.filter((r) => {
+      if (!inTime(r) || !inTicket(r)) return false;
       if (files && r.uid !== undefined && !files.has(fileOf(r))) return false;
       if (excl && excl.has(r.uid !== undefined ? r.uid : r.idx)) return false;
       if (omit && omit.has(omitKey(r))) return false;
@@ -595,7 +615,7 @@
 
   HAK.Generator = {
     fmtInt, fmtDec, fmtTon, fmtTonRound, isoToVN, slug, vnMoneyWords,
-    filterRows, summarize, plateRows, detailRows, retKey, omitKey,
+    filterSplitText, filterRows, summarize, plateRows, detailRows, retKey, omitKey,
     build(type, ds, params) {
       if (!ds || !ds.ok) return { files: [], summary: {}, warnings: [], errors: ['Chưa có dữ liệu Excel hợp lệ. Hãy thêm file ở mục "Nhập liệu".'] };
       const res = BUILDERS[type](ds, params);
@@ -605,6 +625,13 @@
         else res.excel.note = (res.excel.note ? res.excel.note + ' · ' : '') + scope;
         res.summary['Phạm vi lọc'] = scope;
       }
+      const split = filterSplitText(params.filter);
+      if (split && res.excel) {                                         // tách phiếu cân trong cùng ngày (1 ngày 2 tàu): ghi rõ trên bản xuất + tóm tắt hồ sơ
+        const t = 'Tách phiếu trong ngày: ' + split;
+        if (res.excel.kind === 'A') res.excel.lines = (res.excel.lines || []).concat(t);
+        else res.excel.note = (res.excel.note ? res.excel.note + ' · ' : '') + t;
+      }
+      if (split) res.summary['Tách phiếu trong ngày'] = split;
       return res;
     }
   };

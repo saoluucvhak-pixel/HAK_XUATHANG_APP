@@ -291,6 +291,11 @@ Thủy chốt 28/09/2026: "1. bỏ Trao đổi KHÔNG đồng bộ lên Google S
 - pages.js generateBkls: không chặn khi thiếu Số BKLS / hệ số / tên bên mua — tự điền hoặc để trống + cảnh báo.
 - tests/parse-num.test.cjs, tests/numfmt.test.cjs.
 
+## (Chưa phát hành) Tách phiếu cân trong cùng ngày — 1 ngày chạy 2 tàu
+- Phạm vi dữ liệu có thêm ô **Giờ cân từ / đến** (qua nửa đêm được) và **Số phiếu từ / đến** (so theo dãy số cuối của số phiếu). Mỗi tàu lập một hồ sơ với giờ hoặc dãy số phiếu của tàu đó; hai hồ sơ cùng ngày không trùng, không mất phiếu, báo cáo cộng đủ.
+- Chi tiết hợp đồng (tàu): thêm Giờ cân từ / đến, Số phiếu từ / đến (áp khi tick "Lọc xe theo ngày cân") — chọn tàu ở form lập biên bản là tự điền cả ngày, giờ và số phiếu.
+- Phạm vi tách được lưu trong hồ sơ Lưu trữ, ghi vào tóm tắt hồ sơ và ghi chú Excel ("Tách phiếu trong ngày: …"). Hồ sơ cũ không đổi.
+
 ## v2.17.1 — Dọn mã dùng chung
 - util.js (HAK.Util: hasNum, vnDate) thay cho các bản sao giống hệt ở contract-file, contract-status, customs, gsync-contracts, catalog. Không đổi hành vi; ESLint, 256 test (Node 18 / 20 / 22) và mở thử 17 màn hình + Hồ sơ hợp đồng đạt.
 - Chưa áp Prettier cho toàn bộ mã: định dạng lại hàng chục nghìn dòng sẽ tạo thay đổi không thể duyệt; nên làm riêng theo từng file khi sửa.

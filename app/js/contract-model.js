@@ -1,7 +1,7 @@
 (function(root){
 'use strict';
 const HAK=root.HAK=root.HAK||{};
-const childFields=['ship','tkhq','product','qty','priceUsd','exchangeRate','valueUsd','valueVnd','certNo','certDate','mt','bdmt','moisture','deliverId','receiverId','whId','fromDate','toDate','filterTrips','certificateFiles','sourcePdfId','sourceEvidence','sourcePage','note','deletedAt','revision','legacyAlias'];
+const childFields=['ship','tkhq','product','qty','priceUsd','exchangeRate','valueUsd','valueVnd','certNo','certDate','mt','bdmt','moisture','deliverId','receiverId','whId','fromDate','toDate','fromTime','toTime','ticketFrom','ticketTo','filterTrips','certificateFiles','sourcePdfId','sourceEvidence','sourcePage','note','deletedAt','revision','legacyAlias'];
 const numeric=['qty','priceUsd','exchangeRate','valueUsd','valueVnd','mt','bdmt','moisture'];
 const copy=x=>JSON.parse(JSON.stringify(x));
 function id(prefix){return prefix+(root.crypto&&root.crypto.randomUUID?root.crypto.randomUUID():Date.now().toString(36)+'-'+Math.random().toString(36).slice(2));}
