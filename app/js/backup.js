@@ -602,7 +602,7 @@
       (st.persisted === false ? '<button class="btn btn-outline-secondary" id="bkPersist" type="button">Yêu cầu trình duyệt giữ dữ liệu</button>' : '') + '</div>' +
       '<div class="form-check mt-2 admin-only"><input class="form-check-input" type="checkbox" id="bkKeepAuth" checked><label class="form-check-label small" for="bkKeepAuth"><b>Giữ tài khoản đang dùng trên máy này</b> khi khôi phục (không lấy tài khoản / mật khẩu trong file sao lưu). ' +
       'Bỏ tick khi chuyển sang máy mới và muốn mọi người đăng nhập bằng mật khẩu cũ.</label></div>' +
-      '<div class="form-text mt-2">Nên sao lưu định kỳ và trước khi đổi máy / trình duyệt hoặc xóa dữ liệu duyệt web. File sao lưu là <b>.zip</b> (nén, từ v2.7.5); Khôi phục nhận cả .zip và file .json của bản cũ. Khôi phục sẽ ghi đè cài đặt cùng tên và gộp hồ sơ Lưu trữ (hồ sơ mới hơn được giữ).' +
+      '<div class="form-text mt-2">Nên sao lưu định kỳ và trước khi đổi máy / trình duyệt hoặc xóa dữ liệu duyệt web. File sao lưu là <b>.zip</b> (nén, từ v2.7.5); Nhập từ bản sao nhận cả .zip và file .json của bản cũ; chọn <b>Nhập bổ sung</b> (gộp theo phiên bản, giữ dữ liệu mới hơn) hoặc <b>Khôi phục (ghi đè)</b> danh mục &amp; cài đặt về thời điểm sao lưu.' +
       (dirOk ? ' Đã chọn thư mục mặc định thì hộp thoại "Lưu file" khi bấm Sao lưu sẽ tự mở sẵn tại thư mục đó (trình duyệt chỉ cho biết tên thư mục, không cho biết đường dẫn đầy đủ). Chỉ hỗ trợ trên Chrome/Edge.' : '') + '</div>' +
       await autoHtml();
     bindAuto();

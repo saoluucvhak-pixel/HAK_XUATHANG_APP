@@ -6,6 +6,10 @@
 - Chọn phiếu: chỉ chọn dòng đang hiển thị (300/lần) + "Chọn tất cả kết quả"; dán số phiếu khớp đúng trước; trạng thái Chưa gán/Đã gán/Chưa xác minh; chống kết quả bất đồng bộ cũ; mở hồ sơ nguồn.
 - Thanh "Đang làm việc"; thông báo "Danh mục đã thay đổi" (cũ/mới, giữ giá trị gõ tay).
 - Bộ lọc: phân biệt Lọc xem trước / Phạm vi lập chứng từ / Kỳ báo cáo; nút "Dùng phạm vi đang xem"; nêu lý do 0 phiếu và điều kiện hết hiệu lực.
+- Google Sheet: 4 trang snapshot ghép theo mã bản ghi (Code.gs v3, cần dán lại); ghi chú/công thức đi theo mã; dòng thiếu/trùng mã được giữ và báo; báo đã ghi / lỗi / chưa chạy theo lô và theo trang; gửi lại không nhân đôi.
+- Sao lưu: Nhập bổ sung (gộp theo phiên bản, mặc định) tách khỏi Khôi phục (ghi đè); xem trước phạm vi; báo từng kho khi dừng giữa chừng.
+- Đóng năm: nút "Tiếp tục đóng năm" sau khi bị gián đoạn, đối chiếu với file ZIP đã xác minh.
+- Thanh "Đang làm việc" thêm Tàu / chuyến và Thực giao.
 - Cập nhật HUONG_DAN.md và mục "Quy trình lập hồ sơ" trong Hướng dẫn của app.
 
 ## Phase 1 + BKLS trả về

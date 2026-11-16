@@ -18,3 +18,8 @@ test('hướng dẫn trong app có mục Quy trình lập hồ sơ với đúng 
   ['Dùng phạm vi đang xem', 'Chọn tất cả', 'Thử lưu lại', 'Lưu / Bỏ thay đổi / Quay lại'].forEach((k) => assert.ok(h.includes(k), k));
   assert.match(read('HUONG_DAN.md'), /Quy trình lập hồ sơ từ đầu đến cuối/);
 });
+test('hướng dẫn nêu Nhập bổ sung / Khôi phục, Code.gs bản 3, Tiếp tục đóng năm', () => {
+  const d = read('HUONG_DAN.md');
+  ['Nhập bổ sung', 'Khôi phục (ghi đè)', 'Hoàn tác khôi phục', 'Tiếp tục đóng năm', 'đã ghi N lô', 'dán lại Code.gs mới'].forEach((k) => assert.ok(d.includes(k), k));
+  assert.match(read('js/backup.js'), /data-choice="merge"/);
+});

@@ -955,6 +955,7 @@
     const st = ST[type], ds = getDs(type), act = HAK.Yearbook && HAK.Yearbook.active ? HAK.Yearbook.active(type) : null, p = [];
     const cid = (() => { const el = $('#' + fid(type, 'giaoId')); return el ? el.value : ''; })(), co = cid ? (cfg().companies || []).find((c) => c.id === cid) : null;
     p.push('<b>Công ty:</b> ' + esc(co ? (co.short || co.name) : 'chưa chọn'));
+    { const shipEl = $('#' + fid(type, 'ship')); if (shipEl) p.push('<b>Tàu / chuyến:</b> ' + esc(shipEl.value.trim() || 'chưa nhập')); }
     let src;
     if (st.savedDs) src = '<b>Nguồn:</b> hồ sơ năm đã lưu' + (act ? ' (năm ' + esc(act.year) + ' · phiên bản ' + esc(act.revision) + ')' : '') + ' — <span class="muted">không dùng Excel đang nạp</span>';
     else { const sl = HAK.App && HAK.App.slots && HAK.App.slots[type], bs = sl && sl.batches ? sl.batches : []; src = '<b>Đợt cân:</b> ' + (bs.length ? esc(bs.length + ' đợt Excel đang nạp (' + bs.slice(0, 3).map((b) => b.fileName).join(', ') + (bs.length > 3 ? ', …' : '') + ')') : '<span class="text-warning">chưa nạp Excel</span>'); }
@@ -971,6 +972,8 @@
       if (f.from || f.to) extra.push('ngày ' + (f.from || '…') + ' → ' + (f.to || '…')); const sp = G().filterSplitText(f); if (sp) extra.push(sp.replace(/chỉ \d+ phiếu được chọn riêng/, '').replace(/ · $/, '').trim());
       if (st.omit.size) extra.push('bỏ ' + st.omit.size + ' phiếu'); if (st.returned.size) extra.push(st.returned.size + ' xe trả về');
       p.push('<b>Phạm vi lập chứng từ:</b> ' + fmtInt(rows.length) + ' / ' + fmtInt(all) + ' phiếu' + ((f.pick || []).length ? ' · chọn riêng ' + f.pick.length : '') + (extra.filter(Boolean).length ? ' (' + esc(extra.filter(Boolean).join(' · ')) + ')' : ''));
+      { const sum = G().summarize(rows), retKg = DOCS[type].extra === 'returned' ? rows.filter((r) => st.returned.has(G().retKey(r))).reduce((n, r) => n + r.net, 0) : 0;
+        p.push('<b>Thực giao:</b> ' + G().fmtTon(sum.kg - retKg) + ' tấn' + (retKg ? ' (đã trừ xe trả về ' + G().fmtTon(retKg) + ' tấn)' : '')); }
     }
     const dirty = isDirty(type);
     p.push('<b>Trạng thái:</b> ' + (st.ro ? '<span class="badge text-bg-secondary">Chỉ xem năm đã đóng</span>' : dirty ? '<span class="badge text-bg-warning">● Chưa lưu thay đổi</span>' : act ? '<span class="badge text-bg-success">✔ Đã lưu hồ sơ năm</span>' : '<span class="badge text-bg-light border">Hồ sơ mới — chưa lưu</span>'));
