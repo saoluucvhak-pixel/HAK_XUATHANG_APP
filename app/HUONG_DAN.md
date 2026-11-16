@@ -85,6 +85,11 @@ Muốn lập đúng điều đang xem: ở Nhập liệu bấm **Dùng phạm vi
 - Dán danh sách số phiếu: khớp **đúng số** trước; chỉ khớp hậu tố khi duy nhất một phiếu; còn lại hiện bảng để bạn xác nhận (vd. dán `123` chỉ chọn phiếu 123, không chọn `99123`).
 - Mỗi phiếu có trạng thái: *Đang kiểm tra…*, *Chưa gán*, *Đã gán · tên hồ sơ*, *⚠ Chưa xác minh được* (lỗi đọc kho). Bấm tên hồ sơ để mở hồ sơ nguồn; khi lưu mà phiếu đã gán nơi khác sẽ có hộp xác nhận.
 
+**3b. Một ngày chạy hai tàu (cùng nguồn cân)**
+1. Lập hồ sơ tàu A: ở *Phạm vi lập chứng từ* lọc theo giờ cân / số phiếu từ–đến hoặc bấm **Chọn phiếu…**, tick đúng các phiếu của tàu A → **Lưu hồ sơ**.
+2. Bấm **Thêm mới** → lập tàu B trên cùng đợt cân: phiếu bỏ, xe trả về, phiếu chọn riêng của A đã được xóa. Cột *Đã gán* trong hộp chọn cho biết phiếu nào đã thuộc tàu khác (bấm tên hồ sơ để mở); lưu phiếu đã gán nơi khác sẽ có hộp xác nhận.
+3. Mở lại tàu A từ Sổ hồ sơ theo năm: các lựa chọn của A được khôi phục đúng.
+
 **4. Xe trả về khác phiếu bỏ**
 - *Phiếu bỏ* (loại khỏi hồ sơ): không vào biên bản, không tính vào khối lượng.
 - *Xe trả về*: vẫn thuộc đợt cân nhưng được đánh dấu trả về, theo quy tắc riêng của từng loại chứng từ.
