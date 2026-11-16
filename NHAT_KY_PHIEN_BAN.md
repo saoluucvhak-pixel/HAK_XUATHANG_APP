@@ -293,6 +293,7 @@ Thủy chốt 28/09/2026: "1. bỏ Trao đổi KHÔNG đồng bộ lên Google S
 
 ## (Chưa phát hành) Tách phiếu cân trong cùng ngày — 1 ngày chạy 2 tàu
 - Phạm vi dữ liệu có thêm ô **Giờ cân từ / đến** (qua nửa đêm được) và **Số phiếu từ / đến** (so theo dãy số cuối của số phiếu). Mỗi tàu lập một hồ sơ với giờ hoặc dãy số phiếu của tàu đó; hai hồ sơ cùng ngày không trùng, không mất phiếu, báo cáo cộng đủ.
+- **Chọn phiếu cân của tàu này**: khi 2 tàu cân xen kẽ trong ngày, tick đúng các phiếu của tàu (hoặc dán danh sách số phiếu); hồ sơ chỉ gồm các phiếu đã chọn, tàu kia lập hồ sơ với phần còn lại; lưu trong hồ sơ, giữ khi chuyển từ Xuất kho gửi.
 - Chi tiết hợp đồng (tàu): thêm Giờ cân từ / đến, Số phiếu từ / đến (áp khi tick "Lọc xe theo ngày cân") — chọn tàu ở form lập biên bản là tự điền cả ngày, giờ và số phiếu.
 - Phạm vi tách được lưu trong hồ sơ Lưu trữ, ghi vào tóm tắt hồ sơ và ghi chú Excel ("Tách phiếu trong ngày: …"). Hồ sơ cũ không đổi.
 

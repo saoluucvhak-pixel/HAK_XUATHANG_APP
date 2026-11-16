@@ -67,6 +67,7 @@
     f = f || {}; const p = [];
     if (f.timeFrom || f.timeTo) p.push('giờ cân ' + (f.timeFrom || '00:00') + ' → ' + (f.timeTo || '23:59'));
     if (f.ticketFrom || f.ticketTo) p.push('số phiếu ' + (f.ticketFrom || '…') + ' → ' + (f.ticketTo || '…'));
+    if (f.pick && f.pick.length) p.push('chỉ ' + f.pick.length + ' phiếu được chọn riêng');
     return p.join(' · ');
   }
   function filterRows(rows, filter) {
@@ -90,7 +91,9 @@
       return (tf === null || m >= tf) && (tt === null || m <= tt);
     };
     const inTicket = (r) => { if (kf === null && kt === null) return true; const n = tnum(r.ticket); return n !== null && (kf === null || n >= kf) && (kt === null || n <= kt); };
+    const pick = filter.pick && filter.pick.length ? new Set(filter.pick) : null;       // CHỌN TỪNG PHIẾU của tàu này (khóa omitKey) — dùng khi 2 tàu cân xen kẽ trong ngày
     const selected = rows.filter((r) => {
+      if (pick && !pick.has(omitKey(r))) return false;
       if (!inTime(r) || !inTicket(r)) return false;
       if (files && r.uid !== undefined && !files.has(fileOf(r))) return false;
       if (excl && excl.has(r.uid !== undefined ? r.uid : r.idx)) return false;

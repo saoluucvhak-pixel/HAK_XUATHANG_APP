@@ -358,6 +358,8 @@
       '<div class="col-6 col-md-3"><label class="form-label small mb-0" for="kt-' + type + '">Số phiếu đến</label><input type="text" class="form-control form-control-sm" id="kt-' + type + '" inputmode="numeric" autocomplete="off"></div></div>' +
       '<div class="form-text mt-1" id="splitNote-' + type + '">Để trống = không tách. Ca qua nửa đêm: giờ từ lớn hơn giờ đến (vd 22:00 → 02:00). Số phiếu so theo dãy số cuối (PC-000123 → 123).</div></div>' +
       '<div class="d-flex flex-wrap align-items-center gap-2 mt-2"><button class="btn btn-outline-danger btn-sm" id="btnOmit-' + type + '" type="button">🚫 Bỏ phiếu cân…</button><span id="omitSummary-' + type + '" class="muted small">Chưa bỏ phiếu nào.</span></div>' +
+      '<div class="d-flex flex-wrap align-items-center gap-2 mt-2"><button class="btn btn-outline-success btn-sm" id="btnPick-' + type + '" type="button">✅ Chọn phiếu cân của tàu này…</button><span id="pickSummary-' + type + '" class="muted small">Chưa chọn riêng — lấy theo phạm vi ở trên.</span></div>' +
+      '<div class="form-text">2 tàu cân xen kẽ trong ngày: tick đúng các phiếu của tàu này (hoặc dán danh sách số phiếu); hồ sơ chỉ gồm các phiếu đã chọn. Tàu kia lập hồ sơ riêng với các phiếu còn lại.</div>' +
       '<div class="form-text">Phiếu bị bỏ coi như không có: không tính vào tổng, biên bản, BKLS, báo cáo. Có thể khôi phục bất cứ lúc nào trước khi lưu hồ sơ.</div><div id="convNote-' + type + '"></div></div></div>';
     // ---- v2.7.0: chia vùng nhập liệu thành tab (vùng không có nhóm nào thì bỏ tab) ----
     const zones = ZONES.map(([z, lb]) => ({ z, lb: (D.zoneLabels || {})[z] || lb,
@@ -490,6 +492,7 @@
     }
     if (DOCS[type].extra === 'returned') $('#btnReturn-' + type).addEventListener('click', () => openReturnModal(type));
     $('#btnOmit-' + type).addEventListener('click', () => openOmitModal(type));
+    $('#btnPick-' + type).addEventListener('click', () => openPickModal(type));
     if (CONV_FROM[type]) sec.addEventListener('click', (e) => { const b = e.target.closest('[data-conv]'); if (b) convertTo(type, b.dataset.conv); });
     sec.addEventListener('click', (e) => {                  // v2.7.0 tab vùng nhập liệu + nút Quay lại / Tiếp
       const b = e.target.closest('.zone-tab, [data-zone-go]'); if (!b) return;
@@ -535,7 +538,7 @@
     saveForm(dst);
     // ---- phạm vi: đúng các đợt đã chuyển + lọc ngày / nhãn; xe trả về ----
     const hasRet = DOCS[dst].extra === 'returned', ret = p.returned || [];
-    ST[dst].filter = { smart: p.filter.smart ? JSON.parse(JSON.stringify(p.filter.smart)) : undefined, groups: p.filter.groups ? new Set(p.filter.groups) : null, from: p.filter.from || '', to: p.filter.to || '', files, exclude: hasRet ? null : ret.slice(), fromType: src, fromShip: p.ship || '' };
+    ST[dst].filter = { smart: p.filter.smart ? JSON.parse(JSON.stringify(p.filter.smart)) : undefined, groups: p.filter.groups ? new Set(p.filter.groups) : null, from: p.filter.from || '', to: p.filter.to || '', timeFrom: p.filter.timeFrom || '', timeTo: p.filter.timeTo || '', ticketFrom: p.filter.ticketFrom || '', ticketTo: p.filter.ticketTo || '', pick: p.filter.pick ? p.filter.pick.slice() : undefined, files, exclude: hasRet ? null : ret.slice(), fromType: src, fromShip: p.ship || '' };   // giữ nguyên phạm vi tách tàu khi chuyển từ Xuất kho gửi
     ST[dst].returned = new Set(hasRet ? ret : []);
     renderConv(src);
     showZone(dst, 'party');                                   // bước tiếp theo ở trang đích: chọn hợp đồng
@@ -761,7 +764,8 @@
     const allLabels = ds ? ds.stats.groups.map((g) => g.label) : [];
     const sel = stt.filter.groups;
     p.filter = { groups: sel && sel.size < allLabels.length ? Array.from(sel) : null, from: stt.filter.from, to: stt.filter.to };
-    ['timeFrom', 'timeTo', 'ticketFrom', 'ticketTo'].forEach((k) => { if (stt.filter[k]) p.filter[k] = stt.filter[k]; });          // tách phiếu cân trong cùng ngày
+    ['timeFrom', 'timeTo', 'ticketFrom', 'ticketTo'].forEach((k) => { if (stt.filter[k]) p.filter[k] = stt.filter[k]; });
+    if (stt.filter.pick && stt.filter.pick.length) p.filter.pick = stt.filter.pick.slice();                                             // phiếu chọn riêng cho tàu này          // tách phiếu cân trong cùng ngày
     if (stt.filter.smart) p.filter.smart = Object.assign(JSON.parse(JSON.stringify(stt.filter.smart)), {tu: stt.filter.from || "", den: stt.filter.to || ""});
     if (stt.filter.files && stt.filter.files.length) p.filter.files = stt.filter.files.slice();          // v2.6.7: phạm vi chuyển từ kho gửi
     if (stt.filter.exclude && stt.filter.exclude.length) p.filter.exclude = stt.filter.exclude.slice();
@@ -887,6 +891,8 @@
     if (type === 'dieuchuyen') html += li('Khối lượng làm tròn', G().fmtTonRound(sum.kg) + ' tấn');
     const om = omittedInfo(type);
     if (om.n) html += li('Đã bỏ', om.n + ' phiếu · −' + G().fmtTon(om.kg) + ' tấn');
+    const pk = ST[type].filter.pick || [], ps = $('#pickSummary-' + type);
+    if (ps) ps.textContent = pk.length ? 'Đã chọn riêng ' + pk.length + ' phiếu — hồ sơ chỉ gồm các phiếu này.' : 'Chưa chọn riêng — lấy theo phạm vi ở trên.';
     const os = $('#omitSummary-' + type);
     if (os) os.textContent = om.n ? 'Đã bỏ ' + om.n + ' phiếu (−' + G().fmtTon(om.kg) + ' tấn) — coi như không có.' : 'Chưa bỏ phiếu nào.';
     const warnRows = rows.filter((r) => r.warn && r.warn.length).length;
@@ -1192,6 +1198,54 @@
     if (ST[type].savedDs) { const v = Array.from(om.values()); return { n: v.length, kg: v.reduce((x, e) => x + (+e.kg || 0), 0) }; }   // hồ sơ đã lưu: dòng bỏ không còn trong dữ liệu → đếm theo nhật ký
     const hit = rowsWithOmitted(type).filter((r) => om.has(G().omitKey(r)));
     return { n: hit.length, kg: hit.reduce((a, r) => a + (+r.net || 0), 0) };
+  }
+  /* ---- Chọn phiếu cân của tàu này (khi 2 tàu cân xen kẽ trong ngày): hồ sơ chỉ gồm các phiếu đã tick ---- */
+  let pickType = null;
+  function rowsForPick(type) {
+    const ds = getDs(type); if (!ds) return [];
+    const p = collect(type), f = Object.assign({}, p.filter); delete f.pick;
+    return G().filterRows(ds.rows, f);
+  }
+  function ensurePickModal() {
+    if ($('#pickModal')) return;
+    const m = document.createElement('div'); m.className = 'modal fade'; m.id = 'pickModal'; m.tabIndex = -1;
+    m.innerHTML = '<div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Chọn phiếu cân của tàu này</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button></div>' +
+      '<div class="modal-body"><p class="small muted">Tick các phiếu <b>thuộc tàu này</b>. Hồ sơ chỉ gồm các phiếu đã chọn (không tick gì = lấy theo phạm vi ngày / giờ / số phiếu). Các phiếu còn lại dành cho hồ sơ của tàu kia. Danh sách chỉ hiện phiếu nằm trong phạm vi ngày / giờ / số phiếu đang đặt ở trên — muốn chọn trong cả ngày thì để trống giờ và số phiếu.</p>' +
+      '<div class="row g-2 mb-2"><div class="col-md-5"><input id="pickSearch" class="form-control form-control-sm" placeholder="Tìm số phiếu / biển số…" autocomplete="off"></div>' +
+      '<div class="col-md-7 d-flex gap-2"><button class="btn btn-sm btn-outline-primary" id="pickAllShown" type="button">Chọn các phiếu đang hiển thị</button><button class="btn btn-sm btn-outline-secondary" id="pickNone" type="button">Bỏ chọn hết</button></div></div>' +
+      '<div class="mb-2"><textarea id="pickPaste" class="form-control form-control-sm" rows="2" placeholder="Hoặc dán danh sách số phiếu của tàu này (cách nhau bằng dấu cách / phẩy / xuống dòng)"></textarea><button class="btn btn-sm btn-outline-primary mt-1" id="pickApply" type="button">Chọn theo danh sách đã dán</button> <span class="small" id="pickPasteMsg"></span></div>' +
+      '<div class="tbl-wrap"><table class="table table-sm"><thead><tr><th>Chọn</th><th>Số phiếu</th><th>Giờ cân 1</th><th>Biển số</th><th class="num">KL (kg)</th></tr></thead><tbody id="pickBody"></tbody></table></div><div class="small muted" id="pickInfo"></div></div>' +
+      '<div class="modal-footer"><span class="me-auto small" id="pickCount"></span><button class="btn btn-primary" data-bs-dismiss="modal" type="button">Xong</button></div></div></div>';
+    document.body.appendChild(m);
+    const cur = () => (ST[pickType].filter.pick || []);
+    const setPick = (arr) => { ST[pickType].filter.pick = arr; renderPickList(); updateSummary(pickType); };
+    $('#pickSearch').addEventListener('input', debounce(renderPickList, 150));
+    $('#pickBody').addEventListener('change', (e) => {
+      const cb = e.target.closest('input[data-key]'); if (!cb) return;
+      const s = new Set(cur()); if (cb.checked) s.add(cb.dataset.key); else s.delete(cb.dataset.key); setPick(Array.from(s));
+    });
+    $('#pickNone').addEventListener('click', () => setPick([]));
+    $('#pickAllShown').addEventListener('click', () => { const s = new Set(cur()), K = G().omitKey, q = $('#pickSearch').value.trim().toLowerCase(); rowsForPick(pickType).filter((r) => !q || String(r.ticket || '').toLowerCase().includes(q) || String(r.plate || '').toLowerCase().includes(q)).forEach((r) => s.add(K(r))); setPick(Array.from(s)); });
+    $('#pickApply').addEventListener('click', () => {
+      const tokens = $('#pickPaste').value.split(/[\s,;]+/).filter(Boolean), rows = rowsForPick(pickType), s = new Set(cur()), miss = [], K = G().omitKey; let add = 0;
+      tokens.forEach((t) => { const hit = rows.filter((r) => String(r.ticket || '') === t || String(r.ticket || '').endsWith(t)); if (!hit.length) miss.push(t); else hit.forEach((r) => { if (!s.has(K(r))) { s.add(K(r)); add++; } }); });
+      $('#pickPasteMsg').innerHTML = '<span class="' + (miss.length ? 'text-warning' : 'text-success') + '">Đã chọn thêm ' + add + ' phiếu' + (miss.length ? '; không tìm thấy: ' + esc(miss.join(', ')) : '') + '</span>';
+      setPick(Array.from(s));
+    });
+  }
+  function renderPickList() {
+    const rows = rowsForPick(pickType), q = $('#pickSearch').value.trim().toLowerCase(), on = new Set(ST[pickType].filter.pick || []), K = G().omitKey;
+    const shown = rows.filter((r) => !q || String(r.ticket || '').toLowerCase().includes(q) || String(r.plate || '').toLowerCase().includes(q)), page = shown.slice(0, 300);
+    $('#pickBody').innerHTML = page.map((r) => '<tr' + (on.has(K(r)) ? ' class="table-success"' : '') + '><td><input class="form-check-input" type="checkbox" data-key="' + esc(K(r)) + '"' + (on.has(K(r)) ? ' checked' : '') + '></td><td class="mono">' + esc(r.ticket || '(dòng ' + r.idx + ')') + '</td><td>' + esc(r.time1) + '</td><td>' + esc(r.plate) + '</td><td class="num">' + fmtInt(r.net) + '</td></tr>').join('');
+    $('#pickInfo').textContent = 'Hiển thị ' + page.length + ' / ' + shown.length + ' phiếu trong phạm vi' + (shown.length > 300 ? ' — gõ tìm kiếm để thu hẹp.' : '.');
+    const kg = rows.filter((r) => on.has(K(r))).reduce((a, r) => a + (+r.net || 0), 0);
+    $('#pickCount').textContent = on.size ? 'Đã chọn ' + on.size + ' phiếu · ' + G().fmtTon(kg) + ' tấn' : 'Chưa chọn phiếu nào';
+  }
+  function openPickModal(type) {
+    if (!getDs(type)) { toast('Chưa có dữ liệu Excel.', 'error'); return; }
+    if (ST[type].ro) { toast('Hồ sơ đang ở chế độ chỉ xem, không chọn phiếu được.', 'warning'); return; }
+    ensurePickModal(); pickType = type; $('#pickSearch').value = ''; $('#pickPasteMsg').textContent = '';
+    renderPickList(); bootstrap.Modal.getOrCreateInstance($('#pickModal')).show();
   }
   let omitType = null;
   function ensureOmitModal() {

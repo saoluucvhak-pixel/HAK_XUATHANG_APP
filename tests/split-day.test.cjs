@@ -37,3 +37,14 @@ test('chi tiết hợp đồng (tàu) lưu giờ / số phiếu riêng và giữ
   const d = c.details[0]; assert.deepEqual([d.fromTime, d.toTime, d.ticketFrom, d.ticketTo, d.filterTrips], ['00:00', '12:30', '101', '103', true]);
   assert.equal(M.child('hd1', JSON.parse(JSON.stringify(d))).toTime, '12:30');
 });
+
+test('CHỌN TỪNG PHIẾU (2 tàu cân xen kẽ): hồ sơ chỉ gồm các phiếu đã chọn; phần còn lại thuộc tàu kia; giờ / số phiếu vẫn kết hợp được', () => {
+  const K = G.omitKey, mix = [101, 103, 105], shipA = ROWS.filter((r) => mix.includes(r.idx)).map(K);
+  const a = f({ pick: shipA }), bPick = ROWS.filter((r) => !mix.includes(r.idx)).map(K), b = f({ pick: bPick });
+  assert.deepEqual(a.map((r) => r.idx), [101, 103, 105]); assert.deepEqual(b.map((r) => r.idx), [102, 104, 106]); assert.equal(kg(a) + kg(b), kg(f({})), 'hai tàu cộng lại đủ cả ngày, không trùng, không sót');
+  assert.deepEqual(f({ pick: shipA, timeTo: '12:00' }).map((r) => r.idx), [101, 103], 'chọn riêng kết hợp với giờ cân');
+  assert.equal(f({ pick: [] }).length, 6, 'danh sách chọn rỗng = không chọn riêng'); assert.equal(G.filterSplitText({ pick: shipA }), 'chỉ 3 phiếu được chọn riêng');
+  const mk = (id, rows) => ({ id, type: 'xuatkhau', title: id, ship: 'T' + id, giao: 'HAK', nhan: 'ĐN', cid: 'hak', contract: 'ct-' + id, from: '12/11/2026', to: '12/11/2026', trips: rows.length, kg: kg(rows), retKg: 0, retTrips: 0, updatedAt: id === 'B' ? 2 : 1 });
+  const mA = mk('A', a), mB = mk('B', b), tk = new Map([['A', W.ticketsOf(a, () => false, mA)], ['B', W.ticketsOf(b, () => false, mB)]]);
+  const m = R.compute([mA, mB], { tickets: tk }); assert.equal(m.byType.xuatkhau.trips, 6); assert.deepEqual(m.conflicts, []); assert.equal(m.dupTickets.trips, 0);
+});
