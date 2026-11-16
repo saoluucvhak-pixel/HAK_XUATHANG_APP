@@ -662,7 +662,7 @@
    *  (tránh chuỗi XML hàng trăm MB làm treo/tràn bộ nhớ trình duyệt, và file Word quá nặng không mở nổi). */
   const TRIP_SPLIT_OVER = 1500, TRIP_PART_SIZE = 1000;
   /** Bản IN (PDF từng xe): mỗi đợt in ≤ PDF_BATCH xe — dựng hàng nghìn trang vào một trang web làm treo trình duyệt, nên chia đợt thay vì chặn. */
-  const PDF_BATCH = 100;
+  const PDF_BATCH = 150;
   const rangesOfSize = (n, size) => { const r = []; for (let a = 0; a < n; a += size) r.push([a, Math.min(n, a + size)]); return r.length ? r : [[0, 0]]; };
   function tripRanges(n) {
     if (n <= TRIP_SPLIT_OVER) return [[0, n]];

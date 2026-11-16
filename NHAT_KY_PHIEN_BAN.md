@@ -291,9 +291,9 @@ Thủy chốt 28/09/2026: "1. bỏ Trao đổi KHÔNG đồng bộ lên Google S
 - pages.js generateBkls: không chặn khi thiếu Số BKLS / hệ số / tên bên mua — tự điền hoặc để trống + cảnh báo.
 - tests/parse-num.test.cjs, tests/numfmt.test.cjs.
 
-## (Chưa phát hành) Tách phiếu cân trong cùng ngày — 1 ngày chạy 2 tàu
+## v2.18.0 — Tách phiếu cân trong cùng ngày (1 ngày chạy 2 tàu) + BKLS nhiều xe
 - Phạm vi dữ liệu có thêm ô **Giờ cân từ / đến** (qua nửa đêm được) và **Số phiếu từ / đến** (so theo dãy số cuối của số phiếu). Mỗi tàu lập một hồ sơ với giờ hoặc dãy số phiếu của tàu đó; hai hồ sơ cùng ngày không trùng, không mất phiếu, báo cáo cộng đủ.
-- **BKLS nhiều xe**: bỏ giới hạn cứng 200 xe (mẫu BKLS mới) và 100 xe (PDF từng xe). Word từng xe không giới hạn (nhiều file tự gói ZIP); PDF từng xe tự chia thành các đợt in ≤ 100 xe, mỗi đợt một hộp thoại in, hỏi xác nhận giữa các đợt.
+- **BKLS nhiều xe**: bỏ giới hạn cứng 200 xe (mẫu BKLS mới) và 100 xe (PDF từng xe). Word từng xe không giới hạn (nhiều file tự gói ZIP); PDF từng xe tự chia thành các đợt in ≤ 150 xe (mỗi lần in 150 xe), mỗi đợt một hộp thoại in, hỏi xác nhận giữa các đợt.
 - **Chọn phiếu cân của tàu này**: khi 2 tàu cân xen kẽ trong ngày, tick đúng các phiếu của tàu (hoặc dán danh sách số phiếu); hồ sơ chỉ gồm các phiếu đã chọn, tàu kia lập hồ sơ với phần còn lại; lưu trong hồ sơ, giữ khi chuyển từ Xuất kho gửi.
 - Chi tiết hợp đồng (tàu): thêm Giờ cân từ / đến, Số phiếu từ / đến (áp khi tick "Lọc xe theo ngày cân") — chọn tàu ở form lập biên bản là tự điền cả ngày, giờ và số phiếu.
 - Phạm vi tách được lưu trong hồ sơ Lưu trữ, ghi vào tóm tắt hồ sơ và ghi chú Excel ("Tách phiếu trong ngày: …"). Hồ sơ cũ không đổi.

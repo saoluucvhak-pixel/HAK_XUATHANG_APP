@@ -936,7 +936,7 @@
    * giữa các đợt hỏi người dùng (đã lưu PDF đợt trước chưa) nên không dựng hàng nghìn trang trong một lần.
    */
   async function printInBatches(files, weights) {
-    const cap = (HAK.Bkls && HAK.Bkls.PDF_BATCH) || 100, batches = [];
+    const cap = (HAK.Bkls && HAK.Bkls.PDF_BATCH) || 150, batches = [];
     let cur = [], w = 0;
     files.forEach((f, i) => { const x = weights[i] || 0; if (cur.length && w + x > cap) { batches.push(cur); cur = []; w = 0; } cur.push(f); w += x; });
     if (cur.length) batches.push(cur);
