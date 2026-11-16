@@ -661,6 +661,9 @@
   /** Bản từng xe: tối đa TRIP_SPLIT_OVER xe → 1 file như cũ; nhiều hơn → chia đều thành các file ≤ TRIP_PART_SIZE xe
    *  (tránh chuỗi XML hàng trăm MB làm treo/tràn bộ nhớ trình duyệt, và file Word quá nặng không mở nổi). */
   const TRIP_SPLIT_OVER = 1500, TRIP_PART_SIZE = 1000;
+  /** Bản IN (PDF từng xe): mỗi đợt in ≤ PDF_BATCH xe — dựng hàng nghìn trang vào một trang web làm treo trình duyệt, nên chia đợt thay vì chặn. */
+  const PDF_BATCH = 100;
+  const rangesOfSize = (n, size) => { const r = []; for (let a = 0; a < n; a += size) r.push([a, Math.min(n, a + size)]); return r.length ? r : [[0, 0]]; };
   function tripRanges(n) {
     if (n <= TRIP_SPLIT_OVER) return [[0, n]];
     const parts = Math.ceil(n / TRIP_PART_SIZE), size = Math.ceil(n / parts), r = [];
@@ -700,10 +703,12 @@
       done++;
     }
     if (want.tripPdf) {
-      for (let pi = 0; pi < ranges.length; pi++) {
-        const [a, b] = ranges[pi];
-        add('tripPdf', 'BKLS TỪNG XE' + partLabel(pi, a, b) + ' (PDF)', partName(pi, '.docx'),
-          await getTrip(pi,a,b));
+      const pr = rangesOfSize(n, PDF_BATCH), psplit = pr.length > 1, ppad = (i) => String(i + 1).padStart(Math.max(2, String(pr.length).length), '0'), pdfDocs = new Map();
+      for (let pi = 0; pi < pr.length; pi++) {
+        const [a, b] = pr[pi];
+        if (!pdfDocs.has(pi)) pdfDocs.set(pi, docxPerVehicle(tpl, ctx, lot, (d, t) => step('BKLS từng xe (in) ' + (a + d) + '/' + n + '…', pct((pi + d / t) / pr.length)), a, b));
+        add('tripPdf', 'BKLS TỪNG XE' + (psplit ? ' — đợt in ' + (pi + 1) + '/' + pr.length + ': xe ' + (a + 1) + '–' + b : ' — ' + n + ' trang') + ' (PDF)', baseName + '_tung_xe_in' + (psplit ? '_dot' + ppad(pi) : '') + '.docx', await pdfDocs.get(pi));
+        out[out.length - 1].weight = b - a;
       }
       done++;
     }
@@ -715,7 +720,7 @@
     ensureAssets, readSnapshot, generate, aggregateValues, tripValues, docxTotal, docxPerVehicle, buildPdf,
     /** Số BKLS riêng của xe thứ i (0-based) trong bộ số `soBkls` — đúng số in trên bản từng xe (báo cáo Xuất hàng dùng lại). */
     tripNo: (soBkls, i) => soRiengOf({ soBkls }, i),
-    soThanhChu, formatSoVN, parseDMY, splitCongTyHeader, stripLabelPrefix, templateBuffer, tripRanges, TRIP_SPLIT_OVER, TRIP_PART_SIZE,
+    soThanhChu, formatSoVN, parseDMY, splitCongTyHeader, stripLabelPrefix, templateBuffer, tripRanges, rangesOfSize, PDF_BATCH, TRIP_SPLIT_OVER, TRIP_PART_SIZE,
     DEFAULT_NGUON_GOC: 'Dăm gỗ keo sản xuất từ nguyên liệu gỗ keo rừng trồng mua từ cá nhân và hộ gia đình',   // v2.7.1 — giữ đồng bộ với NGUON_GOC_DEF (pages.js)
     DEFAULT_HE_SO: 0.468
   };

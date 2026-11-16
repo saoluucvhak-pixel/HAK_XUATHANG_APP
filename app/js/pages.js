@@ -931,6 +931,22 @@
     return ok;
   }
   const SAVED = ' · đã lưu vào Lưu trữ';
+  /**
+   * In PDF theo từng ĐỢT (trước đây chặn > 100 / > 200 xe): gom các file theo trọng số "số xe" tới PDF_BATCH rồi mở hộp thoại in cho từng đợt;
+   * giữa các đợt hỏi người dùng (đã lưu PDF đợt trước chưa) nên không dựng hàng nghìn trang trong một lần.
+   */
+  async function printInBatches(files, weights) {
+    const cap = (HAK.Bkls && HAK.Bkls.PDF_BATCH) || 100, batches = [];
+    let cur = [], w = 0;
+    files.forEach((f, i) => { const x = weights[i] || 0; if (cur.length && w + x > cap) { batches.push(cur); cur = []; w = 0; } cur.push(f); w += x; });
+    if (cur.length) batches.push(cur);
+    for (let i = 0; i < batches.length; i++) {
+      if (i > 0 && !confirm('Đã mở hộp thoại in đợt ' + i + '/' + batches.length + '.\n\nBấm OK để in đợt ' + (i + 1) + '/' + batches.length + ' (nhớ đã lưu PDF đợt trước); Hủy để dừng.')) { toast('Đã dừng sau đợt in ' + i + '/' + batches.length + '.', 'warning'); return; }
+      const first = batches[i][0].name.replace(/\.docx$/i, '');
+      await HAK.Word.Pdf.print(batches[i], { title: batches.length > 1 ? first + '_dot' + (i + 1) + 'of' + batches.length : undefined });
+      if (batches.length > 1) await new Promise((r) => setTimeout(r, 600));        // chờ trình duyệt dọn bản in đợt trước
+    }
+  }
 
   /** src (tùy chọn) = { ds, params } lấy từ hồ sơ Lưu trữ → dựng lại mà không cần file Excel cân. */
   async function generate(type, mode, src) {
@@ -1019,7 +1035,6 @@
     const chosen = await HAK.BklsTemplates.choose(p); if (!chosen) return;
     p.bklsTemplate = chosen.template;
     const want = chosen.want;
-    if(want.tripPdf&&rowsAll.length>100){toast('PDF từng xe giới hạn 100 xe mỗi lần để tránh treo trình duyệt. Lọc ít ngày hơn hoặc chọn Word từng xe.','warning');return;}
     if (!Object.keys(want).some((k) => want[k])) { toast('Chọn ít nhất một bản BKLS cần tạo (Tổng / Từng xe).', 'warning'); return; }
 
     // Xe trả về (chỉ những loại có "Chọn xe trả về") → tách riêng, KHÔNG tính vào BKLS chính.
@@ -1070,6 +1085,7 @@
       confirmMsgs.push('Phạm vi đang có ' + fmtInt(tripMax) + ' xe — bản từng xe sẽ tự chia thành ' + HAK.Bkls.tripRanges(tripMax).length +
         ' file (≤ ' + fmtInt(HAK.Bkls.TRIP_PART_SIZE) + ' xe/file, số BKLS từng xe vẫn liên tục) và có thể mất vài phút. Nếu quên lọc ngày, hãy chọn lại phạm vi.');
     }
+    if (want.tripPdf && tripMax > HAK.Bkls.PDF_BATCH) confirmMsgs.push('PDF từng xe có ' + fmtInt(tripMax) + ' xe sẽ được IN THÀNH ' + Math.ceil(tripMax / HAK.Bkls.PDF_BATCH) + ' ĐỢT (≤ ' + HAK.Bkls.PDF_BATCH + ' xe/đợt): mỗi đợt mở một hộp thoại in, lưu PDF xong bấm tiếp đợt sau.');
     const confirmKey = p.bklsSoBkls + '|' + rowsAll.length + '|' + confirmMsgs.length;
     if (confirmMsgs.length && ST[type].bklsDupKey !== confirmKey) {
       ST[type].bklsDupKey = confirmKey;
@@ -1140,7 +1156,7 @@
       } else for(const o of downloadable){if(!await HAK.Word.Files.saveBlob(o.blob,o.name))return;}
       if (printable.length) {
         const files = await Promise.all(printable.map(async o => ({name:o.name, bytes:new Uint8Array(await o.blob.arrayBuffer())})));
-        Loading.hide(); await HAK.Word.Pdf.print(files);
+        Loading.hide(); await printInBatches(files, printable.map((o) => o.weight || 0));
       }
 
       if (HAK.Issued && !(HAK.Yearbook&&HAK.Yearbook.active(type)&&HAK.Yearbook.active(type).readonly)) {
@@ -1385,7 +1401,7 @@
     readOnly(type,on){ST[type].ro=!!on;$$('#page-'+type+' input,#page-'+type+' select,#page-'+type+' textarea').forEach(n=>n.disabled=on);if(on)$('#year-note-'+type).textContent='Chỉ xem năm đã đóng · Không ghi vào kho làm việc. Dùng Khôi phục năm nếu cần sửa.';},
     snapshot(type){const ds=getDs(type);if(!ds)throw Error('Chưa có dữ liệu cân.');const params=collect(type);return {params,rows:JSON.parse(JSON.stringify(G().filterRows(ds.rows,params.filter)))};},
     openSnapshot(record){const type=record.type;if(!DOCS[type])throw Error('Loại hồ sơ không hỗ trợ.');const rows=JSON.parse(JSON.stringify(record.rows));ST[type].savedDs={ok:true,rows,stats:HAK.Excel.computeStats(rows)};ST[type].snapshotParams=JSON.parse(JSON.stringify(record.params));ST[type].filter=Object.assign({groups:null,from:'',to:''},record.params.filter||{});if(ST[type].filter.groups)ST[type].filter.groups=new Set(ST[type].filter.groups);ST[type].returned=new Set(record.params.returned||[]);ST[type].omit=new Map(((record.params.filter||{}).omitLog||[]).map(e=>[e.key,e]));Object.assign(HAK.Config.custom,record.context&&record.context.custom||{});DOCS[type].groups.forEach(g=>g.fields.forEach(f=>{const node=$('#'+fid(type,f.id)),value=record.params[f.id];if(!node)return;if(node.tagName==='SELECT'&&value!=null&&!Array.from(node.options).some(o=>o.value===value)){const option=document.createElement('option');option.value=value;option.textContent=value+' (đã lưu)';node.append(option);}if(f.type==='contract')return;if(value!=null)setField(type,f,value);else resetField(type,f,node);}));const contract=$('#'+fid(type,'contractId'));if(contract){contract.value='';contract.disabled=true;contract.title='Hồ sơ dùng thông tin hợp đồng đã lưu; chọn Thêm mới để dùng hợp đồng khác.';}renderFilter(type);updateSummary(type);$('#year-note-'+type).textContent='Đang sửa hồ sơ năm '+record.year+' · phiên bản '+record.revision+' · Lưu hồ sơ để ghi thay đổi';},
-    refreshSelects, generate, generateBkls,
+    refreshSelects, generate, generateBkls, _printInBatches: (f, w) => printInBatches(f, w),
     /** Loại biên bản có lập BKLS hay không (dùng ở Lưu trữ). */
     hasBkls: (t) => pageBkls(t),
     /** Dùng cho kiểm thử tự động */
