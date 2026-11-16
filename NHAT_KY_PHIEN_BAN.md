@@ -1,5 +1,8 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.19.2 (bản vá)
+- Tiếp tục đóng năm: chọn đúng lần đóng dở theo SHA-256 khi cùng năm có nhiều lần đóng dở.
+
 ## v2.19.1 (bản vá)
 - Thông báo sau khi lưu / xuất kèm dòng đối chiếu; thêm test bộ lọc theo màn hình.
 
