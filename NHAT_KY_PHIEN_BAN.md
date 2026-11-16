@@ -1,5 +1,8 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.19.1 (bản vá)
+- Thông báo sau khi lưu / xuất kèm dòng đối chiếu; thêm test bộ lọc theo màn hình.
+
 ## v2.19.0 — nâng cấp quy trình nhập liệu & lập hồ sơ
 - Thêm mới / mở hồ sơ dùng chung một hàm đặt lại trạng thái (xóa phiếu bỏ, xe trả về, phiếu chọn riêng, bộ lọc, liên kết hợp đồng, ảnh chụp); hỏi Lưu / Bỏ / Quay lại khi có thay đổi chưa lưu.
 - Đợt cân: lưu file + thông số trong MỘT giao dịch IndexedDB có kiểm tra phiên bản; xác nhận thay đợt; kiểm tra tham chiếu trước khi xóa; nhãn trạng thái lưu.
