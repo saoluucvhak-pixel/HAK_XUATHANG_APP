@@ -11,7 +11,7 @@ const fileOf = (obj) => { const b = Buffer.from(JSON.stringify(obj)); return { s
 const backupOf = (keys) => ({ app: 'hak-bienban-backup', v: 1, keys, archive: [] });
 test('khôi phục chụp bản hiện tại; hoàn tác trả lại đúng, gỡ khóa mới do khôi phục tạo ra', async () => {
   const { store } = boot(false); HAK.Store.set('hak.config.v1', { a: 1 }); HAK.Store.set('hak.catalog.v1', { v: 3, contracts: ['máy này'] });
-  const r = await HAK.Backup.restoreFile(fileOf(backupOf({ 'hak.config.v1': { a: 2 }, 'hak.catalog.v1': { v: 2 }, 'hak.moi.v1': { x: 1 } })), { keepAuth: false });
+  const r = await HAK.Backup.restoreFile(fileOf(backupOf({ 'hak.config.v1': { a: 2 }, 'hak.catalog.v1': { v: 2 }, 'hak.moi.v1': { x: 1 } })), { keepAuth: false, mode: 'replace' });
   assert.equal(r.snapshot, true); assert.deepEqual(HAK.Store.get('hak.config.v1'), { a: 2 }); assert.ok(HAK.Store.get('hak.moi.v1')); assert.ok(HAK.Backup.preRestoreInfo());
   const u = HAK.Backup.undoRestore();
   assert.deepEqual(HAK.Store.get('hak.config.v1'), { a: 1 }); assert.deepEqual(HAK.Store.get('hak.catalog.v1'), { v: 3, contracts: ['máy này'] }); assert.equal(HAK.Store.get('hak.moi.v1', null), null, 'khóa mới bị gỡ');
@@ -19,10 +19,10 @@ test('khôi phục chụp bản hiện tại; hoàn tác trả lại đúng, g�
 });
 test('không chụp được bản hiện tại → từ chối khôi phục, dữ liệu máy không đổi', async () => {
   boot(true); HAK.Store.set('hak.config.v1', { a: 1 });
-  await assert.rejects(HAK.Backup.restoreFile(fileOf(backupOf({ 'hak.config.v1': { a: 9 } })), { keepAuth: false }), /Không chụp được bản hiện tại/);
+  await assert.rejects(HAK.Backup.restoreFile(fileOf(backupOf({ 'hak.config.v1': { a: 9 } })), { keepAuth: false, mode: 'replace' }), /Không chụp được bản hiện tại/);
   assert.deepEqual(HAK.Store.get('hak.config.v1'), { a: 1 });
 });
 test('bản chụp không lọt vào sao lưu toàn bộ và không bị ghi đè bởi file sao lưu', async () => {
-  boot(false); HAK.Store.set('hak.config.v1', { a: 1 }); await HAK.Backup.restoreFile(fileOf(backupOf({ 'hak.config.v1': { a: 2 }, 'hak.prerestore.v1': { at: 1, keys: { x: 1 } } })), { keepAuth: false });
+  boot(false); HAK.Store.set('hak.config.v1', { a: 1 }); await HAK.Backup.restoreFile(fileOf(backupOf({ 'hak.config.v1': { a: 2 }, 'hak.prerestore.v1': { at: 1, keys: { x: 1 } } })), { keepAuth: false, mode: 'replace' });
   const c = await HAK.Backup.collect(); assert.equal('hak.prerestore.v1' in c.keys, false); assert.deepEqual(HAK.Store.get('hak.prerestore.v1').keys['hak.config.v1'], { a: 1 }, 'chụp là bản của máy, không phải của file');
 });

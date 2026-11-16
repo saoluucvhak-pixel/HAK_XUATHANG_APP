@@ -61,11 +61,13 @@
       const list = await this.loadAll();
       return list.map((x) => ({ meta: x.meta, b64: bufToB64(x.bytes) }));
     },
-    async importAll(items) {
+    /** opts.keepNewer: không đè đợt đang có trên máy nếu phiên bản (rev) máy này >= bản sao (nhập bổ sung theo phiên bản; nhập lặp không đổi gì). */
+    async importAll(items, opts) {
       let n = 0;
       for (const it of items || []) {
         if (!it || !it.meta || !it.meta.id || typeof it.b64 !== 'string') continue;
-        await DB().put('batchdata', b64ToBuf(it.b64), it.meta.id); await DB().put('batches', it.meta); n++;
+        if (opts && opts.keepNewer) { const cur = await DB().get('batches', it.meta.id); if (cur && (cur.rev || 0) >= (it.meta.rev || 0)) continue; }
+        await DB().guarded(['batches', 'batchdata'], 'batches', it.meta.id, () => null, (tx) => { tx.objectStore('batchdata').put(b64ToBuf(it.b64), it.meta.id); tx.objectStore('batches').put(it.meta); }); n++;
       }
       return n;
     }

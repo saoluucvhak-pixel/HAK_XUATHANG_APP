@@ -149,44 +149,104 @@
     HAK.Store.remove(PRE_KEY);
     return { set, removed };
   }
-  async function restoreFile(file, opts) {
-    const keepAuth = !!(opts && opts.keepAuth);
-    const j = await readJson(file);                                      // v2.7.5: .zip hoặc .json
-    if (j && j.app === 'hak-bienban-archive' && Array.isArray(j.items)) { // file sao lưu riêng Lưu trữ (bản cũ)
-      const r = await HAK.Archive.importItems(j.items);
-      return { legacy: true, keys: 0, added: r.added, updated: r.updated, skipped: r.skipped };
-    }
+  const CAT = 'hak.catalog.v1';
+  /** Kiểm tra cấu trúc bản sao TRƯỚC khi ghi bất cứ gì (ném lỗi nếu hỏng). */
+  function validateBackup(j) {
     if (!j || j.app !== APP || typeof j.keys !== 'object' || !Array.isArray(j.archive)) throw new Error('Đây không phải file sao lưu toàn bộ của app.');
-    for (const store of ['attachments','bklsTemplates']) {
+    for (const store of ['attachments', 'bklsTemplates']) {
       if (j[store] !== undefined && !Array.isArray(j[store])) throw new Error('Kho tệp sao lưu không hợp lệ');
       for (const item of j[store] || []) {
         if (!item || typeof item.id !== 'string' || typeof item.base64 !== 'string' || !/^[A-Za-z0-9+/]*={0,2}$/.test(item.base64)) throw new Error('Tệp đính kèm hoặc mẫu không hợp lệ');
       }
     }
-    if (HAK.ContractModel && j.keys['hak.catalog.v1'] && j.keys['hak.catalog.v1'].v === 3) {
-      const catalog = HAK.ContractModel.migrate(j.keys['hak.catalog.v1']).data;
-      for (const c of catalog.contracts) { const error = HAK.ContractModel.validate(c,catalog); if (error) throw new Error('Danh mục trong bản sao lưu không hợp lệ: '+error); }
+    if (HAK.ContractModel && j.keys[CAT] && j.keys[CAT].v === 3) {
+      const catalog = HAK.ContractModel.migrate(j.keys[CAT]).data;
+      for (const c of catalog.contracts) { const error = HAK.ContractModel.validate(c, catalog); if (error) throw new Error('Danh mục trong bản sao lưu không hợp lệ: ' + error); }
     }
-    if(j.yearbook&&HAK.Yearbook)HAK.Yearbook.validateBundle(j.yearbook.records);
-    const snapshot = snapshotBeforeRestore();
-    if (!snapshot) throw new Error('Không chụp được bản hiện tại trước khi khôi phục (bộ nhớ trình duyệt đầy?). Chưa thay đổi gì — hãy Sao lưu toàn bộ ra file rồi dọn bớt dữ liệu trước.');
-    let keys = 0;
-    Object.keys(j.keys).forEach((k) => {
-      if (k === PRE_KEY) return;
-      if (keepAuth && AUTH_KEYS.indexOf(k) >= 0) return;                // giữ tài khoản / mật khẩu / khóa khôi phục / loại máy hiện tại
-      if (k.indexOf('hak.') === 0 && k !== LAST_KEY && k !== AUTO_KEY && j.keys[k] !== null) { HAK.Store.set(k, j.keys[k]); keys++; }
-    });
-    if(j.yearbook&&HAK.Yearbook)await HAK.Yearbook.importState(j.yearbook.records);
-    const r = await HAK.Archive.importItems(j.archive);
-    for (const store of ['attachments','bklsTemplates']) {
-      if (Array.isArray(j[store])) for (const item of j[store]) {
-        if (!item || typeof item.id !== 'string' || typeof item.base64 !== 'string') throw new Error('Tệp đính kèm hoặc mẫu không hợp lệ');
-        await HAK.DB.put(store, item);
+    if (j.yearbook && HAK.Yearbook) HAK.Yearbook.validateBundle(j.yearbook.records);
+  }
+  /** Đọc + kiểm tra + tóm tắt bản sao (KHÔNG ghi gì): dùng để hiện phạm vi dữ liệu trước khi người dùng chọn Nhập bổ sung / Khôi phục. */
+  async function inspect(file) {
+    const j = await readJson(file);
+    if (j && j.app === 'hak-bienban-archive' && Array.isArray(j.items)) return { j, legacy: true, plan: { archive: j.items.length } };
+    validateBackup(j);
+    const plan = { keys: Object.keys(j.keys).filter((k) => k.indexOf('hak.') === 0 && k !== PRE_KEY && k !== LAST_KEY && k !== AUTO_KEY).length, archive: j.archive.length,
+      batches: (j.batches || []).length, issued: (j.issued || []).length, attachments: (j.attachments || []).length, templates: (j.bklsTemplates || []).length, catalog: null };
+    const cin = j.keys[CAT];
+    if (cin && HAK.ContractModel) {
+      const local = HAK.Store.get(CAT, null), M = HAK.ContractModel, inD = M.migrate(cin).data, loD = M.migrate(local || { v: 3, customers: [], contracts: [] }).data;
+      const merged = M.mergeCatalog(local, cin), rp = M.mergeCatalog.report || {}, have = new Set(loD.contracts.map((c) => c.id));
+      plan.catalog = { fileContracts: inD.contracts.length, localContracts: loD.contracts.length, add: inD.contracts.filter((c) => !have.has(c.id)).length, keptNewer: (rp.kept || []).length, conflicts: (rp.conflicts || []).length, resultContracts: merged.contracts.length,
+        willOverwrite: loD.contracts.filter((c) => { const f = inD.contracts.find((x) => x.id === c.id); return f && JSON.stringify(f) !== JSON.stringify(c); }).length,
+        localNewer: loD.contracts.filter((c) => { const f = inD.contracts.find((x) => x.id === c.id); return f && (c.revision || 0) > (f.revision || 0); }).map((c) => (c.no || c.id) + ' (máy này v' + (c.revision || 0) + ' > bản sao v' + ((inD.contracts.find((x) => x.id === c.id) || {}).revision || 0) + ')') };
+    }
+    return { j, legacy: false, plan };
+  }
+  /** Chạy tuần tự các bước ghi, ghi lại bước nào xong / lỗi / chưa chạy và bước nào hoàn tác được. */
+  async function runSteps(steps) {
+    const report = steps.map((x) => ({ id: x.id, label: x.label, undoable: !!x.undoable, status: 'pending', n: 0 }));
+    for (let i = 0; i < steps.length; i++) {
+      try { const r = await steps[i].run(); report[i].status = 'done'; report[i].n = r && typeof r === 'object' ? r : { n: r }; }
+      catch (e) {
+        report[i].status = 'failed'; report[i].error = (e && e.message) || String(e);
+        const err = new Error(failText(report)); err.report = report; throw err;
       }
     }
-    const nb = HAK.Batches && Array.isArray(j.batches) ? await HAK.Batches.importAll(j.batches) : 0;
-    const ni = HAK.Issued && Array.isArray(j.issued) ? await HAK.Issued.importAll(j.issued) : 0;
-    return { legacy: false, keys, added: r.added, updated: r.updated, skipped: r.skipped, batches: nb, issued: ni, keepAuth, snapshot };
+    return report;
+  }
+  const countOf = (x) => (x && typeof x === 'object' ? (x.n !== undefined ? x.n : (x.added || 0) + (x.updated || 0)) : x);
+  function failText(report) {
+    const done = report.filter((x) => x.status === 'done'), fail = report.find((x) => x.status === 'failed'), pend = report.filter((x) => x.status === 'pending');
+    return 'Khôi phục DỪNG GIỮA CHỪNG tại "' + fail.label + '": ' + fail.error + '. ' +
+      'Đã nhập: ' + (done.length ? done.map((x) => x.label + ' (' + countOf(x.n) + ')').join(', ') : 'chưa có kho nào') + '. Chưa chạy: ' + (pend.length ? pend.map((x) => x.label).join(', ') : 'không') + '. ' +
+      'Hoàn tác được bằng nút "Hoàn tác khôi phục": ' + (done.filter((x) => x.undoable).map((x) => x.label).join(', ') || 'không có') + '. ' +
+      'KHÔNG hoàn tác tự động (đã nằm trong IndexedDB, nhập lại bản sao là an toàn vì nhập theo phiên bản): ' + (done.filter((x) => !x.undoable).map((x) => x.label).join(', ') || 'không có') + '.';
+  }
+  /**
+   * opts.mode: 'merge' (mặc định — NHẬP BỔ SUNG: danh mục gộp theo phiên bản, dữ liệu mới hơn trên máy được giữ; cài đặt chỉ điền khóa còn thiếu; tệp/mẫu chỉ thêm cái chưa có) |
+   *            'replace' (KHÔI PHỤC về đúng thời điểm sao lưu: cài đặt + danh mục thay bằng bản sao; hồ sơ Lưu trữ / đợt Excel / nhật ký vẫn gộp theo phiên bản, KHÔNG xóa dữ liệu chỉ có trên máy này).
+   * opts.parsed: kết quả inspect() để khỏi đọc lại file. Trả { …, report } hoặc ném lỗi có .report.
+   */
+  async function restoreFile(file, opts) {
+    const keepAuth = !!(opts && opts.keepAuth), mode = opts && opts.mode === 'replace' ? 'replace' : 'merge';
+    const ins = (opts && opts.parsed) || await inspect(file), j = ins.j;                                    // v2.7.5: .zip hoặc .json
+    if (ins.legacy) {                                                    // file sao lưu riêng Lưu trữ (bản cũ)
+      const r = await HAK.Archive.importItems(j.items);
+      return { legacy: true, keys: 0, added: r.added, updated: r.updated, skipped: r.skipped, mode };
+    }
+    const snapshot = snapshotBeforeRestore();
+    if (!snapshot) throw new Error('Không chụp được bản hiện tại trước khi khôi phục (bộ nhớ trình duyệt đầy?). Chưa thay đổi gì — hãy Sao lưu toàn bộ ra file rồi dọn bớt dữ liệu trước.');
+    const out = { legacy: false, keys: 0, added: 0, updated: 0, skipped: 0, batches: 0, issued: 0, keepAuth, snapshot, mode, keptNewer: 0, conflicts: 0 };
+    const merge = mode === 'merge', fillOnly = async (store, items) => {
+      let n = 0;
+      for (const item of items) { if (!item || typeof item.id !== 'string' || typeof item.base64 !== 'string') throw new Error('Tệp đính kèm hoặc mẫu không hợp lệ'); if (merge && await HAK.DB.get(store, item.id)) continue; await HAK.DB.put(store, item); n++; }
+      return n;
+    };
+    const steps = [
+      { id: 'keys', label: 'cài đặt & danh mục', undoable: true, run: () => {
+        Object.keys(j.keys).forEach((k) => {
+          if (k === PRE_KEY) return;
+          if (keepAuth && AUTH_KEYS.indexOf(k) >= 0) return;            // giữ tài khoản / mật khẩu / khóa khôi phục / loại máy hiện tại
+          if (!(k.indexOf('hak.') === 0 && k !== LAST_KEY && k !== AUTO_KEY && j.keys[k] !== null)) return;
+          if (k === CAT && merge && HAK.ContractModel) {               // CÙNG quy tắc phiên bản với Gói cấu hình: bản cũ không ghi đè bản mới
+            const merged = HAK.ContractModel.mergeCatalog(HAK.Store.get(CAT, null), j.keys[k]), rp = HAK.ContractModel.mergeCatalog.report || {};
+            out.keptNewer = (rp.kept || []).length; out.conflicts = (rp.conflicts || []).length;
+            if (HAK.Store.set(CAT, merged) === false) throw new Error('Không ghi được danh mục.'); out.keys++; return;
+          }
+          if (merge && k !== CAT && HAK.Store.get(k, null) !== null) return;   // nhập bổ sung: không đè cài đặt đang có
+          if (HAK.Store.set(k, j.keys[k]) === false) throw new Error('Không ghi được "' + k + '".'); out.keys++;
+        });
+        return { n: out.keys };
+      } },
+      { id: 'yearbook', label: 'hồ sơ năm', run: async () => { if (j.yearbook && HAK.Yearbook) await HAK.Yearbook.importState(j.yearbook.records); return { n: j.yearbook ? (j.yearbook.records || []).length || 1 : 0 }; } },
+      { id: 'archive', label: 'hồ sơ Lưu trữ', run: async () => { const r = await HAK.Archive.importItems(j.archive); out.added = r.added; out.updated = r.updated; out.skipped = r.skipped; return r; } },
+      { id: 'attachments', label: 'tệp đính kèm', run: () => fillOnly('attachments', j.attachments || []) },
+      { id: 'bklsTemplates', label: 'mẫu BKLS', run: () => fillOnly('bklsTemplates', j.bklsTemplates || []) },
+      { id: 'batches', label: 'đợt Excel', run: async () => { out.batches = HAK.Batches && Array.isArray(j.batches) ? await HAK.Batches.importAll(j.batches, { keepNewer: merge }) : 0; return out.batches; } },
+      { id: 'issued', label: 'nhật ký chứng từ', run: async () => { out.issued = HAK.Issued && Array.isArray(j.issued) ? await HAK.Issued.importAll(j.issued) : 0; return out.issued; } }
+    ];
+    out.report = await runSteps(steps);
+    return out;
   }
 
   /* ---------------- v2.6.4 D2 — Gói cấu hình cài đặt (cài cho nhiều công ty / nhiều máy) ----------------
@@ -485,6 +545,30 @@
   }
 
   /* ---------------- Thẻ trạng thái ở Cài đặt ---------------- */
+  /** Nội dung xem trước phạm vi dữ liệu (HTML) cho hộp chọn cách nhập. */
+  function planHtml(plan) {
+    const c = plan.catalog, li = (t) => '<li>' + t + '</li>';
+    return '<ul class="small mb-2">' + li('Bản sao có: <b>' + plan.keys + '</b> mục cài đặt/danh mục, <b>' + plan.archive + '</b> hồ sơ Lưu trữ, <b>' + plan.batches + '</b> đợt Excel, <b>' + plan.issued + '</b> chứng từ đã lập, <b>' + plan.attachments + '</b> tệp đính kèm, <b>' + plan.templates + '</b> mẫu BKLS.') +
+      (c ? li('Danh mục hợp đồng: bản sao <b>' + c.fileContracts + '</b> · máy này <b>' + c.localContracts + '</b> · thêm mới <b>' + c.add + '</b> · khác nội dung <b>' + c.willOverwrite + '</b>' + (c.localNewer.length ? ' · máy này MỚI HƠN ở: ' + c.localNewer.slice(0, 5).map(esc).join('; ') + (c.localNewer.length > 5 ? '…' : '') : '') + '.') : '') + '</ul>';
+  }
+  /** Hộp chọn: Nhập bổ sung (an toàn, theo phiên bản) | Khôi phục về thời điểm sao lưu (ghi đè danh mục & cài đặt) | Hủy. Trả 'merge' | 'replace' | null. */
+  function chooseMode(info) {
+    if (HAK.Backup && HAK.Backup._choose) return Promise.resolve(HAK.Backup._choose(info));
+    return new Promise((ok) => {
+      let m = document.getElementById('restoreModal');
+      if (m) m.remove();
+      m = document.createElement('div'); m.className = 'modal fade'; m.id = 'restoreModal'; m.tabIndex = -1;
+      const c = info.plan.catalog;
+      m.innerHTML = '<div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Nhập từ bản sao lưu — chọn cách nhập</h5></div><div class="modal-body">' + planHtml(info.plan) +
+        '<div class="border rounded p-2 mb-2"><b>Nhập bổ sung (khuyên dùng)</b><div class="small">Gộp theo phiên bản: dữ liệu <b>mới hơn trên máy này được giữ</b> (vd. máy 700 BDMT phiên bản 4 + bản sao 500 BDMT phiên bản 2 → giữ 700); hợp đồng đã mở lại vẫn mở; cài đặt đang có không bị đè; nhập lặp lại cho cùng kết quả.</div></div>' +
+        '<div class="border border-danger rounded p-2"><b>Khôi phục về đúng thời điểm sao lưu</b><div class="small">Cài đặt và <b>danh mục hợp đồng' + (c ? ' (' + c.willOverwrite + ' hợp đồng khác nội dung sẽ bị thay bằng bản sao, kể cả khi máy này mới hơn)' : '') + '</b> bị <b>ghi đè</b> bằng bản sao. Hồ sơ Lưu trữ / đợt Excel / nhật ký vẫn gộp theo phiên bản; dữ liệu chỉ có trên máy này không bị xóa. Có nút "Hoàn tác khôi phục" cho phần cài đặt &amp; danh mục.</div></div>' +
+        '</div><div class="modal-footer"><button class="btn btn-primary" data-choice="merge" type="button">Nhập bổ sung</button><button class="btn btn-outline-danger" data-choice="replace" type="button">Khôi phục (ghi đè)</button><button class="btn btn-outline-secondary" data-choice="cancel" type="button">Hủy</button></div></div></div>';
+      document.body.appendChild(m);
+      const inst = bootstrap.Modal.getOrCreateInstance(m, { backdrop: 'static', keyboard: false });
+      m.addEventListener('click', (e) => { const b = e.target.closest('[data-choice]'); if (!b) return; inst.hide(); ok(b.dataset.choice === 'cancel' ? null : b.dataset.choice); });
+      inst.show();
+    });
+  }
   async function render() {
     const box = $('#backupBody'); if (!box) return;
     const st = await HAK.DB.status();
@@ -512,7 +596,7 @@
       '<div class="d-flex flex-wrap gap-2">' +
       '<button class="btn btn-primary" id="bkSave" type="button">⬇ Sao lưu toàn bộ (.zip)</button>' +
       (preRestoreInfo() ? '<button class="btn btn-outline-warning admin-only" id="bkUndo" type="button" title="Trả cài đặt / danh mục về trạng thái trước lần khôi phục gần nhất (' + esc(fmtDT(preRestoreInfo().at)) + ')">↶ Hoàn tác khôi phục</button>' : '') +
-      '<label class="btn btn-outline-primary mb-0 admin-only">⬆ Khôi phục toàn bộ<input type="file" id="bkRestore" accept=".zip,.json,application/zip,application/json" hidden></label>' +
+      '<label class="btn btn-outline-primary mb-0 admin-only">⬆ Nhập / Khôi phục từ bản sao<input type="file" id="bkRestore" accept=".zip,.json,application/zip,application/json" hidden></label>' +
       (dirOk ? '<button class="btn btn-outline-secondary" id="bkPickDir" type="button">📁 ' + (dir ? 'Đổi thư mục…' : 'Chọn thư mục mặc định…') + '</button>' : '') +
       (dirOk && dir ? '<button class="btn btn-outline-secondary" id="bkClearDir" type="button">✕ Bỏ chọn thư mục</button>' : '') +
       (st.persisted === false ? '<button class="btn btn-outline-secondary" id="bkPersist" type="button">Yêu cầu trình duyệt giữ dữ liệu</button>' : '') + '</div>' +
@@ -540,12 +624,18 @@
     if (bu) bu.addEventListener('click', () => HAK.UI.confirmClick(bu, () => { try { const r = undoRestore(); toast('Đã hoàn tác khôi phục: trả ' + r.set + ' mục cài đặt / danh mục, gỡ ' + r.removed + ' mục mới. Hồ sơ Lưu trữ đã nhập vẫn giữ.', 'success'); setTimeout(() => root.location.reload(), 1200); } catch (err) { toast(err.message || String(err), 'error'); } }, 'Bấm lần nữa để hoàn tác'));
     b2.addEventListener('change', async (e) => {
       const f = e.target.files[0]; e.target.value = ''; if (!f) return;
-      HAK.UI.Loading.show('Đang khôi phục…');
+      HAK.UI.Loading.show('Đang kiểm tra bản sao…');
+      let info = null;
       try {
-        const ka = $('#bkKeepAuth'), r = await restoreFile(f, { keepAuth: !ka || ka.checked });
-        toast('Khôi phục xong' + (r.legacy ? ' (file riêng Lưu trữ)' : ': ' + r.keys + ' mục cài đặt' + (r.keepAuth ? ' (giữ tài khoản đang dùng)' : ' (lấy cả tài khoản trong file)')) + ', hồ sơ thêm ' + r.added + ', cập nhật ' + r.updated + (r.skipped ? ', bỏ qua ' + r.skipped : '') + (r.legacy ? '' : ', ' + r.batches + ' đợt Excel, ' + r.issued + ' chứng từ') + '. Trang sẽ tải lại…', 'success');
+        info = await inspect(f);                                       // kiểm tra TRƯỚC khi ghi: file hỏng thì chưa đổi gì
+        HAK.UI.Loading.hide();
+        const mode = info.legacy ? 'merge' : await chooseMode(info);
+        if (!mode) { toast('Đã hủy — chưa thay đổi gì.', 'info'); return; }
+        HAK.UI.Loading.show(mode === 'replace' ? 'Đang khôi phục…' : 'Đang nhập bổ sung…');
+        const ka = $('#bkKeepAuth'), r = await restoreFile(f, { keepAuth: !ka || ka.checked, mode, parsed: info });
+        toast((mode === 'replace' ? 'Khôi phục' : 'Nhập bổ sung') + ' xong' + (r.legacy ? ' (file riêng Lưu trữ)' : ': ' + r.keys + ' mục cài đặt' + (r.keepAuth ? ' (giữ tài khoản đang dùng)' : ' (lấy cả tài khoản trong file)')) + ', hồ sơ thêm ' + r.added + ', cập nhật ' + r.updated + (r.skipped ? ', bỏ qua ' + r.skipped : '') + (r.keptNewer ? ' · giữ ' + r.keptNewer + ' hợp đồng trên máy vì mới hơn bản sao' : '') + (r.conflicts ? ' · ⚠ ' + r.conflicts + ' hợp đồng cùng phiên bản nhưng khác nội dung (đã giữ bản trên máy)' : '') + '.', r.conflicts ? 'warning' : 'success');
         setTimeout(() => root.location.reload(), 1500);
-      } catch (err) { console.error(err); toast(err.message || String(err), 'error'); }
+      } catch (err) { console.error(err); toast(err.message || String(err), 'error'); if (err && err.report) { try { root.alert(err.message); } catch (e2) { /* bỏ qua */ } } }
       finally { HAK.UI.Loading.hide(); }
     });
     if (b3) b3.addEventListener('click', async () => { toast((await HAK.DB.requestPersist()) ? 'Trình duyệt đã đồng ý giữ dữ liệu.' : 'Trình duyệt chưa đồng ý (thường tự đồng ý khi bạn dùng app đều đặn hoặc thêm vào trang chủ).', 'info'); render(); });
@@ -604,7 +694,7 @@
     root.addEventListener('hashchange', () => setTimeout(bkBanner, 300));
   }
 
-  HAK.Backup = { boot, init, render, saveAll, restoreFile, undoRestore, preRestoreInfo, collect, dirPickerSupported, getSavedDir, pickDefaultDir, setSavedDir, saveBackupBlob,
+  HAK.Backup = { boot, init, render, saveAll, restoreFile, inspect, planHtml, undoRestore, preRestoreInfo, collect, dirPickerSupported, getSavedDir, pickDefaultDir, setSavedDir, saveBackupBlob,
     backupNag, bkBanner, readJson, buildFull, zipParts, health, autoStatus, autoRun, autoTick, autoAllowAndRun, autoList, autoPick,
     packBuild, packExport, packRead, packSummaryHtml, packApply, packMsg };
 })(window);

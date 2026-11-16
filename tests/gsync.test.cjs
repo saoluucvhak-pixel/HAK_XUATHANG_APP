@@ -23,6 +23,7 @@ function makeSS() {
       getRange(r, c, nr, nc) { nr = nr || 1; nc = nc || 1; return {
         getValues: () => Array.from({ length: nr }, (_, i) => Array.from({ length: nc }, (_, j) => get(r + i, c + j))),
         setValues: (vals) => vals.forEach((row, i) => row.forEach((v, j) => set(r + i, c + j, v))),
+        getFormulasR1C1: () => Array.from({ length: nr }, () => Array.from({ length: nc }, () => '')), setFormulaR1C1() {},
         clearContent() { for (let i = 0; i < nr; i++) for (let j = 0; j < nc; j++) set(r + i, c + j, ''); },
         setFontWeight() { return this; }, setBackground() { return this; }, setNumberFormat(f) { g.fmt = g.fmt || {}; g.fmt[c] = f; return this; } }; }
     });
@@ -43,7 +44,7 @@ test('Code.gs: sai mã / dữ liệu hỏng / lệnh lạ bị từ chối; ping
   assert.equal(S.post({ token: 'x', action: 'ping' }).ok, false);
   assert.match(S.post('{khong phai json').error, /không đọc được/);
   assert.match(S.post({ token: 'tok1', action: 'xoa' }).error, /không hợp lệ/);
-  const p = S.post({ token: 'tok1', action: 'ping' }); assert.equal(p.ok, true); assert.equal(p.version, 2);
+  const p = S.post({ token: 'tok1', action: 'ping' }); assert.equal(p.ok, true); assert.equal(p.version, 3);
 });
 
 test('Code.gs: NL_PC_XH "replace" thay cả lô, giữ dòng lô khác; NL_DH_XB "upsert" cập nhật tại chỗ giữ STT, thêm lô mới cuối', () => {
@@ -83,7 +84,7 @@ test('client: push() gửi đúng theo công ty, báo "chưa cài Sheet"; pushSh
   assert.deepEqual(hd.map((s) => s.name), ['NL_HOPDONG', 'NL_CHUNGTHU', 'NL_TOKHAI', 'NL_PHULUC']);
   const ok = await G.pushSheets('hak', hd); assert.equal(ok.NL_HOPDONG.total, 0); assert.equal(ok.NL_CHUNGTHU.total, 0);
   // script cũ (không trả kết quả cho sheet mới) → lỗi rõ ràng
-  await assert.rejects(() => G.pushSheets('dh', hd), /bản cũ.*NL_HOPDONG/);
+  await assert.rejects(() => G.pushSheets('dh', hd), /bản cũ.*VỊ TRÍ/);
 });
 
 test('buildSheets: số liệu hợp đồng / tờ khai / phụ lục đúng (KL hiện hành, còn lại, thuế còn nợ, tăng giảm)', () => {
