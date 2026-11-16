@@ -58,6 +58,41 @@ Cả 7 trang có nút **📊 Xuất Excel** (cạnh nút Tải PDF) → tải fi
 - **🩺 Sức khỏe dữ liệu** (Tổng quan): bộ nhớ trình duyệt, cài đặt (localStorage / 5 MB), số hồ sơ Lưu trữ (vàng khi > 1.500), sao lưu toàn bộ gần nhất (vàng > 7 ngày, đỏ > 14 ngày / chưa có), tự sao lưu (xanh khi đang bật và có quyền ghi, đỏ khi lỗi).
 - Lưu trữ **không tự xóa hồ sơ** (từ v2.7.4; bản cũ tự xóa khi quá 500). Nhiều hồ sơ thì dùng **📦 Xuất & dọn hồ sơ cũ** ở trang Lưu trữ. Nên sao lưu định kỳ, nhất là trước khi đổi máy / trình duyệt.
 
+## Quy trình lập hồ sơ từ đầu đến cuối (v2.19.0)
+
+Luồng đúng: **Danh mục → Nhập bảng cân → Chọn phiếu → Lưu hồ sơ → Xuất chứng từ → Báo cáo.** Đầu mỗi trang biên bản có thanh *"Đang làm việc"*: công ty, hình thức, đợt cân, hợp đồng, phạm vi phiếu (số phiếu · tổng kg).
+
+**1. Nhập bảng cân (mục Nhập liệu)**
+- Chọn file Excel → đợt được lưu bền. Nhãn **✔ Đã lưu** hiện khi đã ghi xong; **⚠ Chưa lưu bền** + nút *Thử lưu lại* nếu ghi lỗi.
+- Nạp lại file trùng tên: app hỏi xác nhận *thay đợt*, nêu rõ hình thức, số phiếu, số tấn của đợt cũ.
+- Xóa đợt đã chuyển sang hình thức khác: app kiểm tra tham chiếu và báo trước; lỗi xóa thì đợt được giữ nguyên.
+- Mở app ở 2 cửa sổ: nếu đợt đã đổi ở cửa sổ kia, app báo xung đột, tải lại trang rồi làm lại.
+
+**2. Ba "phạm vi" khác nhau — đừng nhầm**
+| Tên trên màn hình | Nằm ở | Ảnh hưởng |
+|---|---|---|
+| **Lọc xem trước** | Nhập liệu | Chỉ bảng/thống kê đang xem |
+| **Phạm vi lập chứng từ** | Trang biên bản | Tập phiếu dùng để lập biên bản/BKLS/Excel |
+| **Kỳ báo cáo** | Báo cáo | Kỳ tính báo cáo (theo ngày bắt đầu hồ sơ hoặc ngày cân) |
+
+Muốn lập đúng điều đang xem: ở Nhập liệu bấm **Dùng phạm vi đang xem** → app chuyển ngày/biển số/ĐVVC/từ khóa sang trang biên bản và báo số phiếu, tổng tấn; điều kiện không chuyển được sẽ được liệt kê. Nếu phạm vi ra 0 phiếu, trang biên bản nêu điều kiện nào làm về 0 và dải ngày thực có trong dữ liệu; điều kiện đã hết hiệu lực (biển số/ĐVVC không còn trong dữ liệu) cũng được cảnh báo.
+
+**3. Chọn phiếu**
+- *Chọn N dòng đang hiển thị* chỉ chọn các dòng đang thấy (mỗi lần hiện tối đa 300); *Chọn tất cả K kết quả* chọn mọi kết quả lọc.
+- Dán danh sách số phiếu: khớp **đúng số** trước; chỉ khớp hậu tố khi duy nhất một phiếu; còn lại hiện bảng để bạn xác nhận (vd. dán `123` chỉ chọn phiếu 123, không chọn `99123`).
+- Mỗi phiếu có trạng thái: *Đang kiểm tra…*, *Chưa gán*, *Đã gán · tên hồ sơ*, *⚠ Chưa xác minh được* (lỗi đọc kho). Bấm tên hồ sơ để mở hồ sơ nguồn; khi lưu mà phiếu đã gán nơi khác sẽ có hộp xác nhận.
+
+**4. Xe trả về khác phiếu bỏ**
+- *Phiếu bỏ* (loại khỏi hồ sơ): không vào biên bản, không tính vào khối lượng.
+- *Xe trả về*: vẫn thuộc đợt cân nhưng được đánh dấu trả về, theo quy tắc riêng của từng loại chứng từ.
+- Bấm **Thêm mới** để lập hồ sơ khác: danh sách phiếu bỏ, xe trả về, phiếu chọn riêng, bộ lọc, liên kết hợp đồng và ảnh chụp cũ được xóa sạch; nếu hồ sơ đang mở có thay đổi chưa lưu, app hỏi **Lưu / Bỏ thay đổi / Quay lại**. Mở lại hồ sơ cũ sẽ khôi phục đúng nội dung đã lưu.
+
+**5. Danh mục thay đổi**
+- Khi danh mục (công ty, kho, hợp đồng…) đổi sau khi bạn đã mở hồ sơ, app hiện thông báo **Danh mục đã thay đổi** với giá trị cũ/mới; bạn chọn áp dụng hay giữ, giá trị bạn đã gõ tay không bị ghi đè. Hồ sơ đã lưu luôn mở theo ảnh chụp lúc lưu.
+
+**6. Mở lại / in lại hồ sơ cũ**
+- Hồ sơ đã lưu được mở theo đúng phiên bản đã lưu; năm đã đóng chỉ xem. Khi mở hồ sơ khác lúc đang sửa dở, app hỏi Lưu/Bỏ/Quay lại.
+
 ## Báo cáo tổng hợp (📊 menu Hệ thống)
 Cộng các hồ sơ trong Lưu trữ: thẻ tổng theo loại (Ủy thác xuất khẩu, Xuất hàng kho gửi, Trung chuyển gửi kho, Điều chuyển, Trao đổi), bảng theo loại (qua cân · xe trả về · thực giao), theo tháng, theo tàu. Lọc theo **Năm** (ô chọn nhanh 01/01–31/12) hoặc khoảng ngày (tính theo ngày bắt đầu của hồ sơ); có bảng theo năm và theo tháng. Nút **Xuất Excel** ra file 5 sheet (có sheet Theo năm); tên file có kỳ báo cáo, vd `BaoCaoTongHop_Nam2025_xuat20261018.xlsx`.
 - **Theo đơn vị vận chuyển (theo tàu / theo đợt, chi tiết theo ngày)**: chọn 1 mục trong danh sách xổ xuống (nhóm theo loại). Xuất khẩu / Ủy thác xuất khẩu / Xuất hàng kho gửi chọn theo **tàu** (gộp mọi hồ sơ cùng tên tàu). Trung chuyển gửi kho / Điều chuyển nội bộ / Trao đổi hàng hóa / Xuất bán không có tàu nên chọn theo **đợt** (mỗi hồ sơ trong Lưu trữ là 1 đợt riêng, nhãn hiển thị theo ngày + bên giao/nhận + loại). App đọc lại các dòng phiếu cân từ 🗄️ Lưu trữ, gộp theo **ngày + đơn vị vận chuyển** (cột ĐVVC / nhà xe / chủ xe trong Excel cân — dòng không có cột này gộp vào "(Không xác định)"), kèm bảng tổng theo từng đơn vị vận chuyển. Có thể mất vài giây với tàu/đợt nhiều xe vì phải giải nén lại dữ liệu đã lưu. Nút **Xuất Excel (tất cả tàu / đợt)** xuất 1 sheet gộp mọi tàu/đợt đang được tính (theo tick chọn hồ sơ + khoảng ngày lọc).

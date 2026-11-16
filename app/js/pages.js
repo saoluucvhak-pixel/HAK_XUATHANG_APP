@@ -344,9 +344,9 @@
       '<div class="form-text">Khối lượng thực giao = khối lượng qua cân − khối lượng xe trả về. Bảng phụ lục "xe trả về" chỉ xuất hiện khi có chọn xe.</div></div></div>') : '';
     // ---- bộ lọc ----
     const filterHtml =
-      '<div class="card mb-3"><div class="card-body"><div class="sec-title">Phạm vi dữ liệu lấy từ Excel</div>' +
+      '<div class="card mb-3"><div class="card-body"><div class="sec-title">Phạm vi lập chứng từ <span class="muted fw-normal small">— tập phiếu dùng để lập biên bản / BKLS / Excel (lọc ở đây chính là phạm vi sẽ lập; khác với "Lọc xem trước" ở Nhập liệu và "Kỳ báo cáo" ở Báo cáo)</span></div>' +
       '<div id="smart-' + type + '"></div>' +
-      '<div id="chips-' + type + '" class="d-none"></div>' +
+      '<div id="chips-' + type + '" class="d-none"></div><div id="zeroWhy-' + type + '" class="alert alert-warning py-1 small mt-2 mb-0 d-none" role="status"></div>' +
       '<div class="row g-2 align-items-end d-none"><div class="col-6 col-md-4"><label class="form-label">Từ ngày</label><input type="date" class="form-control" id="from-' + type + '"></div>' +
       '<div class="col-6 col-md-4"><label class="form-label">Đến ngày</label><input type="date" class="form-control" id="to-' + type + '"></div>' +
       '<div class="col-12 col-md-4 d-grid"><button class="btn btn-outline-secondary" id="resetFlt-' + type + '" type="button">Đặt lại bộ lọc</button></div></div>' +
@@ -373,6 +373,7 @@
 
     sec.innerHTML =
       '<div class="d-flex align-items-start gap-3 mb-3"><div class="fs-1 page-ico">' + (HAK.Icons && HAK.Icons.has(type) ? HAK.Icons.svg(type) : D.icon) + '</div><div><h4 class="mb-1">' + esc(D.title) + '</h4><div class="muted">' + esc(D.desc) + '</div></div></div>' +
+      '<div id="ctxBar-' + type + '" class="border rounded p-2 small mb-3 bg-body-tertiary" role="status" aria-live="polite"></div>' +
       '<div id="noData-' + type + '" class="alert alert-warning d-none">Chưa có dữ liệu Excel cho loại biên bản này. <a href="#/file" class="alert-link" data-filetype="' + type + '">Nhập liệu cho loại này</a> để bắt đầu.</div>' +
       navHtml +
       '<div class="row g-3"><div class="col-xl-8">' +
@@ -622,6 +623,21 @@
     if (!await guardLeave(type)) return false;
     resetRecordState(type); return true;
   }
+  /**
+   * "Dùng phạm vi đang xem": chuyển điều kiện của LỌC XEM TRƯỚC (Nhập liệu) sang PHẠM VI LẬP CHỨNG TỪ của trang biên bản `type`.
+   * Trả { moved: [nhãn], skipped: [nhãn không chuyển được], rows, kg } để báo trước khi người dùng lập chứng từ.
+   */
+  function useScope(type, state) {
+    const st = ST[type]; if (!st) return { moved: [], skipped: [], rows: 0, kg: 0 };
+    const s = JSON.parse(JSON.stringify(state || {})), moved = [], skipped = [], ok = { sel: ['plate', 'carrier'], flag: ['warnings'] };
+    ['sel', 'one', 'flag'].forEach((kind) => Object.keys(s[kind] || {}).forEach((k) => { if ((ok[kind] || []).indexOf(k) >= 0) moved.push(k === 'plate' ? 'Biển số' : k === 'carrier' ? 'Đơn vị vận chuyển' : 'Chỉ dòng có cảnh báo'); else { skipped.push(k); delete s[kind][k]; } }));
+    if (s.q) moved.push('Tìm: ' + s.q); if (s.tu || s.den) moved.push('Ngày ' + (s.tu || '…') + ' → ' + (s.den || '…'));
+    st.filter.smart = s; st.filter.from = s.tu || ''; st.filter.to = s.den || '';
+    if (!st.built) return { moved, skipped, rows: 0, kg: 0, pending: true };
+    if (st.built) { try { documentSmart(type); } catch (e) { console.warn(e); } renderFilter(type); updateSummary(type); }
+    const rows = currentRows(type), sum = G().summarize(rows);
+    return { moved, skipped, rows: rows.length, kg: sum.kg };
+  }
   function resetFilter(type) {
     const ds = getDs(type);
     ST[type].filter = { groups: null, from: '', to: '' };
@@ -801,6 +817,7 @@
     const cur = sel.value;
     sel.innerHTML = contractOptions(type, cur);
     if (sel.value !== cur) { saveForm(type); const b = $('#ctMsg-' + type); if (b) b.innerHTML = ''; }
+    else renderCatalogNotice(type);                          // Danh mục đổi (BDMT, chứng thư…) khi đang lập: báo + cho xem giá trị cũ / mới trước khi áp dụng
   }
 
   /* ===============================================================
@@ -929,7 +946,99 @@
     }
     box.innerHTML = html.join('');
   }
+  /**
+   * Thanh "Đang làm việc trên": công ty · đợt cân (nguồn dữ liệu) · hợp đồng · phạm vi phiếu · trạng thái lưu — để luôn biết tài liệu đang mở lấy từ đâu.
+   * Ba nguồn tách bạch: (1) đợt Excel ĐANG NẠP (Nhập liệu) · (2) HỒ SƠ NĂM đã lưu (Lưu hồ sơ / Xem năm cũ) · (3) hồ sơ trong LƯU TRỮ — nguồn của Báo cáo (tự ghi khi xuất Word / PDF / Excel).
+   */
+  function renderContext(type) {
+    const bar = $('#ctxBar-' + type); if (!bar) return;
+    const st = ST[type], ds = getDs(type), act = HAK.Yearbook && HAK.Yearbook.active ? HAK.Yearbook.active(type) : null, p = [];
+    const cid = (() => { const el = $('#' + fid(type, 'giaoId')); return el ? el.value : ''; })(), co = cid ? (cfg().companies || []).find((c) => c.id === cid) : null;
+    p.push('<b>Công ty:</b> ' + esc(co ? (co.short || co.name) : 'chưa chọn'));
+    let src;
+    if (st.savedDs) src = '<b>Nguồn:</b> hồ sơ năm đã lưu' + (act ? ' (năm ' + esc(act.year) + ' · phiên bản ' + esc(act.revision) + ')' : '') + ' — <span class="muted">không dùng Excel đang nạp</span>';
+    else { const sl = HAK.App && HAK.App.slots && HAK.App.slots[type], bs = sl && sl.batches ? sl.batches : []; src = '<b>Đợt cân:</b> ' + (bs.length ? esc(bs.length + ' đợt Excel đang nạp (' + bs.slice(0, 3).map((b) => b.fileName).join(', ') + (bs.length > 3 ? ', …' : '') + ')') : '<span class="text-warning">chưa nạp Excel</span>'); }
+    p.push(src);
+    const c = st.snapshotParams ? null : selectedContract(type), snap = st.snapshotParams;
+    let hd = 'chưa chọn (nhập tay)';
+    if (c) hd = HAK.Catalog.label(c); else if (snap && (snap.contractDetailId || snap.contractNo)) {
+      const h = snap.contractDetailId && HAK.Catalog ? HAK.Catalog.contract(snap.contractDetailId, { history: true }) : null;
+      hd = (h ? HAK.Catalog.label(h) : snap.contractNo || snap.contractDetailId) + ' (bản đã lưu' + (h && h.deletedAt ? ' · ⚠ hợp đồng / chi tiết đã ngừng dùng' : '') + ')';
+    }
+    p.push('<b>Hợp đồng:</b> ' + esc(hd));
+    if (ds) {
+      const all = ds.rows.length, rows = currentRows(type), f = st.filter, extra = [];
+      if (f.from || f.to) extra.push('ngày ' + (f.from || '…') + ' → ' + (f.to || '…')); const sp = G().filterSplitText(f); if (sp) extra.push(sp.replace(/chỉ \d+ phiếu được chọn riêng/, '').replace(/ · $/, '').trim());
+      if (st.omit.size) extra.push('bỏ ' + st.omit.size + ' phiếu'); if (st.returned.size) extra.push(st.returned.size + ' xe trả về');
+      p.push('<b>Phạm vi lập chứng từ:</b> ' + fmtInt(rows.length) + ' / ' + fmtInt(all) + ' phiếu' + ((f.pick || []).length ? ' · chọn riêng ' + f.pick.length : '') + (extra.filter(Boolean).length ? ' (' + esc(extra.filter(Boolean).join(' · ')) + ')' : ''));
+    }
+    const dirty = isDirty(type);
+    p.push('<b>Trạng thái:</b> ' + (st.ro ? '<span class="badge text-bg-secondary">Chỉ xem năm đã đóng</span>' : dirty ? '<span class="badge text-bg-warning">● Chưa lưu thay đổi</span>' : act ? '<span class="badge text-bg-success">✔ Đã lưu hồ sơ năm</span>' : '<span class="badge text-bg-light border">Hồ sơ mới — chưa lưu</span>'));
+    bar.innerHTML = p.join(' <span class="muted">·</span> ');
+  }
+  /**
+   * Danh mục đổi lúc đang lập hồ sơ: so các ô điền từ hợp đồng (giá trị lần điền gần nhất) với Danh mục hiện tại.
+   * Trả về [{ id, label, old, nv, edited }] — edited = người dùng đã sửa tay ô đó (khi áp dụng sẽ được GIỮ, không ghi đè).
+   */
+  function catalogDiff(type) {
+    const c = ST[type].snapshotParams ? null : selectedContract(type); if (!c) return [];
+    const last = HAK.Store.get(ctFillKey(type), {}) || {}, v = contractValues(type, c).v, out = [];
+    Object.keys(v).forEach((id) => {
+      if (last[id] === undefined) return;
+      const f = fieldDef(type, id), cur = String(fieldValue(type, f) || '').trim(), nv = String(v[id]).trim(), old = String(last[id] || '').trim();
+      if (nv !== old && nv !== cur) out.push({ id, label: f.label, old, nv, edited: cur !== old, cur });
+    });
+    return out;
+  }
+  function renderCatalogNotice(type) {
+    const box = $('#ctMsg-' + type); if (!box || ST[type].snapshotParams) return;
+    const d = catalogDiff(type), sig = JSON.stringify(d.map((x) => [x.id, x.nv]));
+    if (!d.length || ST[type].ctIgnored === sig) { if (box.dataset.notice) { box.innerHTML = ''; delete box.dataset.notice; } return; }
+    box.dataset.notice = '1';
+    box.innerHTML = '<div class="alert alert-warning py-2 small mb-2"><b>⚠ Danh mục đã thay đổi</b> trong lúc đang lập hồ sơ. Xem các ô sẽ cập nhật rồi chọn:' +
+      '<table class="table table-sm mb-1 mt-1"><thead><tr><th>Ô</th><th>Đang dùng</th><th>Danh mục mới</th><th></th></tr></thead><tbody>' +
+      d.map((x) => '<tr><td>' + esc(x.label) + '</td><td>' + esc(x.edited ? x.cur : x.old) + (x.edited ? ' <span class="badge text-bg-info">bạn đã nhập tay</span>' : '') + '</td><td><b>' + esc(x.nv) + '</b></td><td>' + (x.edited ? '<span class="muted">giữ giá trị nhập tay</span>' : 'sẽ cập nhật') + '</td></tr>').join('') +
+      '</tbody></table><button class="btn btn-sm btn-warning" data-ct-apply="' + type + '" type="button">Áp dụng cập nhật</button> <button class="btn btn-sm btn-outline-secondary" data-ct-ignore="' + type + '" type="button">Giữ nguyên các ô hiện tại</button>' +
+      '<div class="muted mt-1">Ô bạn đã nhập tay luôn được giữ. Hồ sơ đã lưu dùng bản chụp nên không đổi theo Danh mục.</div></div>';
+    box.querySelector('[data-ct-apply]').addEventListener('click', () => { delete box.dataset.notice; ST[type].ctIgnored = ''; applyContract(type); renderContext(type); });
+    box.querySelector('[data-ct-ignore]').addEventListener('click', () => { ST[type].ctIgnored = sig; box.innerHTML = ''; delete box.dataset.notice; });
+  }
+  /** Vì sao phạm vi lập chứng từ ra 0 phiếu: áp từng điều kiện cộng dồn, báo điều kiện làm số phiếu về 0 (+ dải ngày thực có trong dữ liệu). */
+  function explainZero(type) {
+    const ds = getDs(type); if (!ds || !ds.rows.length) return '';
+    const st = ST[type], f = st.filter, G_ = G(), total = ds.rows.length, base = { files: f.files, exclude: f.exclude, groups: f.groups };
+    const stages = [['khoảng ngày', { from: f.from, to: f.to }], ['giờ cân', { timeFrom: f.timeFrom, timeTo: f.timeTo }], ['số phiếu từ–đến', { ticketFrom: f.ticketFrom, ticketTo: f.ticketTo }],
+      ['phiếu chọn riêng', { pick: f.pick }], ['bộ lọc nâng cao (tìm kiếm / biển số / ĐVVC)', { smart: f.smart }], ['phiếu đã bỏ', { omit: Array.from(st.omit.keys()) }]];
+    let acc = Object.assign({}, base);
+    if (G_.filterRows(ds.rows, acc).length === 0) return 'Dữ liệu đang nạp có ' + fmtInt(total) + ' phiếu nhưng phạm vi đợt / nhãn đã loại hết.';
+    for (const [name, part] of stages) {
+      const next = Object.assign({}, acc, part), n = G_.filterRows(ds.rows, next).length;
+      if (n === 0) {
+        const mm = ds.stats && ds.stats.minTs !== null && ds.stats.minTs !== undefined ? ' Dữ liệu có phiếu cân từ ' + dmyOf(ds.stats.minTs) + ' đến ' + dmyOf(ds.stats.maxTs) + '.' : '';
+        return 'Không có phiếu nào vì điều kiện "' + name + '": trước điều kiện này còn ' + fmtInt(G_.filterRows(ds.rows, acc).length) + ' / ' + fmtInt(total) + ' phiếu, sau điều kiện còn 0.' + mm;
+      }
+      acc = next;
+    }
+    return '';
+  }
+  const dmyOf = (ts) => { const t = HAK.Excel.util.tsToParts(ts); return String(t.d).padStart(2, '0') + '/' + String(t.m).padStart(2, '0') + '/' + t.y; };
+  /** Điều kiện lọc nâng cao đã LƯU / đang dùng mà dữ liệu hiện tại không còn (đổi công ty, loại, đợt, năm): [{ label, value }]. */
+  function expiredConditions(type) {
+    const ds = getDs(type), sm = ST[type].filter.smart; if (!ds || !sm || !sm.sel) return [];
+    const out = [], have = { plate: new Set(ds.rows.map((r) => r.plate)), carrier: new Set(ds.rows.map((r) => r.carrier)) }, lab = { plate: 'Biển số', carrier: 'Đơn vị vận chuyển' };
+    Object.keys(sm.sel).forEach((k) => { if (!have[k]) return; (sm.sel[k] || []).forEach((v) => { if (!have[k].has(v)) out.push({ label: lab[k] || k, value: v }); }); });
+    return out;
+  }
+  function renderZeroWhy(type) {
+    const box = $('#zeroWhy-' + type); if (!box) return;
+    const ds = getDs(type), rows = ds ? currentRows(type) : [], exp = ds ? expiredConditions(type) : [], parts = [];
+    if (exp.length) parts.push('Điều kiện đã hết hiệu lực (không có trong dữ liệu hiện tại): ' + exp.slice(0, 5).map((x) => x.label + ' "' + x.value + '"').join(', ') + (exp.length > 5 ? ', …' : '') + ' — bấm "Đặt lại bộ lọc" hoặc sửa bộ lọc.');
+    if (ds && !rows.length) { const z = explainZero(type); if (z) parts.push(z); }
+    box.classList.toggle('d-none', !parts.length); box.textContent = parts.join(' ');
+  }
   function updateSummary(type) {
+    renderZeroWhy(type);
+    renderContext(type);
     certCheck(type);
     if (pageBkls(type)) bklsHint(type);
     const ds = getDs(type);
@@ -1552,9 +1661,9 @@
         }
       });
     },
-    show(type) { if (ST[type].built) { refreshContracts(type); renderFilter(type); updateSummary(type); if (ST[type].baseSig === undefined) markClean(type); } },
+    show(type) { if (ST[type].built) { if (ST[type].filter.smart) { try { documentSmart(type); } catch (e) { console.warn(e); } } refreshContracts(type); renderFilter(type); updateSummary(type); if (ST[type].baseSig === undefined) markClean(type); } },
     unloadSnapshot(type){resetRecordState(type,{fields:false});},
-    newRecord, guardLeave, markClean, isDirty, _st: (t) => ST[t], _pick: { resolveTicket, view: () => pickView(), PICK_PAGE },
+    newRecord, guardLeave, markClean, isDirty, _explainZero: explainZero, _expired: expiredConditions, useScope, hasType: (t) => !!ST[t], _st: (t) => ST[t], _catalogDiff: catalogDiff, _renderContext: renderContext, _pick: { resolveTicket, view: () => pickView(), PICK_PAGE },
     readOnly(type,on){ST[type].ro=!!on;$$('#page-'+type+' input,#page-'+type+' select,#page-'+type+' textarea').forEach(n=>n.disabled=on);if(on)$('#year-note-'+type).textContent='Chỉ xem năm đã đóng · Không ghi vào kho làm việc. Dùng Khôi phục năm nếu cần sửa.';},
     snapshot(type){const ds=getDs(type);if(!ds)throw Error('Chưa có dữ liệu cân.');const params=collect(type);return {params,rows:JSON.parse(JSON.stringify(G().filterRows(ds.rows,params.filter)))};},
     openSnapshot(record){const type=record.type;if(!DOCS[type])throw Error('Loại hồ sơ không hỗ trợ.');const rows=JSON.parse(JSON.stringify(record.rows));ST[type].savedDs={ok:true,rows,stats:HAK.Excel.computeStats(rows)};ST[type].snapshotParams=JSON.parse(JSON.stringify(record.params));ST[type].filter=Object.assign({groups:null,from:'',to:''},record.params.filter||{});if(ST[type].filter.groups)ST[type].filter.groups=new Set(ST[type].filter.groups);ST[type].returned=new Set(record.params.returned||[]);ST[type].omit=new Map(((record.params.filter||{}).omitLog||[]).map(e=>[e.key,e]));Object.assign(HAK.Config.custom,record.context&&record.context.custom||{});DOCS[type].groups.forEach(g=>g.fields.forEach(f=>{const node=$('#'+fid(type,f.id)),value=record.params[f.id];if(!node)return;if(node.tagName==='SELECT'&&value!=null&&!Array.from(node.options).some(o=>o.value===value)){const option=document.createElement('option');option.value=value;option.textContent=value+' (đã lưu)';node.append(option);}if(f.type==='contract')return;if(value!=null)setField(type,f,value);else resetField(type,f,node);}));const contract=$('#'+fid(type,'contractId'));if(contract){contract.value='';contract.disabled=true;contract.title='Hồ sơ dùng thông tin hợp đồng đã lưu; chọn Thêm mới để dùng hợp đồng khác.';}renderFilter(type);updateSummary(type);$('#year-note-'+type).textContent='Đang sửa hồ sơ năm '+record.year+' · phiên bản '+record.revision+' · Lưu hồ sơ để ghi thay đổi';markClean(type);},

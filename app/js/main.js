@@ -512,6 +512,14 @@
     }
     const key=App.type+'|'+App.fileName;if(key!==dataSmartKey){dataSmartKey=key;dataSmart.setState(F.core.empty());}dataSmart.refresh();return dataSmart;
   }
+  function useViewScope(){
+    if(!dataSmart||!App.ds)return;const res=dataSmart.filter(App.ds.rows),rows=res.rows||[],kg=rows.reduce((a,r)=>a+(+r.net||0),0),state=dataSmart.getState();
+    if(!rows.length){HAK.UI.toast('Phạm vi đang xem không có phiếu nào — chưa thể chuyển.','warning');return;}
+    const P=HAK.Pages;if(!P||!P.useScope||!P.hasType(App.type)){HAK.UI.toast('Hình thức này chưa có trang lập chứng từ.','warning');return;}
+    const r=P.useScope(App.type,state);
+    const msg='Đã chuyển phạm vi đang xem sang trang lập chứng từ: '+rows.length+' phiếu · '+G.fmtTon(kg)+' tấn.'+(r.skipped.length?' Điều kiện KHÔNG chuyển được (cần đặt lại ở trang biên bản): '+r.skipped.join(', ')+'.':'');
+    HAK.UI.toast(msg,r.skipped.length?'warning':'success');location.hash='#/'+App.type;
+  }
   const previewRows=()=>dataSmart?dataSmart.filter(App.ds.rows).rows:App.ds.rows;
   function renderFile() {
     const ds = App.ds;
@@ -657,6 +665,7 @@
 
     $('#sheetSelect').addEventListener('change', (e) => { App.sheet = e.target.value; App.mapping = {}; App.headerRow = null; parseCurrent(true); });
     $('#btnReparse').addEventListener('click', () => parseCurrent(true));
+    $('#btnUseScope').addEventListener('click', useViewScope);
     $('#btnResetMap').addEventListener('click', () => { App.mapping = {}; App.headerRow = null; parseCurrent(true); toast('Đã nhận diện lại các cột.', 'info'); });
     $('#plateSearch').addEventListener('input', debounce(() => { if (App.ds && App.ds.ok) renderPlates(); }, 150));
     $('#prevPrev').addEventListener('click', () => { App.previewPage--; renderPreview(); });
