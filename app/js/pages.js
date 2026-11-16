@@ -1216,7 +1216,30 @@
     return { n: hit.length, kg: hit.reduce((a, r) => a + (+r.net || 0), 0) };
   }
   /* ---- Chọn phiếu cân của tàu này (khi 2 tàu cân xen kẽ trong ngày): hồ sơ chỉ gồm các phiếu đã tick ---- */
-  let pickType = null;
+  let pickType = null, pickAssigned = new Map(), pickLoading = false;
+  const pickCache = new Map();
+  /**
+   * Phiếu nào đã nằm trong hồ sơ Lưu trữ khác (cùng công ty, ngày cân giao nhau) → nhãn "TÀU · tên hồ sơ" để khỏi gán trùng.
+   * Nhận diện theo cùng khóa với đối soát phiếu cân (công ty + số phiếu + ngày + biển số, hoặc công ty + ngày + giờ + biển số).
+   */
+  async function loadPickAssigned(type) {
+    pickAssigned = new Map();
+    if (!HAK.Archive || !HAK.Report || !HAK.Weigh) return;
+    const p = collect(type), rows = rowsForPick(type), tss = rows.map((r) => r.ts1).filter((x) => x !== null && x !== undefined);
+    if (!tss.length) return;
+    const lo = Math.min.apply(null, tss), hi = Math.max.apply(null, tss) + 86400000, dmy = (s) => { const m = String(s || '').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/); return m ? Date.UTC(+m[3], +m[2] - 1, +m[1]) : null; };
+    const metas = (await HAK.Archive.list()).filter((m) => (m.cid || '') === (p.giaoId || '') && dmy(m.from) !== null && dmy(m.from) <= hi && (dmy(m.to) === null ? dmy(m.from) : dmy(m.to)) + 86399999 >= lo);
+    if (!metas.length) return;
+    const tk = await HAK.Report.prepareTickets(metas, pickCache, true);
+    metas.forEach((m) => (tk.get(m.id) || []).forEach((t) => {
+      if (!t.id) return; const k = t.id.replace(/#\d+$/, ''), arr = pickAssigned.get(k) || []; arr.push({ ship: m.ship || '', title: m.title || m.id, id: m.id }); pickAssigned.set(k, arr);
+    }));
+  }
+  const assignedLabel = (r) => {
+    const cid = (collect(pickType) || {}).giaoId || '', k = HAK.Weigh && HAK.Weigh.identity(r, cid), a = k ? pickAssigned.get(k) : null;
+    if (!a || !a.length) return k ? '<span class="muted">— chưa gán</span>' : '<span class="muted" title="Thiếu số phiếu / giờ / biển số để nhận diện">?</span>';
+    return a.map((x) => '<span class="badge text-bg-warning" title="' + esc(x.title) + '">' + esc(x.ship || 'không rõ tàu') + '</span>').join(' ');
+  };
   function rowsForPick(type) {
     const ds = getDs(type); if (!ds) return [];
     const p = collect(type), f = Object.assign({}, p.filter); delete f.pick;
@@ -1230,7 +1253,7 @@
       '<div class="row g-2 mb-2"><div class="col-md-5"><input id="pickSearch" class="form-control form-control-sm" placeholder="Tìm số phiếu / biển số…" autocomplete="off"></div>' +
       '<div class="col-md-7 d-flex gap-2"><button class="btn btn-sm btn-outline-primary" id="pickAllShown" type="button">Chọn các phiếu đang hiển thị</button><button class="btn btn-sm btn-outline-secondary" id="pickNone" type="button">Bỏ chọn hết</button></div></div>' +
       '<div class="mb-2"><textarea id="pickPaste" class="form-control form-control-sm" rows="2" placeholder="Hoặc dán danh sách số phiếu của tàu này (cách nhau bằng dấu cách / phẩy / xuống dòng)"></textarea><button class="btn btn-sm btn-outline-primary mt-1" id="pickApply" type="button">Chọn theo danh sách đã dán</button> <span class="small" id="pickPasteMsg"></span></div>' +
-      '<div class="tbl-wrap"><table class="table table-sm"><thead><tr><th>Chọn</th><th>Số phiếu</th><th>Giờ cân 1</th><th>Biển số</th><th class="num">KL (kg)</th></tr></thead><tbody id="pickBody"></tbody></table></div><div class="small muted" id="pickInfo"></div></div>' +
+      '<div class="tbl-wrap"><table class="table table-sm"><thead><tr><th>Chọn</th><th>Số phiếu</th><th>Giờ cân 1</th><th>Biển số</th><th class="num">KL (kg)</th><th>Đã gán cho hồ sơ / tàu</th></tr></thead><tbody id="pickBody"></tbody></table></div><div class="small muted" id="pickInfo"></div></div>' +
       '<div class="modal-footer"><span class="me-auto small" id="pickCount"></span><button class="btn btn-primary" data-bs-dismiss="modal" type="button">Xong</button></div></div></div>';
     document.body.appendChild(m);
     const cur = () => (ST[pickType].filter.pick || []);
@@ -1252,7 +1275,7 @@
   function renderPickList() {
     const rows = rowsForPick(pickType), q = $('#pickSearch').value.trim().toLowerCase(), on = new Set(ST[pickType].filter.pick || []), K = G().omitKey;
     const shown = rows.filter((r) => !q || String(r.ticket || '').toLowerCase().includes(q) || String(r.plate || '').toLowerCase().includes(q)), page = shown.slice(0, 300);
-    $('#pickBody').innerHTML = page.map((r) => '<tr' + (on.has(K(r)) ? ' class="table-success"' : '') + '><td><input class="form-check-input" type="checkbox" data-key="' + esc(K(r)) + '"' + (on.has(K(r)) ? ' checked' : '') + '></td><td class="mono">' + esc(r.ticket || '(dòng ' + r.idx + ')') + '</td><td>' + esc(r.time1) + '</td><td>' + esc(r.plate) + '</td><td class="num">' + fmtInt(r.net) + '</td></tr>').join('');
+    $('#pickBody').innerHTML = page.map((r) => '<tr' + (on.has(K(r)) ? ' class="table-success"' : '') + '><td><input class="form-check-input" type="checkbox" data-key="' + esc(K(r)) + '"' + (on.has(K(r)) ? ' checked' : '') + '></td><td class="mono">' + esc(r.ticket || '(dòng ' + r.idx + ')') + '</td><td>' + esc(r.time1) + '</td><td>' + esc(r.plate) + '</td><td class="num">' + fmtInt(r.net) + '</td><td class="small">' + (pickLoading ? '<span class="muted">đang đọc…</span>' : assignedLabel(r)) + '</td></tr>').join('');
     $('#pickInfo').textContent = 'Hiển thị ' + page.length + ' / ' + shown.length + ' phiếu trong phạm vi' + (shown.length > 300 ? ' — gõ tìm kiếm để thu hẹp.' : '.');
     const kg = rows.filter((r) => on.has(K(r))).reduce((a, r) => a + (+r.net || 0), 0);
     $('#pickCount').textContent = on.size ? 'Đã chọn ' + on.size + ' phiếu · ' + G().fmtTon(kg) + ' tấn' : 'Chưa chọn phiếu nào';
@@ -1261,7 +1284,8 @@
     if (!getDs(type)) { toast('Chưa có dữ liệu Excel.', 'error'); return; }
     if (ST[type].ro) { toast('Hồ sơ đang ở chế độ chỉ xem, không chọn phiếu được.', 'warning'); return; }
     ensurePickModal(); pickType = type; $('#pickSearch').value = ''; $('#pickPasteMsg').textContent = '';
-    renderPickList(); bootstrap.Modal.getOrCreateInstance($('#pickModal')).show();
+    pickLoading = true; renderPickList(); bootstrap.Modal.getOrCreateInstance($('#pickModal')).show();
+    loadPickAssigned(type).catch((e) => console.warn('Không đọc được các hồ sơ đã gán phiếu', e)).finally(() => { pickLoading = false; if (pickType === type) renderPickList(); });
   }
   let omitType = null;
   function ensureOmitModal() {

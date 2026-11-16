@@ -291,6 +291,9 @@ Thủy chốt 28/09/2026: "1. bỏ Trao đổi KHÔNG đồng bộ lên Google S
 - pages.js generateBkls: không chặn khi thiếu Số BKLS / hệ số / tên bên mua — tự điền hoặc để trống + cảnh báo.
 - tests/parse-num.test.cjs, tests/numfmt.test.cjs.
 
+## (Chưa phát hành) Hộp chọn phiếu có cột "Đã gán cho hồ sơ / tàu"
+- Mỗi phiếu hiện nhãn tàu của hồ sơ Lưu trữ khác (cùng công ty, ngày cân giao nhau) đã lấy phiếu đó; "— chưa gán" nếu chưa; "?" nếu thiếu số phiếu / giờ / biển số để nhận diện — tránh gán trùng một phiếu cho hai tàu.
+
 ## v2.18.0 — Tách phiếu cân trong cùng ngày (1 ngày chạy 2 tàu) + BKLS nhiều xe
 - Phạm vi dữ liệu có thêm ô **Giờ cân từ / đến** (qua nửa đêm được) và **Số phiếu từ / đến** (so theo dãy số cuối của số phiếu). Mỗi tàu lập một hồ sơ với giờ hoặc dãy số phiếu của tàu đó; hai hồ sơ cùng ngày không trùng, không mất phiếu, báo cáo cộng đủ.
 - **BKLS nhiều xe**: bỏ giới hạn cứng 200 xe (mẫu BKLS mới) và 100 xe (PDF từng xe). Word từng xe không giới hạn (nhiều file tự gói ZIP); PDF từng xe tự chia thành các đợt in ≤ 150 xe (mỗi lần in 150 xe), mỗi đợt một hộp thoại in, hỏi xác nhận giữa các đợt.
