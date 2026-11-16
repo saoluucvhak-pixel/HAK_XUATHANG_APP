@@ -25,11 +25,16 @@ async function pendingYears(){const state=await H.Yearbook.read();return (state.
  * Đối chiếu file ZIP đã xác minh với dữ liệu đang làm việc rồi dọn tiếp. KHÔNG dọn nếu có hồ sơ / đợt cân ĐÃ SỬA sau khi đóng dở (file ZIP không chứa bản mới).
  * Trả { resumed:true, records, archive, batches, leftover:{records,batches} } | { needsReview:true, diffs:{changedRecords,changedBatches,changedArchive} } | { nothing:true }.
  */
-async function resumeClose(year,file){
+async function resumeClose(year,file,expectedSha){
   if(H.Auth&&(!H.Auth.isAdmin()||H.Auth.scopeIds('archive')!==null))throw Error('Tiếp tục đóng năm cần Quản trị xem tất cả công ty.');
-  const state=await H.Yearbook.read(),pend=(state.closed||[]).find(c=>c.pending&&c.year===year);if(!pend)return {nothing:true};
-  if(!file)throw Error('Chọn lại đúng file ZIP năm '+year+' đã lưu ('+(pend.path||'HAK_NamDaDong_'+year+'.zip')+') để đối chiếu.');
-  if(await digest(file)!==pend.sha256)throw Error('File không khớp bản ZIP đã xác minh khi đóng năm '+year+'; chưa dọn gì. Hãy chọn đúng file '+(pend.path||'')+'.');
+  const state=await H.Yearbook.read(),pendings=(state.closed||[]).filter(c=>c.pending&&c.year===year);
+  // Chỉ xét lần đóng dở ĐÚNG NĂM và (nếu có) đúng SHA-256 đã chọn; lần đã hoàn tất hoặc không còn chờ → không dọn thêm.
+  const named=expectedSha?pendings.find(c=>c.sha256===expectedSha):null;
+  if(!pendings.length||(expectedSha&&!named))return {nothing:true};
+  if(!file){const hint=named||pendings[0];throw Error('Chọn lại đúng file ZIP năm '+year+' đã lưu ('+(hint.path||'HAK_NamDaDong_'+year+'.zip')+') để đối chiếu.');}
+  const sha=await digest(file);                                          // tính SHA-256 một lần
+  const pend=named||pendings.find(c=>c.sha256===sha);
+  if(!pend||sha!==pend.sha256)throw Error('File không khớp bản ZIP đã xác minh khi đóng năm '+year+'; chưa dọn gì. Hãy chọn đúng file '+((named||pendings[0]).path||'')+'.');
   const bundle=await H.Backup.readJson(file);if(!bundle||bundle.app!=='hak-yearbook'||bundle.year!==year||!Array.isArray(bundle.records))throw Error('File năm không hợp lệ.');
   const live=await build(year,{allowEmpty:true}),liveBundle=live.bundle;
   const byId=(xs,f)=>new Map(xs.map(x=>[f(x),x]));

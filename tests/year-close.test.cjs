@@ -40,3 +40,30 @@ test('tiếp tục đóng năm: hồ sơ mới thêm sau khi đóng dở đượ
   const r=await h.C.resumeClose(2025,h.savedBlob);assert.equal(r.resumed,true);assert.equal(JSON.stringify(r.leftover.records.map(x=>x.id)),'["them-moi"]');
   assert.equal(JSON.stringify((await h.Y.read()).records.map(x=>x.id).sort()),'["keep","them-moi"]');
 });
+async function twoPending(){
+  const h=harness({fail:true});await assert.rejects(h.C.closeYear(2025,()=>true));const blob1=h.savedBlob;
+  const st=h.db.maps.kv.get('hak.yearbook.v1').val;st.records.push(rec('them',2025));       // dữ liệu khác → ZIP lần 2 có SHA-256 khác
+  await assert.rejects(h.C.closeYear(2025,()=>true));const blob2=h.savedBlob;h.db.clearFail();
+  const pend=(await h.Y.read()).closed.filter(c=>c.pending);assert.equal(pend.length,2);assert.notEqual(pend[0].sha256,pend[1].sha256);
+  return {h,blob1,blob2,sha1:pend[0].sha256,sha2:pend[1].sha256};
+}
+test('hai lần đóng dở cùng năm: chọn lần 1 nhưng đưa file lần 2 → không khớp, giữ nguyên hồ sơ và đợt cân',async()=>{
+  const {h,blob2,sha1}=await twoPending();
+  await assert.rejects(h.C.resumeClose(2025,blob2,sha1),/không khớp/);
+  const s=await h.Y.read();assert.equal(s.records.length,3);assert.equal(s.closed.filter(c=>c.pending).length,2);assert.equal(h.db.maps.batches.size,1);assert.equal(h.db.maps.batchdata.size,1);
+});
+test('hai lần đóng dở cùng năm: chọn đúng lần 2 + đúng file → chỉ lần 2 hoàn tất, lần 1 vẫn đang chờ; chạy lại không dọn thêm',async()=>{
+  const {h,blob2,sha1,sha2}=await twoPending();
+  const r=await h.C.resumeClose(2025,blob2,sha2);assert.equal(r.resumed,true);
+  let s=await h.Y.read();const by=x=>s.closed.find(c=>c.sha256===x);
+  assert.equal(by(sha2).pending,false);assert.equal(by(sha1).pending,true);assert.equal(s.closed.length,2);assert.equal(h.db.maps.batches.size,0);
+  assert.equal(JSON.stringify(s.records.map(x=>x.id)),'["keep"]');
+  const before=JSON.stringify(await h.Y.read());
+  assert.equal(JSON.stringify(await h.C.resumeClose(2025,blob2,sha2)),'{"nothing":true}');assert.equal(JSON.stringify(await h.Y.read()),before);
+});
+test('hai lần đóng dở cùng năm: gọi chữ ký cũ (năm + file lần 2) vẫn tìm đúng bản ghi',async()=>{
+  const {h,blob2,sha1,sha2}=await twoPending();
+  const r=await h.C.resumeClose(2025,blob2);assert.equal(r.resumed,true);
+  const s=await h.Y.read();assert.equal(s.closed.find(c=>c.sha256===sha2).pending,false);assert.equal(s.closed.find(c=>c.sha256===sha1).pending,true);
+  await assert.rejects(h.C.resumeClose(2025,new Blob(['khác'])),/không khớp/);
+});
