@@ -950,6 +950,13 @@
    * Thanh "Đang làm việc trên": công ty · đợt cân (nguồn dữ liệu) · hợp đồng · phạm vi phiếu · trạng thái lưu — để luôn biết tài liệu đang mở lấy từ đâu.
    * Ba nguồn tách bạch: (1) đợt Excel ĐANG NẠP (Nhập liệu) · (2) HỒ SƠ NĂM đã lưu (Lưu hồ sơ / Xem năm cũ) · (3) hồ sơ trong LƯU TRỮ — nguồn của Báo cáo (tự ghi khi xuất Word / PDF / Excel).
    */
+  /** Một dòng chữ để đối chiếu trước/sau khi lưu hoặc xuất: công ty · tàu · số phiếu · phiếu bỏ · xe trả về · tấn thực giao (cùng tập phiếu với màn hình và file xuất). */
+  function scopeSummary(type) {
+    const ds = getDs(type), st = ST[type]; if (!ds) return '';
+    const rows = currentRows(type), cid = (() => { const el = $('#' + fid(type, 'giaoId')); return el ? el.value : ''; })(), co = cid ? (cfg().companies || []).find((c) => c.id === cid) : null, shipEl = $('#' + fid(type, 'ship'));
+    const ret = DOCS[type].extra === 'returned' ? rows.filter((r) => st.returned.has(G().retKey(r))) : [], retKg = ret.reduce((n, r) => n + r.net, 0), sum = G().summarize(rows);
+    return [co ? (co.short || co.name) : null, shipEl && shipEl.value.trim() ? 'tàu ' + shipEl.value.trim() : null, fmtInt(rows.length) + ' phiếu', st.omit.size ? 'bỏ ' + st.omit.size : null, ret.length ? ret.length + ' xe trả về' : null, 'thực giao ' + G().fmtTon(sum.kg - retKg) + ' tấn'].filter(Boolean).join(' · ');
+  }
   function renderContext(type) {
     const bar = $('#ctxBar-' + type); if (!bar) return;
     const st = ST[type], ds = getDs(type), act = HAK.Yearbook && HAK.Yearbook.active ? HAK.Yearbook.active(type) : null, p = [];
@@ -1150,7 +1157,7 @@
         await new Promise((ok) => setTimeout(ok, 30));      // cho vòng quay "Đang xuất…" kịp hiện trước khi dựng file
         const out = await HAK.Exporter.download(res.excel);if(!out)return;
         const sv = await archive(type, params, res, ds, 'xlsx');
-        toast('Đã xuất: ' + out.name + ' (' + out.rows.toLocaleString('vi-VN') + ' phiếu' + (out.sheets > 1 ? ', ' + out.sheets + ' sheet' : '') + ')' + (sv ? SAVED : ''), 'success');
+        toast('Đã xuất: ' + out.name + ' (' + out.rows.toLocaleString('vi-VN') + ' phiếu' + (out.sheets > 1 ? ', ' + out.sheets + ' sheet' : '') + ')' + (sv ? SAVED : '') + ' — ' + scopeSummary(type), 'success');
       } catch (e) { console.error(e); toast(e.message || String(e), 'error'); }
       finally { Loading.hide(); btn.disabled = false; }
       return;
@@ -1161,7 +1168,7 @@
       const done = await HAK.Word.Files.generateAndSave(res.files, { zip: !!params.zip, zipName, onProgress: Loading.set });
       const names = params.zip && done.length > 1 ? zipName : done.map((d) => d.name).join(', ');
       if(!done.length)return;const sv = await archive(type, params, res, ds, 'word');
-      toast('Đã sinh: ' + names + (res.warnings.length ? ' (có ' + res.warnings.length + ' lưu ý)' : '') + (sv ? SAVED : ''), 'success');
+      toast('Đã sinh: ' + names + (res.warnings.length ? ' (có ' + res.warnings.length + ' lưu ý)' : '') + (sv ? SAVED : '') + ' — ' + scopeSummary(type), 'success');
     } catch (e) {
       console.error(e); toast(e.message || String(e), 'error');
     } finally { Loading.hide(); btn.disabled = false; }
@@ -1666,7 +1673,7 @@
     },
     show(type) { if (ST[type].built) { if (ST[type].filter.smart) { try { documentSmart(type); } catch (e) { console.warn(e); } } refreshContracts(type); renderFilter(type); updateSummary(type); if (ST[type].baseSig === undefined) markClean(type); } },
     unloadSnapshot(type){resetRecordState(type,{fields:false});},
-    newRecord, guardLeave, markClean, isDirty, _explainZero: explainZero, _expired: expiredConditions, useScope, hasType: (t) => !!ST[t], _st: (t) => ST[t], _catalogDiff: catalogDiff, _renderContext: renderContext, _pick: { resolveTicket, view: () => pickView(), PICK_PAGE },
+    newRecord, guardLeave, markClean, isDirty, _explainZero: explainZero, _expired: expiredConditions, scopeSummary, useScope, hasType: (t) => !!ST[t], _st: (t) => ST[t], _catalogDiff: catalogDiff, _renderContext: renderContext, _pick: { resolveTicket, view: () => pickView(), PICK_PAGE },
     readOnly(type,on){ST[type].ro=!!on;$$('#page-'+type+' input,#page-'+type+' select,#page-'+type+' textarea').forEach(n=>n.disabled=on);if(on)$('#year-note-'+type).textContent='Chỉ xem năm đã đóng · Không ghi vào kho làm việc. Dùng Khôi phục năm nếu cần sửa.';},
     snapshot(type){const ds=getDs(type);if(!ds)throw Error('Chưa có dữ liệu cân.');const params=collect(type);return {params,rows:JSON.parse(JSON.stringify(G().filterRows(ds.rows,params.filter)))};},
     openSnapshot(record){const type=record.type;if(!DOCS[type])throw Error('Loại hồ sơ không hỗ trợ.');const rows=JSON.parse(JSON.stringify(record.rows));ST[type].savedDs={ok:true,rows,stats:HAK.Excel.computeStats(rows)};ST[type].snapshotParams=JSON.parse(JSON.stringify(record.params));ST[type].filter=Object.assign({groups:null,from:'',to:''},record.params.filter||{});if(ST[type].filter.groups)ST[type].filter.groups=new Set(ST[type].filter.groups);ST[type].returned=new Set(record.params.returned||[]);ST[type].omit=new Map(((record.params.filter||{}).omitLog||[]).map(e=>[e.key,e]));Object.assign(HAK.Config.custom,record.context&&record.context.custom||{});DOCS[type].groups.forEach(g=>g.fields.forEach(f=>{const node=$('#'+fid(type,f.id)),value=record.params[f.id];if(!node)return;if(node.tagName==='SELECT'&&value!=null&&!Array.from(node.options).some(o=>o.value===value)){const option=document.createElement('option');option.value=value;option.textContent=value+' (đã lưu)';node.append(option);}if(f.type==='contract')return;if(value!=null)setField(type,f,value);else resetField(type,f,node);}));const contract=$('#'+fid(type,'contractId'));if(contract){contract.value='';contract.disabled=true;contract.title='Hồ sơ dùng thông tin hợp đồng đã lưu; chọn Thêm mới để dùng hợp đồng khác.';}renderFilter(type);updateSummary(type);$('#year-note-'+type).textContent='Đang sửa hồ sơ năm '+record.year+' · phiên bản '+record.revision+' · Lưu hồ sơ để ghi thay đổi';markClean(type);},

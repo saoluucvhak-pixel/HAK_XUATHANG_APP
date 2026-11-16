@@ -9,6 +9,7 @@
 - Google Sheet: 4 trang snapshot ghép theo mã bản ghi (Code.gs v3, cần dán lại); ghi chú/công thức đi theo mã; dòng thiếu/trùng mã được giữ và báo; báo đã ghi / lỗi / chưa chạy theo lô và theo trang; gửi lại không nhân đôi.
 - Sao lưu: Nhập bổ sung (gộp theo phiên bản, mặc định) tách khỏi Khôi phục (ghi đè); xem trước phạm vi; báo từng kho khi dừng giữa chừng.
 - Đóng năm: nút "Tiếp tục đóng năm" sau khi bị gián đoạn, đối chiếu với file ZIP đã xác minh.
+- Thông báo sau khi lưu / xuất kèm dòng đối chiếu (công ty · tàu · số phiếu · bỏ · trả về · thực giao); thêm test bộ lọc theo màn hình, xuất lại cùng tập phiếu.
 - Thanh "Đang làm việc" thêm Tàu / chuyến và Thực giao.
 - Cập nhật HUONG_DAN.md và mục "Quy trình lập hồ sơ" trong Hướng dẫn của app.
 
