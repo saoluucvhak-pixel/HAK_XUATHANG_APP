@@ -18,6 +18,7 @@
   'use strict';
   const HAK = (root.HAK = root.HAK || {});
   const KEY_V1 = 'hak.gsync.v1', KEY = 'hak.gsync.v2';
+  let batchTrips = 4000;             // (hằng BATCH_TRIPS) chỉnh được để kiểm thử
   const BATCH_TRIPS = 4000;          // mỗi lần gửi ≤ ~4.000 phiếu (≈ 1,5 MB) để script chạy xa giới hạn 6 phút
   const $ = (s) => document.querySelector(s);
   const esc = (s) => HAK.UI.esc(s);
@@ -35,7 +36,7 @@
   }
   const curCo = () => (HAK.Auth && HAK.Auth.company ? HAK.Auth.company() : '') || 'hak';
   const cfg = (cid) => Object.assign({ url: '', token: '', last: null }, all().cos[cid || curCo()] || {});
-  const saveCfg = (cid, c) => { const d = all(); d.cos[cid] = { url: c.url || '', token: c.token || '', last: c.last || null, lastContracts: c.lastContracts || null }; d.migV1 = true; HAK.Store.set(KEY, d); };
+  const saveCfg = (cid, c) => { const d = all(); d.cos[cid] = { url: c.url || '', token: c.token || '', last: c.last || null, lastContracts: c.lastContracts || null, partial: c.partial || null }; d.migV1 = true; HAK.Store.set(KEY, d); };
   const configured = (cid) => { const c = cfg(cid); return !!(c.url && c.token); };
   const coName = (cid) => { const c = ((HAK.Config && HAK.Config.data.companies) || []).find((x) => x.id === cid); return c ? (c.short || c.name) : cid; };
   function genToken() {
@@ -214,9 +215,19 @@
     if (!configured(cid)) return { skipped: true };
     const pg = await call({ action: 'ping' }, cid);
     if ((pg.version || 0) < 3) throw new Error('Code.gs trên Google Sheet của ' + coName(cid) + ' là bản cũ (v' + (pg.version || 1) + ') ghép cột ghi chú theo VỊ TRÍ dòng nên có thể làm ghi chú đổi chủ khi đổi thứ tự hợp đồng — chưa gửi gì. Cài đặt → Chung → ☁ Đồng bộ → 📋 Code.gs, dán lại mã mới rồi Triển khai → Quản lý → Sửa → Phiên bản mới.');
-    const j = await call({ action: 'push', keys: [], sheets: sheets.map((s) => ({ name: s.name, keyCol: s.keyCol, cols: s.cols, rows: s.rows })) }, cid);
-    const r = j.result || {}, missing = sheets.filter((s) => !r[s.name]).map((s) => s.name);
-    if (missing.length) throw new Error('Code.gs trên Google Sheet của ' + coName(cid) + ' là bản cũ (chưa có sheet ' + missing.join(', ') + ') — Cài đặt → Chung → ☁ Đồng bộ → 📋 Code.gs, dán lại vào Apps Script rồi Triển khai → Quản lý → Sửa → Phiên bản mới.');
+    // Mỗi trang tính gửi riêng: lỗi giữa chừng cho biết trang nào đã ghi / lỗi / chưa chạy. Gửi lại an toàn vì ghép theo mã (không nhân đôi dòng).
+    const r = {}, done = [];
+    for (let i = 0; i < sheets.length; i++) {
+      const sh = sheets[i];
+      try {
+        const j = await call({ action: 'push', keys: [], sheets: [{ name: sh.name, keyCol: sh.keyCol, cols: sh.cols, rows: sh.rows }] }, cid);
+        if (!(j.result || {})[sh.name]) throw new Error('Code.gs trên Google Sheet của ' + coName(cid) + ' là bản cũ (chưa có sheet ' + sh.name + ') — Cài đặt → Chung → ☁ Đồng bộ → 📋 Code.gs, dán lại mã mới rồi Triển khai → Quản lý → Sửa → Phiên bản mới.');
+        r[sh.name] = j.result[sh.name]; done.push(sh.name);
+      } catch (e) {
+        const pending = sheets.slice(i + 1).map((x) => x.name), err = new Error((e.message || String(e)) + ' — Đã ghi: ' + (done.join(', ') || 'chưa trang nào') + '. Lỗi tại: ' + sh.name + '. Chưa chạy: ' + (pending.join(', ') || 'không') + '. Bấm đồng bộ lại để gửi tiếp (an toàn, không nhân đôi dòng).');
+        err.partial = { done, failed: sh.name, pending }; throw err;
+      }
+    }
     const c = cfg(cid); c.lastContracts = { at: Date.now(), hd: (r.NL_HOPDONG || {}).total || 0, tk: (r.NL_TOKHAI || {}).total || 0 }; saveCfg(cid, Object.assign(c, { last: c.last }));
     return r;
   }
@@ -239,11 +250,11 @@
     keys.forEach((k) => { const cid = (coOf && coOf(k)) || curCo(); if (!byCo.has(cid)) byCo.set(cid, []); byCo.get(cid).push(k); });
     const jobs = [];
     byCo.forEach((ks, cid) => {
-      const it = { cid, name: coName(cid), lots: ks.length, trips: ks.reduce((a, k) => a + tripsOf.get(k).length, 0), added: 0, removed: 0, updated: 0, batches: [] };
+      const it = { cid, name: coName(cid), lots: ks.length, trips: ks.reduce((a, k) => a + tripsOf.get(k).length, 0), added: 0, removed: 0, updated: 0, batches: [], lotsDone: 0, batchesDone: 0 };
       if (!configured(cid)) it.skipped = true;
       else {                // mỗi nhóm ≤ BATCH_TRIPS phiếu (1 lô lớn hơn vẫn gửi riêng 1 lần — không cắt đôi lô vì script xóa cả lô trước khi ghi)
         let cur = [], n = 0;
-        ks.forEach((k) => { const t = tripsOf.get(k).length; if (cur.length && n + t > BATCH_TRIPS) { it.batches.push(cur); cur = []; n = 0; } cur.push(k); n += t; });
+        ks.forEach((k) => { const t = tripsOf.get(k).length; if (cur.length && n + t > batchTrips) { it.batches.push(cur); cur = []; n = 0; } cur.push(k); n += t; });
         if (cur.length) it.batches.push(cur);
       }
       jobs.push(it);
@@ -265,12 +276,19 @@
           }, it.cid);
           const r = j.result || {};
           it.removed += (r.NL_PC_XH || {}).removed || 0; it.added += (r.NL_PC_XH || {}).added || 0; it.updated += (r.NL_DH_XB || {}).updated || 0;
+          it.lotsDone += ks.length; it.batchesDone++;
         }
-        const c = cfg(it.cid); c.last = { at: Date.now(), lots: it.lots, trips: it.trips }; saveCfg(it.cid, c);
-      } catch (e) { it.error = e.message || String(e); }
+        const c = cfg(it.cid); c.last = { at: Date.now(), lots: it.lots, trips: it.trips }; delete c.partial; saveCfg(it.cid, c);
+      } catch (e) {
+        it.error = e.message || String(e);
+        // lô đã ghi / lô lỗi (cả nhóm đang gửi) / lô chưa chạy → hiển thị và gửi lại an toàn (thay theo mã lô, không nhân đôi phiếu)
+        const failing = it.batches[it.batchesDone] || [];
+        it.lotsFailed = failing.length; it.lotsPending = Math.max(0, it.lots - it.lotsDone - it.lotsFailed);
+        const c = cfg(it.cid); c.partial = { at: Date.now(), lotsDone: it.lotsDone, lotsFailed: it.lotsFailed, lotsPending: it.lotsPending, error: it.error }; saveCfg(it.cid, c);
+      }
       delete it.batches;
     }
-    jobs.forEach((j) => { delete j.batches; });
+    jobs.forEach((j) => { delete j.batches; delete j.batchesDone; });
     renderStatus(); renderTable();
     return { lots: keys.length, trips: pc.rows.length, per: jobs };
   }
@@ -280,7 +298,8 @@
    * ------------------------------------------------------------- */
   const fmtTime = (ts) => { const d = new Date(ts), p = (x) => String(x).padStart(2, '0'); return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()); };
   function lastText(cid) {
-    const l = cfg(cid).last;
+    const l = cfg(cid).last, pa = cfg(cid).partial;
+    if (pa) return '⚠ lần gửi gần nhất DỪNG GIỮA CHỪNG ' + fmtTime(pa.at) + ' — đã ghi ' + pa.lotsDone + ' lô, lỗi ' + pa.lotsFailed + ' lô, chưa chạy ' + pa.lotsPending + ' lô (' + pa.error + ') — bấm đồng bộ lại để gửi tiếp';
     return l ? 'đồng bộ gần nhất ' + fmtTime(l.at) + ' — ' + l.lots + ' lô, ' + l.trips.toLocaleString('vi-VN') + ' phiếu' : 'chưa đồng bộ lần nào';
   }
   /** Báo cáo: trạng thái Sheet của công ty đang làm (hoặc mọi công ty đang xem khi bật "Xem tất cả"). */
@@ -349,5 +368,5 @@
   }
   function init() { render(); renderStatus(); root.addEventListener('hak:scope', (e) => { if (e.detail && e.detail.key === 'report') renderStatus(); }); }
 
-  HAK.GSync = { init, render, renderStatus, configured, test, push, pushSheets, codeGs, _call: call, BATCH_TRIPS, _cfg: cfg };
+  HAK.GSync = { _setBatchTrips: (n) => { batchTrips = n; }, init, render, renderStatus, configured, test, push, pushSheets, codeGs, _call: call, BATCH_TRIPS, _cfg: cfg };
 })(window);

@@ -714,7 +714,7 @@
           const trips = await xhTrips(lots, (i, n) => Loading.set(Math.round(i / n * 40), 'Đang đọc hồ sơ ' + i + ' / ' + n + '…'));
           const r = await HAK.GSync.push(xhSheetRows(lots, trips, []), (i, n, k, name) => Loading.set(40 + Math.round((i - 1) / n * 60), 'Đang ghi Google Sheet ' + name + ' — lần ' + i + ' / ' + n + ' (' + k + ' lô)…'), (key) => byKey.get(key));
           Loading.hide();
-          const parts = r.per.map((p) => p.skipped ? p.name + ': chưa cài Sheet — bỏ qua ' + p.lots + ' lô' : p.error ? p.name + ': LỖI — ' + p.error : p.name + ': ' + p.lots + ' lô, ' + p.added.toLocaleString('vi-VN') + ' phiếu (thay ' + p.removed.toLocaleString('vi-VN') + ' phiếu cũ)');
+          const parts = r.per.map((p) => p.skipped ? p.name + ': chưa cài Sheet — bỏ qua ' + p.lots + ' lô' : p.error ? p.name + ': LỖI — đã ghi ' + (p.lotsDone || 0) + ' lô, lỗi ' + (p.lotsFailed || 0) + ' lô, chưa chạy ' + (p.lotsPending || 0) + ' lô (' + p.error + ')' : p.name + ': ' + p.lots + ' lô, ' + p.added.toLocaleString('vi-VN') + ' phiếu (thay ' + p.removed.toLocaleString('vi-VN') + ' phiếu cũ)');
           const bad = r.per.some((p) => p.skipped || p.error);
           toast((bad ? 'Đồng bộ Google Sheet xong một phần. ' : 'Đã đồng bộ Google Sheet. ') + parts.join(' · ') + '.', r.per.some((p) => p.error) ? 'error' : bad ? 'warning' : 'success');
         } catch (err) { Loading.hide(); console.error(err); toast('Đồng bộ Google Sheet chưa xong: ' + (err.message || err) + ' — các lô đã gửi trước đó vẫn được ghi; bấm lại để gửi tiếp.', 'error'); }
