@@ -12,3 +12,9 @@ test('pages.js xuất useScope, explainZero, expiredConditions', () => {
   ['_explainZero: explainZero', '_expired: expiredConditions', 'useScope,'].forEach((k) => assert.ok(s.includes(k), k));
   assert.match(read('js/main.js'), /btnUseScope/);
 });
+test('hướng dẫn trong app có mục Quy trình lập hồ sơ với đúng tên nút', () => {
+  const h = read('js/help.js');
+  assert.match(h, /help-flow/);
+  ['Dùng phạm vi đang xem', 'Chọn tất cả', 'Thử lưu lại', 'Lưu / Bỏ thay đổi / Quay lại'].forEach((k) => assert.ok(h.includes(k), k));
+  assert.match(read('HUONG_DAN.md'), /Quy trình lập hồ sơ từ đầu đến cuối/);
+});

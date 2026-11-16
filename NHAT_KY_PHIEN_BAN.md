@@ -1,12 +1,12 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
-## v2.19.0 (chưa phát hành) — nâng cấp quy trình nhập liệu & lập hồ sơ
+## v2.19.0 — nâng cấp quy trình nhập liệu & lập hồ sơ
 - Thêm mới / mở hồ sơ dùng chung một hàm đặt lại trạng thái (xóa phiếu bỏ, xe trả về, phiếu chọn riêng, bộ lọc, liên kết hợp đồng, ảnh chụp); hỏi Lưu / Bỏ / Quay lại khi có thay đổi chưa lưu.
 - Đợt cân: lưu file + thông số trong MỘT giao dịch IndexedDB có kiểm tra phiên bản; xác nhận thay đợt; kiểm tra tham chiếu trước khi xóa; nhãn trạng thái lưu.
 - Chọn phiếu: chỉ chọn dòng đang hiển thị (300/lần) + "Chọn tất cả kết quả"; dán số phiếu khớp đúng trước; trạng thái Chưa gán/Đã gán/Chưa xác minh; chống kết quả bất đồng bộ cũ; mở hồ sơ nguồn.
 - Thanh "Đang làm việc"; thông báo "Danh mục đã thay đổi" (cũ/mới, giữ giá trị gõ tay).
 - Bộ lọc: phân biệt Lọc xem trước / Phạm vi lập chứng từ / Kỳ báo cáo; nút "Dùng phạm vi đang xem"; nêu lý do 0 phiếu và điều kiện hết hiệu lực.
-- Cập nhật HUONG_DAN.md.
+- Cập nhật HUONG_DAN.md và mục "Quy trình lập hồ sơ" trong Hướng dẫn của app.
 
 ## Phase 1 + BKLS trả về
 - BKLS Tổng + Từng xe chuyển sang trang "Tạo biên bản" cho 5 hình thức: Xuất khẩu, Ủy thác, Xuất hàng kho gửi, Xuất bán, Trao đổi (Điều chuyển, Trung chuyển không có BKLS).

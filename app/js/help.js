@@ -19,6 +19,15 @@
       '<li><b>Công cụ khôi phục</b> <span class="mono">HAK_KhoiPhucQuanTri.exe</span> — chỉ 1 người giữ (máy chính / USB), dùng khi Quản trị một máy quên mật khẩu. Không nằm trong bộ cài app.</li></ul>' +
       '<div class="help-flow"><span>Máy chính</span><i>→ 📦 gói cho công ty X →</i><span>Máy trạm X</span><i>→ tạo Quản trị riêng →</i><span>Dùng</span></div>'],
 
+    ['help-flow', 'Quy trình lập hồ sơ', false,
+      '<p>Luồng đúng: <b>Danh mục → Nhập liệu (bảng cân) → Chọn phiếu → Lưu hồ sơ → Xuất chứng từ → Báo cáo.</b> Đầu trang biên bản có thanh "Đang làm việc" cho biết công ty, hình thức, đợt cân, hợp đồng và phạm vi phiếu.</p>' +
+      '<ul><li><b>Nhập liệu:</b> chọn file Excel; nhãn <b>✔ Đã lưu</b> hiện khi đợt đã ghi xong, <b>⚠ Chưa lưu bền</b> kèm nút "Thử lưu lại" nếu lỗi. Nạp lại file trùng tên sẽ hỏi xác nhận thay đợt.</li>' +
+      '<li><b>Ba phạm vi khác nhau:</b> "Lọc xem trước" (Nhập liệu — chỉ để xem), "Phạm vi lập chứng từ" (trang biên bản — tập phiếu sẽ lập), "Kỳ báo cáo" (Báo cáo). Bấm <b>Dùng phạm vi đang xem</b> ở Nhập liệu để chuyển điều kiện sang trang biên bản.</li>' +
+      '<li><b>Chọn phiếu:</b> "Chọn … dòng đang hiển thị" chỉ chọn các dòng thấy (300 mỗi lần); "Chọn tất cả … kết quả" chọn hết kết quả lọc. Dán số phiếu: khớp đúng số trước, nếu mơ hồ sẽ hiện bảng để bạn xác nhận.</li>' +
+      '<li><b>Phiếu bỏ khác xe trả về:</b> phiếu bỏ bị loại khỏi hồ sơ; xe trả về vẫn thuộc đợt cân nhưng được đánh dấu trả về.</li>' +
+      '<li><b>Thêm mới:</b> xóa sạch phiếu bỏ, xe trả về, phiếu chọn riêng, bộ lọc và liên kết hợp đồng của hồ sơ trước; nếu còn thay đổi chưa lưu sẽ hỏi Lưu / Bỏ thay đổi / Quay lại.</li>' +
+      '<li><b>Danh mục thay đổi:</b> khi hợp đồng/danh mục đổi sau lúc mở hồ sơ, app báo "Danh mục đã thay đổi" (giá trị cũ/mới); giá trị bạn gõ tay được giữ. Hồ sơ đã lưu mở lại theo đúng nội dung lúc lưu.</li></ul>'],
+
     ['help-roles', 'Phân quyền', false,
       '<div class="tbl-wrap" style="max-height:none"><table class="table table-sm align-middle help-tbl"><thead><tr><th>Việc</th><th>Quản trị máy chính</th><th>Quản trị máy trạm</th><th>Nhân viên</th></tr></thead><tbody>' +
       [['Chọn công ty làm việc', 'Mọi công ty', 'Chỉ công ty của máy', 'Công ty được gán (trong phạm vi máy)'],
