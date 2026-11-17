@@ -64,26 +64,24 @@
       if (CT[type] && CT[type].bkls && !has('bkls')) miss.push('BKLS');
       if (miss.length) todo.push({ type, b, miss });
     });
-    todo
-      .slice(0, 6)
-      .forEach((x) =>
-        A.push({
-          ico: '⏳',
-          txt:
-            '<b>' +
-            esc(tName(x.type)) +
-            '</b> — đợt "' +
-            esc(x.b.fileName) +
-            '" (' +
-            fmtInt(x.b.ds.stats.trips) +
-            ' xe, ' +
-            fmtTon(x.b.ds.stats.kg) +
-            ' tấn) chưa lập ' +
-            x.miss.join(' + '),
-          href: '#/chungtu',
-          tag: 'Lập chứng từ',
-        })
-      );
+    todo.slice(0, 6).forEach((x) =>
+      A.push({
+        ico: '⏳',
+        txt:
+          '<b>' +
+          esc(tName(x.type)) +
+          '</b> — đợt "' +
+          esc(x.b.fileName) +
+          '" (' +
+          fmtInt(x.b.ds.stats.trips) +
+          ' xe, ' +
+          fmtTon(x.b.ds.stats.kg) +
+          ' tấn) chưa lập ' +
+          x.miss.join(' + '),
+        href: '#/chungtu',
+        tag: 'Lập chứng từ',
+      })
+    );
     if (todo.length > 6)
       A.push({ ico: '⏳', txt: '… và ' + (todo.length - 6) + ' đợt khác chưa lập chứng từ.', href: '#/chungtu', tag: 'Mở' });
     // 2. BKLS trùng số giữa các đợt
