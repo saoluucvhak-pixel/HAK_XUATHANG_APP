@@ -23,3 +23,9 @@ test('hướng dẫn nêu Nhập bổ sung / Khôi phục, Code.gs bản 3, Ti�
   ['Nhập bổ sung', 'Khôi phục (ghi đè)', 'Hoàn tác khôi phục', 'Tiếp tục đóng năm', 'đã ghi N lô', 'dán lại Code.gs mới'].forEach((k) => assert.ok(d.includes(k), k));
   assert.match(read('js/backup.js'), /data-choice="merge"/);
 });
+test('Tổng quan có ô "Thực giao đã lập hồ sơ" dùng cùng engine Báo cáo; xuất có xác nhận phạm vi; menu theo quy trình', () => {
+  const d = read('js/dashboard.js'), p = read('js/pages.js'), h = read('index.html');
+  assert.match(d, /Report\.prepareTickets/); assert.match(d, /Report\.compute/); assert.match(d, /scopeIds\('report'\)/); assert.match(d, /dupNote/);
+  assert.match(p, /function confirmScope/); assert.match(p, /if \(!src && !confirmScope\(type\)\) return;/);
+  const order = ['① Chuẩn bị dữ liệu', '② Lập hồ sơ', '③ Xuất chứng từ', '④ Báo cáo &amp; theo dõi'].map((k) => h.indexOf(k)); assert.ok(order.every((x, i) => x > 0 && (i === 0 || x > order[i - 1])), 'thứ tự menu');
+});

@@ -1127,6 +1127,12 @@
     }
   }
 
+  /** Xác nhận trước khi xuất: công ty · tàu · số phiếu · bỏ · trả về · thực giao (cùng tập phiếu với màn hình). Test đặt HAK.Pages._confirmScope. */
+  function confirmScope(type) {
+    const txt = 'Lập chứng từ "' + DOCS[type].title + '" cho:\n' + scopeSummary(type) + '\n\nĐúng phạm vi cần lập? (Hủy để chỉnh lại)';
+    if (HAK.Pages && HAK.Pages._confirmScope) return HAK.Pages._confirmScope(txt, type);
+    return typeof root.confirm === 'function' ? root.confirm(txt) : true;
+  }
   /** src (tùy chọn) = { ds, params } lấy từ hồ sơ Lưu trữ → dựng lại mà không cần file Excel cân. */
   async function generate(type, mode, src) {
     const ds = src ? src.ds : getDs(type);
@@ -1137,6 +1143,7 @@
     catch (e) { console.error(e); toast('Lỗi khi tính dữ liệu: ' + e.message, 'error'); return; }
     showMessages(type, res);
     if (res.errors.length) { toast(res.errors[0], 'error'); if (!src) focusError(type, res.errors[0]); return; }
+    if (!src && !confirmScope(type)) return;
     const btn = $('#' + (mode === 'pdf' ? 'pdf-' : mode === 'xlsx' ? 'xls-' : 'gen-') + type); btn.disabled = true;
     if (mode === 'pdf') {                                     // PDF: dựng bản in từ DOCX → hộp thoại in → "Lưu dưới dạng PDF"
       Loading.show('Đang dựng bản in PDF…');
