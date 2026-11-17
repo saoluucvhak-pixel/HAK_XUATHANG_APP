@@ -1,5 +1,11 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.20.3 (bản vá)
+- Báo cáo kỳ "Ngày cân từng phiếu": hồ sơ không đọc được chi tiết và phiếu thiếu / sai ngày cân không còn bị tự dồn vào ngày bắt đầu hồ sơ; được tách thành **chưa phân bổ** (khung cảnh báo trên Báo cáo, sheet "Chưa phân bổ" và ghi chú phạm vi trong Excel). `prepareTickets` ghi lại hồ sơ đọc lỗi và nguyên nhân. Nhãn căn cứ tính trên màn hình / bản xuất theo căn cứ thực sự dùng. Xuất được Excel khi mọi hồ sơ đều chưa phân bổ. Số tấn trong cảnh báo luôn 2 số lẻ.
+- Nhập liệu: đổi sheet / dòng tiêu đề / ánh xạ cột / nhận diện lại cột được đọc thử trước; có dòng trùng hoàn toàn hoặc kết quả không hợp lệ thì không áp dụng, giữ cấu hình hợp lệ gần nhất, báo sheet + số phiếu + dòng Excel (module read-config.js).
+- Bảo trì: tách logic gộp đợt thành js/batch-merge.js (test gọi trực tiếp, không đọc mã nguồn); thêm .gitattributes (LF) và Prettier endOfLine "auto" để checkout Windows / Linux cho kết quả như nhau.
+- Kiểm thử: report-unallocated, read-config, merge-batches (viết lại), gsync-interrupt (mất phản hồi sau khi Sheet đã ghi, gián đoạn từng trang, hợp đồng đổi phiên bản), restore-resume (khôi phục nhiều kho gián đoạn rồi thử lại); `npm run e2e` luồng xuyên màn hình hai tàu cân xen kẽ.
+
 ## v2.20.2 (bản vá)
 - Giao diện: sửa tương phản WCAG AA ở cả 4 chủ đề × sáng/tối (nút viền, chữ cảnh báo vàng, nút chính chế độ tối, liên kết, tab đang chọn): 86 → 0 vi phạm trên 80 màn hình; thêm nhãn truy cập cho ô chọn danh sách xe.
 - Thêm `npm run ui-audit` (tràn ngang ở 3 kích thước, tương phản, nhãn truy cập, lỗi script) và chạy trong CI; ghi kết quả rà soát vào docs/RA_SOAT_THIET_KE_SO_LIEU_2026-11.md.

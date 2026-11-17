@@ -1,30 +1,13 @@
-/* Gộp nhiều đợt Excel của một loại (mergeSlot): chỉ loại phiếu trùng GIỮA các file; dòng lặp trong cùng một file được giữ nguyên. */
+/* Gộp nhiều đợt Excel của một loại (HAK.BatchMerge.merge): chỉ loại phiếu trùng GIỮA các file; dòng lặp trong cùng một file được giữ nguyên.
+ * Gọi trực tiếp logic gộp — không đọc mã nguồn, nên không phụ thuộc xuống dòng LF / CRLF của bản checkout. */
 const { test } = require('node:test'),
-  assert = require('node:assert/strict'),
-  fs = require('node:fs'),
-  vm = require('node:vm');
+  assert = require('node:assert/strict');
 global.window = global;
 global.HAK = {};
 require('../app/js/excel.js');
 require('../app/js/generator.js');
-function load(prefer) {
-  const src = fs.readFileSync(require.resolve('../app/js/main.js'), 'utf8');
-  const a = src.indexOf('  const PREFER_KEY'),
-    f = src.indexOf('function mergeSlot'),
-    b = src.indexOf('    sl.ds = {', f),
-    end = src.indexOf('\n  }\n', b) + 4;
-  assert.ok(a > 0 && f > a && b > f && end > b, 'không tìm thấy mergeSlot trong main.js — cập nhật điểm cắt của test');
-  const ctx = {
-    HAK: { Store: { get: () => prefer || [], set() {}, remove() {} } },
-    G: HAK.Generator,
-    X: HAK.Excel,
-    App: { slots: {} },
-    console,
-  };
-  vm.createContext(ctx);
-  vm.runInContext(src.slice(a, end) + '\nthis.mergeSlot = mergeSlot;', ctx);
-  return ctx;
-}
+const BM = require('../app/js/batch-merge.js');
+
 const row = (idx, ticket, plate, ts, net) => ({
   idx,
   ticket,
@@ -37,13 +20,12 @@ const row = (idx, ticket, plate, ts, net) => ({
   tare: 10000,
   warn: [],
 });
-const ds = (rows) => ({ ok: true, rows, warnings: [], stats: HAK.Excel.computeStats(rows), errors: [], meta: {} });
-const batch = (name, rows) => ({ fileName: name, ds: ds(rows) });
+const ds = (rows, extra) =>
+  Object.assign({ ok: true, rows, warnings: [], stats: HAK.Excel.computeStats(rows), errors: [], meta: {} }, extra);
+const batch = (name, rows, extra) => ({ fileName: name, ds: ds(rows, extra) });
 function merge(batches, prefer) {
-  const ctx = load(prefer),
-    sl = { batches, sel: 0 };
-  ctx.App.slots.t = sl;
-  ctx.mergeSlot(sl);
+  const sl = { batches, sel: 0 };
+  BM.merge(sl, prefer ? new Set(prefer) : undefined);
   return sl.ds;
 }
 const A = () => [row(2, 'T1', '43C-1', 1000, 20000), row(3, 'T1', '43C-1', 1000, 20000), row(4, 'T2', '43C-2', 2000, 30000)];
@@ -59,22 +41,67 @@ test('đợt không giao nhau: dòng lặp trong cùng một file không bị lo
   assert.equal(both.warnings.length, 0);
 });
 test('phiếu trùng thật giữa hai file (cùng khối lượng): chỉ tính một lần, giữ đợt nạp trước', () => {
-  const ds2 = merge([
+  const d = merge([
     batch('a.xlsx', [row(2, 'T1', '43C-1', 1000, 20000)]),
     batch('b.xlsx', [row(5, 'T1', '43C-1', 1000, 20000), row(6, 'T3', '43C-3', 3000, 5000)]),
   ]);
-  assert.equal(ds2.stats.trips, 2);
-  assert.equal(ds2.dup, 1);
-  assert.equal(ds2.conflicts.length, 0);
-  assert.match(ds2.warnings[0], /Đã bỏ 1 phiếu trùng giữa các đợt/);
+  assert.equal(d.stats.trips, 2);
+  assert.equal(d.dup, 1);
+  assert.equal(d.conflicts.length, 0);
+  assert.match(d.warnings[0], /Đã bỏ 1 phiếu trùng giữa các đợt/);
+  assert.equal(d.rows.find((r) => r.ticket === 'T1').uid, 'a.xlsx#2', 'giữ dòng của đợt nạp trước');
 });
 test('phiếu trùng giữa hai file nhưng KHÁC khối lượng: báo xung đột, mặc định dùng đợt trước; chọn đợt sau thì dùng số đợt sau', () => {
   const mk = () => [batch('a.xlsx', [row(2, 'T1', '43C-1', 1000, 20000)]), batch('b.xlsx', [row(5, 'T1', '43C-1', 1000, 21000)])];
   const d1 = merge(mk());
   assert.equal(d1.conflicts.length, 1);
   assert.equal(d1.stats.kg, 20000);
+  assert.match(d1.warnings[0], /KHÁC khối lượng/);
   const key = HAK.Generator.omitKey(row(2, 'T1', '43C-1', 1000, 20000));
   const d2 = merge(mk(), [key]);
   assert.equal(d2.stats.kg, 21000);
   assert.equal(d2.conflicts[0].useNew, true);
+  assert.deepEqual(
+    d2.conflicts[0].items.map((x) => [x.file, x.net]),
+    [
+      ['a.xlsx', 20000],
+      ['b.xlsx', 21000],
+    ]
+  );
+});
+test('một file có dòng lặp và file kia trùng với chúng: giữ nguyên toàn bộ dòng của đợt được chọn', () => {
+  const d = merge([
+    batch('a.xlsx', [row(2, 'T1', '43C-1', 1000, 20000), row(3, 'T1', '43C-1', 1000, 20000)]),
+    batch('b.xlsx', [row(7, 'T1', '43C-1', 1000, 20000)]),
+  ]);
+  assert.equal(d.stats.trips, 2, 'đợt trước giữ cả 2 dòng; dòng của đợt sau bị bỏ');
+  assert.equal(d.dup, 1);
+});
+test('một đợt hợp lệ: dùng thẳng ds của đợt đó; không có đợt nào: ds = null; đợt không hợp lệ không bị gộp', () => {
+  const one = batch('a.xlsx', A());
+  const sl = { batches: [one], sel: 0 };
+  BM.merge(sl);
+  assert.equal(sl.ds, one.ds);
+  assert.equal(one.ds.rows[0].uid, 'a.xlsx#2');
+  const empty = { batches: [], sel: 0 };
+  BM.merge(empty);
+  assert.equal(empty.ds, null);
+  const bad = batch('x.xlsx', [], { ok: false, errors: ['lỗi'] });
+  const mixed = { batches: [bad, one], sel: 0 };
+  BM.merge(mixed);
+  assert.equal(mixed.ds, one.ds, 'chỉ còn một đợt hợp lệ');
+  const allBad = { batches: [bad], sel: 0 };
+  BM.merge(allBad);
+  assert.equal(allBad.ds, bad.ds);
+});
+test('dòng gộp được sắp theo giờ cân; dòng không có giờ cân xuống cuối; cảnh báo từng file mang tên file', () => {
+  const d = merge([
+    batch('a.xlsx', [row(2, 'T1', 'A', 5000, 1000), row(3, 'T2', 'B', null, 1000)], { warnings: ['cảnh báo a'] }),
+    batch('b.xlsx', [row(2, 'T3', 'C', 2000, 1000)], { warnings: ['cảnh báo b'] }),
+  ]);
+  assert.deepEqual(
+    d.rows.map((r) => r.ticket),
+    ['T3', 'T1', 'T2']
+  );
+  assert.ok(d.warnings.includes('[a.xlsx] cảnh báo a') && d.warnings.includes('[b.xlsx] cảnh báo b'));
 });

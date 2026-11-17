@@ -75,6 +75,8 @@ Luồng đúng: **Danh mục → Nhập bảng cân → Chọn phiếu → Lưu 
 - Nạp lại file trùng tên: app hỏi xác nhận *thay đợt*, nêu rõ hình thức, số phiếu, số tấn của đợt cũ.
 - Xóa đợt đã chuyển sang hình thức khác: app kiểm tra tham chiếu và báo trước; lỗi xóa thì đợt được giữ nguyên.
 - Mở app ở 2 cửa sổ: nếu đợt đã đổi ở cửa sổ kia, app báo xung đột, tải lại trang rồi làm lại.
+- **Đổi sheet, dòng tiêu đề, ánh xạ cột hoặc "Nhận diện lại cột":** app đọc thử trước khi áp dụng. Nếu cách đọc mới làm xuất hiện **dòng trùng hoàn toàn** (cùng số phiếu, biển số, giờ cân) hoặc kết quả **không hợp lệ**, app **không áp dụng**, giữ nguyên sheet và cấu hình đang dùng, và nêu tên sheet, số phiếu, số dòng Excel cần xử lý. Bạn xóa dòng thừa trong file, chỉnh ánh xạ hoặc chọn sheet khác. Đợt đang chưa hợp lệ (bạn đang chỉnh để sửa) vẫn được thử tiếp, trừ khi có dòng trùng.
+- **Sheet trùng:** ví dụ sheet A sạch, sheet B có dòng trùng — nạp file dùng A; đổi sang B bị từ chối và báo đúng dòng, A vẫn dùng bình thường.
 
 **2. Ba "phạm vi" khác nhau — đừng nhầm**
 | Tên trên màn hình | Nằm ở | Ảnh hưởng |
@@ -98,6 +100,15 @@ Muốn lập đúng điều đang xem: ở Nhập liệu bấm **Dùng phạm vi
 1. Lập hồ sơ tàu A: ở *Phạm vi lập chứng từ* lọc theo giờ cân / số phiếu từ–đến hoặc bấm **Chọn phiếu…**, tick đúng các phiếu của tàu A → **Lưu hồ sơ**.
 2. Bấm **Thêm mới** → lập tàu B trên cùng đợt cân: phiếu bỏ, xe trả về, phiếu chọn riêng của A đã được xóa. Cột *Đã gán* trong hộp chọn cho biết phiếu nào đã thuộc tàu khác (bấm tên hồ sơ để mở); lưu phiếu đã gán nơi khác sẽ có hộp xác nhận.
 3. Mở lại tàu A từ Sổ hồ sơ theo năm: các lựa chọn của A được khôi phục đúng.
+
+**3c. Báo cáo theo "Ngày cân từng phiếu": số liệu chưa phân bổ (v2.20.3)**
+- Ở kỳ theo ngày cân, mỗi phiếu được xếp vào tháng/năm theo **ngày cân của chính nó**. Số liệu **không xác minh được ngày cân** không bị đoán theo ngày bắt đầu hồ sơ mà được tách riêng thành **chưa phân bổ**:
+  - **Hồ sơ không đọc được chi tiết** (lỗi đọc kho, hồ sơ không có danh sách phiếu): cả hồ sơ chưa phân bổ — nêu mã hồ sơ và nguyên nhân.
+  - **Phiếu thiếu / sai ngày cân** (đọc được hồ sơ nhưng phiếu không có ngày hợp lệ, vd 29/02 của năm không nhuận): chỉ các phiếu đó chưa phân bổ; phần còn lại vẫn vào đúng tháng.
+- Trên trang **Báo cáo** có khung vàng nêu số hồ sơ, số xe, **tấn qua cân và tấn thực giao** chưa phân bổ cùng nguyên nhân từng hồ sơ. Số liệu theo tháng / năm và thẻ tổng **chỉ gồm phần đã xác minh**.
+- File Excel báo cáo ghi rõ phạm vi này ở dòng chú thích sheet *Tổng hợp* và có thêm sheet **Chưa phân bổ** (hồ sơ, loại, từ–đến, số xe, tấn, nguyên nhân, mã hồ sơ). Vẫn xuất được Excel khi mọi hồ sơ đều chưa phân bổ.
+- Muốn đưa số liệu vào tháng: mở lại hồ sơ, lưu lại hoặc sửa ngày cân, hoặc thử tải lại trang nếu là lỗi đọc tạm thời.
+- Báo cáo lịch sử **theo ngày bắt đầu hồ sơ** không đổi. Nếu chọn "ngày cân" mà chưa đọc được danh sách phiếu, app báo đang tính theo ngày bắt đầu; nhãn căn cứ trên màn hình và trong file xuất luôn là căn cứ **thực sự được dùng**.
 
 **4. Xe trả về khác phiếu bỏ**
 - *Phiếu bỏ* (loại khỏi hồ sơ): không vào biên bản, không tính vào khối lượng.

@@ -24,3 +24,10 @@ Không đổi thư mục cài cũ hoặc trình duyệt đang dùng; sao lưu tr
 - HAK-Enterprise-Design-System: CSS thành phần giống hệt; hak-enterprise-theme.css là bản chuyển thể cho Bootstrap, không đổi.
 - HAK_ACCOUNTING_REPORT_STANDARD: bộ định dạng BigInt chỉ để hiển thị, khác numfmt.js (đọc số nhập); không ghép.
 - Commit ghim trong HAK_SOURCES.json cập nhật theo các bản đã đối chiếu.
+
+## Checkout Windows và Linux (xuống dòng)
+- `.gitattributes` buộc mã nguồn, cấu hình và tài liệu (`*.js, *.cjs, *.json, *.css, *.html, *.md, *.yml`) về **LF** khi checkout, kể cả máy Windows có `core.autocrlf=true`; nhờ đó `npm run format:check` và các test cho kết quả giống nhau trên Windows và Linux.
+- Tệp `app/native/hakdocs-token.js` (do bộ cài Windows ghi) và mã chép nguyên từ repo gốc `tools/hak-quality/**` được giữ nguyên xuống dòng (`-text`).
+- Prettier đặt `endOfLine: "auto"`: bản checkout cũ còn CRLF vẫn qua `format:check`. Muốn chuyển bản đang có sang LF: `git add --renormalize .` rồi commit, hoặc xóa và checkout lại.
+- Test không còn đọc mã nguồn để tìm hàm (`tests/merge-batches.test.cjs` gọi trực tiếp `HAK.BatchMerge.merge`), nên không phụ thuộc kiểu xuống dòng.
+- Kiểm thử trên trình duyệt: `npm run smoke`, `npm run ui-audit`, `npm run e2e` (luồng xuyên màn hình hai tàu cân xen kẽ). Đặt `HAK_CHROMIUM` để dùng Edge/Chrome khác.

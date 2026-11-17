@@ -1,0 +1,26 @@
+# Mã nguồn, cấu hình, tài liệu: luôn LF khi checkout (kể cả Windows có core.autocrlf=true)
+# để Prettier (format:check) và các test đọc mã nguồn cho kết quả giống nhau trên Windows và Linux.
+* text=auto
+*.js text eol=lf
+*.cjs text eol=lf
+*.json text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Giữ nguyên xuống dòng của tệp sinh ra bởi bộ cài Windows và mã chép nguyên từ repo HAK gốc
+app/native/hakdocs-token.js -text
+tools/hak-quality/** -text
+
+# Nhị phân
+*.png binary
+*.ico binary
+*.exe binary
+*.zip binary
+*.docx binary
+*.xlsx binary
+*.woff binary
+*.woff2 binary
+*.ttf binary

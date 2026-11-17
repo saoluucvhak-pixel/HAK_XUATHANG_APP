@@ -117,6 +117,7 @@
     validateRange(opt);
     // Kỳ báo cáo: 'start' (mặc định, cách đọc của mọi báo cáo lịch sử) = theo NGÀY BẮT ĐẦU của hồ sơ; 'weigh' = theo NGÀY CÂN của từng phiếu (cần opt.tickets của mọi hồ sơ).
     const basis = opt.basis === 'weigh' && opt.tickets ? 'weigh' : 'start';
+    const basisFallback = opt.basis === 'weigh' && basis !== 'weigh'; // chọn "ngày cân" nhưng không có danh sách phiếu → đang tính theo ngày bắt đầu
     const filter = recordFilter(basis === 'weigh' ? Object.assign({}, opt, { from: '', to: '' }) : opt);
     const manual = opt.manual || {};
     const recs = metas.map((m) =>
@@ -170,23 +171,65 @@
     const fromTs = isoToTs(opt.from),
       toTs = isoToTs(opt.to),
       inWin = (ts) => ts !== null && (fromTs === null || ts >= fromTs) && (toTs === null || ts <= toTs);
+    // Chưa phân bổ (chỉ ở kỳ theo ngày cân): số liệu KHÔNG xác minh được ngày cân của từng phiếu thì không đoán theo ngày bắt đầu hồ sơ,
+    // mà tách riêng để không lẫn vào tháng / năm: (a) hồ sơ không đọc được phiếu cân; (b) phiếu đọc được nhưng thiếu / sai ngày cân.
+    const unalloc = [];
+    const ticketErrors = opt.ticketErrors || null;
     if (basis === 'weigh')
       recs.forEach((r) => {
         if (!r.inRange || !r.include) return;
         const list = tk.get(r.id);
         if (!list) {
-          r.inRange = r.fromTs !== null && inWin(r.fromTs);
+          const err = ticketErrors && ticketErrors.get(r.id);
+          unalloc.push({
+            id: r.id,
+            title: r.title,
+            type: r.type,
+            from: r.from,
+            to: r.to,
+            whole: true,
+            code: err ? err.code : 'unread',
+            reason: err ? 'Không đọc được chi tiết hồ sơ: ' + err.message : 'Chưa đọc được phiếu cân của hồ sơ',
+            trips: r.trips || 0,
+            kg: r.kg || 0,
+            delKg: r.delKg || 0,
+          });
+          r.unverified = true;
+          r.inRange = false;
           return;
-        } // không đọc được phiếu → lùi về ngày bắt đầu hồ sơ
+        }
         const skip = r.skipIdx ? new Set(r.skipIdx) : new Set(),
           ret = HAS_RET[r.type],
-          mine = [];
+          mine = [],
+          undated = [];
         list.forEach((t) => {
           if (skip.has(t.i)) return;
-          const ts = dmyToTs(t.date) !== null ? dmyToTs(t.date) : r.fromTs; // phiếu thiếu ngày → ngày bắt đầu hồ sơ
+          const ts = dmyToTs(t.date);
+          if (ts === null) {
+            undated.push(t); // phiếu thiếu / sai ngày cân → chưa phân bổ (không dùng ngày bắt đầu hồ sơ)
+            skip.add(t.i);
+            return;
+          }
           if (inWin(ts)) mine.push({ t, ts });
           else skip.add(t.i);
         });
+        if (undated.length) {
+          const kgU = undated.reduce((a, x) => a + x.net, 0),
+            retU = ret ? undated.filter((x) => x.ret).reduce((a, x) => a + x.net, 0) : 0;
+          unalloc.push({
+            id: r.id,
+            title: r.title,
+            type: r.type,
+            from: r.from,
+            to: r.to,
+            whole: false,
+            code: 'no-date',
+            reason: undated.length + ' phiếu thiếu / sai ngày cân',
+            trips: undated.length,
+            kg: kgU,
+            delKg: kgU - retU,
+          });
+        }
         r.kgRaw = r.kgRaw === undefined ? r.kg : r.kgRaw;
         r.tripsRaw = r.tripsRaw === undefined ? r.trips : r.tripsRaw;
         r.skipIdx = skip;
@@ -199,6 +242,15 @@
         r.delKg = r.kg - r.retKg;
         r.inRange = mine.length > 0;
       });
+    const unallocated = {
+      items: unalloc,
+      n: new Set(unalloc.map((x) => x.id)).size,
+      nUnread: unalloc.filter((x) => x.whole).length,
+      nNoDate: unalloc.filter((x) => !x.whole).length,
+      trips: unalloc.reduce((a, x) => a + x.trips, 0),
+      kg: unalloc.reduce((a, x) => a + x.kg, 0),
+      delKg: unalloc.reduce((a, x) => a + x.delKg, 0),
+    };
     const used = recs.filter((r) => r.inRange && r.include);
     const byType = {};
     TYPES.forEach(([k]) => {
@@ -235,6 +287,8 @@
       overall = W.overall(used.map((r) => ({ rec: r, tickets: r.wTickets || tk.get(r.id) })));
     return {
       basis,
+      basisFallback,
+      unallocated,
       conflicts,
       pendingKg,
       dupTickets,
@@ -264,6 +318,7 @@
     const W = HAK.Weigh;
     cache = cache || new Map();
     const out = new Map();
+    out.errors = new Map(); // id hồ sơ → { code, message }: hồ sơ KHÔNG đọc được (khác với hồ sơ đọc được nhưng phiếu thiếu ngày)
     if (!W) return out;
     const recs = metas.map((m) => Object.assign({}, m, { fromTs: dmyToTs(m.from), toTs: dmyToTs(m.to) || dmyToTs(m.from) }));
     // all = true (kỳ theo ngày cân): đọc phiếu của MỌI hồ sơ để phân bổ từng phiếu theo ngày; mặc định chỉ hồ sơ trong cụm giao nhau cần đối soát.
@@ -274,8 +329,12 @@
         continue;
       }
       try {
-        const d = await HAK.Archive.load(r.id),
-          p = d.params || {},
+        const d = await HAK.Archive.load(r.id);
+        if (!d || !Array.isArray(d.rows)) {
+          out.errors.set(r.id, { code: 'no-rows', message: 'hồ sơ không có danh sách phiếu cân' });
+          continue;
+        }
+        const p = d.params || {},
           rows = G().filterRows(d.rows || [], p.filter),
           ret = new Set(HAS_RET[r.type] ? p.returned || [] : []);
         const t = recTickets(r, p, rows, ret);
@@ -283,6 +342,7 @@
         out.set(r.id, t);
       } catch (e) {
         console.warn('Không đọc được phiếu cân của hồ sơ', r.id, e);
+        out.errors.set(r.id, { code: 'load-error', message: (e && e.message) || String(e) });
       }
     }
     return out;
@@ -379,10 +439,12 @@
       NF = XNF,
       NI = XNI;
     const range = model.rangeText || 'Tất cả thời gian';
+    const basisNote = unallocatedText(model);
     const note =
       'Nguồn: hồ sơ trong Lưu trữ (' +
       range +
-      '). Thực giao = qua cân − xe trả về. Không cộng chung các loại vì một lô hàng có thể đi qua nhiều loại biên bản.';
+      '). Thực giao = qua cân − xe trả về. Không cộng chung các loại vì một lô hàng có thể đi qua nhiều loại biên bản.' +
+      (basisNote ? ' ' + basisNote : '');
     // 1. Tổng hợp theo loại
     sheet(
       'Tổng hợp',
@@ -426,6 +488,37 @@
       model.months.map(([mo, v]) => [mo.split('-').reverse().join('/')].concat(TYPES.map(([k]) => T(v[k] || 0)))),
       { total: true }
     );
+    // 2b. Chưa phân bổ (chỉ kỳ theo ngày cân): hồ sơ không đọc được phiếu cân / phiếu thiếu ngày — KHÔNG nằm trong số liệu theo tháng / năm ở trên
+    if (model.basis === 'weigh' && model.unallocated && model.unallocated.n)
+      sheet(
+        'Chưa phân bổ',
+        'SỐ LIỆU CHƯA PHÂN BỔ THEO NGÀY CÂN',
+        'Các dòng dưới đây không xác minh được ngày cân của từng phiếu nên KHÔNG nằm trong số liệu theo tháng / năm của file này. ' +
+          unallocatedText(model),
+        [
+          { h: 'Hồ sơ', w: 36 },
+          { h: 'Loại biên bản', w: 24 },
+          { h: 'Từ ngày', w: 12 },
+          { h: 'Đến ngày', w: 12 },
+          { h: 'Số xe', w: 10, n: NI },
+          { h: 'Qua cân (tấn)', w: 16, n: NF },
+          { h: 'Thực giao (tấn)', w: 16, n: NF },
+          { h: 'Nguyên nhân', w: 60 },
+          { h: 'Mã hồ sơ', w: 26 },
+        ],
+        model.unallocated.items.map((x) => [
+          x.title || x.id,
+          typeName(x.type),
+          x.from || '',
+          x.to || '',
+          x.trips,
+          T(x.kg),
+          T(x.delKg),
+          x.reason,
+          x.id,
+        ]),
+        { total: false }
+      );
     // 3. Theo tàu
     sheet(
       'Theo tàu',
@@ -1164,6 +1257,7 @@
     manual: manualGet(),
     basis: basisNow(),
     tickets: basisNow() === 'weigh' && ticketMapAll ? ticketMapAll : ticketMap,
+    ticketErrors: ((basisNow() === 'weigh' && ticketMapAll ? ticketMapAll : ticketMap) || {}).errors || null,
     scope: HAK.Auth && HAK.Auth.scopeIds ? HAK.Auth.scopeIds('report') : null,
   });
 
@@ -1191,13 +1285,70 @@
   }
   const basisNow = () => ($('#repBasis') && $('#repBasis').value === 'weigh' ? 'weigh' : 'start');
   const BASIS_TEXT = { start: 'kỳ tính theo ngày BẮT ĐẦU của hồ sơ', weigh: 'kỳ tính theo NGÀY CÂN của từng phiếu' };
-  function rangeText() {
+  function rangeText(basis) {
     const a = $('#repFrom').value,
       b = $('#repTo').value,
       v = (s) => s.split('-').reverse().join('/');
     return (
-      (basisNow() === 'weigh' ? '[' + BASIS_TEXT.weigh + '] ' : '') +
-      (a || b ? 'từ ' + (a ? v(a) : '…') + ' đến ' + (b ? v(b) : '…') : 'toàn bộ thời gian')
+      '[' + BASIS_TEXT[basis || basisNow()] + '] ' + (a || b ? 'từ ' + (a ? v(a) : '…') + ' đến ' + (b ? v(b) : '…') : 'toàn bộ thời gian')
+    );
+  }
+
+  // Tấn với đúng 2 số lẻ như mọi nơi khác của app (82,00 tấn), làm tròn half-up trên số nguyên kg
+  const tonText = (kg) => G().fmtTon(kg);
+  /** Câu chữ thuần (dùng cho Excel / chú thích): phạm vi đã xác minh và phần chưa phân bổ của kỳ theo ngày cân. */
+  function unallocatedText(model) {
+    if (!model) return '';
+    if (model.basisFallback)
+      return 'Đã chọn kỳ theo ngày cân nhưng chưa đọc được danh sách phiếu cân — số liệu đang tính theo ngày BẮT ĐẦU của hồ sơ.';
+    const u = model.unallocated;
+    if (model.basis !== 'weigh') return '';
+    if (!u || !u.n) return 'Kỳ theo ngày cân: đã xác minh ngày cân của toàn bộ phiếu trong các hồ sơ đang tính.';
+    return (
+      'Kỳ theo ngày cân — số liệu theo tháng / năm CHỈ gồm phần đã xác minh ngày cân từng phiếu. Chưa phân bổ: ' +
+      u.n +
+      ' hồ sơ · ' +
+      u.trips.toLocaleString('vi-VN') +
+      ' xe · ' +
+      tonText(u.kg) +
+      ' tấn qua cân (' +
+      tonText(u.delKg) +
+      ' tấn thực giao)' +
+      (u.nUnread ? ' · ' + u.nUnread + ' hồ sơ không đọc được phiếu cân' : '') +
+      (u.nNoDate ? ' · ' + u.nNoDate + ' hồ sơ có phiếu thiếu / sai ngày cân' : '') +
+      '.'
+    );
+  }
+  /** Khối cảnh báo trên màn hình (HTML đã thoát) — rỗng nếu không có gì cần báo. */
+  function unallocatedNote(model) {
+    const t = unallocatedText(model);
+    if (!t || (model.basis === 'weigh' && !(model.unallocated && model.unallocated.n))) return '';
+    const items = model.basis === 'weigh' && model.unallocated ? model.unallocated.items : [];
+    return (
+      '⚠ ' +
+      esc(t) +
+      (items.length
+        ? '<ul class="mb-0 mt-1">' +
+          items
+            .slice(0, 6)
+            .map(
+              (x) =>
+                '<li><b>' +
+                esc(x.title || x.id) +
+                '</b> (' +
+                esc(x.from || '?') +
+                ' → ' +
+                esc(x.to || '?') +
+                '): ' +
+                esc(x.reason) +
+                ' — ' +
+                (x.kg ? tonText(x.kg) + ' tấn · ' + x.trips + ' xe' : 'chưa có số liệu') +
+                '</li>'
+            )
+            .join('') +
+          (items.length > 6 ? '<li>… và ' + (items.length - 6) + ' mục khác (xem sheet "Chưa phân bổ" trong file Excel).</li>' : '') +
+          '</ul>'
+        : '')
     );
   }
 
@@ -1233,7 +1384,8 @@
       if ($(id)) $(id).disabled = false;
     });
     model = compute(scope ? metas.filter((m) => scope.indexOf(HAK.Auth.companyOfMeta(m)) >= 0) : metas, opts());
-    model.rangeText = rangeText() + ' · ' + model.filterText + ' · Công ty: ' + (scope ? scope.join(', ') : 'tất cả công ty được phép');
+    model.rangeText =
+      rangeText(model.basis) + ' · ' + model.filterText + ' · Công ty: ' + (scope ? scope.join(', ') : 'tất cả công ty được phép');
     $('#repFilterSummary').textContent = model.used.length + ' hồ sơ đang tính · ' + model.rangeText;
     {
       const w = $('#repWeighWarn'),
@@ -1242,6 +1394,14 @@
       if (w) {
         w.textContent = t;
         w.classList.toggle('d-none', !t);
+      }
+    }
+    {
+      const u = $('#repUnalloc'),
+        t = unallocatedNote(model);
+      if (u) {
+        u.innerHTML = t;
+        u.classList.toggle('d-none', !t);
       }
     }
     if (reportSmart) reportSmart.refresh();
@@ -1709,7 +1869,8 @@
     $('#repXls').addEventListener('click', async () => {
       const { toast } = HAK.UI;
       try {
-        if (!model || !model.used.length) {
+        // Có thể chưa có số liệu đã xác minh nhưng vẫn có phần "chưa phân bổ" cần xuất (sheet "Chưa phân bổ") để người dùng xử lý.
+        if (!model || (!model.used.length && !(model.unallocated && model.unallocated.n))) {
           toast('Chưa có số liệu để xuất.', 'warning');
           return;
         }
@@ -1742,6 +1903,8 @@
     init,
     TYPES,
     prepareTickets,
+    unallocatedText,
+    unallocatedNote,
     xhLots,
     xhTrips,
     xhSheetRows,
