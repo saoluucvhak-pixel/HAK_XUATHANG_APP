@@ -1,0 +1,18 @@
+# Tệp sinh tự động / dữ liệu nhúng / thư viện bên thứ ba: không định dạng lại
+app/libs/
+app/native/
+app/js/docx-worker-source.js
+app/js/bkls-assets.js
+app/js/bkls-form01.js
+app/js/sample-xlsx.js
+app/js/templates-data.js
+tools/vendor/
+dist/
+reports/
+node_modules/
+installer/
+qa-report.html
+*.html
+*.css
+*.md
+*.json

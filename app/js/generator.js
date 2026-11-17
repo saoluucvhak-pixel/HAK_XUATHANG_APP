@@ -18,13 +18,15 @@
    * 1. Định dạng số theo kiểu Việt Nam (1.234,56)
    * ============================================================= */
   const thousands = (s) => s.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-  const fmtInt = (n) => (n === null || n === undefined || isNaN(n)) ? '' : (n < 0 ? '-' : '') + thousands(String(Math.round(Math.abs(n))));
+  const fmtInt = (n) => (n === null || n === undefined || isNaN(n) ? '' : (n < 0 ? '-' : '') + thousands(String(Math.round(Math.abs(n)))));
   /** n với d chữ số thập phân, làm tròn "half up" trên số nguyên để tránh sai số dấu phẩy động. */
   function fmtDec(n, d) {
     if (n === null || n === undefined || isNaN(n)) return '';
-    const f = Math.pow(10, d), neg = n < 0;
+    const f = Math.pow(10, d),
+      neg = n < 0;
     const v = Math.round(Math.abs(n) * f + 1e-9);
-    const ip = Math.floor(v / f), fp = String(v % f).padStart(d, '0');
+    const ip = Math.floor(v / f),
+      fp = String(v % f).padStart(d, '0');
     return (neg ? '-' : '') + thousands(String(ip)) + (d ? ',' + fp : '');
   }
   /** kg → tấn, 2 số lẻ (20.755.430 kg → "20.755,43"). Làm tròn trên số nguyên kg. */
@@ -40,11 +42,15 @@
   }
   /** Bỏ dấu + ký tự lạ để làm tên file: "HJ TIANHE V.2610" → "HJTIANHE_V2610". */
   function slug(s) {
-    const t = String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D');
-    const m = t.match(/^(.*?)\s+(V\.?\s?\d.*)$/i);          // tách phần chuyến (V.2610) nếu có
+    const t = String(s || '')
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .replace(/đ/g, 'd')
+      .replace(/Đ/g, 'D');
+    const m = t.match(/^(.*?)\s+(V\.?\s?\d.*)$/i); // tách phần chuyến (V.2610) nếu có
     const a = (m ? m[1] : t).replace(/[^A-Za-z0-9]+/g, '');
     const b = m ? m[2].replace(/[^A-Za-z0-9]+/g, '') : '';
-    return (a + (b ? '_' + b : '')) || 'Tau';
+    return a + (b ? '_' + b : '') || 'Tau';
   }
 
   /* ===============================================================
@@ -61,10 +67,12 @@
     return Date.UTC(p.y, p.m - 1, p.d, endOfDay ? 23 : 0, endOfDay ? 59 : 0, endOfDay ? 59 : 0);
   }
   /** Khóa nhận diện 1 phiếu để bỏ tay: số phiếu | biển số | giờ cân vào (cùng khóa khử trùng đợt) — bền khi nạp lại file đổi thứ tự dòng. */
-  const omitKey = (r) => (r.ticket || '') + '|' + r.plate + '|' + (r.ts1 !== null && r.ts1 !== undefined ? r.ts1 : r.time1) + (r.ticket ? '' : '|' + r.net);
+  const omitKey = (r) =>
+    (r.ticket || '') + '|' + r.plate + '|' + (r.ts1 !== null && r.ts1 !== undefined ? r.ts1 : r.time1) + (r.ticket ? '' : '|' + r.net);
   /** Mô tả phần lọc "tách trong ngày" ('' nếu không dùng) — ghi vào tóm tắt hồ sơ / Excel để biết phiếu của tàu nào. */
   function filterSplitText(f) {
-    f = f || {}; const p = [];
+    f = f || {};
+    const p = [];
     if (f.timeFrom || f.timeTo) p.push('giờ cân ' + (f.timeFrom || '00:00') + ' → ' + (f.timeTo || '23:59'));
     if (f.ticketFrom || f.ticketTo) p.push('số phiếu ' + (f.ticketFrom || '…') + ' → ' + (f.ticketTo || '…'));
     if (f.pick && f.pick.length) p.push('chỉ ' + f.pick.length + ' phiếu được chọn riêng');
@@ -73,25 +81,44 @@
   function filterRows(rows, filter) {
     filter = filter || {};
     const groups = filter.groups ? new Set(filter.groups) : null;
-    const from = toTs(filter.from, false), to = toTs(filter.to, true);
+    const from = toTs(filter.from, false),
+      to = toTs(filter.to, true);
     // v2.6.7: phạm vi "chuyển từ Xuất hàng kho gửi" — chỉ các đợt (tên file) đã chuyển + loại xe trả về (hình thức đích không có "xe trả về")
     const files = filter.files && filter.files.length ? new Set(filter.files) : null;
     const excl = filter.exclude && filter.exclude.length ? new Set(filter.exclude) : null;
-    const omit = filter.omit && filter.omit.length ? new Set(filter.omit) : null;   // phiếu bị bỏ tay → coi như không có
-    const fileOf = (r) => { const u = r.uid === undefined ? '' : String(r.uid), i = u.lastIndexOf('#'); return i < 0 ? '' : u.slice(0, i); };
+    const omit = filter.omit && filter.omit.length ? new Set(filter.omit) : null; // phiếu bị bỏ tay → coi như không có
+    const fileOf = (r) => {
+      const u = r.uid === undefined ? '' : String(r.uid),
+        i = u.lastIndexOf('#');
+      return i < 0 ? '' : u.slice(0, i);
+    };
     // v2.18.0 — TÁCH PHIẾU CÂN TRONG CÙNG NGÀY (1 ngày chạy 2 tàu): ngoài khoảng ngày còn lọc theo GIỜ CÂN (từ–đến, qua nửa đêm được) và SỐ PHIẾU (từ–đến, lấy dãy số cuối của số phiếu).
-    const tmin = (s) => { const m = String(s || '').match(/^(\d{1,2}):(\d{2})$/); return m && +m[1] < 24 && +m[2] < 60 ? +m[1] * 60 + +m[2] : null; };
-    const tnum = (s) => { const m = String(s == null ? '' : s).match(/(\d+)\D*$/); return m ? Number(m[1]) : null; };
-    const tf = tmin(filter.timeFrom), tt = tmin(filter.timeTo), kf = tnum(filter.ticketFrom), kt = tnum(filter.ticketTo);
+    const tmin = (s) => {
+      const m = String(s || '').match(/^(\d{1,2}):(\d{2})$/);
+      return m && +m[1] < 24 && +m[2] < 60 ? +m[1] * 60 + +m[2] : null;
+    };
+    const tnum = (s) => {
+      const m = String(s == null ? '' : s).match(/(\d+)\D*$/);
+      return m ? Number(m[1]) : null;
+    };
+    const tf = tmin(filter.timeFrom),
+      tt = tmin(filter.timeTo),
+      kf = tnum(filter.ticketFrom),
+      kt = tnum(filter.ticketTo);
     const inTime = (r) => {
       if (tf === null && tt === null) return true;
       if (r.ts1 === null || r.ts1 === undefined) return false;
-      const d = new Date(r.ts1), m = d.getUTCHours() * 60 + d.getUTCMinutes();
-      if (tf !== null && tt !== null && tf > tt) return m >= tf || m <= tt;                 // ca qua nửa đêm (vd 22:00 → 02:00)
+      const d = new Date(r.ts1),
+        m = d.getUTCHours() * 60 + d.getUTCMinutes();
+      if (tf !== null && tt !== null && tf > tt) return m >= tf || m <= tt; // ca qua nửa đêm (vd 22:00 → 02:00)
       return (tf === null || m >= tf) && (tt === null || m <= tt);
     };
-    const inTicket = (r) => { if (kf === null && kt === null) return true; const n = tnum(r.ticket); return n !== null && (kf === null || n >= kf) && (kt === null || n <= kt); };
-    const pick = filter.pick && filter.pick.length ? new Set(filter.pick) : null;       // CHỌN TỪNG PHIẾU của tàu này (khóa omitKey) — dùng khi 2 tàu cân xen kẽ trong ngày
+    const inTicket = (r) => {
+      if (kf === null && kt === null) return true;
+      const n = tnum(r.ticket);
+      return n !== null && (kf === null || n >= kf) && (kt === null || n <= kt);
+    };
+    const pick = filter.pick && filter.pick.length ? new Set(filter.pick) : null; // CHỌN TỪNG PHIẾU của tàu này (khóa omitKey) — dùng khi 2 tàu cân xen kẽ trong ngày
     const selected = rows.filter((r) => {
       if (pick && !pick.has(omitKey(r))) return false;
       if (!inTime(r) || !inTicket(r)) return false;
@@ -104,7 +131,7 @@
       return true;
     });
     if (filter.smart) {
-      if (!HAK.Filters) throw new Error("Chưa nạp bộ lọc thông minh HAK.");
+      if (!HAK.Filters) throw new Error('Chưa nạp bộ lọc thông minh HAK.');
       return HAK.Filters.trips(selected, filter.smart);
     }
     return selected;
@@ -112,8 +139,15 @@
   function summarize(rows) {
     const st = HAK.Excel.computeStats(rows);
     return {
-      trips: st.trips, kg: st.kg, tons: fmtTon(st.kg), vehicles: st.plates,
-      from: st.from, to: st.to, minTs: st.minTs, maxTs: st.maxTs, byPlate: st.byPlate
+      trips: st.trips,
+      kg: st.kg,
+      tons: fmtTon(st.kg),
+      vehicles: st.plates,
+      from: st.from,
+      to: st.to,
+      minTs: st.minTs,
+      maxTs: st.maxTs,
+      byPlate: st.byPlate,
     };
   }
 
@@ -122,11 +156,11 @@
    * ============================================================= */
   const cfg = () => HAK.Config.data;
   const blank = () => cfg().general.blank || '………';
-  const orBlank = (v) => (v === null || v === undefined || String(v).trim() === '') ? blank() : String(v);
+  const orBlank = (v) => (v === null || v === undefined || String(v).trim() === '' ? blank() : String(v));
 
   /** Thông tin 1 bên (công ty) → các biến {prefix}_name, _tax, ... */
   function party(c, prefix, role) {
-    const rep = c.rep ? ((c.salutation ? c.salutation + ' ' : '') + c.rep) : '';
+    const rep = c.rep ? (c.salutation ? c.salutation + ' ' : '') + c.rep : '';
     const o = {};
     o[prefix + '_name'] = orBlank(c.name);
     o[prefix + '_name_upper'] = orBlank(c.name).toUpperCase();
@@ -156,15 +190,22 @@
   /** Ngày lập văn bản: dd/mm/yyyy | yyyy-mm-dd | rỗng → hôm nay. */
   function docDateParts(s) {
     let p = s ? U().parseDT(s) : null;
-    if (!p || !p.hasDate) { const n = new Date(); p = { y: n.getFullYear(), m: n.getMonth() + 1, d: n.getDate() }; }
+    if (!p || !p.hasDate) {
+      const n = new Date();
+      p = { y: n.getFullYear(), m: n.getMonth() + 1, d: n.getDate() };
+    }
     return { date: pad2(p.d), month: pad2(p.m), year: String(p.y) };
   }
   /** Kỳ dữ liệu (tháng/năm) — lấy theo ngày cân sớm nhất, cho phép ghi đè "MM/YYYY". */
   function period(sum, override) {
     const m = override && String(override).match(/^(\d{1,2})\s*\/\s*(\d{4})$/);
     if (m) return { periodMonth: pad2(+m[1]), periodYear: m[2] };
-    if (sum.minTs !== null) { const t = U().tsToParts(sum.minTs); return { periodMonth: pad2(t.m), periodYear: String(t.y) }; }
-    const n = new Date(); return { periodMonth: pad2(n.getMonth() + 1), periodYear: String(n.getFullYear()) };
+    if (sum.minTs !== null) {
+      const t = U().tsToParts(sum.minTs);
+      return { periodMonth: pad2(t.m), periodYear: String(t.y) };
+    }
+    const n = new Date();
+    return { periodMonth: pad2(n.getMonth() + 1), periodYear: String(n.getFullYear()) };
   }
   const monthCode = (per) => per.periodMonth + per.periodYear; // "032025"
 
@@ -176,7 +217,7 @@
       const n = i + 1;
       return {
         stt: String(n),
-        ticket: o.renumber ? n + '/' + o.renumber + '/TĐ' : (r.ticket || ''),
+        ticket: o.renumber ? n + '/' + o.renumber + '/TĐ' : r.ticket || '',
         time1: r.time1 || '',
         time2: r.time2 || '',
         plate: r.plate,
@@ -185,7 +226,7 @@
         net: fmtInt(r.net),
         driver: r.driver || g.defaultDriver || '',
         carrier: r.carrier || o.defaultCarrier || g.defaultCarrier || '',
-        wh: r.wh || o.defaultWh || ''
+        wh: r.wh || o.defaultWh || '',
       };
     });
   }
@@ -195,16 +236,28 @@
     const map = new Map();
     rows.forEach((r) => {
       let p = map.get(r.plate);
-      if (!p) { p = { plate: r.plate, trips: 0, kg: 0, min: Infinity, max: -Infinity }; map.set(r.plate, p); }
-      p.trips++; p.kg += r.net;
-      if (r.ts1 !== null) { p.min = Math.min(p.min, r.ts1); p.max = Math.max(p.max, r.ts1); }
+      if (!p) {
+        p = { plate: r.plate, trips: 0, kg: 0, min: Infinity, max: -Infinity };
+        map.set(r.plate, p);
+      }
+      p.trips++;
+      p.kg += r.net;
+      if (r.ts1 !== null) {
+        p.min = Math.min(p.min, r.ts1);
+        p.max = Math.max(p.max, r.ts1);
+      }
     });
-    return Array.from(map.values()).sort((a, b) => a.plate.localeCompare(b.plate)).map((p, i) => ({
-      stt: String(i + 1), trips: String(p.trips), plate: p.plate,
-      dFrom: isFinite(p.min) ? U().fmtDate(U().tsToParts(p.min)) : '',
-      dTo: isFinite(p.max) ? U().fmtDate(U().tsToParts(p.max)) : '',
-      tons: fmtTon(p.kg), note: ''
-    }));
+    return Array.from(map.values())
+      .sort((a, b) => a.plate.localeCompare(b.plate))
+      .map((p, i) => ({
+        stt: String(i + 1),
+        trips: String(p.trips),
+        plate: p.plate,
+        dFrom: isFinite(p.min) ? U().fmtDate(U().tsToParts(p.min)) : '',
+        dTo: isFinite(p.max) ? U().fmtDate(U().tsToParts(p.max)) : '',
+        tons: fmtTon(p.kg),
+        note: '',
+      }));
   }
 
   /** Dòng phiếu cân cho file Excel lưu trữ: khối lượng là SỐ (kg), giữ số phiếu gốc, ĐVVC ghi MÃ NGẮN (HAK / ĐH / QC …). */
@@ -212,35 +265,55 @@
     o = o || {};
     const g = cfg().general;
     return rows.map((r) => ({
-      ticket: r.ticket || '', time1: r.time1 || '', time2: r.time2 || '', plate: r.plate,
-      tare: r.tare === undefined ? null : r.tare, gross: r.gross === undefined ? null : r.gross, net: r.net,
+      ticket: r.ticket || '',
+      time1: r.time1 || '',
+      time2: r.time2 || '',
+      plate: r.plate,
+      tare: r.tare === undefined ? null : r.tare,
+      gross: r.gross === undefined ? null : r.gross,
+      net: r.net,
       driver: r.driver || g.defaultDriver || '',
       carrier: r.carrierCode || r.carrier || o.defaultCarrier || g.defaultCarrier || '',
-      wh: r.wh || o.defaultWh || '', whSrc: r.wh || ''
+      wh: r.wh || o.defaultWh || '',
+      whSrc: r.wh || '',
     }));
   }
 
   /** Khối thống kê chung (tổng xe, tổng tấn, thời gian…). */
   function totals(rows, sum) {
     return {
-      trip: String(sum.trips), vehicles: String(sum.vehicles),
-      weight: fmtTon(sum.kg), weightKg: fmtInt(sum.kg), weightRound: fmtTonRound(sum.kg),
-      dateFrom: sum.from, dateTo: sum.to,
-      totalLine: 'TỔNG CỘNG: ' + sum.trips + ' phiếu — ' + fmtInt(sum.kg) + ' kg (' + fmtTon(sum.kg) + ' tấn)'
+      trip: String(sum.trips),
+      vehicles: String(sum.vehicles),
+      weight: fmtTon(sum.kg),
+      weightKg: fmtInt(sum.kg),
+      weightRound: fmtTonRound(sum.kg),
+      dateFrom: sum.from,
+      dateTo: sum.to,
+      totalLine: 'TỔNG CỘNG: ' + sum.trips + ' phiếu — ' + fmtInt(sum.kg) + ' kg (' + fmtTon(sum.kg) + ' tấn)',
     };
   }
 
   /** Bộ biến chung + bí danh theo danh sách placeholder người dùng yêu cầu. */
   function commonCtx(giao, nhan, khoG, khoN, sum, per, dateStr, giaoRole, nhanRole) {
     const dp = docDateParts(dateStr);
-    const ctx = Object.assign({},
-      party(giao, 'giao', giaoRole), party(nhan, 'nhan', nhanRole),
-      khoG ? wh(khoG, 'kho_giao') : {}, khoN ? wh(khoN, 'kho_nhan') : {},
-      per, dp, { place: cfg().general.place || 'Đà Nẵng' });
+    const ctx = Object.assign(
+      {},
+      party(giao, 'giao', giaoRole),
+      party(nhan, 'nhan', nhanRole),
+      khoG ? wh(khoG, 'kho_giao') : {},
+      khoN ? wh(khoN, 'kho_nhan') : {},
+      per,
+      dp,
+      { place: cfg().general.place || 'Đà Nẵng' }
+    );
     // Bí danh: {{company}} {{address}} {{tax}} {{director}} {{position}} {{from}} {{to}}
-    ctx.company = ctx.giao_name; ctx.address = ctx.giao_address; ctx.tax = ctx.giao_tax;
-    ctx.director = ctx.giao_rep; ctx.position = ctx.giao_position;
-    ctx.from = ctx.kho_giao || ''; ctx.to = ctx.kho_nhan || '';
+    ctx.company = ctx.giao_name;
+    ctx.address = ctx.giao_address;
+    ctx.tax = ctx.giao_tax;
+    ctx.director = ctx.giao_rep;
+    ctx.position = ctx.giao_position;
+    ctx.from = ctx.kho_giao || '';
+    ctx.to = ctx.kho_nhan || '';
     return ctx;
   }
 
@@ -260,8 +333,10 @@
     const rows = filterRows(ds.rows, p.filter);
     if (!need(res, rows)) return res;
     const sum = summarize(rows);
-    const giao = HAK.Config.company(p.giaoId), nhan = HAK.Config.company(p.nhanId);
-    const kg = HAK.Config.warehouse(p.khoGiaoId), kn = HAK.Config.warehouse(p.khoNhanId);
+    const giao = HAK.Config.company(p.giaoId),
+      nhan = HAK.Config.company(p.nhanId);
+    const kg = HAK.Config.warehouse(p.khoGiaoId),
+      kn = HAK.Config.warehouse(p.khoNhanId);
     if (giao.id === nhan.id) res.warnings.push('Bên giao và bên nhận đang là cùng một công ty.');
     if (kg.id === kn.id) res.warnings.push('Kho gửi và kho nhận đang trùng nhau.');
     const per = period(sum, p.period);
@@ -269,26 +344,40 @@
       commonCtx(giao, nhan, kg, kn, sum, per, p.docDate, 'chủ sở hữu hàng hóa', 'kho tiếp nhận'),
       totals(rows, sum),
       {
-        dateFromShort: (sum.from || '').slice(0, 5),                        // "04/06" (dòng "ĐỢT 04/06 - 15/06/2026")
-        appendix: plateRows(rows),                                          // (tổng hợp theo xe — dành cho mẫu tùy chỉnh)
+        dateFromShort: (sum.from || '').slice(0, 5), // "04/06" (dòng "ĐỢT 04/06 - 15/06/2026")
+        appendix: plateRows(rows), // (tổng hợp theo xe — dành cho mẫu tùy chỉnh)
         // Phụ lục bảng kê từng phiếu cân: xếp theo giờ cân lần 2 (giờ xe ra khỏi bàn cân), như mẫu
-        table: detailRows(rows.slice().sort((a, b) => (a.ts2 !== null ? a.ts2 : (a.ts1 || 0)) - (b.ts2 !== null ? b.ts2 : (b.ts1 || 0))), { defaultWh: kg.short }),
-        showDetail: true
-      });
+        table: detailRows(
+          rows.slice().sort((a, b) => (a.ts2 !== null ? a.ts2 : a.ts1 || 0) - (b.ts2 !== null ? b.ts2 : b.ts1 || 0)),
+          { defaultWh: kg.short }
+        ),
+        showDetail: true,
+      }
+    );
     // Mẫu theo tháng (phụ lục tổng hợp theo biển số) hoặc theo đợt (phụ lục từng phiếu cân)
     const thang = p.variant === 'thang';
-    if (thang) { ctx.evidence = p.evidence || 'Phiếu xuất kho kiêm vận chuyển nội bộ (PXK)'; ctx.showDetail = !!p.showDetail; }
+    if (thang) {
+      ctx.evidence = p.evidence || 'Phiếu xuất kho kiêm vận chuyển nội bộ (PXK)';
+      ctx.showDetail = !!p.showDetail;
+    }
     res.files.push({ tpl: thang ? 'GuiKhoThang' : 'GuiKho', name: 'BienBanGuiKho_' + monthCode(per) + '.docx', data: ctx });
     const mm = per.periodMonth + '/' + per.periodYear;
     res.excel = {
-      kind: 'A', fileName: 'BangChiTietCanHang_GuiKho_' + (thang ? 'Thang_' : 'Dot_') + monthCode(per) + '.xlsx',
+      kind: 'A',
+      fileName: 'BangChiTietCanHang_GuiKho_' + (thang ? 'Thang_' : 'Dot_') + monthCode(per) + '.xlsx',
       title: 'PHỤ LỤC — BẢNG CHI TIẾT CÂN HÀNG GỬI KHO — ' + (thang ? 'THÁNG ' + mm : 'ĐỢT ' + sum.from.slice(0, 5) + ' - ' + sum.to),
       lines: ['Bên giao: ' + giao.name + ' (' + giao.short + ')  —  Bên nhận: ' + nhan.name + '  —  Bàn cân xuất: ' + kg.name],
       totalLabel: 'TỔNG CỘNG ' + (thang ? 'THÁNG ' + mm : 'ĐỢT ' + sum.from.slice(0, 5) + ' - ' + sum.to) + ':',
-      rows: excelRows(rows.slice().sort((a, b) => (a.ts2 !== null ? a.ts2 : (a.ts1 || 0)) - (b.ts2 !== null ? b.ts2 : (b.ts1 || 0)))),
-      sign: { left: { title: 'ĐẠI DIỆN BÊN GIAO', org: giao.name }, right: { title: 'ĐẠI DIỆN BÊN NHẬN', org: nhan.name } }
+      rows: excelRows(rows.slice().sort((a, b) => (a.ts2 !== null ? a.ts2 : a.ts1 || 0) - (b.ts2 !== null ? b.ts2 : b.ts1 || 0))),
+      sign: { left: { title: 'ĐẠI DIỆN BÊN GIAO', org: giao.name }, right: { title: 'ĐẠI DIỆN BÊN NHẬN', org: nhan.name } },
     };
-    res.summary = { 'Số lượt xe': sum.trips, 'Số xe (biển số)': sum.vehicles, 'Tổng khối lượng': ctx.weight + ' tấn', 'Thời gian': sum.from + ' → ' + sum.to, 'Kho gửi → nhận': kg.short + ' → ' + kn.short };
+    res.summary = {
+      'Số lượt xe': sum.trips,
+      'Số xe (biển số)': sum.vehicles,
+      'Tổng khối lượng': ctx.weight + ' tấn',
+      'Thời gian': sum.from + ' → ' + sum.to,
+      'Kho gửi → nhận': kg.short + ' → ' + kn.short,
+    };
     return res;
   }
 
@@ -315,8 +404,10 @@
     if (!String(p.ship || '').trim()) res.errors.push('Chưa nhập tên tàu.');
     if (res.errors.length) return res;
     const sum = summarize(rows);
-    const giao = HAK.Config.company(p.giaoId), nhan = HAK.Config.company(p.nhanId);
-    const kg = HAK.Config.warehouse(p.khoGiaoId), kn = HAK.Config.warehouse(p.khoNhanId);
+    const giao = HAK.Config.company(p.giaoId),
+      nhan = HAK.Config.company(p.nhanId);
+    const kg = HAK.Config.warehouse(p.khoGiaoId),
+      kn = HAK.Config.warehouse(p.khoNhanId);
     if (giao.id === nhan.id) res.warnings.push('Bên gửi và bên nhận đang là cùng một công ty.');
     const { retRows, retKg, deliveredKg } = returnedInfo(rows, p, sum);
     const per = period(sum, p.period);
@@ -326,25 +417,43 @@
       {
         ship: String(p.ship).trim().toUpperCase(),
         khoGuiCode: orBlank(p.khoGuiCode),
-        weightScaleTon: fmtTon(sum.kg), weightScaleKg: fmtInt(sum.kg),
+        weightScaleTon: fmtTon(sum.kg),
+        weightScaleKg: fmtInt(sum.kg),
         returnedText: retRows.length ? fmtTon(retKg) + ' tấn (' + retRows.length + ' xe)' : 'Không có xe trả về',
-        returnedTon: fmtTon(retKg), returnedKg: fmtInt(retKg), returnedTrip: String(retRows.length),
+        returnedTon: fmtTon(retKg),
+        returnedKg: fmtInt(retKg),
+        returnedTrip: String(retRows.length),
         weightDelivered: fmtTon(deliveredKg),
-        table: detailRows(rows, { defaultWh: p.whLabel || '' }),          // phụ lục: toàn bộ phiếu qua cân (gross)
-        returned: detailRows(retRows, { defaultWh: p.whLabel || '' }), hasReturned: retRows.length > 0
-      });
+        table: detailRows(rows, { defaultWh: p.whLabel || '' }), // phụ lục: toàn bộ phiếu qua cân (gross)
+        returned: detailRows(retRows, { defaultWh: p.whLabel || '' }),
+        hasReturned: retRows.length > 0,
+      }
+    );
     res.files.push({ tpl: 'XuatKhoGui', name: 'XuatKhoGui_' + slug(ctx.ship) + '.docx', data: ctx });
     res.excel = {
-      kind: 'B', fileName: 'PhieuCan_' + slug(ctx.ship) + '_' + slug(giao.short) + '.xlsx',
+      kind: 'B',
+      fileName: 'PhieuCan_' + slug(ctx.ship) + '_' + slug(giao.short) + '.xlsx',
       title: 'BẢNG CHI TIẾT CÂN ' + giao.short.toUpperCase() + ' XUẤT KHẨU - ' + ctx.ship,
       station: 'Trạm cân: ' + giao.short,
-      note: giao.short + ' gửi kho tại ' + kn.short + ', ' + nhan.short + ' đại diện kho gửi' + (retRows.length ? '; trong đó xe trả về ' + retRows.length + ' xe (' + ctx.returnedTon + ' tấn)' : '') + '.',
-      rows: excelRows(rows, { defaultWh: p.whLabel || '' })
+      note:
+        giao.short +
+        ' gửi kho tại ' +
+        kn.short +
+        ', ' +
+        nhan.short +
+        ' đại diện kho gửi' +
+        (retRows.length ? '; trong đó xe trả về ' + retRows.length + ' xe (' + ctx.returnedTon + ' tấn)' : '') +
+        '.',
+      rows: excelRows(rows, { defaultWh: p.whLabel || '' }),
     };
     res.summary = {
-      'Tàu': ctx.ship, 'Bên gửi → nhận': giao.short + ' → ' + nhan.short, 'Thời gian xuất hàng': sum.from + ' → ' + sum.to,
-      'Kho xuất → gửi đến': kg.short + ' → ' + kn.short, 'Khối lượng qua cân': ctx.weightScaleTon + ' tấn (' + sum.trips + ' xe)',
-      'Xe trả về': retRows.length ? ctx.returnedTon + ' tấn (' + retRows.length + ' xe)' : 'Không có', 'Thực gửi/nhận': ctx.weightDelivered + ' tấn'
+      Tàu: ctx.ship,
+      'Bên gửi → nhận': giao.short + ' → ' + nhan.short,
+      'Thời gian xuất hàng': sum.from + ' → ' + sum.to,
+      'Kho xuất → gửi đến': kg.short + ' → ' + kn.short,
+      'Khối lượng qua cân': ctx.weightScaleTon + ' tấn (' + sum.trips + ' xe)',
+      'Xe trả về': retRows.length ? ctx.returnedTon + ' tấn (' + retRows.length + ' xe)' : 'Không có',
+      'Thực gửi/nhận': ctx.weightDelivered + ' tấn',
     };
     return res;
   }
@@ -358,24 +467,42 @@
     if (res.errors.length) return res;
     const N = U().parseNum;
     const sum = summarize(rows);
-    const giao = HAK.Config.company(p.giaoId), nhan = HAK.Config.company(p.nhanId);
+    const giao = HAK.Config.company(p.giaoId),
+      nhan = HAK.Config.company(p.nhanId);
     if (giao.id === nhan.id) res.warnings.push('Bên ủy thác và bên nhận ủy thác đang là cùng một công ty.');
 
     // ---- khối lượng qua cân / xe trả về / thực giao ----
     const { retRows, retKg, deliveredKg } = returnedInfo(rows, p, sum);
 
     // ---- khối lượng giám định: tự tính tấn khô / độ ẩm khi thiếu ----
-    let wet = N(p.certWet), dry = N(p.certDry), moist = N(p.moisture);
+    let wet = N(p.certWet),
+      dry = N(p.certDry),
+      moist = N(p.moisture);
     let autoNote = '';
-    if (wet !== null && moist !== null && dry === null) { dry = Math.round(wet * (1 - moist / 100) * 100) / 100; autoNote = 'Tấn khô được tự tính = tấn tươi × (1 − độ ẩm).'; }
-    else if (wet !== null && dry !== null && moist === null) { moist = Math.round((1 - dry / wet) * 1e6) / 1e4; autoNote = 'Độ ẩm được tự tính từ tấn tươi và tấn khô.'; }
+    if (wet !== null && moist !== null && dry === null) {
+      dry = Math.round(wet * (1 - moist / 100) * 100) / 100;
+      autoNote = 'Tấn khô được tự tính = tấn tươi × (1 − độ ẩm).';
+    } else if (wet !== null && dry !== null && moist === null) {
+      moist = Math.round((1 - dry / wet) * 1e6) / 1e4;
+      autoNote = 'Độ ẩm được tự tính từ tấn tươi và tấn khô.';
+    }
     if (autoNote) res.warnings.push(autoNote);
     if (moist !== null && (moist < 0 || moist > 100)) res.errors.push('Độ ẩm phải nằm trong khoảng 0–100%.');
     if (wet !== null && dry !== null && dry > wet) res.errors.push('Tấn khô lớn hơn tấn tươi — vui lòng kiểm tra lại.');
     if (res.errors.length) return res;
     const dTons = deliveredKg / 1000;
     if (wet !== null && Math.abs(wet - dTons) / Math.max(dTons, 1) > 0.02)
-      res.warnings.push('Khối lượng giám định (tươi) ' + fmtDec(wet, 2) + ' tấn lệch ' + fmtDec(Math.abs(wet - dTons), 2) + ' tấn (' + fmtDec(Math.abs(wet - dTons) / dTons * 100, 2) + '%) so với thực giao ' + fmtTon(deliveredKg) + ' tấn.');
+      res.warnings.push(
+        'Khối lượng giám định (tươi) ' +
+          fmtDec(wet, 2) +
+          ' tấn lệch ' +
+          fmtDec(Math.abs(wet - dTons), 2) +
+          ' tấn (' +
+          fmtDec((Math.abs(wet - dTons) / dTons) * 100, 2) +
+          '%) so với thực giao ' +
+          fmtTon(deliveredKg) +
+          ' tấn.'
+      );
 
     const per = period(sum, p.period);
     const qty = N(p.contractQty);
@@ -385,34 +512,50 @@
       {
         ship: String(p.ship).trim().toUpperCase(),
         factory: orBlank(giao.factory),
-        contractNo: orBlank(p.contractNo), contractDate: p.contractDate ? isoToVN(p.contractDate) : blank(),
-        contractQtyText: qty !== null ? ' (khối lượng tạm tính trên hợp đồng: ' + fmtDec(qty, qty % 1 ? 2 : 0) + ' BDMT, tấn khô kiệt)' : '',
-        certNo: orBlank(p.certNo), certDate: p.certDate ? isoToVN(p.certDate) : blank(),
+        contractNo: orBlank(p.contractNo),
+        contractDate: p.contractDate ? isoToVN(p.contractDate) : blank(),
+        contractQtyText:
+          qty !== null ? ' (khối lượng tạm tính trên hợp đồng: ' + fmtDec(qty, qty % 1 ? 2 : 0) + ' BDMT, tấn khô kiệt)' : '',
+        certNo: orBlank(p.certNo),
+        certDate: p.certDate ? isoToVN(p.certDate) : blank(),
         certWetText: wet !== null ? fmtDec(wet, 2) + ' tấn' : blank(),
         certDryText: dry !== null ? fmtDec(dry, 2) + ' tấn' : blank(),
         moistureText: moist !== null ? String(moist).replace('.', ',') + '%' : blank(),
-        weightScaleTon: fmtTon(sum.kg), weightScaleKg: fmtInt(sum.kg),
+        weightScaleTon: fmtTon(sum.kg),
+        weightScaleKg: fmtInt(sum.kg),
         returnedText: retRows.length ? fmtTon(retKg) + ' tấn (' + retRows.length + ' xe)' : 'Không có xe trả về',
-        returnedTon: fmtTon(retKg), returnedKg: fmtInt(retKg), returnedTrip: String(retRows.length),
+        returnedTon: fmtTon(retKg),
+        returnedKg: fmtInt(retKg),
+        returnedTrip: String(retRows.length),
         weightDelivered: fmtTon(deliveredKg),
         hasReturned: retRows.length > 0,
         table: detailRows(rows, { defaultWh: p.wh || '' }),
-        returned: detailRows(retRows, { defaultWh: p.returnWh || '' })
-      });
+        returned: detailRows(retRows, { defaultWh: p.returnWh || '' }),
+      }
+    );
     // ghi đè: "xe trả về" nằm trong bảng qua cân nên tổng bảng = qua cân
     res.files.push({ tpl: 'UyThac', name: 'UyThac_' + slug(p.ship) + '.docx', data: ctx });
     res.excel = {
-      kind: 'B', fileName: 'PhieuCan_' + slug(ctx.ship) + '_' + slug(giao.short) + '.xlsx',
+      kind: 'B',
+      fileName: 'PhieuCan_' + slug(ctx.ship) + '_' + slug(giao.short) + '.xlsx',
       title: 'BẢNG CHI TIẾT CÂN ' + giao.short.toUpperCase() + ' XUẤT KHẨU - ' + ctx.ship,
       station: 'Trạm cân: ' + giao.short,
-      note: giao.short + ' ủy thác cho ' + nhan.short + ' xuất khẩu' + (retRows.length ? '; trong đó xe trả về ' + retRows.length + ' xe (' + ctx.returnedTon + ' tấn)' : '') + '.',
-      rows: excelRows(rows, { defaultWh: p.wh || '' })
+      note:
+        giao.short +
+        ' ủy thác cho ' +
+        nhan.short +
+        ' xuất khẩu' +
+        (retRows.length ? '; trong đó xe trả về ' + retRows.length + ' xe (' + ctx.returnedTon + ' tấn)' : '') +
+        '.',
+      rows: excelRows(rows, { defaultWh: p.wh || '' }),
     };
     res.summary = {
-      'Tàu': ctx.ship, 'Bên ủy thác': giao.short, 'Thời gian xuất hàng': sum.from + ' → ' + sum.to,
+      Tàu: ctx.ship,
+      'Bên ủy thác': giao.short,
+      'Thời gian xuất hàng': sum.from + ' → ' + sum.to,
       'Khối lượng qua cân': ctx.weightScaleTon + ' tấn (' + sum.trips + ' xe)',
       'Xe trả về': retRows.length ? ctx.returnedTon + ' tấn (' + retRows.length + ' xe)' : 'Không có',
-      'Khối lượng thực giao': ctx.weightDelivered + ' tấn'
+      'Khối lượng thực giao': ctx.weightDelivered + ' tấn',
     };
     return res;
   }
@@ -424,10 +567,12 @@
     if (!need(res, rows)) return res;
     if (!String(p.qdNo || '').trim()) res.warnings.push('Chưa nhập số Quyết định — sẽ để trống để điền tay.');
     const sum = summarize(rows);
-    const giao = HAK.Config.company(p.giaoId), nhan = HAK.Config.company(p.nhanId);
+    const giao = HAK.Config.company(p.giaoId),
+      nhan = HAK.Config.company(p.nhanId);
     const issuer = HAK.Config.company(p.issuerId);
     if (giao.id === nhan.id) res.warnings.push('Bên giao và bên nhận đang là cùng một đơn vị.');
-    const kg = HAK.Config.warehouse(p.khoGiaoId), kn = HAK.Config.warehouse(p.khoNhanId);
+    const kg = HAK.Config.warehouse(p.khoGiaoId),
+      kn = HAK.Config.warehouse(p.khoNhanId);
     const per = period(sum, p.period);
     const wtype = p.weightType || cfg().general.defaultWeightType || 'Trung Chuyển';
     const giaoRole = (giao.kind === 'Chi nhánh' ? 'Chi nhánh xuất hàng' : 'Công ty xuất hàng') + ' — ' + kg.short;
@@ -437,25 +582,47 @@
       totals(rows, sum),
       party(issuer, 'issuer'),
       {
-        issuer_name: orBlank(issuer.name), issuer_name_upper: orBlank(issuer.name).toUpperCase(), issuer_rep: orBlank(issuer.rep),
-        giao_khoShort: kg.short, nhan_khoShort: kn.short,
-        qdNo: orBlank(p.qdNo), qdDate: p.qdDate ? isoToVN(p.qdDate) : blank(),
+        issuer_name: orBlank(issuer.name),
+        issuer_name_upper: orBlank(issuer.name).toUpperCase(),
+        issuer_rep: orBlank(issuer.rep),
+        giao_khoShort: kg.short,
+        nhan_khoShort: kn.short,
+        qdNo: orBlank(p.qdNo),
+        qdDate: p.qdDate ? isoToVN(p.qdDate) : blank(),
         weightType: wtype,
-        table: detailRows(rows, { defaultWh: kg.short })
-      });
+        table: detailRows(rows, { defaultWh: kg.short }),
+      }
+    );
     const code = 'T' + monthCode(per);
     res.excel = {
-      kind: 'A', fileName: 'BangChiTietCanHang_DieuChuyen_Thang_' + monthCode(per) + '.xlsx',
+      kind: 'A',
+      fileName: 'BangChiTietCanHang_DieuChuyen_Thang_' + monthCode(per) + '.xlsx',
       title: 'PHỤ LỤC — BẢNG CHI TIẾT CÂN HÀNG ĐIỀU CHUYỂN NỘI BỘ — THÁNG ' + per.periodMonth + '/' + per.periodYear,
-      lines: [p.qdNo ? '(Kèm theo Quyết định điều chuyển số: ' + p.qdNo + ' — ' + issuer.name + ')' : '',
-        'Bên giao: ' + giao.name + ' (' + giao.short + ')  —  Bên nhận: ' + nhan.name + '  —  Kho đi: ' + kg.name + '  —  Kho đến: ' + kn.name],
+      lines: [
+        p.qdNo ? '(Kèm theo Quyết định điều chuyển số: ' + p.qdNo + ' — ' + issuer.name + ')' : '',
+        'Bên giao: ' +
+          giao.name +
+          ' (' +
+          giao.short +
+          ')  —  Bên nhận: ' +
+          nhan.name +
+          '  —  Kho đi: ' +
+          kg.name +
+          '  —  Kho đến: ' +
+          kn.name,
+      ],
       totalLabel: 'TỔNG CỘNG THÁNG ' + per.periodMonth + '/' + per.periodYear + ':',
       rows: excelRows(rows, { defaultWh: kg.short }),
-      sign: { left: { title: 'ĐẠI DIỆN BÊN GIAO', org: giao.name }, right: { title: 'ĐẠI DIỆN BÊN NHẬN', org: nhan.name } }
+      sign: { left: { title: 'ĐẠI DIỆN BÊN GIAO', org: giao.name }, right: { title: 'ĐẠI DIỆN BÊN NHẬN', org: nhan.name } },
     };
     res.files.push({ tpl: 'QuyetDinh', name: 'QuyetDinh_DieuChuyen_' + code + '.docx', data: ctx });
     res.files.push({ tpl: 'DieuChuyen', name: 'DieuChuyen_' + code + '.docx', data: ctx });
-    res.summary = { 'Số lượt xe': sum.trips, 'Khối lượng': ctx.weight + ' tấn (làm tròn ' + ctx.weightRound + ')', 'Thời gian': sum.from + ' → ' + sum.to, 'Kho đi → đến': kg.short + ' → ' + kn.short };
+    res.summary = {
+      'Số lượt xe': sum.trips,
+      'Khối lượng': ctx.weight + ' tấn (làm tròn ' + ctx.weightRound + ')',
+      'Thời gian': sum.from + ' → ' + sum.to,
+      'Kho đi → đến': kg.short + ' → ' + kn.short,
+    };
     return res;
   }
 
@@ -466,28 +633,37 @@
     if (!need(res, rows)) return res;
     if (!String(p.contractNo || '').trim()) res.warnings.push('Chưa nhập số hợp đồng trao đổi — sẽ để trống để điền tay.');
     const sum = summarize(rows);
-    const giao = HAK.Config.company(p.giaoId), nhan = HAK.Config.company(p.nhanId);
+    const giao = HAK.Config.company(p.giaoId),
+      nhan = HAK.Config.company(p.nhanId);
     if (giao.id === nhan.id) res.warnings.push('Bên giao và bên nhận đang là cùng một công ty.');
-    const kg = HAK.Config.warehouse(p.khoGiaoId), kn = HAK.Config.warehouse(p.khoNhanId);
+    const kg = HAK.Config.warehouse(p.khoGiaoId),
+      kn = HAK.Config.warehouse(p.khoNhanId);
     const per = period(sum, p.period);
-    const ctx = Object.assign(
-      commonCtx(giao, nhan, kg, kn, sum, per, p.docDate, 'đơn vị giao', 'đơn vị nhận'),
-      totals(rows, sum),
-      {
-        contractNo: orBlank(p.contractNo),
-        table: detailRows(rows, { renumber: p.renumber ? monthCode(per) : '', defaultCarrier: p.defaultCarrier || '' })
-      });
+    const ctx = Object.assign(commonCtx(giao, nhan, kg, kn, sum, per, p.docDate, 'đơn vị giao', 'đơn vị nhận'), totals(rows, sum), {
+      contractNo: orBlank(p.contractNo),
+      table: detailRows(rows, { renumber: p.renumber ? monthCode(per) : '', defaultCarrier: p.defaultCarrier || '' }),
+    });
     res.files.push({ tpl: 'TraoDoi', name: 'TraoDoi_' + monthCode(per) + '.docx', data: ctx });
     res.excel = {
-      kind: 'A', fileName: 'BangChiTietCanHang_TraoDoi_Thang_' + monthCode(per) + '.xlsx',
+      kind: 'A',
+      fileName: 'BangChiTietCanHang_TraoDoi_Thang_' + monthCode(per) + '.xlsx',
       title: 'PHỤ LỤC — BẢNG CHI TIẾT CÂN HÀNG LÔ HÀNG TRAO ĐỔI — THÁNG ' + per.periodMonth + '/' + per.periodYear,
-      lines: [String(p.contractNo || '').trim() ? '(Kèm theo Hợp đồng trao đổi số: ' + p.contractNo + ' giữa ' + giao.name + ' và ' + nhan.name + ')' : '',
-        'Đơn vị giao: ' + giao.name + ' (' + giao.short + ')  —  Bàn cân xuất: ' + kg.name + '  —  Nơi giao hàng: ' + kn.name],
+      lines: [
+        String(p.contractNo || '').trim()
+          ? '(Kèm theo Hợp đồng trao đổi số: ' + p.contractNo + ' giữa ' + giao.name + ' và ' + nhan.name + ')'
+          : '',
+        'Đơn vị giao: ' + giao.name + ' (' + giao.short + ')  —  Bàn cân xuất: ' + kg.name + '  —  Nơi giao hàng: ' + kn.name,
+      ],
       totalLabel: 'TỔNG CỘNG THÁNG ' + per.periodMonth + '/' + per.periodYear + ':',
-      rows: excelRows(rows, { defaultCarrier: p.defaultCarrier || '' }),           // giữ SỐ PHIẾU GỐC (không đánh lại n/MMYYYY/TĐ)
-      sign: { left: { title: 'ĐẠI DIỆN BÊN GIAO', org: giao.name }, right: { title: 'ĐẠI DIỆN BÊN NHẬN', org: nhan.name } }
+      rows: excelRows(rows, { defaultCarrier: p.defaultCarrier || '' }), // giữ SỐ PHIẾU GỐC (không đánh lại n/MMYYYY/TĐ)
+      sign: { left: { title: 'ĐẠI DIỆN BÊN GIAO', org: giao.name }, right: { title: 'ĐẠI DIỆN BÊN NHẬN', org: nhan.name } },
     };
-    res.summary = { 'Số phiếu': sum.trips, 'Khối lượng': ctx.weight + ' tấn', 'Thời gian': sum.from + ' → ' + sum.to, 'Giao → nhận': giao.short + ' → ' + nhan.short };
+    res.summary = {
+      'Số phiếu': sum.trips,
+      'Khối lượng': ctx.weight + ' tấn',
+      'Thời gian': sum.from + ' → ' + sum.to,
+      'Giao → nhận': giao.short + ' → ' + nhan.short,
+    };
     return res;
   }
 
@@ -498,11 +674,18 @@
     rows.forEach((r) => {
       const k = r.dateStr || '(không rõ ngày)';
       let d = map.get(k);
-      if (!d) { d = { date: k, ts: r.ts1 === null ? Infinity : r.ts1, trips: 0, kg: 0, retKg: 0 }; map.set(k, d); }
-      d.trips++; d.kg += r.net; if (retSet.has(retKey(r))) d.retKg += r.net;
+      if (!d) {
+        d = { date: k, ts: r.ts1 === null ? Infinity : r.ts1, trips: 0, kg: 0, retKg: 0 };
+        map.set(k, d);
+      }
+      d.trips++;
+      d.kg += r.net;
+      if (retSet.has(retKey(r))) d.retKg += r.net;
       if (r.ts1 !== null && r.ts1 < d.ts) d.ts = r.ts1;
     });
-    return Array.from(map.values()).sort((a, b) => a.ts - b.ts).map((d) => ({ date: d.date, trips: d.trips, kg: d.kg, retKg: d.retKg, delKg: d.kg - d.retKg }));
+    return Array.from(map.values())
+      .sort((a, b) => a.ts - b.ts)
+      .map((d) => ({ date: d.date, trips: d.trips, kg: d.kg, retKg: d.retKg, delKg: d.kg - d.retKg }));
   }
   function buildXuatKhau(ds, p) {
     const res = newRes();
@@ -512,35 +695,56 @@
     if (res.errors.length) return res;
     const sum = summarize(rows);
     const giao = HAK.Config.company(p.giaoId);
-    const kg = HAK.Config.warehouse(p.khoGiaoId), kn = HAK.Config.warehouse(p.khoNhanId);
+    const kg = HAK.Config.warehouse(p.khoGiaoId),
+      kn = HAK.Config.warehouse(p.khoNhanId);
     const { retRows, retKg, deliveredKg } = returnedInfo(rows, p, sum);
     const per = period(sum, p.period);
     const days = dailyRows(rows, new Set(retRows.map(retKey)));
-    const ctx = Object.assign(
-      commonCtx(giao, giao, kg, kn, sum, per, p.docDate, 'chủ sở hữu hàng hóa', ''),
-      totals(rows, sum),
-      {
-        ship: String(p.ship).trim().toUpperCase(),
-        weightScaleTon: fmtTon(sum.kg), weightScaleKg: fmtInt(sum.kg),
-        returnedText: retRows.length ? fmtTon(retKg) + ' tấn (' + retRows.length + ' xe)' : 'Không có xe trả về',
-        returnedTon: fmtTon(retKg), returnedKg: fmtInt(retKg), returnedTrip: String(retRows.length),
-        weightDelivered: fmtTon(deliveredKg), weightDeliveredKg: fmtInt(deliveredKg),
-        days: days.map((d, i) => ({ stt: String(i + 1), date: d.date, trips: String(d.trips), kg: fmtInt(d.kg), retKg: d.retKg ? fmtInt(d.retKg) : '—', delKg: fmtInt(d.delKg) })),
-        table: detailRows(rows, { defaultWh: kg.short }),
-        returned: detailRows(retRows, { defaultWh: kg.short }), hasReturned: retRows.length > 0
-      });
+    const ctx = Object.assign(commonCtx(giao, giao, kg, kn, sum, per, p.docDate, 'chủ sở hữu hàng hóa', ''), totals(rows, sum), {
+      ship: String(p.ship).trim().toUpperCase(),
+      weightScaleTon: fmtTon(sum.kg),
+      weightScaleKg: fmtInt(sum.kg),
+      returnedText: retRows.length ? fmtTon(retKg) + ' tấn (' + retRows.length + ' xe)' : 'Không có xe trả về',
+      returnedTon: fmtTon(retKg),
+      returnedKg: fmtInt(retKg),
+      returnedTrip: String(retRows.length),
+      weightDelivered: fmtTon(deliveredKg),
+      weightDeliveredKg: fmtInt(deliveredKg),
+      days: days.map((d, i) => ({
+        stt: String(i + 1),
+        date: d.date,
+        trips: String(d.trips),
+        kg: fmtInt(d.kg),
+        retKg: d.retKg ? fmtInt(d.retKg) : '—',
+        delKg: fmtInt(d.delKg),
+      })),
+      table: detailRows(rows, { defaultWh: kg.short }),
+      returned: detailRows(retRows, { defaultWh: kg.short }),
+      hasReturned: retRows.length > 0,
+    });
     res.files.push({ tpl: 'XuatKhau', name: 'XuatKhau_' + slug(ctx.ship) + '.docx', data: ctx });
     res.excel = {
-      kind: 'B', fileName: 'PhieuCan_XuatKhau_' + slug(ctx.ship) + '_' + slug(giao.short) + '.xlsx',
+      kind: 'B',
+      fileName: 'PhieuCan_XuatKhau_' + slug(ctx.ship) + '_' + slug(giao.short) + '.xlsx',
       title: 'BẢNG TỔNG HỢP HÀNG XUẤT KHẨU QUA CÂN - ' + ctx.ship,
       station: 'Trạm cân: ' + kg.short,
-      note: giao.short + ' xuất khẩu, hàng nạp lên tàu tại ' + kn.short + (retRows.length ? '; trong đó xe trả về ' + retRows.length + ' xe (' + ctx.returnedTon + ' tấn)' : '') + '.',
-      rows: excelRows(rows, { defaultWh: kg.short }), daily: days
+      note:
+        giao.short +
+        ' xuất khẩu, hàng nạp lên tàu tại ' +
+        kn.short +
+        (retRows.length ? '; trong đó xe trả về ' + retRows.length + ' xe (' + ctx.returnedTon + ' tấn)' : '') +
+        '.',
+      rows: excelRows(rows, { defaultWh: kg.short }),
+      daily: days,
     };
     res.summary = {
-      'Tàu': ctx.ship, 'Đơn vị xuất khẩu': giao.short, 'Thời gian xuất hàng': sum.from + ' → ' + sum.to,
-      'Kho xuất → cảng': kg.short + ' → ' + kn.short, 'Khối lượng qua cân': ctx.weightScaleTon + ' tấn (' + sum.trips + ' xe)',
-      'Xe trả về': retRows.length ? ctx.returnedTon + ' tấn (' + retRows.length + ' xe)' : 'Không có', 'Thực xuất': ctx.weightDelivered + ' tấn'
+      Tàu: ctx.ship,
+      'Đơn vị xuất khẩu': giao.short,
+      'Thời gian xuất hàng': sum.from + ' → ' + sum.to,
+      'Kho xuất → cảng': kg.short + ' → ' + kn.short,
+      'Khối lượng qua cân': ctx.weightScaleTon + ' tấn (' + sum.trips + ' xe)',
+      'Xe trả về': retRows.length ? ctx.returnedTon + ' tấn (' + retRows.length + ' xe)' : 'Không có',
+      'Thực xuất': ctx.weightDelivered + ' tấn',
     };
     return res;
   }
@@ -551,21 +755,37 @@
     n = Math.round(n);
     if (!(n > 0)) return 'Không đồng';
     const dg = ['không', 'một', 'hai', 'ba', 'bốn', 'năm', 'sáu', 'bảy', 'tám', 'chín'];
-    const three = (x, full) => {                       // full: có nhóm cao hơn → đọc "không trăm" / "lẻ"
-      const h = Math.floor(x / 100), t = Math.floor(x / 10) % 10, u = x % 10;
-      let s = (h > 0 || full) ? dg[h] + ' trăm' : '';
-      if (t > 1) { s += ' ' + dg[t] + ' mươi'; s += u === 1 ? ' mốt' : u === 4 ? ' tư' : u === 5 ? ' lăm' : u > 0 ? ' ' + dg[u] : ''; }
-      else if (t === 1) { s += ' mười'; s += u === 5 ? ' lăm' : u > 0 ? ' ' + dg[u] : ''; }
-      else if (u > 0) { s += ((h > 0 || full) ? ' lẻ ' : ' ') + dg[u]; }
+    const three = (x, full) => {
+      // full: có nhóm cao hơn → đọc "không trăm" / "lẻ"
+      const h = Math.floor(x / 100),
+        t = Math.floor(x / 10) % 10,
+        u = x % 10;
+      let s = h > 0 || full ? dg[h] + ' trăm' : '';
+      if (t > 1) {
+        s += ' ' + dg[t] + ' mươi';
+        s += u === 1 ? ' mốt' : u === 4 ? ' tư' : u === 5 ? ' lăm' : u > 0 ? ' ' + dg[u] : '';
+      } else if (t === 1) {
+        s += ' mười';
+        s += u === 5 ? ' lăm' : u > 0 ? ' ' + dg[u] : '';
+      } else if (u > 0) {
+        s += (h > 0 || full ? ' lẻ ' : ' ') + dg[u];
+      }
       return s.trim();
     };
     const under1e9 = (x, higher) => {
-      const g = [x % 1000, Math.floor(x / 1000) % 1000, Math.floor(x / 1e6)], nm = ['', 'nghìn', 'triệu'], out = [];
+      const g = [x % 1000, Math.floor(x / 1000) % 1000, Math.floor(x / 1e6)],
+        nm = ['', 'nghìn', 'triệu'],
+        out = [];
       let hi = higher;
-      for (let i = 2; i >= 0; i--) if (g[i] > 0) { out.push(three(g[i], hi) + (nm[i] ? ' ' + nm[i] : '')); hi = true; }
+      for (let i = 2; i >= 0; i--)
+        if (g[i] > 0) {
+          out.push(three(g[i], hi) + (nm[i] ? ' ' + nm[i] : ''));
+          hi = true;
+        }
       return out.join(' ');
     };
-    const b = Math.floor(n / 1e9), r = n % 1e9;
+    const b = Math.floor(n / 1e9),
+      r = n % 1e9;
     let s = '';
     if (b > 0) s = (b >= 1e9 ? vnMoneyWords(b).replace(/ đồng chẵn$/, '') : under1e9(b, false)) + ' tỷ';
     if (r > 0) s += (s ? ' ' : '') + under1e9(r, b > 0);
@@ -577,9 +797,11 @@
     if (!need(res, rows)) return res;
     if (!String(p.contractNo || '').trim()) res.warnings.push('Chưa nhập số hợp đồng mua bán — sẽ để trống để điền tay.');
     const sum = summarize(rows);
-    const giao = HAK.Config.company(p.giaoId), nhan = HAK.Config.company(p.nhanId);
+    const giao = HAK.Config.company(p.giaoId),
+      nhan = HAK.Config.company(p.nhanId);
     if (giao.id === nhan.id) res.warnings.push('Bên bán và bên mua đang là cùng một công ty.');
-    const kg = HAK.Config.warehouse(p.khoGiaoId), kn = HAK.Config.warehouse(p.khoNhanId);
+    const kg = HAK.Config.warehouse(p.khoGiaoId),
+      kn = HAK.Config.warehouse(p.khoNhanId);
     const per = period(sum, p.period);
     // ---- đơn giá / thành tiền: tấn (2 số lẻ như in trong biên bản) × đơn giá ----
     const price = String(p.unitPrice || '').trim() === '' ? null : U().parseNum(p.unitPrice);
@@ -587,55 +809,105 @@
     if (res.errors.length) return res;
     const tons = Math.round(sum.kg / 10) / 100;
     const amount = price !== null ? Math.round(tons * price) : null;
-    const ctx = Object.assign(
-      commonCtx(giao, nhan, kg, kn, sum, per, p.docDate, 'bên bán', 'bên mua'),
-      totals(rows, sum),
-      {
-        contractNo: orBlank(p.contractNo),
-        hasPrice: amount !== null, unitPrice: price !== null ? fmtDec(price, price % 1 ? 2 : 0) : '',
-        amount: amount !== null ? fmtInt(amount) : '', amountWords: amount !== null ? vnMoneyWords(amount) : '',
-        priceNote: String(p.priceNote || '').trim() ? ' (' + String(p.priceNote).trim() + ')' : '',
-        table: detailRows(rows, { defaultCarrier: p.defaultCarrier || '' })            // giữ SỐ PHIẾU GỐC
-      });
+    const ctx = Object.assign(commonCtx(giao, nhan, kg, kn, sum, per, p.docDate, 'bên bán', 'bên mua'), totals(rows, sum), {
+      contractNo: orBlank(p.contractNo),
+      hasPrice: amount !== null,
+      unitPrice: price !== null ? fmtDec(price, price % 1 ? 2 : 0) : '',
+      amount: amount !== null ? fmtInt(amount) : '',
+      amountWords: amount !== null ? vnMoneyWords(amount) : '',
+      priceNote: String(p.priceNote || '').trim() ? ' (' + String(p.priceNote).trim() + ')' : '',
+      table: detailRows(rows, { defaultCarrier: p.defaultCarrier || '' }), // giữ SỐ PHIẾU GỐC
+    });
     res.files.push({ tpl: 'XuatBan', name: 'XuatBan_' + monthCode(per) + '.docx', data: ctx });
     const mm = per.periodMonth + '/' + per.periodYear;
     res.excel = {
-      kind: 'A', fileName: 'BangChiTietCanHang_XuatBan_Thang_' + monthCode(per) + '.xlsx',
+      kind: 'A',
+      fileName: 'BangChiTietCanHang_XuatBan_Thang_' + monthCode(per) + '.xlsx',
       title: 'BIÊN BẢN GIAO NHẬN HÀNG HÓA — BẢNG CHI TIẾT CÂN HÀNG XUẤT BÁN — THÁNG ' + mm,
-      lines: [String(p.contractNo || '').trim() ? '(Theo Hợp đồng mua bán số: ' + p.contractNo + ' giữa ' + giao.name + ' (Bên bán) và ' + nhan.name + ' (Bên mua))' : '',
-        'Bên bán: ' + giao.name + ' (' + giao.short + ')  —  Bên mua: ' + nhan.name + '  —  Bàn cân xuất: ' + kg.name + '  —  Nơi giao hàng: ' + kn.name,
-        amount !== null ? 'Đơn giá: ' + ctx.unitPrice + ' đồng/tấn  —  Thành tiền: ' + ctx.amount + ' đồng' + ctx.priceNote + '. Bằng chữ: ' + ctx.amountWords + '.' : ''],
+      lines: [
+        String(p.contractNo || '').trim()
+          ? '(Theo Hợp đồng mua bán số: ' + p.contractNo + ' giữa ' + giao.name + ' (Bên bán) và ' + nhan.name + ' (Bên mua))'
+          : '',
+        'Bên bán: ' +
+          giao.name +
+          ' (' +
+          giao.short +
+          ')  —  Bên mua: ' +
+          nhan.name +
+          '  —  Bàn cân xuất: ' +
+          kg.name +
+          '  —  Nơi giao hàng: ' +
+          kn.name,
+        amount !== null
+          ? 'Đơn giá: ' +
+            ctx.unitPrice +
+            ' đồng/tấn  —  Thành tiền: ' +
+            ctx.amount +
+            ' đồng' +
+            ctx.priceNote +
+            '. Bằng chữ: ' +
+            ctx.amountWords +
+            '.'
+          : '',
+      ],
       totalLabel: 'TỔNG CỘNG THÁNG ' + mm + ':',
       rows: excelRows(rows, { defaultCarrier: p.defaultCarrier || '' }),
-      sign: { left: { title: 'ĐẠI DIỆN BÊN BÁN', org: giao.name }, right: { title: 'ĐẠI DIỆN BÊN MUA', org: nhan.name } }
+      sign: { left: { title: 'ĐẠI DIỆN BÊN BÁN', org: giao.name }, right: { title: 'ĐẠI DIỆN BÊN MUA', org: nhan.name } },
     };
-    res.summary = { 'Số phiếu': sum.trips, 'Khối lượng': ctx.weight + ' tấn', 'Thời gian': sum.from + ' → ' + sum.to, 'Bán → mua': giao.short + ' → ' + nhan.short };
+    res.summary = {
+      'Số phiếu': sum.trips,
+      'Khối lượng': ctx.weight + ' tấn',
+      'Thời gian': sum.from + ' → ' + sum.to,
+      'Bán → mua': giao.short + ' → ' + nhan.short,
+    };
     if (amount !== null) res.summary['Thành tiền'] = ctx.amount + ' đồng';
     return res;
   }
 
-  const BUILDERS = { guikho: buildGuiKho, xuatkhogui: buildXuatKhoGui, xuatkhau: buildXuatKhau, uythac: buildUyThac, dieuchuyen: buildDieuChuyen, traodoi: buildTraoDoi, xuatban: buildXuatBan };
+  const BUILDERS = {
+    guikho: buildGuiKho,
+    xuatkhogui: buildXuatKhoGui,
+    xuatkhau: buildXuatKhau,
+    uythac: buildUyThac,
+    dieuchuyen: buildDieuChuyen,
+    traodoi: buildTraoDoi,
+    xuatban: buildXuatBan,
+  };
 
   HAK.Generator = {
-    fmtInt, fmtDec, fmtTon, fmtTonRound, isoToVN, slug, vnMoneyWords,
-    filterSplitText, filterRows, summarize, plateRows, detailRows, retKey, omitKey,
+    fmtInt,
+    fmtDec,
+    fmtTon,
+    fmtTonRound,
+    isoToVN,
+    slug,
+    vnMoneyWords,
+    filterSplitText,
+    filterRows,
+    summarize,
+    plateRows,
+    detailRows,
+    retKey,
+    omitKey,
     build(type, ds, params) {
-      if (!ds || !ds.ok) return { files: [], summary: {}, warnings: [], errors: ['Chưa có dữ liệu Excel hợp lệ. Hãy thêm file ở mục "Nhập liệu".'] };
+      if (!ds || !ds.ok)
+        return { files: [], summary: {}, warnings: [], errors: ['Chưa có dữ liệu Excel hợp lệ. Hãy thêm file ở mục "Nhập liệu".'] };
       const res = BUILDERS[type](ds, params);
       if (params.filter && params.filter.smart && HAK.Filters && res.excel) {
         const scope = 'Phạm vi: ' + HAK.Filters.core.scopeText(HAK.Filters.tripConfig(), params.filter.smart);
-        if(res.excel.kind === 'A') res.excel.lines = (res.excel.lines || []).concat(scope);
+        if (res.excel.kind === 'A') res.excel.lines = (res.excel.lines || []).concat(scope);
         else res.excel.note = (res.excel.note ? res.excel.note + ' · ' : '') + scope;
         res.summary['Phạm vi lọc'] = scope;
       }
       const split = filterSplitText(params.filter);
-      if (split && res.excel) {                                         // tách phiếu cân trong cùng ngày (1 ngày 2 tàu): ghi rõ trên bản xuất + tóm tắt hồ sơ
+      if (split && res.excel) {
+        // tách phiếu cân trong cùng ngày (1 ngày 2 tàu): ghi rõ trên bản xuất + tóm tắt hồ sơ
         const t = 'Tách phiếu trong ngày: ' + split;
         if (res.excel.kind === 'A') res.excel.lines = (res.excel.lines || []).concat(t);
         else res.excel.note = (res.excel.note ? res.excel.note + ' · ' : '') + t;
       }
       if (split) res.summary['Tách phiếu trong ngày'] = split;
       return res;
-    }
+    },
   };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -1,3 +1,48 @@
-const globals=require('globals');
-module.exports=[{files:['**/*.js'],languageOptions:{ecmaVersion:2022,sourceType:'script',globals:{...globals.browser,bootstrap:'readonly',ExcelJS:'readonly',XLSX:'readonly',docx:'readonly',JSZip:'readonly',PizZip:'readonly',saveAs:'readonly',module:'readonly',jspdf:'readonly',require:'readonly',Buffer:'readonly',docxtemplater:'readonly'}},
-rules:{'no-undef':'error','no-unused-vars':['warn',{args:'none',caughtErrors:'none'}],'no-dupe-keys':'error','no-redeclare':'error','no-unreachable':'error','no-self-assign':'warn','no-empty':['warn',{allowEmptyCatch:true}],'eqeqeq':['off'],'no-prototype-builtins':'off','no-cond-assign':'warn','no-fallthrough':'warn','no-useless-escape':'off','no-inner-declarations':'off','no-constant-condition':['warn',{checkLoops:false}],'no-shadow-restricted-names':'error','use-isnan':'error','valid-typeof':'error','no-sparse-arrays':'warn','no-loss-of-precision':'error','no-async-promise-executor':'warn','require-atomic-updates':'off'}}];
+const globals = require('globals');
+module.exports = [
+  {
+    files: ['**/*.js'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'script',
+      globals: {
+        ...globals.browser,
+        bootstrap: 'readonly',
+        ExcelJS: 'readonly',
+        XLSX: 'readonly',
+        docx: 'readonly',
+        JSZip: 'readonly',
+        PizZip: 'readonly',
+        saveAs: 'readonly',
+        module: 'readonly',
+        jspdf: 'readonly',
+        require: 'readonly',
+        Buffer: 'readonly',
+        docxtemplater: 'readonly',
+      },
+    },
+    rules: {
+      'no-undef': 'error',
+      'no-unused-vars': ['warn', { args: 'none', caughtErrors: 'none' }],
+      'no-dupe-keys': 'error',
+      'no-redeclare': 'error',
+      'no-unreachable': 'error',
+      'no-self-assign': 'warn',
+      'no-empty': ['warn', { allowEmptyCatch: true }],
+      eqeqeq: ['off'],
+      'no-prototype-builtins': 'off',
+      'no-cond-assign': 'warn',
+      'no-fallthrough': 'warn',
+      'no-useless-escape': 'off',
+      'no-inner-declarations': 'off',
+      'no-constant-condition': ['warn', { checkLoops: false }],
+      'no-shadow-restricted-names': 'error',
+      'use-isnan': 'error',
+      'valid-typeof': 'error',
+      'no-sparse-arrays': 'warn',
+      'no-loss-of-precision': 'error',
+      'no-async-promise-executor': 'warn',
+      'require-atomic-updates': 'off',
+    },
+  },
+];

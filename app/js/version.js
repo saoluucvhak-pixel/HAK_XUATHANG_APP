@@ -8,10 +8,13 @@
   HAK.VERSION = '2.19.6';
   function paint() {
     if (!root.document) return;
-    root.document.querySelectorAll('[data-hak-version]').forEach((el) => { el.textContent = 'v' + HAK.VERSION; });
+    root.document.querySelectorAll('[data-hak-version]').forEach((el) => {
+      el.textContent = 'v' + HAK.VERSION;
+    });
   }
   if (root.document) {
-    if (root.document.readyState === 'loading') root.document.addEventListener('DOMContentLoaded', paint); else paint();
+    if (root.document.readyState === 'loading') root.document.addEventListener('DOMContentLoaded', paint);
+    else paint();
   }
   if (typeof module !== 'undefined' && module.exports) module.exports = HAK.VERSION;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -1,69 +1,426 @@
-const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),crypto=require('node:crypto');
-const M=require('../app/js/yearbook.js'),C=require('../app/js/year-close.js');
-const row=y=>({net:100,ts1:Date.UTC(y,0,1)}),rec=(id,y)=>({id,type:'xuatkhau',year:y,revision:1,params:{ship:'QA'},rows:[row(y)],updatedAt:1});
-function database(seed){const maps={kv:new Map([['hak.yearbook.v1',{val:structuredClone(seed)}]]),batches:new Map(),batchdata:new Map()};let fail=false;return {maps,setFail(){fail=true;},clearFail(){fail=false;},transaction(stores,mode){const names=Array.isArray(stores)?stores:[stores],local=Object.fromEntries(names.map(n=>[n,new Map([...maps[n]].map(([k,v])=>[k,structuredClone(v)]))]));let pending=0,finished=false;const tx={abort(){if(finished)return;finished=true;queueMicrotask(()=>tx.onabort&&tx.onabort());},objectStore(name){return {get(key){const q={};pending++;queueMicrotask(()=>{if(finished)return;q.result=structuredClone(local[name].get(key));pending--;if(q.onsuccess)q.onsuccess();check();});return q;},put(value,key){if(fail){tx.abort();return;}local[name].set(key===undefined?value.key||value.id:key,structuredClone(value));check();},delete(key){if(fail){tx.abort();return;}local[name].delete(key);check();}}}};function check(){queueMicrotask(()=>{if(finished||pending)return;finished=true;if(mode==='readwrite')for(const n of names)maps[n]=local[n];if(tx.oncomplete)tx.oncomplete();});}return tx;}};}
-function harness(options={}){const initial={v:1,revision:1,records:[rec('closed',2025),rec('keep',2026)]},db=database(initial);const batch={id:'xuatkhau|old.xlsx',type:'xuatkhau',fileName:'old.xlsx',updatedAt:1};db.maps.batches.set(batch.id,batch);db.maps.batchdata.set(batch.id,new Uint8Array([1,2,3]).buffer);let savedBlob,archiveRemoved=false,released=false;const events=[];const Y={yearOf:M.yearOf,validateBundle:xs=>M.merge(M.empty(),xs),read:async()=>structuredClone(db.maps.kv.get('hak.yearbook.v1').val),commit:async(expected,change)=>{const state=await Y.read();if(state.revision!==expected)throw Error('stale');const next=change(state);next.revision++;db.maps.kv.set('hak.yearbook.v1',{val:next});events.push('prepare');return next;},release(){released=true;}};const window={crypto:crypto.webcrypto,JSZip:class{file(name,text){this.text=text;}async generateAsync(){return new Blob([this.text]);}},confirm:()=>true,HAK:{Yearbook:Y,DB:{open:async()=>db,getAll:async store=>[...db.maps[store].values()],get:async(store,id)=>db.maps[store].get(id)},App:{slots:{xuatkhau:{batches:[{fileName:batch.fileName,ds:{ok:true,rows:[row(2025)]}}]}}},Config:{data:{companies:[],warehouses:[]}},Auth:{isAdmin:()=>true,scopeIds:()=>null},Archive:{list:async()=>[],collectItems:async()=>[],closeVerified:async()=>{events.push('prune-archive');archiveRemoved=true;},decode:async text=>JSON.parse(text)},Backup:{readJson:async file=>JSON.parse(await file.text())},Word:{Files:{saveBlob:async blob=>{events.push('save');savedBlob=blob;return options.cancel?false:'C:/year.zip';}}}}};const ctx={window,console,Blob,Uint8Array,btoa,Date,Set,JSON,Error,Number,fetch:async()=>{events.push('verify');if(options.mutate)db.maps.batches.set(batch.id,{...batch,updatedAt:2});if(options.fail)db.setFail();return {ok:true,json:async()=>({sha256:options.corrupt?'wrong':crypto.createHash('sha256').update(Buffer.from(await savedBlob.arrayBuffer())).digest('hex'),size:savedBlob.size})};}};vm.createContext(ctx);vm.runInContext(fs.readFileSync(require.resolve('../app/js/year-close.js'),'utf8'),ctx);return {C:window.HAK.YearClose,Y,db,window,events,get released(){return released;},get savedBlob(){return savedBlob;}};}
-test('only batches wholly within the selected year are eligible',()=>{assert.equal(C.exclusive([row(2025)],2025),true);for(const rows of [[],[row(2025),row(2026)],[{ts1:null}],[{ts1:NaN}]])assert.equal(C.exclusive(rows,2025),false);});
-test('close saves and verifies first, then removes only selected records and original batch bytes',async()=>{const h=harness();const result=await h.C.closeYear(2025,()=>true);assert.equal(result.records,1);const state=await h.Y.read();assert.deepEqual(state.records.map(r=>r.id),['keep']);assert.equal(state.closed[0].pending,false);assert.equal(h.db.maps.batches.size,0);assert.equal(h.db.maps.batchdata.size,0);assert.deepEqual(h.events.slice(0,3),['save','verify','prepare']);assert.equal(h.released,true);const view=await h.C.readFile(h.savedBlob,state.closed[0]);assert.equal(view.year,2025);assert.equal(view.records[0].rows[0].net,100);assert.equal(view.batches[0].b64,'AQID');assert.equal((await h.Y.read()).records.length,1);});
-test('canceling Save As or final cleanup confirmation preserves active data',async()=>{for(const options of [{cancel:true},{}]){const h=harness(options),before=JSON.stringify(await h.Y.read());await h.C.closeYear(2025,()=>false);assert.equal(JSON.stringify(await h.Y.read()),before);assert.equal(h.db.maps.batches.size,1);assert.equal(h.released,false);assert.ok(!h.events.includes('prepare'));}});
-test('wrong file checksum never prepares or prunes data',async()=>{const h=harness({corrupt:true});await assert.rejects(h.C.closeYear(2025,()=>true),/không khớp/);assert.equal((await h.Y.read()).records.length,2);assert.ok(!h.events.includes('prepare'));assert.equal(h.db.maps.batches.size,1);});
-test('changed batch or failed transaction keeps both batch and year records, with verified recovery receipt',async()=>{for(const options of [{mutate:true},{fail:true}]){const h=harness(options);await assert.rejects(h.C.closeYear(2025,()=>true));const s=await h.Y.read();assert.equal(s.records.length,2);assert.equal(s.closed[0].pending,true);assert.equal(h.db.maps.batches.size,1);assert.equal(h.db.maps.batchdata.size,1);assert.equal(h.released,false);assert.ok(h.savedBlob.size>0);}});
-test('viewing a closed file does not import or change any active data and rejects wrong file',async()=>{const h=harness(),before=JSON.stringify(await h.Y.read());const file=new Blob([JSON.stringify({app:'hak-yearbook',v:2,year:2024,records:[rec('offline',2024)],batches:[],archive:[]})]);const view=await h.C.readFile(file);assert.equal(view.year,2024);assert.equal(JSON.stringify(await h.Y.read()),before);await assert.rejects(h.C.readFile(file,{sha256:'wrong'}),/không khớp/);});
-test('restricted account cannot close data outside its company scope',async()=>{const h=harness();h.window.HAK.Auth.scopeIds=()=>['limited'];await assert.rejects(h.C.closeYear(2025,()=>true),/Quản trị/);assert.equal(h.events.length,0);});
-
-test('actual ZIP closes and reopens one year without importing its rows into the live store',async()=>{const h=harness(),Zip=require('../app/libs/jszip.min.js');h.window.JSZip=Zip;h.window.HAK.Backup.readJson=async file=>{const z=await Zip.loadAsync(Buffer.from(await file.arrayBuffer()));return JSON.parse(await z.file('HoSoNam.json').async('string'));};await h.C.closeYear(2025,()=>true);const before=JSON.stringify(await h.Y.read());const offline=await h.C.readFile(h.savedBlob,(await h.Y.read()).closed[0]);assert.equal(offline.records[0].year,2025);assert.equal(offline.records[0].rows[0].net,100);assert.equal(JSON.stringify(await h.Y.read()),before);});
-
-test('legacy archive cleanup checks saved metadata and bytes and aborts atomically on a stale entry',async()=>{for(const stale of [false,true]){const db=database(M.empty());db.maps.meta=new Map([['a',{id:'a',updatedAt:1}],['b',{id:'b',updatedAt:2}]]);db.maps.data=new Map([['a','AAA'],['b','BBB']]);const window={HAK:{},indexedDB:{open:()=>{const q={};queueMicrotask(()=>{q.result=db;q.onsuccess();});return q;}}};const ctx={window,document:{getElementById:()=>null},console,Map,Date,JSON,Math,Uint8Array,Set};vm.createContext(ctx);vm.runInContext(fs.readFileSync(require.resolve('../app/js/archive.js'),'utf8'),ctx);const items=[{meta:{id:'a',updatedAt:1},data:'AAA'},{meta:{id:'b',updatedAt:stale?1:2},data:'BBB'}];if(stale){await assert.rejects(window.HAK.Archive.closeVerified(items),/thay đổi/);assert.equal(db.maps.meta.size,2);assert.equal(db.maps.data.size,2);}else{await window.HAK.Archive.closeVerified(items);assert.equal(db.maps.meta.size,0);assert.equal(db.maps.data.size,0);}}});
-
-test('đóng năm bị gián đoạn giữa bước dọn kho: mở lại, chọn đúng ZIP → dọn tiếp, số liệu khớp; chạy lại không đổi gì',async()=>{
-  const h=harness({fail:true});await assert.rejects(h.C.closeYear(2025,()=>true));
-  let s=await h.Y.read();assert.equal(s.closed.length,1);assert.equal(s.closed[0].pending,true);assert.equal(s.records.length,2,'chưa dọn: hồ sơ vẫn còn');assert.equal(h.db.maps.batches.size,1);
-  assert.equal(JSON.stringify((await h.C.pendingYears()).map(x=>x.year)),'[2025]');
-  h.db.clearFail();                                                    // sự cố đã hết (đóng rồi mở lại app)
-  const res=await h.C.resumeClose(2025,h.savedBlob);
-  assert.equal(res.resumed,true);assert.equal(res.records,1);assert.equal(res.batches,1);assert.equal(res.expected.records,1);assert.equal(res.expected.batches,1);
-  s=await h.Y.read();assert.equal(JSON.stringify(s.records.map(r=>r.id)),'["keep"]');assert.equal(s.closed.length,1);assert.equal(s.closed[0].pending,false);assert.equal(s.closed[0].count,1);assert.equal(h.db.maps.batches.size,0);assert.equal(h.db.maps.batchdata.size,0);
-  assert.equal(JSON.stringify(await h.C.resumeClose(2025,h.savedBlob)),'{"nothing":true}');
-});
-test('tiếp tục đóng năm: sai file ZIP bị từ chối; hồ sơ ĐÃ SỬA sau khi đóng dở → báo cần đối chiếu, KHÔNG dọn',async()=>{
-  const h=harness({fail:true});await assert.rejects(h.C.closeYear(2025,()=>true));h.db.clearFail();
-  await assert.rejects(h.C.resumeClose(2025,new Blob(['khác'])),/không khớp/);
-  await assert.rejects(h.C.resumeClose(2025),/Chọn lại đúng file ZIP/);
-  const st=h.db.maps.kv.get('hak.yearbook.v1').val;st.records.find(r=>r.id==='closed').revision=2;st.records.find(r=>r.id==='closed').params={ship:'SỬA SAU'};
-  const r=await h.C.resumeClose(2025,h.savedBlob);
-  assert.equal(r.needsReview,true);assert.equal(JSON.stringify(r.diffs.changedRecords.map(x=>x.id)),'["closed"]');assert.equal(r.diffs.changedRecords[0].zipRevision,1);assert.equal(r.diffs.changedRecords[0].liveRevision,2);
-  const s=await h.Y.read();assert.equal(s.records.length,2);assert.equal(s.closed[0].pending,true);assert.equal(h.db.maps.batches.size,1);
-});
-test('tiếp tục đóng năm: hồ sơ mới thêm sau khi đóng dở được giữ lại và báo; hồ sơ đã có trong ZIP được dọn',async()=>{
-  const h=harness({fail:true});await assert.rejects(h.C.closeYear(2025,()=>true));h.db.clearFail();
-  const st=h.db.maps.kv.get('hak.yearbook.v1').val;st.records.push(rec('them-moi',2025));
-  const r=await h.C.resumeClose(2025,h.savedBlob);assert.equal(r.resumed,true);assert.equal(JSON.stringify(r.leftover.records.map(x=>x.id)),'["them-moi"]');
-  assert.equal(JSON.stringify((await h.Y.read()).records.map(x=>x.id).sort()),'["keep","them-moi"]');
-});
-async function twoPending(){
-  const h=harness({fail:true});await assert.rejects(h.C.closeYear(2025,()=>true));const blob1=h.savedBlob;
-  const st=h.db.maps.kv.get('hak.yearbook.v1').val;st.records.push(rec('them',2025));       // dữ liệu khác → ZIP lần 2 có SHA-256 khác
-  await assert.rejects(h.C.closeYear(2025,()=>true));const blob2=h.savedBlob;h.db.clearFail();
-  const pend=(await h.Y.read()).closed.filter(c=>c.pending);assert.equal(pend.length,2);assert.notEqual(pend[0].sha256,pend[1].sha256);
-  return {h,blob1,blob2,sha1:pend[0].sha256,sha2:pend[1].sha256};
+const test = require('node:test'),
+  assert = require('node:assert/strict'),
+  vm = require('node:vm'),
+  fs = require('node:fs'),
+  crypto = require('node:crypto');
+const M = require('../app/js/yearbook.js'),
+  C = require('../app/js/year-close.js');
+const row = (y) => ({ net: 100, ts1: Date.UTC(y, 0, 1) }),
+  rec = (id, y) => ({ id, type: 'xuatkhau', year: y, revision: 1, params: { ship: 'QA' }, rows: [row(y)], updatedAt: 1 });
+function database(seed) {
+  const maps = { kv: new Map([['hak.yearbook.v1', { val: structuredClone(seed) }]]), batches: new Map(), batchdata: new Map() };
+  let fail = false;
+  return {
+    maps,
+    setFail() {
+      fail = true;
+    },
+    clearFail() {
+      fail = false;
+    },
+    transaction(stores, mode) {
+      const names = Array.isArray(stores) ? stores : [stores],
+        local = Object.fromEntries(names.map((n) => [n, new Map([...maps[n]].map(([k, v]) => [k, structuredClone(v)]))]));
+      let pending = 0,
+        finished = false;
+      const tx = {
+        abort() {
+          if (finished) return;
+          finished = true;
+          queueMicrotask(() => tx.onabort && tx.onabort());
+        },
+        objectStore(name) {
+          return {
+            get(key) {
+              const q = {};
+              pending++;
+              queueMicrotask(() => {
+                if (finished) return;
+                q.result = structuredClone(local[name].get(key));
+                pending--;
+                if (q.onsuccess) q.onsuccess();
+                check();
+              });
+              return q;
+            },
+            put(value, key) {
+              if (fail) {
+                tx.abort();
+                return;
+              }
+              local[name].set(key === undefined ? value.key || value.id : key, structuredClone(value));
+              check();
+            },
+            delete(key) {
+              if (fail) {
+                tx.abort();
+                return;
+              }
+              local[name].delete(key);
+              check();
+            },
+          };
+        },
+      };
+      function check() {
+        queueMicrotask(() => {
+          if (finished || pending) return;
+          finished = true;
+          if (mode === 'readwrite') for (const n of names) maps[n] = local[n];
+          if (tx.oncomplete) tx.oncomplete();
+        });
+      }
+      return tx;
+    },
+  };
 }
-test('hai lần đóng dở cùng năm: chọn lần 1 nhưng đưa file lần 2 → không khớp, giữ nguyên hồ sơ và đợt cân',async()=>{
-  const {h,blob2,sha1}=await twoPending();
-  await assert.rejects(h.C.resumeClose(2025,blob2,sha1),/không khớp/);
-  const s=await h.Y.read();assert.equal(s.records.length,3);assert.equal(s.closed.filter(c=>c.pending).length,2);assert.equal(h.db.maps.batches.size,1);assert.equal(h.db.maps.batchdata.size,1);
+function harness(options = {}) {
+  const initial = { v: 1, revision: 1, records: [rec('closed', 2025), rec('keep', 2026)] },
+    db = database(initial);
+  const batch = { id: 'xuatkhau|old.xlsx', type: 'xuatkhau', fileName: 'old.xlsx', updatedAt: 1 };
+  db.maps.batches.set(batch.id, batch);
+  db.maps.batchdata.set(batch.id, new Uint8Array([1, 2, 3]).buffer);
+  let savedBlob,
+    archiveRemoved = false,
+    released = false;
+  const events = [];
+  const Y = {
+    yearOf: M.yearOf,
+    validateBundle: (xs) => M.merge(M.empty(), xs),
+    read: async () => structuredClone(db.maps.kv.get('hak.yearbook.v1').val),
+    commit: async (expected, change) => {
+      const state = await Y.read();
+      if (state.revision !== expected) throw Error('stale');
+      const next = change(state);
+      next.revision++;
+      db.maps.kv.set('hak.yearbook.v1', { val: next });
+      events.push('prepare');
+      return next;
+    },
+    release() {
+      released = true;
+    },
+  };
+  const window = {
+    crypto: crypto.webcrypto,
+    JSZip: class {
+      file(name, text) {
+        this.text = text;
+      }
+      async generateAsync() {
+        return new Blob([this.text]);
+      }
+    },
+    confirm: () => true,
+    HAK: {
+      Yearbook: Y,
+      DB: { open: async () => db, getAll: async (store) => [...db.maps[store].values()], get: async (store, id) => db.maps[store].get(id) },
+      App: { slots: { xuatkhau: { batches: [{ fileName: batch.fileName, ds: { ok: true, rows: [row(2025)] } }] } } },
+      Config: { data: { companies: [], warehouses: [] } },
+      Auth: { isAdmin: () => true, scopeIds: () => null },
+      Archive: {
+        list: async () => [],
+        collectItems: async () => [],
+        closeVerified: async () => {
+          events.push('prune-archive');
+          archiveRemoved = true;
+        },
+        decode: async (text) => JSON.parse(text),
+      },
+      Backup: { readJson: async (file) => JSON.parse(await file.text()) },
+      Word: {
+        Files: {
+          saveBlob: async (blob) => {
+            events.push('save');
+            savedBlob = blob;
+            return options.cancel ? false : 'C:/year.zip';
+          },
+        },
+      },
+    },
+  };
+  const ctx = {
+    window,
+    console,
+    Blob,
+    Uint8Array,
+    btoa,
+    Date,
+    Set,
+    JSON,
+    Error,
+    Number,
+    fetch: async () => {
+      events.push('verify');
+      if (options.mutate) db.maps.batches.set(batch.id, { ...batch, updatedAt: 2 });
+      if (options.fail) db.setFail();
+      return {
+        ok: true,
+        json: async () => ({
+          sha256: options.corrupt
+            ? 'wrong'
+            : crypto
+                .createHash('sha256')
+                .update(Buffer.from(await savedBlob.arrayBuffer()))
+                .digest('hex'),
+          size: savedBlob.size,
+        }),
+      };
+    },
+  };
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(require.resolve('../app/js/year-close.js'), 'utf8'), ctx);
+  return {
+    C: window.HAK.YearClose,
+    Y,
+    db,
+    window,
+    events,
+    get released() {
+      return released;
+    },
+    get savedBlob() {
+      return savedBlob;
+    },
+  };
+}
+test('only batches wholly within the selected year are eligible', () => {
+  assert.equal(C.exclusive([row(2025)], 2025), true);
+  for (const rows of [[], [row(2025), row(2026)], [{ ts1: null }], [{ ts1: NaN }]]) assert.equal(C.exclusive(rows, 2025), false);
 });
-test('hai lần đóng dở cùng năm: chọn đúng lần 2 + đúng file → chỉ lần 2 hoàn tất, lần 1 vẫn đang chờ; chạy lại không dọn thêm',async()=>{
-  const {h,blob2,sha1,sha2}=await twoPending();
-  const r=await h.C.resumeClose(2025,blob2,sha2);assert.equal(r.resumed,true);
-  let s=await h.Y.read();const by=x=>s.closed.find(c=>c.sha256===x);
-  assert.equal(by(sha2).pending,false);assert.equal(by(sha1).pending,true);assert.equal(s.closed.length,2);assert.equal(h.db.maps.batches.size,0);
-  assert.equal(JSON.stringify(s.records.map(x=>x.id)),'["keep"]');
-  const before=JSON.stringify(await h.Y.read());
-  assert.equal(JSON.stringify(await h.C.resumeClose(2025,blob2,sha2)),'{"nothing":true}');assert.equal(JSON.stringify(await h.Y.read()),before);
+test('close saves and verifies first, then removes only selected records and original batch bytes', async () => {
+  const h = harness();
+  const result = await h.C.closeYear(2025, () => true);
+  assert.equal(result.records, 1);
+  const state = await h.Y.read();
+  assert.deepEqual(
+    state.records.map((r) => r.id),
+    ['keep']
+  );
+  assert.equal(state.closed[0].pending, false);
+  assert.equal(h.db.maps.batches.size, 0);
+  assert.equal(h.db.maps.batchdata.size, 0);
+  assert.deepEqual(h.events.slice(0, 3), ['save', 'verify', 'prepare']);
+  assert.equal(h.released, true);
+  const view = await h.C.readFile(h.savedBlob, state.closed[0]);
+  assert.equal(view.year, 2025);
+  assert.equal(view.records[0].rows[0].net, 100);
+  assert.equal(view.batches[0].b64, 'AQID');
+  assert.equal((await h.Y.read()).records.length, 1);
 });
-test('hai lần đóng dở cùng năm: gọi chữ ký cũ (năm + file lần 2) vẫn tìm đúng bản ghi',async()=>{
-  const {h,blob2,sha1,sha2}=await twoPending();
-  const r=await h.C.resumeClose(2025,blob2);assert.equal(r.resumed,true);
-  const s=await h.Y.read();assert.equal(s.closed.find(c=>c.sha256===sha2).pending,false);assert.equal(s.closed.find(c=>c.sha256===sha1).pending,true);
-  await assert.rejects(h.C.resumeClose(2025,new Blob(['khác'])),/không khớp/);
+test('canceling Save As or final cleanup confirmation preserves active data', async () => {
+  for (const options of [{ cancel: true }, {}]) {
+    const h = harness(options),
+      before = JSON.stringify(await h.Y.read());
+    await h.C.closeYear(2025, () => false);
+    assert.equal(JSON.stringify(await h.Y.read()), before);
+    assert.equal(h.db.maps.batches.size, 1);
+    assert.equal(h.released, false);
+    assert.ok(!h.events.includes('prepare'));
+  }
+});
+test('wrong file checksum never prepares or prunes data', async () => {
+  const h = harness({ corrupt: true });
+  await assert.rejects(
+    h.C.closeYear(2025, () => true),
+    /không khớp/
+  );
+  assert.equal((await h.Y.read()).records.length, 2);
+  assert.ok(!h.events.includes('prepare'));
+  assert.equal(h.db.maps.batches.size, 1);
+});
+test('changed batch or failed transaction keeps both batch and year records, with verified recovery receipt', async () => {
+  for (const options of [{ mutate: true }, { fail: true }]) {
+    const h = harness(options);
+    await assert.rejects(h.C.closeYear(2025, () => true));
+    const s = await h.Y.read();
+    assert.equal(s.records.length, 2);
+    assert.equal(s.closed[0].pending, true);
+    assert.equal(h.db.maps.batches.size, 1);
+    assert.equal(h.db.maps.batchdata.size, 1);
+    assert.equal(h.released, false);
+    assert.ok(h.savedBlob.size > 0);
+  }
+});
+test('viewing a closed file does not import or change any active data and rejects wrong file', async () => {
+  const h = harness(),
+    before = JSON.stringify(await h.Y.read());
+  const file = new Blob([
+    JSON.stringify({ app: 'hak-yearbook', v: 2, year: 2024, records: [rec('offline', 2024)], batches: [], archive: [] }),
+  ]);
+  const view = await h.C.readFile(file);
+  assert.equal(view.year, 2024);
+  assert.equal(JSON.stringify(await h.Y.read()), before);
+  await assert.rejects(h.C.readFile(file, { sha256: 'wrong' }), /không khớp/);
+});
+test('restricted account cannot close data outside its company scope', async () => {
+  const h = harness();
+  h.window.HAK.Auth.scopeIds = () => ['limited'];
+  await assert.rejects(
+    h.C.closeYear(2025, () => true),
+    /Quản trị/
+  );
+  assert.equal(h.events.length, 0);
+});
+
+test('actual ZIP closes and reopens one year without importing its rows into the live store', async () => {
+  const h = harness(),
+    Zip = require('../app/libs/jszip.min.js');
+  h.window.JSZip = Zip;
+  h.window.HAK.Backup.readJson = async (file) => {
+    const z = await Zip.loadAsync(Buffer.from(await file.arrayBuffer()));
+    return JSON.parse(await z.file('HoSoNam.json').async('string'));
+  };
+  await h.C.closeYear(2025, () => true);
+  const before = JSON.stringify(await h.Y.read());
+  const offline = await h.C.readFile(h.savedBlob, (await h.Y.read()).closed[0]);
+  assert.equal(offline.records[0].year, 2025);
+  assert.equal(offline.records[0].rows[0].net, 100);
+  assert.equal(JSON.stringify(await h.Y.read()), before);
+});
+
+test('legacy archive cleanup checks saved metadata and bytes and aborts atomically on a stale entry', async () => {
+  for (const stale of [false, true]) {
+    const db = database(M.empty());
+    db.maps.meta = new Map([
+      ['a', { id: 'a', updatedAt: 1 }],
+      ['b', { id: 'b', updatedAt: 2 }],
+    ]);
+    db.maps.data = new Map([
+      ['a', 'AAA'],
+      ['b', 'BBB'],
+    ]);
+    const window = {
+      HAK: {},
+      indexedDB: {
+        open: () => {
+          const q = {};
+          queueMicrotask(() => {
+            q.result = db;
+            q.onsuccess();
+          });
+          return q;
+        },
+      },
+    };
+    const ctx = { window, document: { getElementById: () => null }, console, Map, Date, JSON, Math, Uint8Array, Set };
+    vm.createContext(ctx);
+    vm.runInContext(fs.readFileSync(require.resolve('../app/js/archive.js'), 'utf8'), ctx);
+    const items = [
+      { meta: { id: 'a', updatedAt: 1 }, data: 'AAA' },
+      { meta: { id: 'b', updatedAt: stale ? 1 : 2 }, data: 'BBB' },
+    ];
+    if (stale) {
+      await assert.rejects(window.HAK.Archive.closeVerified(items), /thay đổi/);
+      assert.equal(db.maps.meta.size, 2);
+      assert.equal(db.maps.data.size, 2);
+    } else {
+      await window.HAK.Archive.closeVerified(items);
+      assert.equal(db.maps.meta.size, 0);
+      assert.equal(db.maps.data.size, 0);
+    }
+  }
+});
+
+test('đóng năm bị gián đoạn giữa bước dọn kho: mở lại, chọn đúng ZIP → dọn tiếp, số liệu khớp; chạy lại không đổi gì', async () => {
+  const h = harness({ fail: true });
+  await assert.rejects(h.C.closeYear(2025, () => true));
+  let s = await h.Y.read();
+  assert.equal(s.closed.length, 1);
+  assert.equal(s.closed[0].pending, true);
+  assert.equal(s.records.length, 2, 'chưa dọn: hồ sơ vẫn còn');
+  assert.equal(h.db.maps.batches.size, 1);
+  assert.equal(JSON.stringify((await h.C.pendingYears()).map((x) => x.year)), '[2025]');
+  h.db.clearFail(); // sự cố đã hết (đóng rồi mở lại app)
+  const res = await h.C.resumeClose(2025, h.savedBlob);
+  assert.equal(res.resumed, true);
+  assert.equal(res.records, 1);
+  assert.equal(res.batches, 1);
+  assert.equal(res.expected.records, 1);
+  assert.equal(res.expected.batches, 1);
+  s = await h.Y.read();
+  assert.equal(JSON.stringify(s.records.map((r) => r.id)), '["keep"]');
+  assert.equal(s.closed.length, 1);
+  assert.equal(s.closed[0].pending, false);
+  assert.equal(s.closed[0].count, 1);
+  assert.equal(h.db.maps.batches.size, 0);
+  assert.equal(h.db.maps.batchdata.size, 0);
+  assert.equal(JSON.stringify(await h.C.resumeClose(2025, h.savedBlob)), '{"nothing":true}');
+});
+test('tiếp tục đóng năm: sai file ZIP bị từ chối; hồ sơ ĐÃ SỬA sau khi đóng dở → báo cần đối chiếu, KHÔNG dọn', async () => {
+  const h = harness({ fail: true });
+  await assert.rejects(h.C.closeYear(2025, () => true));
+  h.db.clearFail();
+  await assert.rejects(h.C.resumeClose(2025, new Blob(['khác'])), /không khớp/);
+  await assert.rejects(h.C.resumeClose(2025), /Chọn lại đúng file ZIP/);
+  const st = h.db.maps.kv.get('hak.yearbook.v1').val;
+  st.records.find((r) => r.id === 'closed').revision = 2;
+  st.records.find((r) => r.id === 'closed').params = { ship: 'SỬA SAU' };
+  const r = await h.C.resumeClose(2025, h.savedBlob);
+  assert.equal(r.needsReview, true);
+  assert.equal(JSON.stringify(r.diffs.changedRecords.map((x) => x.id)), '["closed"]');
+  assert.equal(r.diffs.changedRecords[0].zipRevision, 1);
+  assert.equal(r.diffs.changedRecords[0].liveRevision, 2);
+  const s = await h.Y.read();
+  assert.equal(s.records.length, 2);
+  assert.equal(s.closed[0].pending, true);
+  assert.equal(h.db.maps.batches.size, 1);
+});
+test('tiếp tục đóng năm: hồ sơ mới thêm sau khi đóng dở được giữ lại và báo; hồ sơ đã có trong ZIP được dọn', async () => {
+  const h = harness({ fail: true });
+  await assert.rejects(h.C.closeYear(2025, () => true));
+  h.db.clearFail();
+  const st = h.db.maps.kv.get('hak.yearbook.v1').val;
+  st.records.push(rec('them-moi', 2025));
+  const r = await h.C.resumeClose(2025, h.savedBlob);
+  assert.equal(r.resumed, true);
+  assert.equal(JSON.stringify(r.leftover.records.map((x) => x.id)), '["them-moi"]');
+  assert.equal(JSON.stringify((await h.Y.read()).records.map((x) => x.id).sort()), '["keep","them-moi"]');
+});
+async function twoPending() {
+  const h = harness({ fail: true });
+  await assert.rejects(h.C.closeYear(2025, () => true));
+  const blob1 = h.savedBlob;
+  const st = h.db.maps.kv.get('hak.yearbook.v1').val;
+  st.records.push(rec('them', 2025)); // dữ liệu khác → ZIP lần 2 có SHA-256 khác
+  await assert.rejects(h.C.closeYear(2025, () => true));
+  const blob2 = h.savedBlob;
+  h.db.clearFail();
+  const pend = (await h.Y.read()).closed.filter((c) => c.pending);
+  assert.equal(pend.length, 2);
+  assert.notEqual(pend[0].sha256, pend[1].sha256);
+  return { h, blob1, blob2, sha1: pend[0].sha256, sha2: pend[1].sha256 };
+}
+test('hai lần đóng dở cùng năm: chọn lần 1 nhưng đưa file lần 2 → không khớp, giữ nguyên hồ sơ và đợt cân', async () => {
+  const { h, blob2, sha1 } = await twoPending();
+  await assert.rejects(h.C.resumeClose(2025, blob2, sha1), /không khớp/);
+  const s = await h.Y.read();
+  assert.equal(s.records.length, 3);
+  assert.equal(s.closed.filter((c) => c.pending).length, 2);
+  assert.equal(h.db.maps.batches.size, 1);
+  assert.equal(h.db.maps.batchdata.size, 1);
+});
+test('hai lần đóng dở cùng năm: chọn đúng lần 2 + đúng file → chỉ lần 2 hoàn tất, lần 1 vẫn đang chờ; chạy lại không dọn thêm', async () => {
+  const { h, blob2, sha1, sha2 } = await twoPending();
+  const r = await h.C.resumeClose(2025, blob2, sha2);
+  assert.equal(r.resumed, true);
+  let s = await h.Y.read();
+  const by = (x) => s.closed.find((c) => c.sha256 === x);
+  assert.equal(by(sha2).pending, false);
+  assert.equal(by(sha1).pending, true);
+  assert.equal(s.closed.length, 2);
+  assert.equal(h.db.maps.batches.size, 0);
+  assert.equal(JSON.stringify(s.records.map((x) => x.id)), '["keep"]');
+  const before = JSON.stringify(await h.Y.read());
+  assert.equal(JSON.stringify(await h.C.resumeClose(2025, blob2, sha2)), '{"nothing":true}');
+  assert.equal(JSON.stringify(await h.Y.read()), before);
+});
+test('hai lần đóng dở cùng năm: gọi chữ ký cũ (năm + file lần 2) vẫn tìm đúng bản ghi', async () => {
+  const { h, blob2, sha1, sha2 } = await twoPending();
+  const r = await h.C.resumeClose(2025, blob2);
+  assert.equal(r.resumed, true);
+  const s = await h.Y.read();
+  assert.equal(s.closed.find((c) => c.sha256 === sha2).pending, false);
+  assert.equal(s.closed.find((c) => c.sha256 === sha1).pending, true);
+  await assert.rejects(h.C.resumeClose(2025, new Blob(['khác'])), /không khớp/);
 });

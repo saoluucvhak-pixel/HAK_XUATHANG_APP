@@ -14,12 +14,20 @@
 (function (root) {
   'use strict';
   const HAK = (root.HAK = root.HAK || {});
-  const norm = (s) => String(s == null ? '' : s).trim().toUpperCase().replace(/\s+/g, '');
-  const kgKey = (n) => Math.round((Number(n) || 0) * 1000);                    // so khớp khối lượng lẻ tới gram
+  const norm = (s) =>
+    String(s == null ? '' : s)
+      .trim()
+      .toUpperCase()
+      .replace(/\s+/g, '');
+  const kgKey = (n) => Math.round((Number(n) || 0) * 1000); // so khớp khối lượng lẻ tới gram
 
   /** Khóa nhận diện của 1 dòng phiếu cân (null = không nhận diện được). */
   function identity(row, cid) {
-    const r = row || {}, c = norm(cid), date = norm(r.dateStr), plate = norm(r.plate), tk = norm(r.ticket);
+    const r = row || {},
+      c = norm(cid),
+      date = norm(r.dateStr),
+      plate = norm(r.plate),
+      tk = norm(r.ticket);
     if (tk) return 'T|' + c + '|' + tk + '|' + date + '|' + plate;
     if (plate && norm(r.time1)) return 'S|' + c + '|' + date + '|' + norm(r.time1) + '|' + plate;
     return null;
@@ -29,12 +37,27 @@
    * @returns {{id:string|null, key:string|null, ticket:string, date:string, plate:string, net:number, ret:boolean, link:string}[]}
    */
   function ticketsOf(rows, isRet, meta) {
-    const m = meta || {}, seen = new Map(), link = norm(m.contract) + '|' + norm(m.ship);
+    const m = meta || {},
+      seen = new Map(),
+      link = norm(m.contract) + '|' + norm(m.ship);
     return (rows || []).map((row, i) => {
       const base = identity(row, m.cid);
       let id = null;
-      if (base) { const n = (seen.get(base) || 0) + 1; seen.set(base, n); id = base + '#' + n; }
-      return { i, id, ticket: String(row.ticket == null ? '' : row.ticket).trim(), date: row.dateStr || '', plate: String(row.plate || '').trim(), net: Number(row.net) || 0, ret: !!(isRet && isRet(row)), link };
+      if (base) {
+        const n = (seen.get(base) || 0) + 1;
+        seen.set(base, n);
+        id = base + '#' + n;
+      }
+      return {
+        i,
+        id,
+        ticket: String(row.ticket == null ? '' : row.ticket).trim(),
+        date: row.dateStr || '',
+        plate: String(row.plate || '').trim(),
+        net: Number(row.net) || 0,
+        ret: !!(isRet && isRet(row)),
+        link,
+      };
     });
   }
   /** Nhóm hồ sơ giao nhau về ngày cân trong cùng loại + công ty → các cụm ≥ 2 hồ sơ cần đối soát. */
@@ -49,10 +72,16 @@
     const out = [];
     groups.forEach((list) => {
       list.sort((a, b) => a.fromTs - b.fromTs);
-      let cur = [], hi = -Infinity;
+      let cur = [],
+        hi = -Infinity;
       list.forEach((r) => {
-        if (cur.length && r.fromTs > hi) { if (cur.length > 1) out.push(cur); cur = []; hi = -Infinity; }
-        cur.push(r); hi = Math.max(hi, r.toTs == null ? r.fromTs : r.toTs);
+        if (cur.length && r.fromTs > hi) {
+          if (cur.length > 1) out.push(cur);
+          cur = [];
+          hi = -Infinity;
+        }
+        cur.push(r);
+        hi = Math.max(hi, r.toTs == null ? r.fromTs : r.toTs);
       });
       if (cur.length > 1) out.push(cur);
     });
@@ -63,44 +92,97 @@
    * @returns {{ byRec: Map<id,{trips,kg,retTrips,retKg,dupTrips,dupKg,noIdTrips}>, conflicts:[], dup:{trips,kg}, pendingKg:number }}
    */
   function resolve(entries) {
-    const order = entries.slice().sort((a, b) => (b.rec.updatedAt || 0) - (a.rec.updatedAt || 0) || String(a.rec.id).localeCompare(String(b.rec.id)));
-    const owner = new Map(), conflictOf = new Map(), byRec = new Map();
-    let dupTrips = 0, dupKg = 0;
+    const order = entries
+      .slice()
+      .sort((a, b) => (b.rec.updatedAt || 0) - (a.rec.updatedAt || 0) || String(a.rec.id).localeCompare(String(b.rec.id)));
+    const owner = new Map(),
+      conflictOf = new Map(),
+      byRec = new Map();
+    let dupTrips = 0,
+      dupKg = 0;
     order.forEach(({ rec, tickets }) => {
       const e = { trips: 0, kg: 0, retTrips: 0, retKg: 0, dupTrips: 0, dupKg: 0, noIdTrips: 0, skip: new Set() };
       byRec.set(rec.id, e);
       tickets.forEach((t) => {
-        if (!t.id) { e.noIdTrips++; count(e, t); return; }
+        if (!t.id) {
+          e.noIdTrips++;
+          count(e, t);
+          return;
+        }
         const o = owner.get(t.id);
-        if (!o) { owner.set(t.id, { rec, t }); count(e, t); return; }
-        if (o.rec.id === rec.id) { count(e, t); return; }
+        if (!o) {
+          owner.set(t.id, { rec, t });
+          count(e, t);
+          return;
+        }
+        if (o.rec.id === rec.id) {
+          count(e, t);
+          return;
+        }
         const same = kgKey(o.t.net) === kgKey(t.net) && o.t.ret === t.ret && o.t.link === t.link;
-        if (same) { e.dupTrips++; e.dupKg += t.net; dupTrips++; dupKg += t.net; e.skip.add(t.i); return; }
+        if (same) {
+          e.dupTrips++;
+          e.dupKg += t.net;
+          dupTrips++;
+          dupKg += t.net;
+          e.skip.add(t.i);
+          return;
+        }
         e.skip.add(t.i);
         let c = conflictOf.get(t.id);
-        if (!c) { c = { id: t.id.replace(/#\d+$/, ''), ticket: o.t.ticket, date: o.t.date, plate: o.t.plate, counted: { rec: o.rec, net: o.t.net, ret: o.t.ret, link: o.t.link }, others: [] }; conflictOf.set(t.id, c); }
+        if (!c) {
+          c = {
+            id: t.id.replace(/#\d+$/, ''),
+            ticket: o.t.ticket,
+            date: o.t.date,
+            plate: o.t.plate,
+            counted: { rec: o.rec, net: o.t.net, ret: o.t.ret, link: o.t.link },
+            others: [],
+          };
+          conflictOf.set(t.id, c);
+        }
         c.others.push({ rec, net: t.net, ret: t.ret, link: t.link });
       });
     });
     const conflicts = Array.from(conflictOf.values());
-    conflicts.forEach((c) => { c.fields = []; const all = [c.counted].concat(c.others);
+    conflicts.forEach((c) => {
+      c.fields = [];
+      const all = [c.counted].concat(c.others);
       if (new Set(all.map((x) => kgKey(x.net))).size > 1) c.fields.push('khối lượng');
       if (new Set(all.map((x) => x.ret)).size > 1) c.fields.push('xe trả về');
-      if (new Set(all.map((x) => x.link)).size > 1) c.fields.push('liên kết hợp đồng / tàu'); });
+      if (new Set(all.map((x) => x.link)).size > 1) c.fields.push('liên kết hợp đồng / tàu');
+    });
     return { byRec, conflicts, dup: { trips: dupTrips, kg: dupKg }, pendingKg: conflicts.reduce((a, c) => a + c.counted.net, 0) };
   }
-  function count(e, t) { e.trips++; e.kg += t.net; if (t.ret) { e.retTrips++; e.retKg += t.net; } }
+  function count(e, t) {
+    e.trips++;
+    e.kg += t.net;
+    if (t.ret) {
+      e.retTrips++;
+      e.retKg += t.net;
+    }
+  }
   /** Tổng thực giao loại trùng GIỮA các loại biên bản (cùng phiếu đi qua nhiều nghiệp vụ). entries như resolve, mỗi rec có type. */
   function overall(entries) {
-    const seen = new Set(), o = { trips: 0, kg: 0, retKg: 0, delKg: 0, sharedTrips: 0, sharedKg: 0 };
-    entries.slice().sort((a, b) => (b.rec.updatedAt || 0) - (a.rec.updatedAt || 0) || String(a.rec.id).localeCompare(String(b.rec.id))).forEach(({ rec, tickets }) => {
-      tickets.forEach((t) => {
-        const k = t.id ? t.id.replace(/#\d+$/, '') + '#' + (t.id.match(/#(\d+)$/) || [])[1] : null;
-        if (k && seen.has(k)) { o.sharedTrips++; o.sharedKg += t.net; return; }
-        if (k) seen.add(k);
-        o.trips++; o.kg += t.net; if (t.ret) o.retKg += t.net;
+    const seen = new Set(),
+      o = { trips: 0, kg: 0, retKg: 0, delKg: 0, sharedTrips: 0, sharedKg: 0 };
+    entries
+      .slice()
+      .sort((a, b) => (b.rec.updatedAt || 0) - (a.rec.updatedAt || 0) || String(a.rec.id).localeCompare(String(b.rec.id)))
+      .forEach(({ rec, tickets }) => {
+        tickets.forEach((t) => {
+          const k = t.id ? t.id.replace(/#\d+$/, '') + '#' + (t.id.match(/#(\d+)$/) || [])[1] : null;
+          if (k && seen.has(k)) {
+            o.sharedTrips++;
+            o.sharedKg += t.net;
+            return;
+          }
+          if (k) seen.add(k);
+          o.trips++;
+          o.kg += t.net;
+          if (t.ret) o.retKg += t.net;
+        });
       });
-    });
     o.delKg = o.kg - o.retKg;
     return o;
   }

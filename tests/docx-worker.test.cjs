@@ -1,16 +1,139 @@
-const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),{Worker:NodeWorker}=require('node:worker_threads');const browser={};vm.runInNewContext(fs.readFileSync(require.resolve('../app/libs/pizzip.min.js'),'utf8'),{window:browser,Uint8Array,ArrayBuffer});const Zip=browser.PizZip;
-function harness(WorkerOverride){let stopped=0;class Worker{constructor(url){this.pending=fetch(url).then(r=>r.text()).then(source=>{if(this.ended)return;this.w=new NodeWorker(`const {parentPort,workerData}=require('node:worker_threads'),vm=require('node:vm');const ctx={console,setTimeout,clearTimeout,Uint8Array,ArrayBuffer,TextEncoder,TextDecoder};ctx.self=ctx;ctx.postMessage=(data,transfer)=>parentPort.postMessage(data,transfer);vm.runInNewContext(workerData.source,ctx);parentPort.on('message',data=>ctx.onmessage({data}));`,{eval:true,workerData:{source}});this.w.on('message',data=>this.onmessage&&this.onmessage({data}));this.w.on('error',e=>this.onerror&&this.onerror(e));return this.w;});}postMessage(message){this.pending.then(w=>w&&w.postMessage(message));}terminate(){this.ended=true;stopped++;if(this.w)this.w.terminate();}}
-const window={Worker:WorkerOverride||Worker,HAK:{UI:{Loading:{set(){}}}}},ctx={window,Blob,URL,atob,Error,setTimeout,clearTimeout};vm.createContext(ctx);for(const f of ['docx-worker-source.js','docx-worker.js'])vm.runInContext(fs.readFileSync(require.resolve('../app/js/'+f),'utf8'),ctx);return {render:window.HAK.DocxWorker.render,get stopped(){return stopped;}};}
-function template(){const z=new Zip();z.file('[Content_Types].xml','<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>');z.file('word/document.xml','<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>{{title}}</w:t></w:r></w:p><w:tbl><w:tr><w:tc><w:p><w:r><w:t>{{#rows}}{{plate}}: {{net}}{{/rows}}</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>');return z.generate({type:'uint8array'});}
-test('real background worker renders 3000 scale rows with correct text while main thread remains responsive',async()=>{const h=harness();let ticks=0;const timer=setInterval(()=>ticks++,5);try{const bytes=await h.render(template(),{title:'BIÊN BẢN QA',rows:Array.from({length:3000},(_,i)=>({plate:'XE-'+i,net:i+.25}))});const xml=new Zip(bytes).file('word/document.xml').asText();assert.ok(xml.includes('BIÊN BẢN QA'));assert.ok(xml.includes('XE-2999: 2999.25'));assert.ok(!xml.includes('{{'));assert.ok(ticks>0);assert.equal(h.stopped,1);}finally{clearInterval(timer);}});
-test('worker timeout terminates stalled rendering instead of keeping loading forever',async()=>{let terminated=0;class Never{postMessage(){}terminate(){terminated++;}}const h=harness(Never);await assert.rejects(h.render(new Uint8Array(),{},10),/quá 90 giây/);assert.equal(terminated,1);});
-test('invalid template reports a worker error and releases the worker',async()=>{const h=harness();await assert.rejects(h.render(new Uint8Array([1,2,3]),{}));assert.equal(h.stopped,1);});
+const test = require('node:test'),
+  assert = require('node:assert/strict'),
+  vm = require('node:vm'),
+  fs = require('node:fs'),
+  { Worker: NodeWorker } = require('node:worker_threads');
+const browser = {};
+vm.runInNewContext(fs.readFileSync(require.resolve('../app/libs/pizzip.min.js'), 'utf8'), { window: browser, Uint8Array, ArrayBuffer });
+const Zip = browser.PizZip;
+function harness(WorkerOverride) {
+  let stopped = 0;
+  class Worker {
+    constructor(url) {
+      this.pending = fetch(url)
+        .then((r) => r.text())
+        .then((source) => {
+          if (this.ended) return;
+          this.w = new NodeWorker(
+            `const {parentPort,workerData}=require('node:worker_threads'),vm=require('node:vm');const ctx={console,setTimeout,clearTimeout,Uint8Array,ArrayBuffer,TextEncoder,TextDecoder};ctx.self=ctx;ctx.postMessage=(data,transfer)=>parentPort.postMessage(data,transfer);vm.runInNewContext(workerData.source,ctx);parentPort.on('message',data=>ctx.onmessage({data}));`,
+            { eval: true, workerData: { source } }
+          );
+          this.w.on('message', (data) => this.onmessage && this.onmessage({ data }));
+          this.w.on('error', (e) => this.onerror && this.onerror(e));
+          return this.w;
+        });
+    }
+    postMessage(message) {
+      this.pending.then((w) => w && w.postMessage(message));
+    }
+    terminate() {
+      this.ended = true;
+      stopped++;
+      if (this.w) this.w.terminate();
+    }
+  }
+  const window = { Worker: WorkerOverride || Worker, HAK: { UI: { Loading: { set() {} } } } },
+    ctx = { window, Blob, URL, atob, Error, setTimeout, clearTimeout };
+  vm.createContext(ctx);
+  for (const f of ['docx-worker-source.js', 'docx-worker.js'])
+    vm.runInContext(fs.readFileSync(require.resolve('../app/js/' + f), 'utf8'), ctx);
+  return {
+    render: window.HAK.DocxWorker.render,
+    get stopped() {
+      return stopped;
+    },
+  };
+}
+function template() {
+  const z = new Zip();
+  z.file(
+    '[Content_Types].xml',
+    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>'
+  );
+  z.file(
+    'word/document.xml',
+    '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>{{title}}</w:t></w:r></w:p><w:tbl><w:tr><w:tc><w:p><w:r><w:t>{{#rows}}{{plate}}: {{net}}{{/rows}}</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>'
+  );
+  return z.generate({ type: 'uint8array' });
+}
+test('real background worker renders 3000 scale rows with correct text while main thread remains responsive', async () => {
+  const h = harness();
+  let ticks = 0;
+  const timer = setInterval(() => ticks++, 5);
+  try {
+    const bytes = await h.render(template(), {
+      title: 'BIÊN BẢN QA',
+      rows: Array.from({ length: 3000 }, (_, i) => ({ plate: 'XE-' + i, net: i + 0.25 })),
+    });
+    const xml = new Zip(bytes).file('word/document.xml').asText();
+    assert.ok(xml.includes('BIÊN BẢN QA'));
+    assert.ok(xml.includes('XE-2999: 2999.25'));
+    assert.ok(!xml.includes('{{'));
+    assert.ok(ticks > 0);
+    assert.equal(h.stopped, 1);
+  } finally {
+    clearInterval(timer);
+  }
+});
+test('worker timeout terminates stalled rendering instead of keeping loading forever', async () => {
+  let terminated = 0;
+  class Never {
+    postMessage() {}
+    terminate() {
+      terminated++;
+    }
+  }
+  const h = harness(Never);
+  await assert.rejects(h.render(new Uint8Array(), {}, 10), /quá 90 giây/);
+  assert.equal(terminated, 1);
+});
+test('invalid template reports a worker error and releases the worker', async () => {
+  const h = harness();
+  await assert.rejects(h.render(new Uint8Array([1, 2, 3]), {}));
+  assert.equal(h.stopped, 1);
+});
 
-test('all nine shipped Word templates render successfully through the actual worker',async()=>{const w={HAK:{}};vm.runInNewContext(fs.readFileSync(require.resolve('../app/js/templates-data.js'),'utf8'),{window:w});for(const [name,b64] of Object.entries(w.HAK.TEMPLATES)){const h=harness();const bytes=await h.render(new Uint8Array(Buffer.from(b64,'base64')),{});const xml=new Zip(bytes).file('word/document.xml').asText();assert.ok(xml.includes('w:document'),name);assert.ok(!xml.includes('{{'),name);assert.equal(h.stopped,1);}});
-test('Vietnamese text inside the worker source is not double-encoded (no mojibake in progress messages)',async()=>{
- let source='';class W{constructor(url){this.pending=fetch(url).then(r=>r.text()).then(t=>{source=t;});}postMessage(){}terminate(){}}
- const ctx={window:{Worker:W,HAK:{UI:{Loading:{set(){}}}}},Blob,URL,atob,Error,Uint8Array,setTimeout,clearTimeout,fetch};vm.createContext(ctx);
- for(const f of ['docx-worker-source.js','docx-worker.js'])vm.runInContext(fs.readFileSync(require.resolve('../app/js/'+f),'utf8'),ctx);
- ctx.window.HAK.DocxWorker.render(new Uint8Array(),{},20).catch(()=>{});await new Promise(r=>setTimeout(r,300));
- assert.ok(source.includes('Đang điền dữ liệu vào mẫu…'),'worker source must contain the correctly decoded Vietnamese text');assert.ok(!source.includes('Ä'));
+test('all nine shipped Word templates render successfully through the actual worker', async () => {
+  const w = { HAK: {} };
+  vm.runInNewContext(fs.readFileSync(require.resolve('../app/js/templates-data.js'), 'utf8'), { window: w });
+  for (const [name, b64] of Object.entries(w.HAK.TEMPLATES)) {
+    const h = harness();
+    const bytes = await h.render(new Uint8Array(Buffer.from(b64, 'base64')), {});
+    const xml = new Zip(bytes).file('word/document.xml').asText();
+    assert.ok(xml.includes('w:document'), name);
+    assert.ok(!xml.includes('{{'), name);
+    assert.equal(h.stopped, 1);
+  }
+});
+test('Vietnamese text inside the worker source is not double-encoded (no mojibake in progress messages)', async () => {
+  let source = '';
+  class W {
+    constructor(url) {
+      this.pending = fetch(url)
+        .then((r) => r.text())
+        .then((t) => {
+          source = t;
+        });
+    }
+    postMessage() {}
+    terminate() {}
+  }
+  const ctx = {
+    window: { Worker: W, HAK: { UI: { Loading: { set() {} } } } },
+    Blob,
+    URL,
+    atob,
+    Error,
+    Uint8Array,
+    setTimeout,
+    clearTimeout,
+    fetch,
+  };
+  vm.createContext(ctx);
+  for (const f of ['docx-worker-source.js', 'docx-worker.js'])
+    vm.runInContext(fs.readFileSync(require.resolve('../app/js/' + f), 'utf8'), ctx);
+  ctx.window.HAK.DocxWorker.render(new Uint8Array(), {}, 20).catch(() => {});
+  await new Promise((r) => setTimeout(r, 300));
+  assert.ok(source.includes('Đang điền dữ liệu vào mẫu…'), 'worker source must contain the correctly decoded Vietnamese text');
+  assert.ok(!source.includes('Ä'));
 });

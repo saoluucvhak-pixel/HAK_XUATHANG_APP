@@ -1,47 +1,183 @@
-const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
-function setup(result,error,delay){const requests=[],notices=[],hints=[];const window={HAK:{UI:{toast:(...x)=>{if(x[1]==='error'||x[1]==='warning')notices.push(x);else hints.push(x);}}}};const ctx={setTimeout,clearTimeout,AbortController,window,console,Uint8Array,Blob,btoa,fetch:async(url,options)=>{requests.push({url,body:JSON.parse(options.body)});if(delay)await new Promise(r=>setTimeout(r,delay));if(error)throw error;return {ok:true,json:async()=>result};}};vm.createContext(ctx);vm.runInContext(fs.readFileSync(require.resolve('../app/js/word.js'),'utf8'),ctx);return {files:window.HAK.Word.Files,requests,notices,hints};}
-test('each download requests a Windows Save As dialog with exact bytes and suggested filename',async()=>{const {files,requests}=setup({path:'C:/Test/output.xlsx',canceled:false});for(let i=0;i<2;i++)assert.equal(await files.saveBlob(new Blob([new Uint8Array([0,255,42])]),'output.xlsx'),'C:/Test/output.xlsx');assert.equal(requests.length,2);assert.equal(requests[0].url,'http://127.0.0.1:31879/save-download');assert.equal(requests[0].body.name,'output.xlsx');assert.deepEqual([...Buffer.from(requests[0].body.base64,'base64')],[0,255,42]);});
-test('cancel returns without another download or success',async()=>{const {files,requests,notices}=setup({canceled:true});assert.equal(await files.saveBlob(new Blob(['test']),'a.docx'),false);assert.equal(requests.length,1);assert.equal(notices.length,0);});
-test('helper unavailable AND browser download unavailable reports a clear failure',async()=>{const {files,requests,notices}=setup(null,new TypeError('offline'));assert.equal(await files.saveBlob(new Blob(['test']),'a.zip'),false);assert.equal(requests.length,1);assert.equal(notices.length,1);});
+const test = require('node:test'),
+  assert = require('node:assert/strict'),
+  vm = require('node:vm'),
+  fs = require('node:fs');
+function setup(result, error, delay) {
+  const requests = [],
+    notices = [],
+    hints = [];
+  const window = {
+    HAK: {
+      UI: {
+        toast: (...x) => {
+          if (x[1] === 'error' || x[1] === 'warning') notices.push(x);
+          else hints.push(x);
+        },
+      },
+    },
+  };
+  const ctx = {
+    setTimeout,
+    clearTimeout,
+    AbortController,
+    window,
+    console,
+    Uint8Array,
+    Blob,
+    btoa,
+    fetch: async (url, options) => {
+      requests.push({ url, body: JSON.parse(options.body) });
+      if (delay) await new Promise((r) => setTimeout(r, delay));
+      if (error) throw error;
+      return { ok: true, json: async () => result };
+    },
+  };
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(require.resolve('../app/js/word.js'), 'utf8'), ctx);
+  return { files: window.HAK.Word.Files, requests, notices, hints };
+}
+test('each download requests a Windows Save As dialog with exact bytes and suggested filename', async () => {
+  const { files, requests } = setup({ path: 'C:/Test/output.xlsx', canceled: false });
+  for (let i = 0; i < 2; i++)
+    assert.equal(await files.saveBlob(new Blob([new Uint8Array([0, 255, 42])]), 'output.xlsx'), 'C:/Test/output.xlsx');
+  assert.equal(requests.length, 2);
+  assert.equal(requests[0].url, 'http://127.0.0.1:31879/save-download');
+  assert.equal(requests[0].body.name, 'output.xlsx');
+  assert.deepEqual([...Buffer.from(requests[0].body.base64, 'base64')], [0, 255, 42]);
+});
+test('cancel returns without another download or success', async () => {
+  const { files, requests, notices } = setup({ canceled: true });
+  assert.equal(await files.saveBlob(new Blob(['test']), 'a.docx'), false);
+  assert.equal(requests.length, 1);
+  assert.equal(notices.length, 0);
+});
+test('helper unavailable AND browser download unavailable reports a clear failure', async () => {
+  const { files, requests, notices } = setup(null, new TypeError('offline'));
+  assert.equal(await files.saveBlob(new Blob(['test']), 'a.zip'), false);
+  assert.equal(requests.length, 1);
+  assert.equal(notices.length, 1);
+});
 
-test('successful save notifies file history with actual selected path and history warning',async()=>{const {files}=setup({path:'D:/Exports/renamed.xlsx',canceled:false,warning:'History unavailable'});let saved;const source=fs.readFileSync(require.resolve('../app/js/word.js'),'utf8');const window={HAK:{Downloads:{saved:(...args)=>saved=args}}};const ctx={setTimeout,clearTimeout,AbortController,window,Uint8Array,Blob,btoa,fetch:async()=>({ok:true,json:async()=>({path:'D:/Exports/renamed.xlsx',canceled:false,warning:'History unavailable'})})};vm.createContext(ctx);vm.runInContext(source,ctx);assert.equal(await window.HAK.Word.Files.saveBlob(new Blob(['test']),'original.xlsx'),'D:/Exports/renamed.xlsx');assert.deepEqual(saved,['D:/Exports/renamed.xlsx','History unavailable']);});
-test('busy helper (409) is retried until it accepts the file instead of failing',async()=>{
- let calls=0;const notices=[];const window={HAK:{UI:{toast:(...x)=>notices.push(x)}}};
- const ctx={setTimeout:(f)=>setTimeout(f,0),clearTimeout,AbortController,window,console,Uint8Array,Blob,btoa,Error,fetch:async()=>{calls++;return calls<3?{ok:false,status:409,json:async()=>({error:'OCR is processing another document. Please wait.'})}:{ok:true,status:200,json:async()=>({path:'C:/x/a.docx',canceled:false})};}};
- vm.createContext(ctx);vm.runInContext(fs.readFileSync(require.resolve('../app/js/word.js'),'utf8'),ctx);
- assert.equal(await window.HAK.Word.Files.saveBlob(new Blob(['x']),'a.docx'),'C:/x/a.docx');assert.equal(calls,3);
+test('successful save notifies file history with actual selected path and history warning', async () => {
+  const { files } = setup({ path: 'D:/Exports/renamed.xlsx', canceled: false, warning: 'History unavailable' });
+  let saved;
+  const source = fs.readFileSync(require.resolve('../app/js/word.js'), 'utf8');
+  const window = { HAK: { Downloads: { saved: (...args) => (saved = args) } } };
+  const ctx = {
+    setTimeout,
+    clearTimeout,
+    AbortController,
+    window,
+    Uint8Array,
+    Blob,
+    btoa,
+    fetch: async () => ({
+      ok: true,
+      json: async () => ({ path: 'D:/Exports/renamed.xlsx', canceled: false, warning: 'History unavailable' }),
+    }),
+  };
+  vm.createContext(ctx);
+  vm.runInContext(source, ctx);
+  assert.equal(await window.HAK.Word.Files.saveBlob(new Blob(['test']), 'original.xlsx'), 'D:/Exports/renamed.xlsx');
+  assert.deepEqual(saved, ['D:/Exports/renamed.xlsx', 'History unavailable']);
 });
-test('network failure and oversized files give clear Vietnamese reasons',async()=>{
- const {files,notices}=setup(null,new TypeError('Failed to fetch'));assert.equal(await files.saveBlob(new Blob(['x']),'a.docx'),false);assert.match(notices[0][0],/không kết nối được trình hỗ trợ lưu tệp/);
- const big=setup({path:'x',canceled:false});assert.equal(await big.files.saveBlob(new Blob([new Uint8Array(28*1024*1024)]),'b.zip'),false);assert.equal(big.requests.length,0);assert.match(big.notices[0][0],/quá lớn/);
+test('busy helper (409) is retried until it accepts the file instead of failing', async () => {
+  let calls = 0;
+  const notices = [];
+  const window = { HAK: { UI: { toast: (...x) => notices.push(x) } } };
+  const ctx = {
+    setTimeout: (f) => setTimeout(f, 0),
+    clearTimeout,
+    AbortController,
+    window,
+    console,
+    Uint8Array,
+    Blob,
+    btoa,
+    Error,
+    fetch: async () => {
+      calls++;
+      return calls < 3
+        ? { ok: false, status: 409, json: async () => ({ error: 'OCR is processing another document. Please wait.' }) }
+        : { ok: true, status: 200, json: async () => ({ path: 'C:/x/a.docx', canceled: false }) };
+    },
+  };
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(require.resolve('../app/js/word.js'), 'utf8'), ctx);
+  assert.equal(await window.HAK.Word.Files.saveBlob(new Blob(['x']), 'a.docx'), 'C:/x/a.docx');
+  assert.equal(calls, 3);
+});
+test('network failure and oversized files give clear Vietnamese reasons', async () => {
+  const { files, notices } = setup(null, new TypeError('Failed to fetch'));
+  assert.equal(await files.saveBlob(new Blob(['x']), 'a.docx'), false);
+  assert.match(notices[0][0], /không kết nối được trình hỗ trợ lưu tệp/);
+  const big = setup({ path: 'x', canceled: false });
+  assert.equal(await big.files.saveBlob(new Blob([new Uint8Array(28 * 1024 * 1024)]), 'b.zip'), false);
+  assert.equal(big.requests.length, 0);
+  assert.match(big.notices[0][0], /quá lớn/);
 });
 
-test('a visible hint appears only when the Windows Save dialog keeps the user waiting',async()=>{
- const slow=setup({path:'C:/x/a.docx',canceled:false},null,1500);await slow.files.saveBlob(new Blob(['x']),'a.docx');
- assert.equal(slow.hints.length,1);assert.match(slow.hints[0][0],/hộp Lưu của Windows/);assert.match(slow.hints[0][0],/taskbar/);
- const fast=setup({path:'C:/x/b.docx',canceled:false});await fast.files.saveBlob(new Blob(['x']),'b.docx');await new Promise(r=>setTimeout(r,1400));
- assert.equal(fast.hints.length,0,'no hint when the dialog answers immediately');
- const failing=setup(null,new TypeError('offline'));await failing.files.saveBlob(new Blob(['x']),'c.docx');await new Promise(r=>setTimeout(r,1400));
- assert.equal(failing.hints.length,0,'no stale hint after the helper failed');
+test('a visible hint appears only when the Windows Save dialog keeps the user waiting', async () => {
+  const slow = setup({ path: 'C:/x/a.docx', canceled: false }, null, 1500);
+  await slow.files.saveBlob(new Blob(['x']), 'a.docx');
+  assert.equal(slow.hints.length, 1);
+  assert.match(slow.hints[0][0], /hộp Lưu của Windows/);
+  assert.match(slow.hints[0][0], /taskbar/);
+  const fast = setup({ path: 'C:/x/b.docx', canceled: false });
+  await fast.files.saveBlob(new Blob(['x']), 'b.docx');
+  await new Promise((r) => setTimeout(r, 1400));
+  assert.equal(fast.hints.length, 0, 'no hint when the dialog answers immediately');
+  const failing = setup(null, new TypeError('offline'));
+  await failing.files.saveBlob(new Blob(['x']), 'c.docx');
+  await new Promise((r) => setTimeout(r, 1400));
+  assert.equal(failing.hints.length, 0, 'no stale hint after the helper failed');
 });
 
-function withBrowser(fetchImpl){const saved=[],hints=[],window={HAK:{UI:{toast:(...x)=>hints.push(x)}},saveAs:(b,n)=>saved.push(n)};
- const ctx={setTimeout:(f)=>setTimeout(f,0),clearTimeout,AbortController,window,console,Uint8Array,Blob,btoa,Error,fetch:fetchImpl};vm.createContext(ctx);vm.runInContext(fs.readFileSync(require.resolve('../app/js/word.js'),'utf8'),ctx);return {files:window.HAK.Word.Files,saved,hints};}
-test('helper offline falls back to a normal browser download instead of an error',async()=>{
- const {files,saved,hints}=withBrowser(async()=>{throw new TypeError('Failed to fetch');});
- assert.equal(await files.saveBlob(new Blob(['x']),'a.docx'),'Downloads/a.docx');assert.deepEqual(saved,['a.docx']);
- assert.ok(hints.some(h=>/Tải xuống/.test(h[0])&&h[1]==='info'),'user is told where the file went');
- assert.ok(!hints.some(h=>h[1]==='error'));
+function withBrowser(fetchImpl) {
+  const saved = [],
+    hints = [],
+    window = { HAK: { UI: { toast: (...x) => hints.push(x) } }, saveAs: (b, n) => saved.push(n) };
+  const ctx = {
+    setTimeout: (f) => setTimeout(f, 0),
+    clearTimeout,
+    AbortController,
+    window,
+    console,
+    Uint8Array,
+    Blob,
+    btoa,
+    Error,
+    fetch: fetchImpl,
+  };
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(require.resolve('../app/js/word.js'), 'utf8'), ctx);
+  return { files: window.HAK.Word.Files, saved, hints };
+}
+test('helper offline falls back to a normal browser download instead of an error', async () => {
+  const { files, saved, hints } = withBrowser(async () => {
+    throw new TypeError('Failed to fetch');
+  });
+  assert.equal(await files.saveBlob(new Blob(['x']), 'a.docx'), 'Downloads/a.docx');
+  assert.deepEqual(saved, ['a.docx']);
+  assert.ok(
+    hints.some((h) => /Tải xuống/.test(h[0]) && h[1] === 'info'),
+    'user is told where the file went'
+  );
+  assert.ok(!hints.some((h) => h[1] === 'error'));
 });
-test('helper busy beyond the retries, or file too large, also falls back to a browser download',async()=>{
- const busy=withBrowser(async()=>({ok:false,status:409,json:async()=>({error:'busy'})}));
- assert.equal(await busy.files.saveBlob(new Blob(['x']),'b.xlsx'),'Downloads/b.xlsx');
- const big=withBrowser(async()=>{throw Error('must not be called');});
- assert.equal(await big.files.saveBlob(new Blob([new Uint8Array(28*1024*1024)]),'c.zip'),'Downloads/c.zip');assert.deepEqual(big.saved,['c.zip']);
+test('helper busy beyond the retries, or file too large, also falls back to a browser download', async () => {
+  const busy = withBrowser(async () => ({ ok: false, status: 409, json: async () => ({ error: 'busy' }) }));
+  assert.equal(await busy.files.saveBlob(new Blob(['x']), 'b.xlsx'), 'Downloads/b.xlsx');
+  const big = withBrowser(async () => {
+    throw Error('must not be called');
+  });
+  assert.equal(await big.files.saveBlob(new Blob([new Uint8Array(28 * 1024 * 1024)]), 'c.zip'), 'Downloads/c.zip');
+  assert.deepEqual(big.saved, ['c.zip']);
 });
-test('user cancelling the Windows Save dialog does not trigger a download',async()=>{
- const t=withBrowser(async()=>({ok:true,status:200,json:async()=>({canceled:true})}));
- assert.equal(await t.files.saveBlob(new Blob(['x']),'d.docx'),false);assert.deepEqual(t.saved,[]);
+test('user cancelling the Windows Save dialog does not trigger a download', async () => {
+  const t = withBrowser(async () => ({ ok: true, status: 200, json: async () => ({ canceled: true }) }));
+  assert.equal(await t.files.saveBlob(new Blob(['x']), 'd.docx'), false);
+  assert.deepEqual(t.saved, []);
 });
 
 test('các nơi gọi HAKDocs đều gửi mã bảo vệ X-HAK-Token (HAKDocs từ chối yêu cầu thiếu mã)', () => {
@@ -51,7 +187,10 @@ test('các nơi gọi HAKDocs đều gửi mã bảo vệ X-HAK-Token (HAKDocs t
     assert.ok(/X-HAK-Client'\s*:\s*'documents-v1'\s*,\s*'X-HAK-Token'\s*:\s*window\.HAK_DOCS_TOKEN/.test(src), f + ' thiếu X-HAK-Token');
   }
   const html = fs.readFileSync(require('node:path').join(__dirname, '../app/index.html'), 'utf8');
-  assert.ok(html.indexOf('native/hakdocs-token.js') >= 0 && html.indexOf('native/hakdocs-token.js') < html.indexOf('js/version.js'), 'index.html phải nạp mã bảo vệ trước các script app');
+  assert.ok(
+    html.indexOf('native/hakdocs-token.js') >= 0 && html.indexOf('native/hakdocs-token.js') < html.indexOf('js/version.js'),
+    'index.html phải nạp mã bảo vệ trước các script app'
+  );
   const cs = fs.readFileSync(require('node:path').join(__dirname, '../installer/native/HAKDocs.cs'), 'utf8');
   assert.ok(/Allow-Headers: Content-Type, X-HAK-Client, X-HAK-Token/.test(cs) && /TokenOk\(headers\["X-HAK-Token"\]\)/.test(cs));
 });
