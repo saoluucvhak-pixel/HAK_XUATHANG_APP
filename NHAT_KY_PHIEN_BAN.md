@@ -1,5 +1,8 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.19.4 (bản vá)
+- Hợp đồng chỉ "Đã hoàn thành" khi mọi chi tiết đã có chứng thư / phiếu cân đều có tờ khai thông quan (xác nhận 17/11/2026).
+
 ## v2.19.3 (bản vá)
 - Menu sắp theo quy trình; Tổng quan thêm ô Thực giao đã lập hồ sơ (cùng engine Báo cáo) và giải thích chênh lệch; xác nhận phạm vi trước khi xuất; sửa hộp hỏi kẹt khi bấm nhanh.
 

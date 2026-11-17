@@ -162,14 +162,28 @@
   const statusDate = (d, status) => { const hit = (d.statusLog || []).filter((x) => x.status === status).pop(); return hit ? hit.at : ''; };
 
   /** Hợp đồng: running (Đang thực hiện) → done (Đã hoàn thành) khi có tờ khai và tất cả đã thông quan. */
-  function contractStatus(customs, contractId, contract) {
+  /**
+   * Chi tiết hợp đồng "đã có bằng chứng thực hiện" = đã có số chứng thư HOẶC (opt.tripDetails) đã có phiếu cân; trả về những chi tiết CHƯA có tờ khai thông quan gắn đúng chi tiết.
+   * Tờ khai chưa gắn chi tiết chỉ được tính cho chi tiết duy nhất khi hợp đồng có đúng 1 chi tiết cần tờ khai (không có gì để nhầm).
+   */
+  function detailsWithoutClearance(list, contract, opt) {
+    const trips = opt && opt.tripDetails ? opt.tripDetails : null;
+    const need = ((contract && contract.details) || []).filter((d) => !d.deletedAt && (String(d.certNo || '').trim() || (trips && trips.has(d.id))));
+    const clearedBy = new Set(list.filter((d) => d.status === 'cleared' && d.detailId).map((d) => d.detailId));
+    const looseCleared = list.filter((d) => d.status === 'cleared' && !d.detailId).length;
+    const missing = need.filter((d) => !clearedBy.has(d.id));
+    if (missing.length === 1 && need.length === 1 && looseCleared > 0) return [];
+    return missing;
+  }
+  function contractStatus(customs, contractId, contract, opt) {
     const list = act(customs).filter((d) => d.contractId === contractId);
     const cleared = list.filter((d) => d.status === 'cleared').length;
     // Đóng thủ công (hợp đồng Xuất bán / Trao đổi không có tờ khai, hoặc đã giao đủ): contract.closedAt = ngày đóng.
     if (contract && contract.closedAt) return { code: 'done', label: 'Đã đóng hợp đồng', total: list.length, cleared, manual: true, closedAt: contract.closedAt };
-    const done = list.length > 0 && cleared === list.length;
+    const missing = contract && list.length > 0 && cleared === list.length ? detailsWithoutClearance(list, contract, opt) : [];
+    const done = list.length > 0 && cleared === list.length && !missing.length;
     // Quy tắc nghiệp vụ ĐÃ XÁC NHẬN (14/11/2026): hợp đồng "Đã hoàn thành" khi mọi tờ khai đã thông quan. Không bao hàm đủ KL / đã nộp thuế / đã giao hết — các chỉ tiêu đó hiển thị riêng (axes).
-    return { code: done ? 'done' : 'running', label: done ? 'Đã hoàn thành' : 'Đang thực hiện', basis: done ? 'Mọi tờ khai đã thông quan' : '', total: list.length, cleared };
+    return { code: done ? 'done' : 'running', label: done ? 'Đã hoàn thành' : 'Đang thực hiện', basis: done ? 'Mọi tờ khai đã thông quan và mọi chi tiết đã có chứng thư / phiếu cân đều có tờ khai thông quan' : (missing.length ? 'Còn ' + missing.length + ' chi tiết chưa có tờ khai thông quan: ' + missing.map((d) => d.ship || d.certNo || d.id).join(', ') : ''), total: list.length, cleared, missingDetails: missing.map((d) => d.id) };
   }
   /**
    * Gợi ý ĐÓNG hợp đồng: đã thực hiện đủ khối lượng hiện hành (Σ KL khô chứng thư ≥ KL hợp đồng) và — với Xuất khẩu / Ủy thác XK — mọi tờ khai đã thông quan.
@@ -180,7 +194,7 @@
     const qty = Number(c.contractQty) || 0; if (!(qty > 0)) return '';
     const got = (c.details || []).filter((d) => !d.deletedAt).reduce((a, d) => a + (Number(d.bdmt) || 0), 0);
     if (got + 0.005 < qty) return '';
-    if ((c.type === 'xuatkhau' || c.type === 'uythac') && contractStatus(customs, c.id).code !== 'done') return '';
+    if ((c.type === 'xuatkhau' || c.type === 'uythac') && contractStatus(customs, c.id, c).code !== 'done') return '';
     return 'Đã thực hiện ' + Math.round(got * 100) / 100 + ' / ' + qty + ' BDMT' + ((c.type === 'xuatkhau' || c.type === 'uythac') ? ' và mọi tờ khai đã thông quan' : '') + ' — có thể đóng hợp đồng.';
   }
   function validate(d, data) {

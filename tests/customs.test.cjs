@@ -75,7 +75,7 @@ test('thuế phải nộp theo khai bổ sung mới nhất; còn phải nộp = 
 test('hợp đồng chuyển "Đã hoàn thành" (điều kiện: mọi tờ khai đã thông quan) khi mọi tờ khai đã thông quan',()=>{
   const a=M.newDecl({no:'111111111111',contractId:'c1',status:'cleared'}),b=M.newDecl({no:'222222222222',contractId:'c1',status:'waiting'}),other=M.newDecl({no:'333333333333',contractId:'c2'});
   assert.equal(M.contractStatus([a,b,other],'c1').code,'running');assert.equal(M.contractStatus([a,b,other],'c1').cleared,1);
-  M.setStatus(b,'cleared','2026-06-30');assert.equal(M.contractStatus([a,b,other],'c1').code,'done');assert.equal(M.contractStatus([a,b,other],'c1').label,'Đã hoàn thành');assert.equal(M.contractStatus([a,b,other],'c1').basis,'Mọi tờ khai đã thông quan');
+  M.setStatus(b,'cleared','2026-06-30');assert.equal(M.contractStatus([a,b,other],'c1').code,'done');assert.equal(M.contractStatus([a,b,other],'c1').label,'Đã hoàn thành');assert.match(M.contractStatus([a,b,other],'c1').basis,/Mọi tờ khai đã thông quan/);
   assert.equal(M.contractStatus([a,b,other],'c3').code,'running','hợp đồng chưa có tờ khai vẫn Đang thực hiện');
   b.deletedAt='x';assert.equal(M.contractStatus([a,b],'c1').code,'done','tờ khai đã xóa không tính');
   assert.equal(M.statusDate(b,'cleared'),'2026-06-30');assert.throws(()=>M.setStatus(b,'xyz'));
@@ -274,4 +274,22 @@ test('thuế bằng 0, thuế chưa nhập, tờ khai có khai bổ sung', () =>
   assert.equal(M.totals(none).undetermined, true); assert.match(M.taxText(M.settlement([none])), /1 tờ khai chưa xác định nghĩa vụ thuế/);
   const t = M.totals(supp); assert.equal(t.payable, 130); assert.equal(t.owed, 30); assert.equal(t.extra, 30); assert.equal(M.settlement([supp]).owed, 30);
   const all = M.settlement([zero, none, supp]); assert.equal(all.nDecl, 3); assert.equal(all.undetermined, 1); assert.equal(all.owed, 30); assert.equal(all.payable, 130);
+});
+
+test('hợp đồng chỉ "Đã hoàn thành" khi mọi chi tiết đã có chứng thư / phiếu cân đều có tờ khai thông quan (xác nhận 17/11/2026)',()=>{
+  const c={id:'c1',details:[{id:'dA',ship:'TÀU A',certNo:'CT-A'},{id:'dB',ship:'TÀU B',certNo:'CT-B'}]};
+  const a=M.newDecl({no:'111111111111',contractId:'c1',detailId:'dA',status:'cleared'});
+  let st=M.contractStatus([a],'c1',c);assert.equal(st.code,'running');assert.match(st.basis,/Còn 1 chi tiết chưa có tờ khai thông quan: TÀU B/);assert.deepEqual(Array.from(st.missingDetails),['dB']);
+  const b=M.newDecl({no:'222222222222',contractId:'c1',detailId:'dB',status:'opened'});assert.equal(M.contractStatus([a,b],'c1',c).code,'running','có tờ khai nhưng chưa thông quan');
+  M.setStatus(b,'cleared','2026-11-17');st=M.contractStatus([a,b],'c1',c);assert.equal(st.code,'done');assert.equal(st.label,'Đã hoàn thành');
+  // chi tiết chưa có chứng thư và chưa có phiếu cân → chưa cần tờ khai
+  const c2={id:'c1',details:[{id:'dA',certNo:'CT-A'},{id:'dX',ship:'TÀU X'}]};assert.equal(M.contractStatus([a],'c1',c2).code,'done');
+  // có phiếu cân (opt.tripDetails) nhưng chưa có chứng thư → vẫn cần tờ khai
+  assert.equal(M.contractStatus([a],'c1',c2,{tripDetails:new Set(['dX'])}).code,'running');
+  // chi tiết đã ngừng dùng không tính
+  const c3={id:'c1',details:[{id:'dA',certNo:'CT-A'},{id:'dB',certNo:'CT-B',deletedAt:'x'}]};assert.equal(M.contractStatus([a],'c1',c3).code,'done');
+  // tờ khai chưa gắn chi tiết: chỉ tính khi hợp đồng có đúng 1 chi tiết cần tờ khai
+  const loose=M.newDecl({no:'333333333333',contractId:'c1',status:'cleared'});assert.equal(M.contractStatus([loose],'c1',{id:'c1',details:[{id:'dA',certNo:'CT-A'}]}).code,'done');assert.equal(M.contractStatus([loose],'c1',c).code,'running');
+  // đóng thủ công vẫn thắng; không truyền hợp đồng → quy tắc cũ (chỉ xét tờ khai)
+  assert.equal(M.contractStatus([a],'c1',Object.assign({closedAt:'2026-11-17'},c)).label,'Đã đóng hợp đồng');assert.equal(M.contractStatus([a],'c1').code,'done');
 });
