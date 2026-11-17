@@ -5,6 +5,10 @@
 - Sửa đọc số dạng chữ: ".500" / "-.250" đọc 500 / -250 (sai 1.000 lần) → 0,5 / -0,25; "1.5E3" đọc 1,53 → 1500.
 - Sửa đọc ngày giờ: ngày không tồn tại (29/02 năm không nhuận, 32/01, tháng 13, giờ 25…) không còn bị tràn sang ngày khác; dòng đó được cảnh báo "Thiếu/sai ngày cân" kèm số dòng Excel.
 - Thêm test: tests/merge-batches.test.cjs, tests/parse-edge.test.cjs.
+- Thuế: số dư còn nợ / nộp thừa làm tròn 0,01 đ để sai số số thực không tạo ra "nộp thừa 0 đ (1 tờ khai)" hay "còn nợ" vài e-17 đồng.
+- Danh mục: so trùng số TKHQ giữa các hợp đồng bỏ khoảng trắng thừa (nhiều dòng hàng dùng chung một TKHQ trong cùng hợp đồng vẫn hợp lệ — quy tắc nghiệp vụ).
+- Nhật ký chứng từ: phát hiện trùng số BKLS không phân biệt hoa/thường và khoảng trắng.
+- Thêm test: tests/contract-tkhq-dup.test.cjs, tests/customs-rounding.test.cjs, tests/issued-dup.test.cjs.
 - Đợt 4: định dạng toàn bộ JS (app/js, tests, tools) bằng Prettier + .editorconfig; CI chạy npm run format:check; npm run format để tự sửa. Đã kiểm chứng cây cú pháp 109/109 file tương đương bản trước (chỉ khác cách viết: khóa đối tượng bỏ nháy, bỏ ngoặc thừa trong chuỗi &&). Tệp sinh tự động/thư viện không định dạng (.prettierignore). Ngưỡng long-file của quality đặt 2.200 dòng (app/.hakquality.json, không đóng gói vào bản phát hành) vì số dòng tăng sau khi định dạng.
 - Đợt 2: tách pages.js (1.694 → 903 dòng) thành pages-modals.js, pages-contract.js, pages-filter.js, pages-bkls.js (không đổi hành vi; nạp trước pages.js). Báo cáo quality không còn cảnh báo.
 - Test thứ tự nạp script (tests/script-order.test.cjs): mỗi file chỉ đọc HAK.<Tên> lúc nạp khi tên đã được file nạp trước gán.
