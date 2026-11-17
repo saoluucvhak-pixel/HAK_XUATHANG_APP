@@ -10,7 +10,8 @@ function contractNumber(input){
  for(let i=0;i<source.length;){const ch=String.fromCodePoint(source.codePointAt(i)),plain=ch.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[đĐ]/g,'D');for(let j=0;j<plain.length;j++){normalized+=plain[j];offsets.push(i);}i+=ch.length;}offsets.push(source.length);
  const code='[A-Z0-9][A-Z0-9/._„”“·,\\u2010-\\u2015\\u2212-]*(?:[ \\t]*\\/[ \\t]*[A-Z0-9._„”“·,\\u2010-\\u2015\\u2212-]+)*';
  const rules=[
-  {rank:4,re:new RegExp('(?:^|\\n)[ \\t]*PURCHASE\\s*ORDER\\s*(?:NUMBER|NO\\.?)[^\\n]*?[:：]\\s*('+code+')','gim')},   // PO: "PURCHASE ORDER NUMBER …:0626LH-HAK2607004" (chữ Hán giữa nhãn và số bị OCR thành rác)
+  {rank:4,re:new RegExp('(?:^|\\n)[ \\t]*PURCHASE\\s*ORDER\\s*(?:NUMBER|NO\\.?)[^\\n]*?[:：]\\s*('+code+')','gim')},
+  {rank:4,re:/(?:^|\n|[ \t]{2,})[ \t]*(?:P\.?O\.?)[ \t]*(?:NO\.?|NUMBER|#)[ \t]*[:：]?[ \t]*([A-Z0-9][A-Z0-9/._]*(?:[ \t]*-[ \t]*[A-Z0-9][A-Z0-9/._]*)+)/gim},   // v2.19.5: PO tiếng Anh "PO No.: 2 -2026CY" (khoảng trắng quanh dấu gạch bị bỏ)   // PO: "PURCHASE ORDER NUMBER …:0626LH-HAK2607004" (chữ Hán giữa nhãn và số bị OCR thành rác)
   {rank:4,re:new RegExp('(?:^|\\n)[ \\t]*(?:CONTRACT\\s*(?:NO\\.?|NUMBER|#)|(?:HOP\\s*DONG|HD)\\s*(?:SO|S6|S0|NO\\.?)|S[O06]\\s*(?:HOP\\s*DONG|HD))\\s*[:：#.\\-]?\\s*('+code+')','gim')},
   {rank:3,re:/(?:^|\n)[ \t]*(IWC[ \t]*\/[ \t]*[A-Z][A-Z0-9/._-]*?\d{2}[ \t]*[-\u2010-\u2015\u2212„”“·,][ \t]*\d{3,8})(?=[ \t]*(?:$|[:：]))/gim},
   {rank:3,re:/^(IWC[ \t]*\/[ \t]*[A-Z0-9/._-]+)[ \t]*$/gim},
@@ -74,8 +75,12 @@ function parse(text,kind){
   const MONTHS='(?:January|February|March|April|May|June|July|August|September|October|November|December)';
   add('date',new RegExp('(?:^|\\n)(\\d{1,2}[- ]'+MONTHS+'\\s+\\d{4})','i'),monthDate);
   add('date',/(?:^|\n)\s*date\b[^\n\d]{0,24}(\d{4}[-/.]\d{1,2}[-/.]\d{1,2})/i,s=>{const [y,m,d]=s.split(/[-/.]/);const t=new Date(+y,+m-1,+d);return t.getFullYear()===+y&&t.getMonth()===+m-1&&t.getDate()===+d?y+'-'+m.padStart(2,'0')+'-'+d.padStart(2,'0'):null;});   // PO: "DATE 日期: 2026-6-26"
-  add('date',new RegExp('(?:^|\\n)\\s*date\\s*[:：]\\s*(\\d{1,2}[- ]'+MONTHS+'\\s+\\d{4})','i'),monthDate);   // v2.13.0: "Date: 27-July 2026"
-  add('ship',/(?:tau|vessel)\s*[:：]?\s*((?:MV\.?\s*)?[A-Z][A-Z0-9 ._-]*?V\.?\s*\d+[A-Z0-9]*)/i);
+  add('date',new RegExp('(?:^|\\n)\\s*date\\s*[:：]\\s*(\\d{1,2}[- ]'+MONTHS+'\\s+\\d{4})','i'),monthDate);
+  if(!found.some(x=>x.key==='date')){   // v2.19.5: PO không có nhãn "Date": "03 February 2026" (bỏ ngày ETA / ETD / hiệu lực / ngày của hợp đồng khung)
+   const re=new RegExp('(\\d{1,2})(?:st|nd|rd|th)?[ -]+('+MONTHS+')[ ,]+(\\d{4})','gi');let dm;
+   while((dm=re.exec(text))){const from=text.lastIndexOf('\n',dm.index)+1,to=text.indexOf('\n',dm.index),line=text.slice(from,to<0?text.length:to).toLowerCase();if(/\b(?:eta|etd|etb|laycan|dated|agreement|valid|expir\w*)\b/.test(line))continue;const v=monthDate(dm[1]+'-'+dm[2]+' '+dm[3]);if(v)found.push({key:'date',value:v,evidence:original.slice(dm.index,dm.index+dm[0].length)});break;}
+  }   // v2.13.0: "Date: 27-July 2026"
+  add('ship',/(?:tau|vessel)\s*[:：]?\s*((?:MV\.?\s*)?[A-Z][A-Z0-9 ._-]*?V[.\-]?\s*\d+[A-Z0-9]*)/i);
   add('qty',/(?:S[o6]\s*lu[qou]+ng)\s*la\s*[:：]?\s*([\d.,]+)\s*BDMT/i,number);
   add('date',/l.{0,2}p\s*(?:vao)?\s*ngay\s*(\d{1,2}\s*thang\s*\d{1,2}\s*nam\s*\d{4})/i,s=>iso(s.replace(/\s*(?:thang|nam)\s*/g,'/')));
   add('ship',/(?:vessel|t[aà]u)\s*[:：]?\s*((?:M\.?\s*V\.?\s*)?[A-Z][A-Z0-9 ._-]{3,65})/);

@@ -1,5 +1,8 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.19.5 (bản vá)
+- Đọc hợp đồng / Purchase Order tiếng Anh bố cục nhiều cột: đúng bên bán – bên mua (Messrs, Seller/Buyer), số PO "2 -2026CY", ngày "03 February 2026", hàng hóa, khối lượng, tàu "V-31".
+
 ## v2.19.4 (bản vá)
 - Hợp đồng chỉ "Đã hoàn thành" khi mọi chi tiết đã có chứng thư / phiếu cân đều có tờ khai thông quan (xác nhận 17/11/2026).
 

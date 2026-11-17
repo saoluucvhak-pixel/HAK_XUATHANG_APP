@@ -105,6 +105,9 @@ Muốn lập đúng điều đang xem: ở Nhập liệu bấm **Dùng phạm vi
 **6. Mở lại / in lại hồ sơ cũ**
 - Hồ sơ đã lưu được mở theo đúng phiên bản đã lưu; năm đã đóng chỉ xem. Khi mở hồ sơ khác lúc đang sửa dở, app hỏi Lưu/Bỏ/Quay lại.
 
+## Đọc hợp đồng / Purchase Order bằng OCR (v2.19.5)
+Ở Danh mục → hợp đồng, đính kèm PDF rồi bấm **Đọc bằng OCR Windows** (cần mở app bằng `native\HAKDocs.exe`). App chỉ **đề xuất** từng trường kèm trang và dòng làm bằng chứng — bạn bấm điền từng ô sau khi đối chiếu. Purchase Order tiếng Anh nhiều cột được nhận: *Messrs* là bên bán, dòng *Seller / Buyer* theo thứ tự nhãn, số PO dạng `2 -2026CY` (khoảng trắng quanh dấu gạch được bỏ), ngày dạng `03 February 2026` (không lấy ngày ETA hay ngày hợp đồng khung), tàu dạng `V-31`. Luôn kiểm tra lại bên bán / bên mua và số liệu trước khi lưu.
+
 ## Đóng năm bị gián đoạn
 Trong **Sổ hồ sơ theo năm**, năm có file ZIP đã kiểm tra nhưng chưa dọn kho sẽ có dòng *"File đã kiểm tra; dọn kho chưa hoàn tất"* và nút **Tiếp tục đóng năm**: chọn lại đúng file ZIP đã lưu → app so mã SHA-256, đối chiếu từng hồ sơ / hồ sơ Lưu trữ cũ / đợt cân với file. Nếu không có gì thay đổi thì dọn tiếp và báo số hồ sơ, hồ sơ cũ, đợt cân đã dọn (đối chiếu với số kỳ vọng). Nếu có hồ sơ hoặc đợt cân **đã sửa sau khi đóng dở** thì app báo "cần đối chiếu" và KHÔNG dọn — hãy bấm **Đóng năm** để tạo file ZIP mới. Hồ sơ mới phát sinh sau khi đóng dở được giữ lại và báo.
  (📊 menu Hệ thống)
