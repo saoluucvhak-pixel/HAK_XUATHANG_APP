@@ -40,3 +40,16 @@ test('phiếu bỏ + giờ cân + phiếu chọn riêng cho cùng kết quả �
   const a = G.filterRows(ROWS, filter).map((r) => r.idx), saved = JSON.parse(JSON.stringify(filter)), b = G.filterRows(ROWS, saved).map((r) => r.idx);
   assert.deepEqual(a, [1, 3]); assert.deepEqual(a, b);
 });
+
+test('kho bộ lọc hỏng: không ghi đè, sao lưu có mốc thời gian, lần hỏng thứ hai không đè bản sao lưu đầu', () => {
+  const store = {}; const st = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: (k) => { delete store[k]; } };
+  SF.presets(st).save('s', 'x', state()); const key = Object.keys(store)[0];
+  store[key] = 'first-corrupt'; let p = SF.presets(st);
+  assert.equal(p.isCorrupt(), true); assert.equal(p.save('s', 'y', state({ sel: { plate: ['A'] } })).corrupt, true);
+  assert.equal(p.readCorrupt(), 'first-corrupt');
+  const a = p.discardCorrupt(); assert.equal(a.ok, true); assert.equal(store[a.backupKey], 'first-corrupt');
+  store[key] = 'second-corrupt'; p = SF.presets(st);
+  const b = p.discardCorrupt(); assert.notEqual(a.backupKey, b.backupKey);
+  assert.equal(store[a.backupKey], 'first-corrupt'); assert.equal(store[b.backupKey], 'second-corrupt');
+  assert.equal(SF.presets(st).isCorrupt(), false);
+});

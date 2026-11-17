@@ -9,6 +9,7 @@
     "lint": "eslint app/js"
   },
   "devDependencies": {
+    "acorn": "^8.15.0",
     "eslint": "^9.0.0",
     "globals": "^15.0.0"
   }
