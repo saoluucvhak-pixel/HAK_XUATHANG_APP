@@ -1,5 +1,10 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.21.4 — Bộ cài chỉ dừng HAKDocs của đúng thư mục cài; công cụ đối soát dữ liệu
+- **Bộ cài:** trước đây khi cài / nâng cấp / gỡ, bộ cài dừng MỌI tiến trình `HAKDocs.exe` theo tên (`taskkill /IM`), có thể làm dừng HAKDocs của một bản cài khác trên cùng máy. Nay `installer/stop-hakdocs.ps1` chỉ dừng tiến trình HAKDocs nằm trong `<thư mục cài>\native\`; bản cài khác không bị ảnh hưởng. CI Windows kiểm bằng 3 bản giả lập (dừng a, còn nguyên b và a2).
+- **Công cụ đối soát dữ liệu** `npm run audit:data` (chỉ đọc, không sửa dữ liệu): liệt kê phiếu lặp cùng phạm vi báo cáo, phiếu cùng nhận diện khác khối lượng / cờ xe trả về / liên kết, phiếu đi qua bước nghiệp vụ hợp lệ (kho gửi → hồ sơ đích), phiếu thiếu ngày / thiếu nhận diện, giấy nộp tiền nghi trùng, bản ghi mồ côi, hồ sơ không đọc được — kèm mã hồ sơ nguồn. Có bộ dữ liệu thử đủ ca (`--sample`, `--write-sample`).
+- Test mới: `data-audit`, `report-reconcile` (mô hình màn hình ↔ Excel), cấu hình bộ cài. Không đổi công thức, giao diện hay cách lưu dữ liệu.
+
 ## Chưa phát hành — Tái cấu trúc phần hải quan (chỉ tách mã, không đổi công thức / giao diện / lưu trữ)
 - `customs.js` (2.618 dòng) tách thành: `customs-common.js` (truy cập dữ liệu, nhãn, bộ lọc, ô số liệu dùng chung), `customs-report.js` (báo cáo hải quan trên màn hình), `customs-contract-report.js` (báo cáo thực hiện hợp đồng + `contractReportModel`), `customs-export.js` (Excel), `customs-print.js` (`printReport`, đặc tả PDF), `customs-receipt.js` (duyệt giấy nộp tiền), `customs-import.js` (nhập Excel / OCR). `customs.js` giữ lõi ghi dữ liệu (`commit`), biểu mẫu, liên kết hợp đồng và facade `HAK.Customs` (23 hàm, giữ nguyên tên).
 - Thêm `npm run e2e:customs`, `npm run snapshot:customs` (đối chiếu trước / sau), test `customs-split`. Số liệu màn hình, Excel, bản in PDF, `contractReportModel` và phạm vi công ty giống hệt trước khi tách.
