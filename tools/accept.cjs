@@ -1,39 +1,85 @@
 /* Nghiệm thu bản phát hành trên trình duyệt thật (dữ liệu thử tự tạo, không đụng dữ liệu thật):
  *  A. hai tàu cân xen kẽ cùng ngày, số phiếu tàu B là ĐUÔI số phiếu tàu A (0101 / 101): chọn phiếu, xe trả về,
- *     xuất Word / Excel / PDF (bản in thật → file PDF) và đối chiếu mã phiếu, khối lượng;
+ *     xuất Word / Excel / PDF (bản in thật → file PDF) rồi ĐỌC LẠI từng file để đối chiếu mã phiếu, kg, tiếng Việt;
  *  B. lưu tàu A → Thêm mới → lưu tàu B → mở lại cả hai;
- *  C. hợp đồng có phụ lục + hai tờ khai (nợ 20 / nộp thừa 20) → mẫu báo cáo "Tiến độ hợp đồng" và "Hải quan và công nợ thuế";
- *  D. PDF của báo cáo dài: tiêu đề bảng lặp lại khi sang trang, tiếng Việt đủ dấu.
- * Chạy: npm run accept   (cần playwright; tùy chọn: unzip, pdftotext, pdfinfo để đọc nội dung Word / PDF — thiếu thì bỏ qua bước đó và báo "bỏ qua").
- * HAK_APP_DIR=<thư mục chứa index.html> để thử gói portable (vd dist/app); HAK_CHROMIUM=<đường dẫn trình duyệt khác>.
- * Thoát mã 1 nếu có ca sai. Chưa kiểm được: Edge / Chrome Windows, bộ cài, Google Sheet thật (xem docs/INTEGRATION.md). */
+ *  C. hợp đồng có phụ lục + hai tờ khai (nợ 20 / nộp thừa 20) → mẫu "Tiến độ hợp đồng" (BDMT có / chưa có số chứng thư) và "Hải quan và công nợ thuế";
+ *  D. PDF báo cáo dài: tiêu đề bảng lặp ở mọi trang, đủ dòng, mọi cột nằm trong khổ trang, tiếng Việt đủ dấu.
+ * Chạy: npm run accept            (thiếu bước nào thì "bỏ qua" và báo riêng)
+ *       npm run accept:release    (chế độ phát hành: Word và PDF BẮT BUỘC; bỏ qua = lỗi, chỉ rõ ca chưa xác minh)
+ * Không cần công cụ ngoài (unzip, pdftotext): đọc DOCX bằng JSZip có sẵn trong app/libs, đọc PDF bằng pdfjs-dist (devDependency) — chạy như nhau trên Windows và Linux.
+ * Trình duyệt: mặc định Chromium của Playwright; HAK_BROWSER_CHANNEL=msedge | chrome để dùng Edge / Chrome đã cài (Windows); HAK_CHROMIUM=<đường dẫn> cho trình duyệt khác.
+ * HAK_APP_DIR=<thư mục chứa index.html> để thử gói portable (vd dist/app). Thoát mã 1 nếu có ca lỗi (hoặc, ở --release, có ca bỏ qua).
+ * Chưa kiểm được bằng script này: bộ cài Windows, Google Sheet thật (xem docs/INTEGRATION.md). */
 const { chromium } = require('playwright');
 const fs = require('node:fs'),
   os = require('node:os'),
-  path = require('node:path'),
-  cp = require('node:child_process');
+  path = require('node:path');
 const XLSX = require('../app/libs/xlsx.full.min.js');
+const JSZip = require('../app/libs/jszip.min.js');
+const RELEASE = process.argv.includes('--release') || process.env.HAK_ACCEPT_RELEASE === '1';
 const APP_DIR = path.resolve(process.env.HAK_APP_DIR || path.join(__dirname, '../app'));
-const APP = 'file://' + path.join(APP_DIR, 'index.html');
+const APP = require('node:url').pathToFileURL(path.join(APP_DIR, 'index.html')).href; // đúng cả với đường dẫn Windows (C:\\...)
 const T = 'uythac';
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hak-accept-'));
-const results = [];
+const counts = { pass: 0, fail: 0, skip: 0 };
+const failed = [],
+  skipped = [];
 const check = (ok, msg, extra) => {
   console.log((ok ? '  ✓ ' : '  ✗ ') + msg + (extra ? '  → ' + extra : ''));
-  results.push(ok);
-};
-const skip = (msg) => console.log('  - bỏ qua: ' + msg);
-const has = (cmd) => {
-  try {
-    cp.execSync('command -v ' + cmd, { stdio: 'ignore' });
-    return true;
-  } catch (e) {
-    return false;
+  if (ok) counts.pass++;
+  else {
+    counts.fail++;
+    failed.push(msg);
   }
 };
-const HAS_UNZIP = has('unzip'),
-  HAS_PDF = has('pdftotext') && has('pdfinfo');
-
+/** Ca KHÔNG chạy được: ở --release là lỗi (chưa xác minh), ngược lại chỉ báo "bỏ qua". */
+const skip = (msg) => {
+  console.log((RELEASE ? '  ✗ CHƯA XÁC MINH: ' : '  - bỏ qua: ') + msg);
+  counts.skip++;
+  skipped.push(msg);
+};
+let pdfjs = null;
+if (process.env.HAK_ACCEPT_NO_PDF !== '1') {
+  // pdfjs-dist in cảnh báo về `canvas` (chỉ cần khi vẽ trang, không cần để đọc chữ) → tắt trong lúc nạp
+  const { log, warn } = console;
+  console.log = console.warn = () => {};
+  try {
+    pdfjs = require('pdfjs-dist/legacy/build/pdf.js');
+  } catch (e) {
+    pdfjs = null;
+  } finally {
+    console.log = log;
+    console.warn = warn;
+  }
+} // HAK_ACCEPT_NO_PDF=1: giả lập thiếu công cụ đọc PDF (để thử chế độ --release phải báo lỗi)
+/** Chữ trong DOCX: đọc word/document.xml bằng JSZip (không cần unzip). */
+const docxText = async (file) => {
+  const z = await JSZip.loadAsync(fs.readFileSync(file));
+  const f = z.file('word/document.xml');
+  if (!f) throw new Error('không phải file DOCX hợp lệ (thiếu word/document.xml)');
+  return (await f.async('string')).replace(/<[^>]+>/g, ' ');
+};
+/** Đọc lại PDF bằng pdfjs: chữ từng trang, khổ trang và phần chữ có tràn ra ngoài lề trang không. */
+const readPdf = async (file) => {
+  if (!pdfjs) throw new Error('thiếu pdfjs-dist (chạy npm ci)');
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(fs.readFileSync(file)), useSystemFonts: true, verbosity: 0 }).promise;
+  const pages = [];
+  for (let i = 1; i <= doc.numPages; i++) {
+    const pg = await doc.getPage(i),
+      [x0, y0, x1, y1] = pg.view,
+      tc = await pg.getTextContent();
+    let maxX = -1e9,
+      minX = 1e9;
+    tc.items.forEach((it) => {
+      if (!String(it.str).trim()) return;
+      const x = it.transform[4];
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x + (it.width || 0));
+    });
+    pages.push({ text: tc.items.map((it) => it.str).join(' '), width: x1 - x0, height: y1 - y0, minX, maxX });
+  }
+  return { n: doc.numPages, pages, txt: pages.map((x) => x.text).join('\n') };
+};
 const H = ['Số phiếu', 'Biển số', 'Ngày giờ cân', 'Trọng lượng xe + hàng', 'Trọng lượng xe', 'Trọng lượng hàng', 'Đơn vị vận chuyển'];
 const R = (t, plate, dt, net, c) => [t, plate, dt, net + 10000, 10000, net, c];
 const DATA = [
@@ -82,8 +128,23 @@ async function login(p) {
 }
 
 (async () => {
-  const exe = process.env.HAK_CHROMIUM || undefined;
-  const browser = await chromium.launch(exe ? { executablePath: exe, args: ['--no-sandbox'] } : {});
+  const exe = process.env.HAK_CHROMIUM || undefined,
+    channel = process.env.HAK_BROWSER_CHANNEL || undefined;
+  const browser = await chromium.launch(exe ? { executablePath: exe, args: ['--no-sandbox'] } : channel ? { channel } : {});
+  console.log(
+    'Môi trường: ' +
+      process.platform +
+      ' · Node ' +
+      process.version +
+      ' · ' +
+      (channel || (exe ? exe : 'chromium')) +
+      ' ' +
+      browser.version() +
+      ' · ' +
+      (RELEASE ? 'CHẾ ĐỘ PHÁT HÀNH (Word/PDF bắt buộc)' : 'chế độ thường') +
+      ' · ' +
+      APP_DIR
+  );
   const errs = [];
   let p = null;
   /** Mỗi phần chạy trong một phiên trình duyệt MỚI (kho dữ liệu trống) để số hồ sơ đếm được không lẫn với phần trước. */
@@ -147,9 +208,7 @@ async function login(p) {
   /** Bản in thật: chặn hộp thoại in, rồi để Chromium dựng file PDF từ đúng nội dung đang in. Trả về chữ trong PDF. */
   const pdfText = async (file) => {
     await p.pdf({ path: file, printBackground: true, preferCSSPageSize: true });
-    const txt = cp.execSync('pdftotext -layout "' + file + '" -', { encoding: 'utf8' });
-    const pages = +/Pages:\s+(\d+)/.exec(cp.execSync('pdfinfo "' + file + '"', { encoding: 'utf8' }))[1];
-    return { txt, pages };
+    return readPdf(file);
   };
 
   console.log('A) Hai tàu cân xen kẽ, số phiếu trùng đuôi (0101 / 101): chọn phiếu, xe trả về, Word / Excel / PDF');
@@ -168,15 +227,15 @@ async function login(p) {
   await setShip('TÀU A');
   const [dlW] = await Promise.all([p.waitForEvent('download', { timeout: 30000 }), p.click('#gen-' + T)]);
   await dlW.saveAs(path.join(tmp, 'A.docx'));
-  if (HAS_UNZIP) {
-    const wt = cp
-      .execSync('unzip -p "' + path.join(tmp, 'A.docx') + '" word/document.xml', { encoding: 'utf8', maxBuffer: 1 << 26 })
-      .replace(/<[^>]+>/g, ' ');
+  try {
+    const wt = await docxText(path.join(tmp, 'A.docx'));
     check(
       /TÀU A/.test(wt) && A.every((t) => wt.includes(t)) && !B.some((t) => hasCode(wt, t)),
-      'Word: đủ 4 mã phiếu tàu A, không có phiếu tàu B'
+      'Word (đọc lại DOCX): đủ 4 mã phiếu tàu A, tiếng Việt, không có phiếu tàu B'
     );
-  } else skip('Word (thiếu unzip)');
+  } catch (e) {
+    skip('Word: không đọc lại được file DOCX (' + e.message + ')');
+  }
   const [dlX] = await Promise.all([p.waitForEvent('download', { timeout: 20000 }), p.click('#xls-' + T)]);
   await dlX.saveAs(path.join(tmp, 'A.xlsx'));
   const xw = XLSX.read(fs.readFileSync(path.join(tmp, 'A.xlsx')));
@@ -193,14 +252,22 @@ async function login(p) {
   });
   await p.click('#pdf-' + T);
   await p.waitForFunction(() => window.__printed > 0, null, { timeout: 30000 }).catch(() => {});
-  if (HAS_PDF && (await p.evaluate(() => window.__printed))) {
-    const { txt, pages } = await pdfText(path.join(tmp, 'A.pdf'));
-    check(
-      A.every((t) => txt.includes(t)) && /TÀU A/.test(txt) && !B.some((t) => hasCode(txt, t)),
-      'PDF (bản in thật): tiếng Việt + 4 mã phiếu tàu A, không có tàu B',
-      pages + ' trang'
-    );
-  } else skip('PDF (thiếu pdftotext / pdfinfo hoặc không mở được bản in)');
+  if (await p.evaluate(() => window.__printed)) {
+    try {
+      const { txt, n, pages } = await pdfText(path.join(tmp, 'A.pdf'));
+      check(
+        A.every((t) => txt.includes(t)) && /TÀU A/.test(txt) && !B.some((t) => hasCode(txt, t)),
+        'PDF (đọc lại file): tiếng Việt + 4 mã phiếu tàu A, không có tàu B',
+        n + ' trang'
+      );
+      check(
+        pages.every((pg) => pg.minX >= -1 && pg.maxX <= pg.width + 1),
+        'PDF Word: mọi chữ nằm trong khổ trang (không bị cắt)'
+      );
+    } catch (e) {
+      skip('PDF Word: không đọc lại được file PDF (' + e.message + ')');
+    }
+  } else skip('PDF Word: không mở được bản in nên không tạo được file PDF');
   await p.evaluate(() => document.body.classList.remove('printing'));
 
   console.log('B) Lưu tàu A → Thêm mới → lưu tàu B → mở lại cả hai');
@@ -347,10 +414,17 @@ async function login(p) {
     r3[col3(/THỰC GIAO QUA CÂN/)]
   );
   check(r3[col3(/THÔNG QUAN/)] === '2/2 đã thông quan', 'mẫu 3: thông quan 2/2 tờ khai, hiện riêng với cột đóng hợp đồng');
-  console.log(
-    '   (ghi nhận) BDMT theo chi tiết hợp đồng hiện ' +
-      r3[col3(/BDMT THEO CHI TIẾT HỢP ĐỒNG/)] +
-      ' — gồm cả chi tiết chưa có số chứng thư (4.000 có chứng thư + 1.000 chưa có); cần xác nhận nghiệp vụ'
+  const v3 = (re) => r3[col3(re)];
+  check(
+    v3(/BDMT THEO CHI TIẾT HỢP ĐỒNG/) === '5.000,00' &&
+      v3(/ĐÃ CÓ SỐ CHỨNG THƯ/) === '4.000,00' &&
+      v3(/CHƯA CÓ SỐ CHỨNG THƯ/) === '1.000,00',
+    'mẫu 3: BDMT chi tiết 5.000 = 4.000 đã có số chứng thư + 1.000 chưa có số chứng thư',
+    [v3(/BDMT THEO CHI TIẾT HỢP ĐỒNG/), v3(/ĐÃ CÓ SỐ CHỨNG THƯ/), v3(/CHƯA CÓ SỐ CHỨNG THƯ/)].join(' / ')
+  );
+  check(
+    v3(/CÒN LẠI/) === '1.000,00' && v3(/CHI TIẾT CÓ CHỨNG THƯ/) === '1/2',
+    'mẫu 3: còn lại = 6.000 − 5.000 = 1.000; chi tiết có chứng thư 1/2'
   );
   await p.selectOption('#repTpl', 'tax');
   await p.waitForTimeout(2500);
@@ -363,7 +437,7 @@ async function login(p) {
   check(/Số dư ròng[^.]*không bù trừ/i.test(body4), 'mẫu 4: số dư ròng ghi đúng tên, kèm "không bù trừ giữa các tờ khai"');
 
   console.log('D) PDF báo cáo dài: tiêu đề bảng lặp lại khi sang trang, tiếng Việt đủ dấu');
-  if (HAS_PDF) {
+  {
     await p.evaluate(() => {
       window.__pr = 0;
       window.print = () => {
@@ -385,19 +459,38 @@ async function login(p) {
       });
     });
     await p.waitForFunction(() => window.__pr > 0, null, { timeout: 15000 }).catch(() => {});
-    const { txt, pages } = await pdfText(path.join(tmp, 'dai.pdf'));
-    const hdr = (txt.match(/Số phiếu/g) || []).length;
-    check(pages >= 2 && hdr >= pages, 'tiêu đề bảng lặp ở mỗi trang', pages + ' trang, tiêu đề ' + hdr + ' lần');
-    check(
-      /Đại Hiệp — HĐ/.test(txt) && /Hoàng Anh Khôi/.test(txt) && (txt.match(/T0\d{3}/g) || []).length === 140,
-      'tiếng Việt đủ dấu, đủ 140 dòng, không cắt cột'
-    );
-  } else skip('PDF báo cáo dài (thiếu pdftotext / pdfinfo)');
+    let rd = null;
+    if (await p.evaluate(() => window.__pr))
+      try {
+        rd = await pdfText(path.join(tmp, 'dai.pdf'));
+      } catch (e) {
+        skip('PDF báo cáo dài: không đọc lại được file PDF (' + e.message + ')');
+      }
+    else skip('PDF báo cáo dài: không mở được bản in nên không tạo được file PDF');
+    if (rd) {
+      const { txt, n: pages, pages: pgs } = rd;
+      const hdr = pgs.filter((pg) => /Số phiếu/.test(pg.text) && /Ghi chú: đơn vị vận chuyển/.test(pg.text)).length;
+      check(pages >= 2 && hdr === pages, 'tiêu đề bảng lặp ở MỌI trang', pages + ' trang, tiêu đề ở ' + hdr + ' trang');
+      check(
+        pgs.every((pg) => pg.minX >= -1 && pg.maxX <= pg.width + 1),
+        'mọi cột nằm trong khổ trang (không tràn lề)'
+      );
+      check(
+        /Đại Hiệp — HĐ/.test(txt) && /Hoàng Anh Khôi/.test(txt) && (txt.match(/T0\d{3}/g) || []).length === 140,
+        'tiếng Việt đủ dấu, đủ 140 dòng'
+      );
+      check(new Set(txt.match(/T0\d{3}/g) || []).size === 140, '140 mã dòng khác nhau, không thiếu, không lặp dòng');
+    }
+  }
 
   check(errs.length === 0, 'không có lỗi script trong suốt luồng', errs[0] || '');
   await browser.close();
-  const bad = results.filter((x) => !x).length;
-  console.log(bad ? '\n✗ ' + bad + ' ca sai (' + results.length + ' ca đã chạy)' : '\n✓ Đạt toàn bộ ' + results.length + ' ca');
+  const total = counts.pass + counts.fail + counts.skip;
+  console.log('\nKết quả (' + total + ' ca): Đạt ' + counts.pass + ' · Lỗi ' + counts.fail + ' · Bỏ qua ' + counts.skip);
+  if (counts.fail) console.log('Ca lỗi:\n  - ' + failed.join('\n  - '));
+  if (counts.skip) console.log((RELEASE ? 'CHƯA XÁC MINH (chế độ phát hành coi là lỗi):\n  - ' : 'Bỏ qua:\n  - ') + skipped.join('\n  - '));
+  const bad = counts.fail > 0 || (RELEASE && counts.skip > 0);
+  console.log(bad ? '\n✗ KHÔNG ĐẠT' : '\n✓ Đạt');
   process.exit(bad ? 1 : 0);
 })().catch((e) => {
   console.error(e);

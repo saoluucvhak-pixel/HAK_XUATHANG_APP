@@ -19,3 +19,10 @@ test('release excludes recovery/reset tools but preserves runtime assets', () =>
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('bộ cài NSIS loại đúng các file khôi phục / cấu hình dev như bản portable (không đóng .hakquality.json vào bộ cài)', () => {
+  const nsi = fs.readFileSync(path.resolve('installer/setup.nsi'), 'utf8'),
+    line = nsi.split(/\r?\n/).find((l) => /File \/r/.test(l)) || '';
+  for (const pat of ['MoKhoa_1Lan*.html', 'XoaSach_DuLieu*.html', '.hakquality.json'])
+    assert.ok(line.includes('/x "' + pat + '"'), 'setup.nsi phải loại ' + pat + ' — dòng: ' + line);
+});

@@ -27,15 +27,35 @@ jobs:
           path: reports/quality/
 
   smoke:
-    # Mở app thật trên Chromium: không được có lỗi script (bắt lỗi thứ tự nạp / tách file)
+    # Mở app thật trên Chromium: không được có lỗi script (bắt lỗi thứ tự nạp / tách file) + luồng xuyên màn hình + nghiệm thu phát hành
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm ci
+      - run: npm ci   # gồm pdfjs-dist (devDependency) để đọc lại file PDF xuất ra
       - run: npm i --no-save playwright@1.63.0   # chỉ dùng trong CI, không thêm vào dependencies
       - run: npx playwright install --with-deps chromium
       - run: npm run smoke
       - run: npm run ui-audit   # tràn ngang, tương phản WCAG AA (4 chủ đề × sáng/tối), nhãn truy cập
+      - run: npm run e2e   # hai tàu cân xen kẽ: nhập, đổi sheet, chọn phiếu, lưu, mở lại, Excel, báo cáo
+      - run: npm run e2e:carrier   # chi tiết đơn vị vận chuyển khớp bảng tổng khi lọc theo ngày cân
+      - run: npm run e2e:reports   # 5 mẫu báo cáo + bảng chéo kho × hình thức: màn hình, tra cứu, Excel, bản in, phạm vi công ty
+      - run: npm run accept:release   # Word và PDF BẮT BUỘC: thiếu / không đọc lại được file → lỗi (chưa xác minh)
+
+  accept-windows:
+    # Nghiệm thu phát hành trên Windows với Microsoft Edge đã cài sẵn trên runner: xuất rồi ĐỌC LẠI Word / Excel / PDF
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm i --no-save playwright@1.63.0
+      - name: Nghiệm thu phát hành (Edge)
+        shell: pwsh
+        env:
+          HAK_BROWSER_CHANNEL: msedge
+        run: npm run accept:release
