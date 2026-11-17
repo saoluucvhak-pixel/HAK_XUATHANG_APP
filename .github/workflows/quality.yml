@@ -42,6 +42,7 @@ jobs:
       - run: npm run e2e   # hai tàu cân xen kẽ: nhập, đổi sheet, chọn phiếu, lưu, mở lại, Excel, báo cáo
       - run: npm run e2e:carrier   # chi tiết đơn vị vận chuyển khớp bảng tổng khi lọc theo ngày cân
       - run: npm run e2e:reports   # 5 mẫu báo cáo + bảng chéo kho × hình thức: màn hình, tra cứu, Excel, bản in, phạm vi công ty
+      - run: npm run e2e:customs   # nhập tờ khai Excel, OCR giấy nộp tiền (giả lập OCR), nhập lại, khai bổ sung, hoàn thuế, hủy, phạm vi công ty
       - run: npm run accept:release   # Word và PDF BẮT BUỘC: thiếu / không đọc lại được file → lỗi (chưa xác minh)
 
   accept-windows:
