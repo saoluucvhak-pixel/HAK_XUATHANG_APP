@@ -687,6 +687,25 @@ test('bảng chéo kho × hình thức: ô = thực giao, tổng hàng / cột k
     )
   );
   assert.equal(x.totals.t_xuatkhau + x.totals.t_uythac, x.totals.delKg);
+  // đối chiếu hàng / cột với tổng thực giao: phần đã xác minh + phần chưa phân bổ = toàn bộ; phần chưa phân bổ KHÔNG nằm trong ô nào
+  const un = sec(doc, 'unallocated');
+  assert.equal(un.totals.delKg, 9000, 'hồ sơ chưa đọc được phiếu nằm ở chưa phân bổ');
+  assert.equal(x.totals.delKg + un.totals.delKg, 29000, 'đã xác minh 20.000 + chưa phân bổ 9.000');
+  assert.equal(
+    x.rows.reduce((a2, r) => a2 + r.c.delKg, 0),
+    x.totals.delKg,
+    'tổng các hàng = tổng bảng'
+  );
+  assert.equal(
+    x.rows.reduce((a2, r) => a2 + r.c.kg - r.c.retKg, 0),
+    x.totals.delKg,
+    'qua cân − xe trả về của từng hàng cộng lại = tổng thực giao'
+  );
+  assert.equal(
+    x.rows.reduce((a2, r) => a2 + r.c.retKg, 0),
+    5000,
+    'xe trả về 5.000 kg chỉ ở cột trả về, không nằm trong ô hình thức'
+  );
   assert.match(x.note, /không có số liệu nhập kho/);
   assert.match(x.note, /Chưa phân bổ/);
   assert.equal(x.rows[0].drill.tickets.length > 0, true, 'mở được phiếu nguồn từ dòng kho');
@@ -695,4 +714,51 @@ test('bảng chéo kho × hình thức: ô = thực giao, tổng hàng / cột k
   assert.ok(cols.includes('Xuất khẩu') || cols.some((h) => /xuất khẩu/i.test(h)));
   const spec = T.toPrintSpec(doc);
   assert.ok(spec.tables.some((t) => t.caption && /Kho xuất × hình thức/.test(t.caption)));
+});
+
+/* ---------- Chỉ tiêu BDMT: chi tiết có / chưa có số chứng thư ---------- */
+test('BDMT mẫu 3: 4.000 BDMT chi tiết có số chứng thư + 1.000 chưa có → tổng chi tiết 5.000, còn lại 1.000; cùng nhãn ở màn hình, Excel và PDF', async () => {
+  const it = contractItem({
+    qty: 5000,
+    addenda: [{ no: 'PL1', date: '2026-09-01', qty: 6000 }],
+    details: [
+      { ship: 'M/V A', certNo: 'C1', bdmt: 4000, mt: 8000 },
+      { ship: 'M/V B', bdmt: 1000, mt: 2000 }, // chưa có số chứng thư
+    ],
+    decls: [{ qtyBdmt: 4000, taxVnd: 10 }],
+  });
+  const doc = T.contractsReport(ctxC([it]), {}),
+    s = sec(doc, 'contracts'),
+    c = s.rows[0].c;
+  assert.equal(c.certOnly, 4000, 'BDMT chi tiết ĐÃ có số chứng thư');
+  assert.equal(c.noCert, 1000, 'BDMT chi tiết CHƯA có số chứng thư');
+  assert.equal(c.certBdmt, 5000, 'tổng theo chi tiết hợp đồng');
+  assert.equal(c.certOnly + c.noCert, c.certBdmt, 'hai phần cộng lại bằng tổng');
+  assert.equal(c.qtyNow, 6000);
+  assert.equal(c.remain, 1000, 'còn lại = hiện hành 6.000 − BDMT chi tiết 5.000');
+  assert.equal(c.pct, 5000 / 6000);
+  assert.equal(c.certs, '1/2');
+  assert.ok(c.flags.indexOf('Thiếu chứng thư') >= 0, 'cờ thiếu chứng thư vẫn bật');
+  assert.equal(s.totals.certOnly, 4000);
+  assert.equal(s.totals.noCert, 1000);
+  // cùng nhãn, cách tính và ghi chú ở màn hình (cột), Excel và PDF
+  const heads = s.columns.map((x) => x.h);
+  const label = heads.find((h) => /BDMT theo chi tiết hợp đồng/.test(h));
+  assert.ok(label && /chưa có chứng thư/.test(label), 'nhãn tổng nêu rõ gồm cả chi tiết chưa có chứng thư');
+  assert.ok(heads.some((h) => /ĐÃ có số chứng thư/.test(h)) && heads.some((h) => /CHƯA có số chứng thư/.test(h)));
+  assert.match(s.note, /ĐÃ có số chứng thư \+ phần CHƯA có số chứng thư/);
+  const spec = T.toPrintSpec(doc),
+    t = spec.tables.find((x) => /Tiến độ theo hợp đồng/.test(x.caption || ''));
+  assert.equal(t.cols.length, heads.length, 'bản in có đủ các cột của màn hình');
+  t.cols.forEach((x, k) => assert.ok(x.h.indexOf(heads[k]) === 0, 'cột in ' + k + ' bắt đầu bằng đúng nhãn màn hình: ' + heads[k]));
+  const wb = new global.ExcelJS.Workbook();
+  await wb.xlsx.load(await T.toExcel(doc, global.ExcelJS).xlsx.writeBuffer());
+  const ws = wb.getWorksheet('Tổng hợp'),
+    cells = [];
+  ws.eachRow((r) => r.eachCell((cc) => cells.push(cc.value)));
+  assert.ok(
+    cells.some((v) => typeof v === 'string' && v.indexOf(label) === 0),
+    'Excel có nhãn tổng'
+  );
+  assert.ok(cells.includes(4000) && cells.includes(1000) && cells.includes(5000), 'Excel có ba số kiểu số');
 });

@@ -1,5 +1,10 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## Chưa phát hành — Nghiệm thu phát hành
+- Mẫu "Tiến độ hợp đồng": thêm hai cột "Trong đó" tách BDMT chi tiết ĐÃ có / CHƯA có số chứng thư (4.000 + 1.000 = 5.000); chỉ tiêu và nhãn thống nhất ở màn hình, Excel, PDF. Cách tính tổng và "Còn lại" không đổi.
+- `npm run accept:release`: chế độ phát hành bắt buộc Word và PDF, đọc lại DOCX (JSZip) và PDF (pdfjs-dist) không cần công cụ ngoài nên chạy như nhau trên Windows và Linux; kiểm tra tiêu đề lặp mọi trang, đủ dòng, cột trong khổ trang; báo Đạt / Lỗi / Bỏ qua riêng. `HAK_BROWSER_CHANNEL=msedge` để dùng Edge.
+- CI chạy e2e, e2e:carrier, e2e:reports và accept:release.
+
 ## v2.21.2 — Bảng chéo kho × hình thức
 - Mẫu "Phân tích theo tàu / kho / ĐVVC" có thêm bảng **Kho xuất × hình thức** (thực giao kg theo từng ô, tổng hàng / cột, tra về hồ sơ và phiếu cân), cùng tập phiếu đã xác minh với bảng nhóm nên tổng khớp; có trong màn hình, Excel (trang Tổng hợp) và PDF. Chưa có số liệu nhập kho.
 

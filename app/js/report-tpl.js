@@ -770,6 +770,9 @@
         mtCert = m.rows.reduce((a, r) => a + (isNum(r.d.mt) ? Number(r.d.mt) : 0), 0),
         hasMt = m.rows.some((r) => isNum(r.d.mt));
       const o = orig(c);
+      // Tách BDMT của các chi tiết ĐÃ có số chứng thư và CHƯA có số chứng thư (cộng lại = BDMT theo chi tiết hợp đồng)
+      const certOnly = m.rows.reduce((a, r) => a + (r.d.certNo ? Number(r.d.bdmt) || 0 : 0), 0),
+        noCert = m.rows.reduce((a, r) => a + (r.d.certNo ? 0 : Number(r.d.bdmt) || 0), 0);
       rows.push({
         c: {
           no: c.no || c.id,
@@ -779,6 +782,8 @@
           qtyOrig: isNum(o) ? Number(o) : '',
           qtyNow: m.qty === null || m.qty === undefined ? '' : m.qty,
           certBdmt: m.certBdmt,
+          certOnly,
+          noCert,
           remain: m.qty === null || m.qty === undefined ? '' : m.qty - m.certBdmt,
           pct: m.qty ? m.certBdmt / m.qty : '',
           certs: m.withCert + '/' + m.rows.length,
@@ -803,6 +808,8 @@
       col('qtyOrig', 'BDMT gốc', 'dec', { u: 'BDMT', sum: 1 }),
       col('qtyNow', 'BDMT hiện hành sau phụ lục', 'dec', { u: 'BDMT', sum: 1 }),
       col('certBdmt', 'BDMT theo chi tiết hợp đồng (gồm cả chi tiết chưa có chứng thư)', 'dec', { u: 'BDMT', sum: 1 }),
+      col('certOnly', 'Trong đó: chi tiết ĐÃ có số chứng thư', 'dec', { u: 'BDMT', sum: 1 }),
+      col('noCert', 'Trong đó: chi tiết CHƯA có số chứng thư', 'dec', { u: 'BDMT', sum: 1 }),
       col('remain', 'Còn lại = hiện hành − BDMT chi tiết', 'dec', { u: 'BDMT', sum: 1 }),
       col('pct', '% đã thực hiện = BDMT chi tiết ÷ hiện hành', 'pct'),
       col('certs', 'Chi tiết có chứng thư'),
@@ -832,7 +839,7 @@
       id: 'contracts',
       sheet: 'Tổng hợp',
       title: 'Tiến độ theo hợp đồng',
-      note: 'BDMT gốc = trước phụ lục; BDMT hiện hành = sau phụ lục; "BDMT theo chi tiết hợp đồng" cộng BDMT của MỌI chi tiết, kể cả chi tiết chưa có số chứng thư (cột "Chi tiết có chứng thư" cho biết còn thiếu bao nhiêu; cờ "Thiếu chứng thư" lọc các hợp đồng này); "Còn lại" và % đã thực hiện tính theo số đó. MT thực giao lấy từ phiếu cân (sau trừ xe trả về) — hai đơn vị này khác nhau nên không so trực tiếp.',
+      note: 'BDMT gốc = trước phụ lục; BDMT hiện hành = sau phụ lục; "BDMT theo chi tiết hợp đồng" cộng BDMT của MỌI chi tiết, kể cả chi tiết chưa có số chứng thư: BDMT theo chi tiết = phần ĐÃ có số chứng thư + phần CHƯA có số chứng thư (hai cột "Trong đó"; cột "Chi tiết có chứng thư" cho biết số chi tiết có / tổng; cờ "Thiếu chứng thư" lọc các hợp đồng còn phần chưa có). "Còn lại" và % đã thực hiện tính trên BDMT theo chi tiết (cả hai phần). MT thực giao lấy từ phiếu cân (sau trừ xe trả về) — hai đơn vị này khác nhau nên không so trực tiếp.',
       columns: cols,
       rows,
       totals: Object.assign(sumRow(cols, rows), { no: 'TỔNG CỘNG' }),

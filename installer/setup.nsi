@@ -64,7 +64,7 @@ Section "Ung dung Quan ly xuat hang" SecApp
   !insertmacro StopHakDocs
   SetOutPath "$INSTDIR"
   ; Recovery/reset utilities must never ship to end users.
-  File /r /x "MoKhoa_1Lan*.html" /x "XoaSach_DuLieu*.html" "app\*.*"
+  File /r /x "MoKhoa_1Lan*.html" /x "XoaSach_DuLieu*.html" /x ".hakquality.json" "app\*.*"
 
   WriteRegStr HKCU "Software\HAK\QuanLyXuatHang" "InstallDir" "$INSTDIR"
 
