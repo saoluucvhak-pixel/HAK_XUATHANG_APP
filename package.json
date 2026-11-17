@@ -13,7 +13,8 @@
     "ui-audit": "node tools/ui-audit.cjs",
     "e2e": "node tools/e2e-flow.cjs",
     "e2e:reports": "node tools/e2e-reports.cjs",
-    "e2e:carrier": "node tools/e2e-carrier.cjs"
+    "e2e:carrier": "node tools/e2e-carrier.cjs",
+    "accept": "node tools/accept.cjs"
   },
   "devDependencies": {
     "acorn": "^8.15.0",
