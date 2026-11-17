@@ -98,10 +98,17 @@
       sig = (r) => [r.net, r.gross, r.tare].join('/');
     groups.forEach((g, k) => {
       const files = new Set(g.map((x) => x.file));
-      if (files.size > 1 && g.some((x) => sig(x.r) !== sig(g[0].r))) {
-        const pickNew = useNew.has(k),
-          chosen = pickNew ? g[g.length - 1] : g[0];
-        rows.push(chosen.r);
+      if (files.size === 1) {
+        // Chỉ một file có khóa này: giữ NGUYÊN các dòng (lặp trong cùng file không phải trùng giữa các đợt; như khi chỉ có 1 đợt).
+        g.forEach((x) => rows.push(x.r));
+        return;
+      }
+      // Nhiều file cùng khóa: giữ toàn bộ dòng của MỘT đợt (đợt nạp trước, hoặc đợt sau nếu người dùng chọn), bỏ dòng của đợt còn lại.
+      const pickNew = useNew.has(k),
+        keepFile = pickNew ? g[g.length - 1].file : g[0].file,
+        kept = g.filter((x) => x.file === keepFile);
+      kept.forEach((x) => rows.push(x.r));
+      if (g.some((x) => sig(x.r) !== sig(kept[0].r))) {
         conflicts.push({
           key: k,
           ticket: g[0].r.ticket || '',
@@ -110,7 +117,7 @@
           useNew: pickNew,
           items: g.map((x) => ({ file: x.file, net: x.r.net, gross: x.r.gross, tare: x.r.tare })),
         });
-      } else rows.push(g[0].r);
+      }
     });
     const dup = total - rows.length;
     if (dup) warnings.unshift('ℹ Đã bỏ ' + dup + ' phiếu trùng giữa các đợt (cùng số phiếu, biển số, ngày giờ cân).');
