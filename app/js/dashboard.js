@@ -158,6 +158,11 @@
   }
 
   /* ---------------- Trang ---------------- */
+  /** Một phiếu nạp ở nhiều hình thức được tính ở TỪNG hình thức; ô "Tổng tấn" đã loại trùng → giải thích phần chênh để các số khớp nhau. */
+  function dupNote(d) {
+    const per = d.types.reduce((a, t) => a + d.idx.perType[t].kg, 0), diff = per - d.kg;
+    return diff > 0.5 ? '<div class="form-text mt-2">Cộng các hình thức = ' + fmtTon(per) + ' tấn, lớn hơn "Tổng tấn" ' + fmtTon(diff) + ' tấn vì cùng một phiếu cân được nạp ở nhiều hình thức (vd. kho gửi → xuất khẩu); "Tổng tấn" chỉ đếm 1 lần.</div>' : '';
+  }
   function render() {
     const host = $('#dashBody'); if (!host) return;
     const issued = (HAK.Issued && HAK.Issued.list) || [];
@@ -168,7 +173,7 @@
     const d = st.data = compute(), idx = d.idx;
     const nPxk = issued.filter((r) => r.kind === 'pxk').length, nBk = issued.filter((r) => r.kind === 'bkls').length;
     const kpi = '<div class="row g-3 mb-3">' +
-      tile(fmtInt(idx.trips.length), 'Lượt xe (đã khử trùng)', d.types.length + ' hình thức · ' + bl.length + ' đợt Excel') + tile(fmtTon(d.kg), 'Tổng tấn') +
+      tile(fmtInt(idx.trips.length), 'Lượt xe (đã khử trùng)', d.types.length + ' hình thức · ' + bl.length + ' đợt Excel') + tile(fmtTon(d.kg), 'Tổng tấn', 'dữ liệu cân đang nạp · loại phiếu trùng giữa hình thức · chưa trừ xe trả về') +
       tile(fmtInt(idx.plates.size), 'Số xe (biển số)') + tile(fmtInt(idx.drivers.size), 'Số tài xế') +
       tile(fmtInt(nPxk), 'PXKKVCNB đã lập') + tile(fmtInt(nBk), 'BKLS đã lập') + '<div class="col-6 col-md-4 col-xl" id="dashArch"></div></div>';
     const al = alerts();
@@ -179,7 +184,7 @@
       '<button type="button" class="btn btn-sm btn-outline-secondary" data-dv="' + (st.view === 'chart' ? 'table' : 'chart') + '">' + (st.view === 'chart' ? 'Bảng số' : 'Biểu đồ') + '</button>') +
       '<div class="card-body" id="dashMonthly"></div></div></div>';
     const typeCard = '<div class="col-lg-4"><div class="card h-100">' + cardH('📊 Theo hình thức (tấn)') + '<div class="card-body">' +
-      barList(d.types.map((t) => ({ label: tIcon(t) + ' ' + tName(t), v: idx.perType[t].kg, kg: idx.perType[t].kg, trips: idx.perType[t].trips, color: '--s' + slot(t) })).sort((a, b) => b.v - a.v), (i) => fmtTon(i.kg) + ' <span class="muted">· ' + fmtInt(i.trips) + ' xe</span>') + '</div></div></div>';
+      barList(d.types.map((t) => ({ label: tIcon(t) + ' ' + tName(t), v: idx.perType[t].kg, kg: idx.perType[t].kg, trips: idx.perType[t].trips, color: '--s' + slot(t) })).sort((a, b) => b.v - a.v), (i) => fmtTon(i.kg) + ' <span class="muted">· ' + fmtInt(i.trips) + ' xe</span>') + dupNote(d) + '</div></div></div>';
     const top = (map, n) => Array.from(map.values()).sort((a, b) => b.kg - a.kg).slice(0, n);
     const topXe = '<div class="col-lg-4"><div class="card h-100">' + cardH('🚛 Top 10 xe (tấn)') + '<div class="card-body">' +
       barList(top(idx.plates, 10).map((a) => ({ label: a.name, v: a.kg, kg: a.kg, trips: a.trips, search: a.name, title: [...a.drivers].join(', ') })), (i) => fmtTon(i.kg) + ' <span class="muted">· ' + fmtInt(i.trips) + '</span>') + '</div></div></div>';
