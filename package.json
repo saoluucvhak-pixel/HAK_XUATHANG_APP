@@ -7,11 +7,14 @@
     "quality": "node tools/hak-quality/bin/hak-quality.js app --out reports/quality --fail-on error",
     "release": "node tools/build-release.cjs",
     "lint": "eslint app/js",
-    "smoke": "node tools/smoke.cjs"
+    "smoke": "node tools/smoke.cjs",
+    "format": "prettier --write \"app/js/**/*.js\" \"tests/*.cjs\" \"tools/*.cjs\" \"eslint.config.cjs\"",
+    "format:check": "prettier --check \"app/js/**/*.js\" \"tests/*.cjs\" \"tools/*.cjs\" \"eslint.config.cjs\""
   },
   "devDependencies": {
     "acorn": "^8.15.0",
     "eslint": "^9.0.0",
-    "globals": "^15.0.0"
+    "globals": "^15.0.0",
+    "prettier": "^3.6.2"
   }
 }

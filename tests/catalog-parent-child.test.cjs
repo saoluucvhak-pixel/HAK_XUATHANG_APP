@@ -1,16 +1,232 @@
-const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
-function harness(initial){const values=new Map();if(initial)values.set('hak.catalog.v1',JSON.stringify(initial));let failKey='';const localStorage={getItem:k=>values.get(k)||null,setItem:(k,v)=>{if(k===failKey)throw Error('quota');values.set(k,String(v));},removeItem:k=>values.delete(k),get length(){return values.size;},key:i=>Array.from(values.keys())[i]};const window={XLSX:require('../app/libs/xlsx.full.min.js'),localStorage,HAK:{DB:{usable:()=>false,open:async()=>null}}};const ctx={window,console,setTimeout,clearTimeout,Set,Map,Date,Math,JSON,Uint8Array,Intl};vm.createContext(ctx);for(const f of ['config.js','excel.js','generator.js','contract-model.js','catalog.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../app/js',f),'utf8'),ctx);return {ctx,K:window.HAK.Catalog,H:window.HAK,values,fail:k=>failKey=k};}
-test('catalog migration remains read-only until save, then verifies backup before replacing old snapshot',async()=>{const old={v:2,customers:[],contracts:[{id:'old',type:'xuatkhau',no:'QA',ship:'QA',qty:100,product:'Wood'}]},h=harness(old);assert.equal(JSON.parse(h.values.get('hak.catalog.v1')).v,2);assert.equal(h.K.contract('old').qty,100);await h.K.persist();assert.equal(JSON.parse(h.values.get('hak.catalog.v1')).v,3);assert.equal(h.values.get('hak.catalog.v1.before-parent-child'),JSON.stringify(old));});
-test('failed migration backup leaves persisted catalog untouched',async()=>{const old={v:2,customers:[],contracts:[{id:'old',no:'QA'}]},h=harness(old);h.fail('hak.catalog.v1.before-parent-child');await assert.rejects(h.K.persist(),/quota/);assert.equal(h.values.get('hak.catalog.v1'),JSON.stringify(old));});
-test('catalog choices expose child IDs, parent edits retain child certificate data',async()=>{const h=harness();const result=h.K.upsertContract({id:'c',no:'QA',type:'xuatkhau',details:[{id:'d',contractId:'c',product:'Wood',qty:500,certificateFiles:['pdf']}]});assert.ok(!result.error,result.error);assert.equal(h.K.contracts()[0].id,'d');const parent=h.K.parent('c');parent.note='Edited';const updated=h.K.upsertContract(parent,parent.revision);assert.ok(!updated.error,updated.error);await h.K.persist();const reopened=harness(JSON.parse(h.values.get('hak.catalog.v1')));assert.equal(reopened.K.contract('d').qty,500);assert.equal(reopened.K.contract('d').certificateFiles[0],'pdf');});
-test('another window changing catalog blocks stale overwrite',async()=>{const h=harness({v:3,customers:[],contracts:[]});h.values.set('hak.catalog.v1',JSON.stringify({v:3,customers:[],contracts:[{id:'other',no:'Other',details:[]}]}));await assert.rejects(h.K.persist(),/cửa sổ khác/);assert.equal(JSON.parse(h.values.get('hak.catalog.v1')).contracts[0].id,'other');});
-test('quota fallback reads newly committed memory value instead of stale localStorage',()=>{const h=harness();h.H.Store.set('hak.quota',{v:1});h.fail('hak.quota');h.H.DB.usable=()=>true;h.H.DB.kvPut=async()=>{};assert.equal(h.H.Store.set('hak.quota',{v:2},{dbCommitted:true}),true);assert.equal(h.H.Store.get('hak.quota').v,2);assert.equal(JSON.parse(h.values.get('hak.quota')).v,1);});
+const test = require('node:test'),
+  assert = require('node:assert/strict'),
+  fs = require('node:fs'),
+  vm = require('node:vm'),
+  path = require('node:path');
+function harness(initial) {
+  const values = new Map();
+  if (initial) values.set('hak.catalog.v1', JSON.stringify(initial));
+  let failKey = '';
+  const localStorage = {
+    getItem: (k) => values.get(k) || null,
+    setItem: (k, v) => {
+      if (k === failKey) throw Error('quota');
+      values.set(k, String(v));
+    },
+    removeItem: (k) => values.delete(k),
+    get length() {
+      return values.size;
+    },
+    key: (i) => Array.from(values.keys())[i],
+  };
+  const window = {
+    XLSX: require('../app/libs/xlsx.full.min.js'),
+    localStorage,
+    HAK: { DB: { usable: () => false, open: async () => null } },
+  };
+  const ctx = { window, console, setTimeout, clearTimeout, Set, Map, Date, Math, JSON, Uint8Array, Intl };
+  vm.createContext(ctx);
+  for (const f of ['config.js', 'excel.js', 'generator.js', 'contract-model.js', 'catalog.js'])
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '../app/js', f), 'utf8'), ctx);
+  return { ctx, K: window.HAK.Catalog, H: window.HAK, values, fail: (k) => (failKey = k) };
+}
+test('catalog migration remains read-only until save, then verifies backup before replacing old snapshot', async () => {
+  const old = { v: 2, customers: [], contracts: [{ id: 'old', type: 'xuatkhau', no: 'QA', ship: 'QA', qty: 100, product: 'Wood' }] },
+    h = harness(old);
+  assert.equal(JSON.parse(h.values.get('hak.catalog.v1')).v, 2);
+  assert.equal(h.K.contract('old').qty, 100);
+  await h.K.persist();
+  assert.equal(JSON.parse(h.values.get('hak.catalog.v1')).v, 3);
+  assert.equal(h.values.get('hak.catalog.v1.before-parent-child'), JSON.stringify(old));
+});
+test('failed migration backup leaves persisted catalog untouched', async () => {
+  const old = { v: 2, customers: [], contracts: [{ id: 'old', no: 'QA' }] },
+    h = harness(old);
+  h.fail('hak.catalog.v1.before-parent-child');
+  await assert.rejects(h.K.persist(), /quota/);
+  assert.equal(h.values.get('hak.catalog.v1'), JSON.stringify(old));
+});
+test('catalog choices expose child IDs, parent edits retain child certificate data', async () => {
+  const h = harness();
+  const result = h.K.upsertContract({
+    id: 'c',
+    no: 'QA',
+    type: 'xuatkhau',
+    details: [{ id: 'd', contractId: 'c', product: 'Wood', qty: 500, certificateFiles: ['pdf'] }],
+  });
+  assert.ok(!result.error, result.error);
+  assert.equal(h.K.contracts()[0].id, 'd');
+  const parent = h.K.parent('c');
+  parent.note = 'Edited';
+  const updated = h.K.upsertContract(parent, parent.revision);
+  assert.ok(!updated.error, updated.error);
+  await h.K.persist();
+  const reopened = harness(JSON.parse(h.values.get('hak.catalog.v1')));
+  assert.equal(reopened.K.contract('d').qty, 500);
+  assert.equal(reopened.K.contract('d').certificateFiles[0], 'pdf');
+});
+test('another window changing catalog blocks stale overwrite', async () => {
+  const h = harness({ v: 3, customers: [], contracts: [] });
+  h.values.set('hak.catalog.v1', JSON.stringify({ v: 3, customers: [], contracts: [{ id: 'other', no: 'Other', details: [] }] }));
+  await assert.rejects(h.K.persist(), /cửa sổ khác/);
+  assert.equal(JSON.parse(h.values.get('hak.catalog.v1')).contracts[0].id, 'other');
+});
+test('quota fallback reads newly committed memory value instead of stale localStorage', () => {
+  const h = harness();
+  h.H.Store.set('hak.quota', { v: 1 });
+  h.fail('hak.quota');
+  h.H.DB.usable = () => true;
+  h.H.DB.kvPut = async () => {};
+  assert.equal(h.H.Store.set('hak.quota', { v: 2 }, { dbCommitted: true }), true);
+  assert.equal(h.H.Store.get('hak.quota').v, 2);
+  assert.equal(JSON.parse(h.values.get('hak.quota')).v, 1);
+});
 
-function idb(h){const records=new Map();for(const [key,val] of h.values)records.set(key,{key,val:JSON.parse(val)});let rejectWrites=false;const operations=[];const db={transaction:()=>{operations.push('transaction');const tx={objectStore:()=>({get:key=>{const rq={};queueMicrotask(()=>{rq.result=records.get(key);rq.onsuccess();});return rq;},put:value=>{if(rejectWrites){tx.abort();return;}queueMicrotask(()=>{records.set(value.key,JSON.parse(JSON.stringify(value)));operations.push('commit');tx.oncomplete();});}}),abort:()=>queueMicrotask(()=>tx.onabort())};return tx;}};h.H.DB={usable:()=>true,open:async()=>db,kvPut:async(key,val)=>{operations.push('backup-write');records.set(key,{key,val:JSON.parse(JSON.stringify(val))});},get:async(store,key)=>{operations.push('backup-read');return records.get(key);}};return {records,operations,fail:()=>rejectWrites=true};}
-test('IndexedDB migration verifies backup then atomically commits the catalog snapshot',async()=>{const old={v:2,customers:[],contracts:[{id:'old',no:'QA',qty:100}]},h=harness(old),db=idb(h);await h.K.persist();assert.deepEqual(db.operations.slice(0,4),['backup-write','backup-read','transaction','commit']);assert.equal(db.records.get('hak.catalog.v1').val.v,3);assert.equal(db.records.get('hak.catalog.v1').ls,false);assert.equal(JSON.stringify(db.records.get('hak.catalog.v1.before-parent-child').val),JSON.stringify(old));});
-test('IndexedDB abort preserves old catalog and never publishes the new localStorage snapshot',async()=>{const old={v:2,customers:[],contracts:[{id:'old',no:'QA'}]},h=harness(old),db=idb(h);db.fail();await assert.rejects(h.K.persist(),/Không ghi/);assert.equal(h.values.get('hak.catalog.v1'),JSON.stringify(old));assert.equal(JSON.stringify(db.records.get('hak.catalog.v1').val),JSON.stringify(old));});
-test('IndexedDB compare-and-swap rejects a newer transaction even with an unchanged local cache',async()=>{const old={v:3,customers:[],contracts:[]},h=harness(old),db=idb(h);const newer={v:3,customers:[],contracts:[{id:'newer',no:'QA',details:[]}]};db.records.set('hak.catalog.v1',{key:'hak.catalog.v1',val:newer});await assert.rejects(h.K.persist(),/đã thay đổi/);assert.equal(db.records.get('hak.catalog.v1').val.contracts[0].id,'newer');assert.equal(h.values.get('hak.catalog.v1'),JSON.stringify(old));});
+function idb(h) {
+  const records = new Map();
+  for (const [key, val] of h.values) records.set(key, { key, val: JSON.parse(val) });
+  let rejectWrites = false;
+  const operations = [];
+  const db = {
+    transaction: () => {
+      operations.push('transaction');
+      const tx = {
+        objectStore: () => ({
+          get: (key) => {
+            const rq = {};
+            queueMicrotask(() => {
+              rq.result = records.get(key);
+              rq.onsuccess();
+            });
+            return rq;
+          },
+          put: (value) => {
+            if (rejectWrites) {
+              tx.abort();
+              return;
+            }
+            queueMicrotask(() => {
+              records.set(value.key, JSON.parse(JSON.stringify(value)));
+              operations.push('commit');
+              tx.oncomplete();
+            });
+          },
+        }),
+        abort: () => queueMicrotask(() => tx.onabort()),
+      };
+      return tx;
+    },
+  };
+  h.H.DB = {
+    usable: () => true,
+    open: async () => db,
+    kvPut: async (key, val) => {
+      operations.push('backup-write');
+      records.set(key, { key, val: JSON.parse(JSON.stringify(val)) });
+    },
+    get: async (store, key) => {
+      operations.push('backup-read');
+      return records.get(key);
+    },
+  };
+  return { records, operations, fail: () => (rejectWrites = true) };
+}
+test('IndexedDB migration verifies backup then atomically commits the catalog snapshot', async () => {
+  const old = { v: 2, customers: [], contracts: [{ id: 'old', no: 'QA', qty: 100 }] },
+    h = harness(old),
+    db = idb(h);
+  await h.K.persist();
+  assert.deepEqual(db.operations.slice(0, 4), ['backup-write', 'backup-read', 'transaction', 'commit']);
+  assert.equal(db.records.get('hak.catalog.v1').val.v, 3);
+  assert.equal(db.records.get('hak.catalog.v1').ls, false);
+  assert.equal(JSON.stringify(db.records.get('hak.catalog.v1.before-parent-child').val), JSON.stringify(old));
+});
+test('IndexedDB abort preserves old catalog and never publishes the new localStorage snapshot', async () => {
+  const old = { v: 2, customers: [], contracts: [{ id: 'old', no: 'QA' }] },
+    h = harness(old),
+    db = idb(h);
+  db.fail();
+  await assert.rejects(h.K.persist(), /Không ghi/);
+  assert.equal(h.values.get('hak.catalog.v1'), JSON.stringify(old));
+  assert.equal(JSON.stringify(db.records.get('hak.catalog.v1').val), JSON.stringify(old));
+});
+test('IndexedDB compare-and-swap rejects a newer transaction even with an unchanged local cache', async () => {
+  const old = { v: 3, customers: [], contracts: [] },
+    h = harness(old),
+    db = idb(h);
+  const newer = { v: 3, customers: [], contracts: [{ id: 'newer', no: 'QA', details: [] }] };
+  db.records.set('hak.catalog.v1', { key: 'hak.catalog.v1', val: newer });
+  await assert.rejects(h.K.persist(), /đã thay đổi/);
+  assert.equal(db.records.get('hak.catalog.v1').val.contracts[0].id, 'newer');
+  assert.equal(h.values.get('hak.catalog.v1'), JSON.stringify(old));
+});
 
-test('Excel import groups one parent with several goods on one customs declaration and is repeatable',()=>{const h=harness(),X=require('../app/libs/xlsx.full.min.js'),wb=X.utils.book_new();X.utils.book_append_sheet(wb,X.utils.aoa_to_sheet([['SỐ HỢP ĐỒNG','SỐ TKHQ','TÀU','KHÁCH HÀNG','TÊN HÀNG HÓA'],['QA-1','001','QA V.1','Buyer','Wood A'],['QA-1','001','QA V.1','Buyer','Wood B']]),'QA');const first=h.K.importWorkbook(wb);assert.equal(first.skipped,0);assert.equal(h.K.parents().length,1);assert.equal(h.K.parents()[0].details.length,2);h.K.importWorkbook(wb);assert.equal(h.K.parents()[0].details.length,2);assert.deepEqual(Array.from(h.K.parents()[0].details,d=>d.product),['Wood A','Wood B']);});
+test('Excel import groups one parent with several goods on one customs declaration and is repeatable', () => {
+  const h = harness(),
+    X = require('../app/libs/xlsx.full.min.js'),
+    wb = X.utils.book_new();
+  X.utils.book_append_sheet(
+    wb,
+    X.utils.aoa_to_sheet([
+      ['SỐ HỢP ĐỒNG', 'SỐ TKHQ', 'TÀU', 'KHÁCH HÀNG', 'TÊN HÀNG HÓA'],
+      ['QA-1', '001', 'QA V.1', 'Buyer', 'Wood A'],
+      ['QA-1', '001', 'QA V.1', 'Buyer', 'Wood B'],
+    ]),
+    'QA'
+  );
+  const first = h.K.importWorkbook(wb);
+  assert.equal(first.skipped, 0);
+  assert.equal(h.K.parents().length, 1);
+  assert.equal(h.K.parents()[0].details.length, 2);
+  h.K.importWorkbook(wb);
+  assert.equal(h.K.parents()[0].details.length, 2);
+  assert.deepEqual(
+    Array.from(h.K.parents()[0].details, (d) => d.product),
+    ['Wood A', 'Wood B']
+  );
+});
 
-test('document forms use selected child quantities and roles; archived snapshot includes goods and customs',()=>{const h=harness();h.K.syncCompanies();const exporter=h.K.customers().find(c=>c.companyId==='hak'),principal=h.K.customers().find(c=>c.companyId==='dh');assert.ok(exporter&&principal);const parent={id:'parent',no:'QA',type:'uythac',exporterId:exporter.id,principalId:principal.id,details:[{id:'a',contractId:'parent',qty:500,product:'PEFC',tkhq:'001',ship:'SHIP A',mt:1200,bdmt:600},{id:'b',contractId:'parent',qty:900,product:'NON PEFC',tkhq:'002',ship:'SHIP B'}]};const res=h.K.upsertContract(parent);assert.ok(!res.error,res.error);h.H.UI={$:id=>id==='#f-uythac-contractId'?{value:'b'}:null,$$:()=>[],esc:String,toast:()=>{},Loading:{},debounce:x=>x,todayISO:()=> '2026-10-17'};for(const f of ['pages-modals.js','pages-contract.js','pages-filter.js','pages-bkls.js','pages.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../app/js/'+f),'utf8'),h.ctx);const a=h.H.Pages._contractValues('uythac',h.K.contract('a')).v,b=h.H.Pages._contractValues('uythac',h.K.contract('b')).v;assert.equal(a.contractQty,'500');assert.equal(a.certWet,'1.200');assert.equal(b.contractQty,'900');assert.equal(b.certWet,'');assert.equal(b.giaoId,'dh');assert.equal(b.nhanId,'hak');const snapshot=h.H.Pages._collect('uythac');assert.equal(snapshot.product,'NON PEFC');assert.equal(snapshot.tkhq,'002');assert.equal(snapshot.contractDetailId,'b');assert.equal(snapshot.parentContractId,'parent');});
+test('document forms use selected child quantities and roles; archived snapshot includes goods and customs', () => {
+  const h = harness();
+  h.K.syncCompanies();
+  const exporter = h.K.customers().find((c) => c.companyId === 'hak'),
+    principal = h.K.customers().find((c) => c.companyId === 'dh');
+  assert.ok(exporter && principal);
+  const parent = {
+    id: 'parent',
+    no: 'QA',
+    type: 'uythac',
+    exporterId: exporter.id,
+    principalId: principal.id,
+    details: [
+      { id: 'a', contractId: 'parent', qty: 500, product: 'PEFC', tkhq: '001', ship: 'SHIP A', mt: 1200, bdmt: 600 },
+      { id: 'b', contractId: 'parent', qty: 900, product: 'NON PEFC', tkhq: '002', ship: 'SHIP B' },
+    ],
+  };
+  const res = h.K.upsertContract(parent);
+  assert.ok(!res.error, res.error);
+  h.H.UI = {
+    $: (id) => (id === '#f-uythac-contractId' ? { value: 'b' } : null),
+    $$: () => [],
+    esc: String,
+    toast: () => {},
+    Loading: {},
+    debounce: (x) => x,
+    todayISO: () => '2026-10-17',
+  };
+  for (const f of ['pages-modals.js', 'pages-contract.js', 'pages-filter.js', 'pages-bkls.js', 'pages.js'])
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '../app/js/' + f), 'utf8'), h.ctx);
+  const a = h.H.Pages._contractValues('uythac', h.K.contract('a')).v,
+    b = h.H.Pages._contractValues('uythac', h.K.contract('b')).v;
+  assert.equal(a.contractQty, '500');
+  assert.equal(a.certWet, '1.200');
+  assert.equal(b.contractQty, '900');
+  assert.equal(b.certWet, '');
+  assert.equal(b.giaoId, 'dh');
+  assert.equal(b.nhanId, 'hak');
+  const snapshot = h.H.Pages._collect('uythac');
+  assert.equal(snapshot.product, 'NON PEFC');
+  assert.equal(snapshot.tkhq, '002');
+  assert.equal(snapshot.contractDetailId, 'b');
+  assert.equal(snapshot.parentContractId, 'parent');
+});

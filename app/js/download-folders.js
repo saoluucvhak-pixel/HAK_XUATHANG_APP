@@ -1,18 +1,145 @@
-(function(){
-'use strict';
-const button=document.getElementById('btnDownloads');if(!button)return;
-async function api(action,path){const r=await fetch('http://127.0.0.1:31879/download-files',{method:'POST',headers:{'Content-Type':'application/json','X-HAK-Client':'documents-v1','X-HAK-Token':window.HAK_DOCS_TOKEN||''},body:JSON.stringify({action,path})});const result=await r.json();if(!r.ok)throw Error(result.error||'Không thực hiện được.');return result;}
-function actionButton(label,action,path,status){const b=document.createElement('button');b.type='button';b.className='btn btn-sm btn-outline-primary me-2 mt-2';b.textContent=label;b.onclick=async()=>{b.disabled=true;try{await api(action,path);status.textContent=action==='open'?'Đã mở file.':'Đã mở thư mục và chọn file.';}catch(e){status.textContent=e.message;}finally{b.disabled=false;}};return b;}
-async function loadHistory(container){try{const result=await api('list');container.replaceChildren();if(!result.items.length)container.textContent='Chưa có file được lưu từ bản cập nhật này.';for(const file of result.items){const row=document.createElement('div');row.className='border-bottom py-2 text-break';const name=document.createElement('strong'),path=document.createElement('div'),status=document.createElement('small');name.textContent=file.name;path.textContent=file.path;path.className='small muted';status.setAttribute('role','status');row.append(name,path,status);if(file.exists)row.append(actionButton('Mở file','open',file.path,status),actionButton('Mở thư mục','reveal',file.path,status));else status.textContent='File đã di chuyển hoặc bị xóa.';container.append(row);}}catch(e){container.textContent='Chưa đọc được lịch sử: '+e.message+'. Mở app bằng lối tắt của bản cài mới.';}}
-window.HAK=window.HAK||{};
-window.HAK.Downloads={saved(path,warning){const old=document.getElementById('hakSavedFile');if(old)old.remove();const box=document.createElement('div');box.id='hakSavedFile';box.className='card shadow p-3';box.classList.add('hak-download-notice');box.setAttribute('role','status');const title=document.createElement('strong'),name=document.createElement('div'),location=document.createElement('small'),status=document.createElement('div'),actions=document.createElement('div');title.textContent='✓ Đã lưu file';name.textContent=path.split(/[\\/]/).pop();location.textContent=path;location.className='text-break muted';status.textContent=warning||'';const close=document.createElement('button');close.type='button';close.className='btn-close float-end';close.setAttribute('aria-label','Đóng thông báo');close.onclick=()=>box.remove();const list=document.createElement('button');list.type='button';list.className='btn btn-sm btn-outline-secondary mt-2';list.textContent='Xem file đã tải';list.onclick=()=>{box.remove();button.click();};actions.append(actionButton('Mở file','open',path,status),actionButton('Mở thư mục','reveal',path,status),list);box.append(close,title,name,location,actions,status);document.body.append(box);}};
-button.onclick=()=>{
- const host=document.createElement('div');host.className='modal fade';host.tabIndex=-1;host.setAttribute('aria-labelledby','hakDownloadTitle');
- host.innerHTML='<div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="hakDownloadTitle">File đã tải</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button></div><div class="modal-body"><div data-history class="mb-3 hak-download-history" aria-live="polite">Đang đọc danh sách file…</div><button type="button" class="btn btn-outline-primary" data-open>Mở Downloads của Windows</button><label class="form-label mt-3 d-block" for="downloadFolderName">Tạo thư mục con trong Downloads</label><input class="form-control" id="downloadFolderName" maxlength="100" placeholder="Ví dụ: HAK_2026"><p class="small muted mt-2">Tạo và mở thư mục để quản lý chứng từ theo năm. Mỗi lần xuất Word, Excel hoặc ZIP, app mở hộp Lưu thành của Windows để chọn thư mục, đổi tên hoặc tạo thư mục mới. PDF dùng hộp thoại in → Lưu dưới dạng PDF.</p><button type="button" class="btn btn-primary" data-create>Tạo và mở thư mục</button><p role="status" class="mt-2 text-break" data-status></p></div></div></div>';
- document.body.append(host);const modal=bootstrap.Modal.getOrCreateInstance(host);
- async function run(action){const status=host.querySelector('[data-status]'),buttons=host.querySelectorAll('button[data-open],button[data-create]');buttons.forEach(b=>b.disabled=true);status.textContent='Đang mở thư mục…';try{const name=action==='create'?host.querySelector('input').value.trim():'';if(action==='create'&&!name)throw Error('Nhập tên thư mục trước khi tạo.');const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);let result;try{const response=await fetch('http://127.0.0.1:31879/downloads',{method:'POST',headers:{'Content-Type':'application/json','X-HAK-Client':'documents-v1','X-HAK-Token':window.HAK_DOCS_TOKEN||''},body:JSON.stringify({action,name}),signal:controller.signal});result=await response.json();if(!response.ok)throw Error(result.error||'Không mở được thư mục.');}finally{clearTimeout(timer);}status.textContent='Đã mở: '+result.path;}catch(e){status.textContent=e instanceof TypeError?'Chưa kết nối tiện ích Windows. Mở lại app bằng lối tắt của bản cài mới.':e.message;}finally{buttons.forEach(b=>b.disabled=false);}}
- host.querySelector('[data-open]').onclick=()=>run('open');host.querySelector('[data-create]').onclick=()=>run('create');host.addEventListener('hidden.bs.modal',()=>{modal.dispose();host.remove();button.focus();});modal.show();
- loadHistory(host.querySelector('[data-history]'));
-
-};
+(function () {
+  'use strict';
+  const button = document.getElementById('btnDownloads');
+  if (!button) return;
+  async function api(action, path) {
+    const r = await fetch('http://127.0.0.1:31879/download-files', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-HAK-Client': 'documents-v1', 'X-HAK-Token': window.HAK_DOCS_TOKEN || '' },
+      body: JSON.stringify({ action, path }),
+    });
+    const result = await r.json();
+    if (!r.ok) throw Error(result.error || 'Không thực hiện được.');
+    return result;
+  }
+  function actionButton(label, action, path, status) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'btn btn-sm btn-outline-primary me-2 mt-2';
+    b.textContent = label;
+    b.onclick = async () => {
+      b.disabled = true;
+      try {
+        await api(action, path);
+        status.textContent = action === 'open' ? 'Đã mở file.' : 'Đã mở thư mục và chọn file.';
+      } catch (e) {
+        status.textContent = e.message;
+      } finally {
+        b.disabled = false;
+      }
+    };
+    return b;
+  }
+  async function loadHistory(container) {
+    try {
+      const result = await api('list');
+      container.replaceChildren();
+      if (!result.items.length) container.textContent = 'Chưa có file được lưu từ bản cập nhật này.';
+      for (const file of result.items) {
+        const row = document.createElement('div');
+        row.className = 'border-bottom py-2 text-break';
+        const name = document.createElement('strong'),
+          path = document.createElement('div'),
+          status = document.createElement('small');
+        name.textContent = file.name;
+        path.textContent = file.path;
+        path.className = 'small muted';
+        status.setAttribute('role', 'status');
+        row.append(name, path, status);
+        if (file.exists)
+          row.append(actionButton('Mở file', 'open', file.path, status), actionButton('Mở thư mục', 'reveal', file.path, status));
+        else status.textContent = 'File đã di chuyển hoặc bị xóa.';
+        container.append(row);
+      }
+    } catch (e) {
+      container.textContent = 'Chưa đọc được lịch sử: ' + e.message + '. Mở app bằng lối tắt của bản cài mới.';
+    }
+  }
+  window.HAK = window.HAK || {};
+  window.HAK.Downloads = {
+    saved(path, warning) {
+      const old = document.getElementById('hakSavedFile');
+      if (old) old.remove();
+      const box = document.createElement('div');
+      box.id = 'hakSavedFile';
+      box.className = 'card shadow p-3';
+      box.classList.add('hak-download-notice');
+      box.setAttribute('role', 'status');
+      const title = document.createElement('strong'),
+        name = document.createElement('div'),
+        location = document.createElement('small'),
+        status = document.createElement('div'),
+        actions = document.createElement('div');
+      title.textContent = '✓ Đã lưu file';
+      name.textContent = path.split(/[\\/]/).pop();
+      location.textContent = path;
+      location.className = 'text-break muted';
+      status.textContent = warning || '';
+      const close = document.createElement('button');
+      close.type = 'button';
+      close.className = 'btn-close float-end';
+      close.setAttribute('aria-label', 'Đóng thông báo');
+      close.onclick = () => box.remove();
+      const list = document.createElement('button');
+      list.type = 'button';
+      list.className = 'btn btn-sm btn-outline-secondary mt-2';
+      list.textContent = 'Xem file đã tải';
+      list.onclick = () => {
+        box.remove();
+        button.click();
+      };
+      actions.append(actionButton('Mở file', 'open', path, status), actionButton('Mở thư mục', 'reveal', path, status), list);
+      box.append(close, title, name, location, actions, status);
+      document.body.append(box);
+    },
+  };
+  button.onclick = () => {
+    const host = document.createElement('div');
+    host.className = 'modal fade';
+    host.tabIndex = -1;
+    host.setAttribute('aria-labelledby', 'hakDownloadTitle');
+    host.innerHTML =
+      '<div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="hakDownloadTitle">File đã tải</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button></div><div class="modal-body"><div data-history class="mb-3 hak-download-history" aria-live="polite">Đang đọc danh sách file…</div><button type="button" class="btn btn-outline-primary" data-open>Mở Downloads của Windows</button><label class="form-label mt-3 d-block" for="downloadFolderName">Tạo thư mục con trong Downloads</label><input class="form-control" id="downloadFolderName" maxlength="100" placeholder="Ví dụ: HAK_2026"><p class="small muted mt-2">Tạo và mở thư mục để quản lý chứng từ theo năm. Mỗi lần xuất Word, Excel hoặc ZIP, app mở hộp Lưu thành của Windows để chọn thư mục, đổi tên hoặc tạo thư mục mới. PDF dùng hộp thoại in → Lưu dưới dạng PDF.</p><button type="button" class="btn btn-primary" data-create>Tạo và mở thư mục</button><p role="status" class="mt-2 text-break" data-status></p></div></div></div>';
+    document.body.append(host);
+    const modal = bootstrap.Modal.getOrCreateInstance(host);
+    async function run(action) {
+      const status = host.querySelector('[data-status]'),
+        buttons = host.querySelectorAll('button[data-open],button[data-create]');
+      buttons.forEach((b) => (b.disabled = true));
+      status.textContent = 'Đang mở thư mục…';
+      try {
+        const name = action === 'create' ? host.querySelector('input').value.trim() : '';
+        if (action === 'create' && !name) throw Error('Nhập tên thư mục trước khi tạo.');
+        const controller = new AbortController(),
+          timer = setTimeout(() => controller.abort(), 15000);
+        let result;
+        try {
+          const response = await fetch('http://127.0.0.1:31879/downloads', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-HAK-Client': 'documents-v1', 'X-HAK-Token': window.HAK_DOCS_TOKEN || '' },
+            body: JSON.stringify({ action, name }),
+            signal: controller.signal,
+          });
+          result = await response.json();
+          if (!response.ok) throw Error(result.error || 'Không mở được thư mục.');
+        } finally {
+          clearTimeout(timer);
+        }
+        status.textContent = 'Đã mở: ' + result.path;
+      } catch (e) {
+        status.textContent = e instanceof TypeError ? 'Chưa kết nối tiện ích Windows. Mở lại app bằng lối tắt của bản cài mới.' : e.message;
+      } finally {
+        buttons.forEach((b) => (b.disabled = false));
+      }
+    }
+    host.querySelector('[data-open]').onclick = () => run('open');
+    host.querySelector('[data-create]').onclick = () => run('create');
+    host.addEventListener('hidden.bs.modal', () => {
+      modal.dispose();
+      host.remove();
+      button.focus();
+    });
+    modal.show();
+    loadHistory(host.querySelector('[data-history]'));
+  };
 })();

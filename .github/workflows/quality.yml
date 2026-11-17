@@ -15,6 +15,7 @@ jobs:
           node-version: ${{ matrix.node }}
       - run: npm ci   # khóa phiên bản công cụ lint bằng package-lock.json
       - run: npm run check
+      - run: npm run format:check   # Prettier: định dạng thống nhất (chạy npm run format để sửa)
       - run: npm run lint   # ESLint: biến chưa khai báo (no-undef), khóa trùng, mã không tới được
       - run: npm test
       - run: npm run quality

@@ -1,6 +1,7 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
-## Chưa phát hành (Đợt 1–2 nâng cấp nền)
+## Chưa phát hành (Đợt 1–4 nâng cấp nền)
+- Đợt 4: định dạng toàn bộ JS (app/js, tests, tools) bằng Prettier + .editorconfig; CI chạy npm run format:check; npm run format để tự sửa. Đã kiểm chứng cây cú pháp 109/109 file tương đương bản trước (chỉ khác cách viết: khóa đối tượng bỏ nháy, bỏ ngoặc thừa trong chuỗi &&). Tệp sinh tự động/thư viện không định dạng (.prettierignore). Ngưỡng long-file của quality đặt 2.200 dòng (app/.hakquality.json, không đóng gói vào bản phát hành) vì số dòng tăng sau khi định dạng.
 - Đợt 2: tách pages.js (1.694 → 903 dòng) thành pages-modals.js, pages-contract.js, pages-filter.js, pages-bkls.js (không đổi hành vi; nạp trước pages.js). Báo cáo quality không còn cảnh báo.
 - Test thứ tự nạp script (tests/script-order.test.cjs): mỗi file chỉ đọc HAK.<Tên> lúc nạp khi tên đã được file nạp trước gán.
 - Smoke test trình duyệt (npm run smoke) + job CI "smoke": mở app thật, không được có lỗi script.

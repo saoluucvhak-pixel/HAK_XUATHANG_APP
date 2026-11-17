@@ -1,79 +1,572 @@
-(function(root){
-'use strict';
-const HAK=root.HAK=root.HAK||{};
-const childFields=['ship','tkhq','product','qty','priceUsd','exchangeRate','valueUsd','valueVnd','certNo','certDate','mt','bdmt','moisture','deliverId','receiverId','whId','fromDate','toDate','fromTime','toTime','ticketFrom','ticketTo','filterTrips','certificateFiles','sourcePdfId','sourceEvidence','sourcePage','note','deletedAt','revision','legacyAlias'];
-const numeric=['qty','priceUsd','exchangeRate','valueUsd','valueVnd','mt','bdmt','moisture'];
-const copy=x=>JSON.parse(JSON.stringify(x));
-function id(prefix){return prefix+(root.crypto&&root.crypto.randomUUID?root.crypto.randomUUID():Date.now().toString(36)+'-'+Math.random().toString(36).slice(2));}
-function child(parentId,values){const d={id:values&&values.id||id('ct-'),contractId:parentId,revision:0};for(const key of childFields){const value=values&&values[key];if(value!==undefined)d[key]=copy(value);}numeric.forEach(k=>{d[k]=d[k]==null||d[k]===''?null:Number(d[k]);});d.certificateFiles=Array.isArray(d.certificateFiles)?d.certificateFiles.slice():[];return d;}
+(function (root) {
+  'use strict';
+  const HAK = (root.HAK = root.HAK || {});
+  const childFields = [
+    'ship',
+    'tkhq',
+    'product',
+    'qty',
+    'priceUsd',
+    'exchangeRate',
+    'valueUsd',
+    'valueVnd',
+    'certNo',
+    'certDate',
+    'mt',
+    'bdmt',
+    'moisture',
+    'deliverId',
+    'receiverId',
+    'whId',
+    'fromDate',
+    'toDate',
+    'fromTime',
+    'toTime',
+    'ticketFrom',
+    'ticketTo',
+    'filterTrips',
+    'certificateFiles',
+    'sourcePdfId',
+    'sourceEvidence',
+    'sourcePage',
+    'note',
+    'deletedAt',
+    'revision',
+    'legacyAlias',
+  ];
+  const numeric = ['qty', 'priceUsd', 'exchangeRate', 'valueUsd', 'valueVnd', 'mt', 'bdmt', 'moisture'];
+  const copy = (x) => JSON.parse(JSON.stringify(x));
+  function id(prefix) {
+    return (
+      prefix +
+      (root.crypto && root.crypto.randomUUID
+        ? root.crypto.randomUUID()
+        : Date.now().toString(36) + '-' + Math.random().toString(36).slice(2))
+    );
+  }
+  function child(parentId, values) {
+    const d = { id: (values && values.id) || id('ct-'), contractId: parentId, revision: 0 };
+    for (const key of childFields) {
+      const value = values && values[key];
+      if (value !== undefined) d[key] = copy(value);
+    }
+    numeric.forEach((k) => {
+      d[k] = d[k] == null || d[k] === '' ? null : Number(d[k]);
+    });
+    d.certificateFiles = Array.isArray(d.certificateFiles) ? d.certificateFiles.slice() : [];
+    return d;
+  }
 
-// Fixed decimal rounding: USD to cents, VND to whole dong, without binary-float rounding drift.
-function fraction(value){const s=String(value),m=/^(\d+)(?:\.(\d+))?(?:e([+-]?\d+))?$/i.exec(s);if(!m)throw Error('Số tiền không hợp lệ');let n=BigInt(m[1]+(m[2]||'')),power=(m[2]||'').length-Number(m[3]||0);return power<0?{n:n*10n**BigInt(-power),d:1n}:{n,d:10n**BigInt(power)};}
-function rounded(values,places,divisor){let n=1n,d=1n;for(const v of values){const f=fraction(v);n*=f.n;d*=f.d;}if(divisor!=null){const f=fraction(divisor);n*=f.d;d*=f.n;}const scale=10n**BigInt(places);const result=Number((n*scale+d/2n)/d)/Number(scale);if(!Number.isFinite(result)||Math.abs(result)>Number.MAX_SAFE_INTEGER)throw Error('Giá trị vượt giới hạn tính toán');return result;}
-function valuation(c,d){const qty=d.bdmt,price=c.priceUsd,rate=d.exchangeRate;const out={valueUsd:null,valueVnd:null};if(qty==null||qty===''||price==null||price==='')return out;if(!Number.isFinite(Number(qty))||!Number.isFinite(Number(price))||Number(qty)<0||Number(price)<0)return out;const fx=rate!=null&&rate!==''&&Number.isFinite(Number(rate))&&Number(rate)>0?Number(rate):null;if(c.currency==='VND'){out.valueVnd=rounded([Number(qty),Number(price)],0);if(fx)out.valueUsd=rounded([out.valueVnd],2,fx);}else{out.valueUsd=rounded([Number(qty),Number(price)],2);if(fx)out.valueVnd=rounded([out.valueUsd,fx],0);}return out;}
-function goodsKey(name){return String(name||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[đĐ]/g,'d').toLowerCase().replace(/\s+/g,' ').trim();}
-function ensureGoods(catalog,name){name=String(name||'').trim();if(!name)return null;catalog.products=Array.isArray(catalog.products)?catalog.products:[];let g=catalog.products.find(x=>goodsKey(x.name)===goodsKey(name));if(!g){g={id:id('goods-'),name,unit:'BDMT'};catalog.products.push(g);}return g;}
-function upsertGoods(catalog,value){const name=String(value.name||'').trim();if(!name)throw Error('Chưa nhập tên hàng hóa');const next=copy(catalog);next.products=next.products||[];if(next.products.some(x=>x.id!==value.id&&goodsKey(x.name)===goodsKey(name)))throw Error('Tên hàng hóa đã có trong danh mục');const at=next.products.findIndex(x=>x.id===value.id),old=next.products[at]||{};const record=Object.assign({},old,value,{id:value.id||id('goods-'),name,unit:'BDMT'});if(at<0)next.products.push(record);else next.products[at]=record;return {data:next,record};}
+  // Fixed decimal rounding: USD to cents, VND to whole dong, without binary-float rounding drift.
+  function fraction(value) {
+    const s = String(value),
+      m = /^(\d+)(?:\.(\d+))?(?:e([+-]?\d+))?$/i.exec(s);
+    if (!m) throw Error('Số tiền không hợp lệ');
+    let n = BigInt(m[1] + (m[2] || '')),
+      power = (m[2] || '').length - Number(m[3] || 0);
+    return power < 0 ? { n: n * 10n ** BigInt(-power), d: 1n } : { n, d: 10n ** BigInt(power) };
+  }
+  function rounded(values, places, divisor) {
+    let n = 1n,
+      d = 1n;
+    for (const v of values) {
+      const f = fraction(v);
+      n *= f.n;
+      d *= f.d;
+    }
+    if (divisor != null) {
+      const f = fraction(divisor);
+      n *= f.d;
+      d *= f.n;
+    }
+    const scale = 10n ** BigInt(places);
+    const result = Number((n * scale + d / 2n) / d) / Number(scale);
+    if (!Number.isFinite(result) || Math.abs(result) > Number.MAX_SAFE_INTEGER) throw Error('Giá trị vượt giới hạn tính toán');
+    return result;
+  }
+  function valuation(c, d) {
+    const qty = d.bdmt,
+      price = c.priceUsd,
+      rate = d.exchangeRate;
+    const out = { valueUsd: null, valueVnd: null };
+    if (qty == null || qty === '' || price == null || price === '') return out;
+    if (!Number.isFinite(Number(qty)) || !Number.isFinite(Number(price)) || Number(qty) < 0 || Number(price) < 0) return out;
+    const fx = rate != null && rate !== '' && Number.isFinite(Number(rate)) && Number(rate) > 0 ? Number(rate) : null;
+    if (c.currency === 'VND') {
+      out.valueVnd = rounded([Number(qty), Number(price)], 0);
+      if (fx) out.valueUsd = rounded([out.valueVnd], 2, fx);
+    } else {
+      out.valueUsd = rounded([Number(qty), Number(price)], 2);
+      if (fx) out.valueVnd = rounded([out.valueUsd, fx], 0);
+    }
+    return out;
+  }
+  function goodsKey(name) {
+    return String(name || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[đĐ]/g, 'd')
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+  function ensureGoods(catalog, name) {
+    name = String(name || '').trim();
+    if (!name) return null;
+    catalog.products = Array.isArray(catalog.products) ? catalog.products : [];
+    let g = catalog.products.find((x) => goodsKey(x.name) === goodsKey(name));
+    if (!g) {
+      g = { id: id('goods-'), name, unit: 'BDMT' };
+      catalog.products.push(g);
+    }
+    return g;
+  }
+  function upsertGoods(catalog, value) {
+    const name = String(value.name || '').trim();
+    if (!name) throw Error('Chưa nhập tên hàng hóa');
+    const next = copy(catalog);
+    next.products = next.products || [];
+    if (next.products.some((x) => x.id !== value.id && goodsKey(x.name) === goodsKey(name)))
+      throw Error('Tên hàng hóa đã có trong danh mục');
+    const at = next.products.findIndex((x) => x.id === value.id),
+      old = next.products[at] || {};
+    const record = Object.assign({}, old, value, { id: value.id || id('goods-'), name, unit: 'BDMT' });
+    if (at < 0) next.products.push(record);
+    else next.products[at] = record;
+    return { data: next, record };
+  }
 
-/** Phụ lục hợp đồng điều chỉnh KHỐI LƯỢNG (bảng con của hợp đồng): c.addenda[]. contractQty luôn là KL hiện hành; qtyOrig là KL gốc. */
-function newAddendum(v){v=v||{};const q=v.qty===''||v.qty==null?null:Number(v.qty);const a={id:v.id||id('pl-'),no:String(v.no||'').trim(),date:v.date||'',qty:Number.isFinite(q)?q:null,reason:String(v.reason||'').trim(),note:String(v.note||'').trim(),seq:Number.isFinite(Number(v.seq))&&Number(v.seq)>0?Number(v.seq):0};if(v.deletedAt)a.deletedAt=v.deletedAt;return a;}
-/** Phụ lục còn hiệu lực xếp theo THỨ TỰ HIỆU LỰC: có ngày ký xếp trước (theo ngày, cùng ngày theo thứ tự nhập seq), phụ lục CHƯA có ngày xếp sau cùng theo thứ tự nhập. Phần tử cuối = KL hiện hành. */
-function addendaOf(c){return (c.addenda||[]).filter(a=>!a.deletedAt&&a.qty!=null).slice().sort((a,b)=>{const da=String(a.date||''),db=String(b.date||'');if(!da!==!db)return da?-1:1;return da.localeCompare(db)||((a.seq||0)-(b.seq||0));});}
-function applyAddenda(c){let mx=0;(c.addenda||[]).forEach(a=>{if(Number(a.seq)>mx)mx=Number(a.seq);});c.addenda=(c.addenda||[]).map(a=>{const n=newAddendum(a);if(!n.seq)n.seq=++mx;return n;});const list=addendaOf(c);/* qtyOrig: undefined = chưa ghi nhận KL gốc (lần đầu có phụ lục → lấy KL hợp đồng lúc đó); null = KL gốc để TRỐNG (giữ nguyên qua mọi lần tính — không lấy KL phụ lục điền vào); số = KL gốc. */
-if(!list.length){if(c.qtyOrig!==undefined){c.contractQty=c.qtyOrig==null||c.qtyOrig===''?null:Number(c.qtyOrig);}delete c.qtyOrig;return c;}if(c.qtyOrig===undefined)c.qtyOrig=c.contractQty==null||c.contractQty===''?null:Number(c.contractQty);else c.qtyOrig=c.qtyOrig==null||c.qtyOrig===''?null:Number(c.qtyOrig);c.contractQty=list[list.length-1].qty;return c;}
-/** KL hợp đồng GỐC (BDMT; null = để trống): có phụ lục → qtyOrig, chưa có phụ lục → contractQty. Dùng chung form, báo cáo, Excel, PDF, Google Sheet. */
-function originalQty(c){if(addendaOf(c).length)return c.qtyOrig==null||c.qtyOrig===''?null:Number(c.qtyOrig);return c.contractQty==null||c.contractQty===''?null:Number(c.contractQty);}
-/** Hồ sơ cũ có thể đã bị ghi nhầm KL phụ lục vào KL gốc (lỗi cũ): KL gốc trùng KL phụ lục đầu tiên → báo cần đối chiếu chứng từ, KHÔNG tự sửa. */
-function auditOriginal(c){const list=addendaOf(c);if(!list.length||c.qtyOrig==null||c.qtyOrig==='')return '';return Number(c.qtyOrig)===Number(list[0].qty)?'KL gốc ('+Number(c.qtyOrig)+' BDMT) trùng KL phụ lục đầu tiên — có thể do lỗi cũ ghi KL phụ lục vào KL gốc. Đối chiếu với hợp đồng gốc; app không tự sửa số liệu.':'';}
-function roles(c){return {exporterId:c.exporterId||(c.type==='uythac'?c.customerId:c.sellerId)||'',principalId:c.principalId||(c.type==='uythac'?c.sellerId:'')||'',buyerId:c.buyerId||(c.type==='uythac'?'':c.customerId)||''};}
-function parent(value){for(const k of ['priceUsd','contractQty'])if(value[k]!=null&&value[k]!==''&&!Number.isFinite(Number(value[k])))throw Error('Số liệu hợp đồng không hợp lệ');for(const row of value.details||[])for(const k of numeric)if(row[k]!=null&&row[k]!==''&&!Number.isFinite(Number(row[k])))throw Error('Số liệu thực hiện không hợp lệ');const c=copy(value);c.id=c.id||id('hd-');Object.assign(c,roles(c));delete c.sellerId;delete c.customerId;c.details=Array.isArray(c.details)?c.details.map(d=>{if(d.contractId&&d.contractId!==c.id)throw Error('Chi tiết có khóa ngoại khác hợp đồng cha');return child(c.id,d);}):[];c.revision=Number(c.revision)||0;if(c.contractProduct===undefined)c.contractProduct=Array.from(new Set(c.details.filter(d=>!d.deletedAt).map(d=>d.product).filter(Boolean))).join('; ');if(c.contractQty===undefined)c.contractQty=sum(c,'qty');else c.contractQty=c.contractQty==null||c.contractQty===''?null:Number(c.contractQty);return c;}
-function migrate(data){const d=copy(data||{customers:[],contracts:[]});let changed=d.v!==3;d.contracts=(d.contracts||[]).map(raw=>{const c=parent(raw);if(!Array.isArray(raw.details)&&childFields.some(k=>raw[k]!==undefined&&raw[k]!==''&&raw[k]!==null&&(k!=='certificateFiles'||raw[k].length))){c.details=[child(c.id,Object.assign({},raw,{id:'ct-legacy-'+c.id,legacyAlias:c.id}))];changed=true;c.contractProduct=c.contractProduct||raw.product||'';if(c.contractQty==null)c.contractQty=sum(c,'qty');}if(raw.contractProduct===undefined||raw.contractQty===undefined)changed=true;for(const key of childFields)if(!['revision','deletedAt','note','priceUsd'].includes(key))delete c[key];return c;});if(!Array.isArray(d.products)){d.products=[];changed=true;for(const c of d.contracts){ensureGoods(d,c.contractProduct);for(const row of c.details||[])ensureGoods(d,row.product);}}d.v=3;return {data:d,changed};}
-function active(c){return (c.details||[]).filter(d=>!d.deletedAt);}
-function sum(c,key){const values=active(c).map(x=>x[key]).filter(x=>x!==null&&x!==undefined&&x!=='');return values.length?values.reduce((a,b)=>a+Number(b),0):null;}
-function projection(c,d){const role=roles(c),legacy=c.type==='uythac';return Object.assign({},c,d,{id:d.id,parentId:c.id,detailId:d.id,no:c.no,date:c.date,type:c.type,currency:c.currency,priceUsd:c.priceUsd,exporterId:role.exporterId,principalId:role.principalId,buyerId:role.buyerId,sellerId:legacy?role.principalId:role.exporterId,customerId:legacy?role.exporterId:role.buyerId,product:d.product||c.contractProduct||'',qty:d.qty==null&&active(c).length===1?c.contractQty:d.qty,detailLabel:d.product||c.contractProduct||d.tkhq||d.ship||d.id});}
-function choices(catalog,type){return (catalog.contracts||[]).filter(c=>!c.deletedAt&&(!type||c.type===type)).flatMap(c=>active(c).map(d=>projection(c,d)));}
-function resolve(catalog,key,opts){for(const c of catalog.contracts||[]){if(c.deletedAt&&!(opts&&opts.history))continue;const d=(opts&&opts.history?c.details||[]:active(c)).find(x=>x.id===key||x.legacyAlias===key);if(d)return projection(c,d);}return null;}
-function validate(c,catalog){if(c.priceUsd!=null&&(!Number.isFinite(c.priceUsd)||c.priceUsd<0))return 'Đơn giá hợp đồng phải là số không âm.';if(c.contractQty!=null&&(!Number.isFinite(c.contractQty)||c.contractQty<0))return 'Khối lượng hợp đồng phải là số không âm.';if(typeof c.id!=='string'||!c.id)return 'Hợp đồng thiếu ID.';if((catalog.contracts||[]).filter(p=>p.id===c.id).length>1)return 'ID hợp đồng bị trùng.';for(const key of ['exporterId','principalId','buyerId']){if(c[key]&&Array.isArray(catalog.customers)&&!catalog.customers.some(x=>x.id===c[key]))return 'Bên liên quan không tồn tại trong danh mục.';}if(!c.deletedAt&&!c.no&&!active(c).some(d=>d.ship||d.tkhq))return 'Cần số hợp đồng hoặc tàu / TKHQ ở dòng chi tiết.';const ids=new Set();for(const d of c.details||[]){if(typeof d.id!=='string'||!d.id||ids.has(d.id))return 'ID chi tiết bị trùng hoặc trống.';ids.add(d.id);if((catalog.contracts||[]).some(p=>p.id!==c.id&&(p.details||[]).some(x=>x.id===d.id)))return 'ID chi tiết đã thuộc hợp đồng khác.';if(d.contractId!==c.id)return 'Chi tiết không thuộc hợp đồng đang sửa.';if(d.deletedAt)continue;for(const key of numeric)if(d[key]!=null&&(!Number.isFinite(d[key])||d[key]<0))return 'Số liệu chi tiết phải là số không âm.';if(d.exchangeRate!=null&&d.exchangeRate<=0)return 'Tỷ giá phải lớn hơn 0.';if(d.moisture!=null&&d.moisture>=100)return 'Độ ẩm phải nhỏ hơn 100%.';if(d.fromDate&&d.toDate&&d.fromDate>d.toDate)return 'Ngày cân từ đang sau ngày đến.';if(d.tkhq){const all=(catalog.contracts||[]).filter(x=>!x.deletedAt&&x.id!==c.id).flatMap(x=>x.details||[]);if(all.some(x=>!x.deletedAt&&x.id!==d.id&&x.tkhq===d.tkhq))return 'Số TKHQ '+d.tkhq+' đã có ở dòng chi tiết khác.';}}
- if(!c.deletedAt&&(catalog.contracts||[]).some(x=>!x.deletedAt&&x.id!==c.id&&x.type===c.type&&x.no&&x.no===c.no))return 'Số hợp đồng đã tồn tại trong cùng hình thức.';return '';}
-function upsert(catalog,value,expectedRevision){const next=copy(catalog),index=next.contracts.findIndex(c=>c.id===value.id),old=next.contracts[index];if(old&&expectedRevision!==undefined&&old.revision!==expectedRevision)throw Error('Hợp đồng đã thay đổi. Mở lại trước khi lưu.');const c=parent(value);const error=validate(c,next);if(error)throw Error(error);for(const row of c.details)Object.assign(row,valuation(c,row));ensureGoods(next,c.contractProduct);for(const row of c.details)ensureGoods(next,row.product);c.revision=(old?old.revision:0)+1;if(index<0)next.contracts.push(c);else next.contracts[index]=c;return {data:next,record:c};}
-function archiveChild(c,detailId){const result=copy(c),d=result.details.find(x=>x.id===detailId);if(!d)throw Error('Không tìm thấy chi tiết');d.deletedAt=new Date().toISOString();d.revision=(d.revision||0)+1;return result;}
-/* Đóng / mở lại hợp đồng THỦ CÔNG — có SỐ PHIÊN BẢN ĐÓNG (closeRev) để gộp bản sao lưu phân biệt được "đã mở lại" với "dữ liệu cũ thiếu trường":
- * mỗi lần đóng hoặc mở lại tăng closeRev; bản có closeRev cao hơn thắng. Bản đã phát hành (v2.16.2) chưa có closeRev: có closedAt → coi là 1, không có → 0. */
-function closeRevOf(c){const n=Number(c&&c.closeRev);return Number.isFinite(n)&&n>0?Math.floor(n):(c&&c.closedAt?1:0);}
-function closeContract(c,date){c.closeRev=closeRevOf(c)+1;c.closedAt=date;delete c.reopenedAt;return c;}
-function reopenContract(c,date){c.closeRev=closeRevOf(c)+1;delete c.closedAt;c.reopenedAt=date||'';return c;}
-/** Gộp trạng thái đóng của 2 bản cùng 1 hợp đồng vào combined: closeRev cao hơn thắng; bằng nhau mà khác trạng thái (xung đột) → bản có mốc ngày muộn hơn, hòa → giữ bản trên máy này. */
-function mergeClosure(old,inc,combined){const ro=closeRevOf(old),ri=closeRevOf(inc);let win=old;if(ri>ro)win=inc;else if(ri===ro&&!!inc.closedAt!==!!old.closedAt){const so=String(old.closedAt||old.reopenedAt||''),si=String(inc.closedAt||inc.reopenedAt||'');if(si>so)win=inc;}
- const rev=Math.max(ro,ri);if(rev>0)combined.closeRev=rev;else delete combined.closeRev;
- if(win.closedAt){combined.closedAt=win.closedAt;delete combined.reopenedAt;}else{delete combined.closedAt;if(win.reopenedAt)combined.reopenedAt=win.reopenedAt;else delete combined.reopenedAt;}}
-/* Gộp 2 bản ghi CÙNG id theo PHIÊN BẢN (revision): bản có revision cao hơn thắng từng trường CÓ giá trị; trường trống không xóa dữ liệu bên kia (giữ chính sách cũ);
- * bản thiếu revision = 0 (cũ nhất); bằng nhau → bản trên máy này thắng, nếu nội dung khác thì ghi XUNG ĐỘT. deletedAt (ngừng dùng) theo đúng bản thắng,
- * nên bản cũ mang dữ liệu đã ngừng dùng không "sống lại" và bản mới khôi phục thì bỏ được dấu ngừng dùng. */
-/** JSON ổn định (không phụ thuộc thứ tự khóa) để so sánh nội dung hai bản ghi. */
-const stable=v=>JSON.stringify(v,(k,x)=>x&&typeof x==='object'&&!Array.isArray(x)?Object.keys(x).sort().reduce((r,key)=>{r[key]=x[key];return r;},{}):x);
-const revOf=x=>Number(x&&x.revision)||0;
-const overlay=(base,top)=>{const r=Object.assign({},base);for(const k of Object.keys(top)){const v=top[k];if(v!==null&&v!==undefined&&v!=='')r[k]=copy(v);}return r;};
-function diffKeys(a,b){const keys=new Set([...Object.keys(a),...Object.keys(b)]);return Array.from(keys).filter(k=>!['revision','details','addenda','customs'].includes(k)&&stable(a[k])!==stable(b[k]));}
-function mergeVersioned(old,inc){const ro=revOf(old),ri=revOf(inc),incWins=ri>ro,win=incWins?inc:old,lose=incWins?old:inc;const r=overlay(lose,win);if(win.deletedAt)r.deletedAt=win.deletedAt;else delete r.deletedAt;
- const conflict=ri===ro?diffKeys(old,inc):[];return {rec:r,incWins,conflict};}
-function mergeById(local,incoming,incWins){const out=copy(local||[]);for(const x of incoming||[]){const at=out.findIndex(y=>y.id===x.id);if(at<0)out.push(copy(x));else{const m=incWins?overlay(out[at],x):overlay(x,out[at]);const win=incWins?x:out[at];if(win.deletedAt)m.deletedAt=win.deletedAt;else delete m.deletedAt;out[at]=m;}}return out;}
-function mergeCatalog(local,incoming){
- const a=migrate(local||{v:3,customers:[],contracts:[]}).data,b=migrate(incoming).data,report={conflicts:[],kept:[]};mergeCatalog.report=report;
- for(const customer of b.customers||[]){const index=a.customers.findIndex(x=>x.id===customer.id);if(index<0)a.customers.push(copy(customer));else a.customers[index]=revOf(a.customers[index])||revOf(customer)?mergeVersioned(a.customers[index],customer).rec:overlay(a.customers[index],customer);}   // khách hàng chưa có phiên bản: giữ cách gộp cũ (bản nhập bổ sung / ghi đè ô có giá trị)
- for(const product of b.products||[]){const at=(a.products||[]).findIndex(x=>x.id===product.id);if(at>=0)a.products[at]=Object.assign({},a.products[at],product);else if(!(a.products||[]).some(x=>goodsKey(x.name)===goodsKey(product.name)))a.products.push(copy(product));}
- for(const value of b.contracts){const index=a.contracts.findIndex(x=>x.id===value.id);if(index<0){a.contracts.push(copy(value));continue;}const old=a.contracts[index],mv=mergeVersioned(old,value),combined=mv.rec;
-  mergeClosure(old,value,combined);
-  if(mv.conflict.length)report.conflicts.push({id:old.id,no:old.no||'',fields:mv.conflict});else if(!mv.incWins&&revOf(old)>revOf(value)&&diffKeys(old,value).length)report.kept.push({id:old.id,no:old.no||'',localRevision:revOf(old),incomingRevision:revOf(value)});
-  combined.contractFiles=Array.from(new Set([...(old.contractFiles||[]),...(value.contractFiles||[])]));
-  {const ad=mergeById(old.addenda,value.addenda,mv.incWins);if(ad.length||old.addenda!==undefined)combined.addenda=ad;else delete combined.addenda;}
-  combined.details=copy(old.details||[]);
-  for(const d of value.details||[]){const at=combined.details.findIndex(x=>x.id===d.id);if(at<0)combined.details.push(copy(d));else{const previous=combined.details[at],dm=mergeVersioned(previous,d);combined.details[at]=dm.rec;combined.details[at].certificateFiles=Array.from(new Set([...(previous.certificateFiles||[]),...(d.certificateFiles||[])]));if(dm.conflict.length)report.conflicts.push({id:old.id,no:old.no||'',detail:d.id,fields:dm.conflict});}}
-  applyAddenda(combined);if(old.addenda===undefined&&!combined.addenda.length)delete combined.addenda;if(old.contractFiles===undefined&&!combined.contractFiles.length)delete combined.contractFiles;
-  const before=copy(old),after=copy(combined);delete before.revision;delete after.revision;combined.revision=stable(before)===stable(after)?old.revision:Math.max(revOf(old),revOf(value))+1;a.contracts[index]=combined;
- }
- if(HAK.CustomsModel&&(a.customs||b.customs))a.customs=HAK.CustomsModel.merge(a.customs||[],b.customs||[]);
- for(const c of a.contracts){const error=validate(c,a);if(error)throw Error(error);}return a;
-}
-HAK.ContractModel={closeRevOf,closeContract,reopenContract,originalQty,auditOriginal,newAddendum,addendaOf,applyAddenda,valuation,ensureGoods,upsertGoods,goodsKey,childFields,child,parent,migrate,active,sum,roles,projection,choices,resolve,validate,upsert,archiveChild,mergeCatalog,copy};
-if(typeof module==='object'&&module.exports)module.exports=HAK.ContractModel;
-})(typeof window!=='undefined'?window:globalThis);
+  /** Phụ lục hợp đồng điều chỉnh KHỐI LƯỢNG (bảng con của hợp đồng): c.addenda[]. contractQty luôn là KL hiện hành; qtyOrig là KL gốc. */
+  function newAddendum(v) {
+    v = v || {};
+    const q = v.qty === '' || v.qty == null ? null : Number(v.qty);
+    const a = {
+      id: v.id || id('pl-'),
+      no: String(v.no || '').trim(),
+      date: v.date || '',
+      qty: Number.isFinite(q) ? q : null,
+      reason: String(v.reason || '').trim(),
+      note: String(v.note || '').trim(),
+      seq: Number.isFinite(Number(v.seq)) && Number(v.seq) > 0 ? Number(v.seq) : 0,
+    };
+    if (v.deletedAt) a.deletedAt = v.deletedAt;
+    return a;
+  }
+  /** Phụ lục còn hiệu lực xếp theo THỨ TỰ HIỆU LỰC: có ngày ký xếp trước (theo ngày, cùng ngày theo thứ tự nhập seq), phụ lục CHƯA có ngày xếp sau cùng theo thứ tự nhập. Phần tử cuối = KL hiện hành. */
+  function addendaOf(c) {
+    return (c.addenda || [])
+      .filter((a) => !a.deletedAt && a.qty != null)
+      .slice()
+      .sort((a, b) => {
+        const da = String(a.date || ''),
+          db = String(b.date || '');
+        if (!da !== !db) return da ? -1 : 1;
+        return da.localeCompare(db) || (a.seq || 0) - (b.seq || 0);
+      });
+  }
+  function applyAddenda(c) {
+    let mx = 0;
+    (c.addenda || []).forEach((a) => {
+      if (Number(a.seq) > mx) mx = Number(a.seq);
+    });
+    c.addenda = (c.addenda || []).map((a) => {
+      const n = newAddendum(a);
+      if (!n.seq) n.seq = ++mx;
+      return n;
+    });
+    const list =
+      addendaOf(
+        c
+      ); /* qtyOrig: undefined = chưa ghi nhận KL gốc (lần đầu có phụ lục → lấy KL hợp đồng lúc đó); null = KL gốc để TRỐNG (giữ nguyên qua mọi lần tính — không lấy KL phụ lục điền vào); số = KL gốc. */
+    if (!list.length) {
+      if (c.qtyOrig !== undefined) {
+        c.contractQty = c.qtyOrig == null || c.qtyOrig === '' ? null : Number(c.qtyOrig);
+      }
+      delete c.qtyOrig;
+      return c;
+    }
+    if (c.qtyOrig === undefined) c.qtyOrig = c.contractQty == null || c.contractQty === '' ? null : Number(c.contractQty);
+    else c.qtyOrig = c.qtyOrig == null || c.qtyOrig === '' ? null : Number(c.qtyOrig);
+    c.contractQty = list[list.length - 1].qty;
+    return c;
+  }
+  /** KL hợp đồng GỐC (BDMT; null = để trống): có phụ lục → qtyOrig, chưa có phụ lục → contractQty. Dùng chung form, báo cáo, Excel, PDF, Google Sheet. */
+  function originalQty(c) {
+    if (addendaOf(c).length) return c.qtyOrig == null || c.qtyOrig === '' ? null : Number(c.qtyOrig);
+    return c.contractQty == null || c.contractQty === '' ? null : Number(c.contractQty);
+  }
+  /** Hồ sơ cũ có thể đã bị ghi nhầm KL phụ lục vào KL gốc (lỗi cũ): KL gốc trùng KL phụ lục đầu tiên → báo cần đối chiếu chứng từ, KHÔNG tự sửa. */
+  function auditOriginal(c) {
+    const list = addendaOf(c);
+    if (!list.length || c.qtyOrig == null || c.qtyOrig === '') return '';
+    return Number(c.qtyOrig) === Number(list[0].qty)
+      ? 'KL gốc (' +
+          Number(c.qtyOrig) +
+          ' BDMT) trùng KL phụ lục đầu tiên — có thể do lỗi cũ ghi KL phụ lục vào KL gốc. Đối chiếu với hợp đồng gốc; app không tự sửa số liệu.'
+      : '';
+  }
+  function roles(c) {
+    return {
+      exporterId: c.exporterId || (c.type === 'uythac' ? c.customerId : c.sellerId) || '',
+      principalId: c.principalId || (c.type === 'uythac' ? c.sellerId : '') || '',
+      buyerId: c.buyerId || (c.type === 'uythac' ? '' : c.customerId) || '',
+    };
+  }
+  function parent(value) {
+    for (const k of ['priceUsd', 'contractQty'])
+      if (value[k] != null && value[k] !== '' && !Number.isFinite(Number(value[k]))) throw Error('Số liệu hợp đồng không hợp lệ');
+    for (const row of value.details || [])
+      for (const k of numeric)
+        if (row[k] != null && row[k] !== '' && !Number.isFinite(Number(row[k]))) throw Error('Số liệu thực hiện không hợp lệ');
+    const c = copy(value);
+    c.id = c.id || id('hd-');
+    Object.assign(c, roles(c));
+    delete c.sellerId;
+    delete c.customerId;
+    c.details = Array.isArray(c.details)
+      ? c.details.map((d) => {
+          if (d.contractId && d.contractId !== c.id) throw Error('Chi tiết có khóa ngoại khác hợp đồng cha');
+          return child(c.id, d);
+        })
+      : [];
+    c.revision = Number(c.revision) || 0;
+    if (c.contractProduct === undefined)
+      c.contractProduct = Array.from(
+        new Set(
+          c.details
+            .filter((d) => !d.deletedAt)
+            .map((d) => d.product)
+            .filter(Boolean)
+        )
+      ).join('; ');
+    if (c.contractQty === undefined) c.contractQty = sum(c, 'qty');
+    else c.contractQty = c.contractQty == null || c.contractQty === '' ? null : Number(c.contractQty);
+    return c;
+  }
+  function migrate(data) {
+    const d = copy(data || { customers: [], contracts: [] });
+    let changed = d.v !== 3;
+    d.contracts = (d.contracts || []).map((raw) => {
+      const c = parent(raw);
+      if (
+        !Array.isArray(raw.details) &&
+        childFields.some((k) => raw[k] !== undefined && raw[k] !== '' && raw[k] !== null && (k !== 'certificateFiles' || raw[k].length))
+      ) {
+        c.details = [child(c.id, Object.assign({}, raw, { id: 'ct-legacy-' + c.id, legacyAlias: c.id }))];
+        changed = true;
+        c.contractProduct = c.contractProduct || raw.product || '';
+        if (c.contractQty == null) c.contractQty = sum(c, 'qty');
+      }
+      if (raw.contractProduct === undefined || raw.contractQty === undefined) changed = true;
+      for (const key of childFields) if (!['revision', 'deletedAt', 'note', 'priceUsd'].includes(key)) delete c[key];
+      return c;
+    });
+    if (!Array.isArray(d.products)) {
+      d.products = [];
+      changed = true;
+      for (const c of d.contracts) {
+        ensureGoods(d, c.contractProduct);
+        for (const row of c.details || []) ensureGoods(d, row.product);
+      }
+    }
+    d.v = 3;
+    return { data: d, changed };
+  }
+  function active(c) {
+    return (c.details || []).filter((d) => !d.deletedAt);
+  }
+  function sum(c, key) {
+    const values = active(c)
+      .map((x) => x[key])
+      .filter((x) => x !== null && x !== undefined && x !== '');
+    return values.length ? values.reduce((a, b) => a + Number(b), 0) : null;
+  }
+  function projection(c, d) {
+    const role = roles(c),
+      legacy = c.type === 'uythac';
+    return Object.assign({}, c, d, {
+      id: d.id,
+      parentId: c.id,
+      detailId: d.id,
+      no: c.no,
+      date: c.date,
+      type: c.type,
+      currency: c.currency,
+      priceUsd: c.priceUsd,
+      exporterId: role.exporterId,
+      principalId: role.principalId,
+      buyerId: role.buyerId,
+      sellerId: legacy ? role.principalId : role.exporterId,
+      customerId: legacy ? role.exporterId : role.buyerId,
+      product: d.product || c.contractProduct || '',
+      qty: d.qty == null && active(c).length === 1 ? c.contractQty : d.qty,
+      detailLabel: d.product || c.contractProduct || d.tkhq || d.ship || d.id,
+    });
+  }
+  function choices(catalog, type) {
+    return (catalog.contracts || [])
+      .filter((c) => !c.deletedAt && (!type || c.type === type))
+      .flatMap((c) => active(c).map((d) => projection(c, d)));
+  }
+  function resolve(catalog, key, opts) {
+    for (const c of catalog.contracts || []) {
+      if (c.deletedAt && !(opts && opts.history)) continue;
+      const d = (opts && opts.history ? c.details || [] : active(c)).find((x) => x.id === key || x.legacyAlias === key);
+      if (d) return projection(c, d);
+    }
+    return null;
+  }
+  function validate(c, catalog) {
+    if (c.priceUsd != null && (!Number.isFinite(c.priceUsd) || c.priceUsd < 0)) return 'Đơn giá hợp đồng phải là số không âm.';
+    if (c.contractQty != null && (!Number.isFinite(c.contractQty) || c.contractQty < 0)) return 'Khối lượng hợp đồng phải là số không âm.';
+    if (typeof c.id !== 'string' || !c.id) return 'Hợp đồng thiếu ID.';
+    if ((catalog.contracts || []).filter((p) => p.id === c.id).length > 1) return 'ID hợp đồng bị trùng.';
+    for (const key of ['exporterId', 'principalId', 'buyerId']) {
+      if (c[key] && Array.isArray(catalog.customers) && !catalog.customers.some((x) => x.id === c[key]))
+        return 'Bên liên quan không tồn tại trong danh mục.';
+    }
+    if (!c.deletedAt && !c.no && !active(c).some((d) => d.ship || d.tkhq)) return 'Cần số hợp đồng hoặc tàu / TKHQ ở dòng chi tiết.';
+    const ids = new Set();
+    for (const d of c.details || []) {
+      if (typeof d.id !== 'string' || !d.id || ids.has(d.id)) return 'ID chi tiết bị trùng hoặc trống.';
+      ids.add(d.id);
+      if ((catalog.contracts || []).some((p) => p.id !== c.id && (p.details || []).some((x) => x.id === d.id)))
+        return 'ID chi tiết đã thuộc hợp đồng khác.';
+      if (d.contractId !== c.id) return 'Chi tiết không thuộc hợp đồng đang sửa.';
+      if (d.deletedAt) continue;
+      for (const key of numeric)
+        if (d[key] != null && (!Number.isFinite(d[key]) || d[key] < 0)) return 'Số liệu chi tiết phải là số không âm.';
+      if (d.exchangeRate != null && d.exchangeRate <= 0) return 'Tỷ giá phải lớn hơn 0.';
+      if (d.moisture != null && d.moisture >= 100) return 'Độ ẩm phải nhỏ hơn 100%.';
+      if (d.fromDate && d.toDate && d.fromDate > d.toDate) return 'Ngày cân từ đang sau ngày đến.';
+      if (d.tkhq) {
+        const all = (catalog.contracts || []).filter((x) => !x.deletedAt && x.id !== c.id).flatMap((x) => x.details || []);
+        if (all.some((x) => !x.deletedAt && x.id !== d.id && x.tkhq === d.tkhq))
+          return 'Số TKHQ ' + d.tkhq + ' đã có ở dòng chi tiết khác.';
+      }
+    }
+    if (!c.deletedAt && (catalog.contracts || []).some((x) => !x.deletedAt && x.id !== c.id && x.type === c.type && x.no && x.no === c.no))
+      return 'Số hợp đồng đã tồn tại trong cùng hình thức.';
+    return '';
+  }
+  function upsert(catalog, value, expectedRevision) {
+    const next = copy(catalog),
+      index = next.contracts.findIndex((c) => c.id === value.id),
+      old = next.contracts[index];
+    if (old && expectedRevision !== undefined && old.revision !== expectedRevision)
+      throw Error('Hợp đồng đã thay đổi. Mở lại trước khi lưu.');
+    const c = parent(value);
+    const error = validate(c, next);
+    if (error) throw Error(error);
+    for (const row of c.details) Object.assign(row, valuation(c, row));
+    ensureGoods(next, c.contractProduct);
+    for (const row of c.details) ensureGoods(next, row.product);
+    c.revision = (old ? old.revision : 0) + 1;
+    if (index < 0) next.contracts.push(c);
+    else next.contracts[index] = c;
+    return { data: next, record: c };
+  }
+  function archiveChild(c, detailId) {
+    const result = copy(c),
+      d = result.details.find((x) => x.id === detailId);
+    if (!d) throw Error('Không tìm thấy chi tiết');
+    d.deletedAt = new Date().toISOString();
+    d.revision = (d.revision || 0) + 1;
+    return result;
+  }
+  /* Đóng / mở lại hợp đồng THỦ CÔNG — có SỐ PHIÊN BẢN ĐÓNG (closeRev) để gộp bản sao lưu phân biệt được "đã mở lại" với "dữ liệu cũ thiếu trường":
+   * mỗi lần đóng hoặc mở lại tăng closeRev; bản có closeRev cao hơn thắng. Bản đã phát hành (v2.16.2) chưa có closeRev: có closedAt → coi là 1, không có → 0. */
+  function closeRevOf(c) {
+    const n = Number(c && c.closeRev);
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : c && c.closedAt ? 1 : 0;
+  }
+  function closeContract(c, date) {
+    c.closeRev = closeRevOf(c) + 1;
+    c.closedAt = date;
+    delete c.reopenedAt;
+    return c;
+  }
+  function reopenContract(c, date) {
+    c.closeRev = closeRevOf(c) + 1;
+    delete c.closedAt;
+    c.reopenedAt = date || '';
+    return c;
+  }
+  /** Gộp trạng thái đóng của 2 bản cùng 1 hợp đồng vào combined: closeRev cao hơn thắng; bằng nhau mà khác trạng thái (xung đột) → bản có mốc ngày muộn hơn, hòa → giữ bản trên máy này. */
+  function mergeClosure(old, inc, combined) {
+    const ro = closeRevOf(old),
+      ri = closeRevOf(inc);
+    let win = old;
+    if (ri > ro) win = inc;
+    else if (ri === ro && !!inc.closedAt !== !!old.closedAt) {
+      const so = String(old.closedAt || old.reopenedAt || ''),
+        si = String(inc.closedAt || inc.reopenedAt || '');
+      if (si > so) win = inc;
+    }
+    const rev = Math.max(ro, ri);
+    if (rev > 0) combined.closeRev = rev;
+    else delete combined.closeRev;
+    if (win.closedAt) {
+      combined.closedAt = win.closedAt;
+      delete combined.reopenedAt;
+    } else {
+      delete combined.closedAt;
+      if (win.reopenedAt) combined.reopenedAt = win.reopenedAt;
+      else delete combined.reopenedAt;
+    }
+  }
+  /* Gộp 2 bản ghi CÙNG id theo PHIÊN BẢN (revision): bản có revision cao hơn thắng từng trường CÓ giá trị; trường trống không xóa dữ liệu bên kia (giữ chính sách cũ);
+   * bản thiếu revision = 0 (cũ nhất); bằng nhau → bản trên máy này thắng, nếu nội dung khác thì ghi XUNG ĐỘT. deletedAt (ngừng dùng) theo đúng bản thắng,
+   * nên bản cũ mang dữ liệu đã ngừng dùng không "sống lại" và bản mới khôi phục thì bỏ được dấu ngừng dùng. */
+  /** JSON ổn định (không phụ thuộc thứ tự khóa) để so sánh nội dung hai bản ghi. */
+  const stable = (v) =>
+    JSON.stringify(v, (k, x) =>
+      x && typeof x === 'object' && !Array.isArray(x)
+        ? Object.keys(x)
+            .sort()
+            .reduce((r, key) => {
+              r[key] = x[key];
+              return r;
+            }, {})
+        : x
+    );
+  const revOf = (x) => Number(x && x.revision) || 0;
+  const overlay = (base, top) => {
+    const r = Object.assign({}, base);
+    for (const k of Object.keys(top)) {
+      const v = top[k];
+      if (v !== null && v !== undefined && v !== '') r[k] = copy(v);
+    }
+    return r;
+  };
+  function diffKeys(a, b) {
+    const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+    return Array.from(keys).filter((k) => !['revision', 'details', 'addenda', 'customs'].includes(k) && stable(a[k]) !== stable(b[k]));
+  }
+  function mergeVersioned(old, inc) {
+    const ro = revOf(old),
+      ri = revOf(inc),
+      incWins = ri > ro,
+      win = incWins ? inc : old,
+      lose = incWins ? old : inc;
+    const r = overlay(lose, win);
+    if (win.deletedAt) r.deletedAt = win.deletedAt;
+    else delete r.deletedAt;
+    const conflict = ri === ro ? diffKeys(old, inc) : [];
+    return { rec: r, incWins, conflict };
+  }
+  function mergeById(local, incoming, incWins) {
+    const out = copy(local || []);
+    for (const x of incoming || []) {
+      const at = out.findIndex((y) => y.id === x.id);
+      if (at < 0) out.push(copy(x));
+      else {
+        const m = incWins ? overlay(out[at], x) : overlay(x, out[at]);
+        const win = incWins ? x : out[at];
+        if (win.deletedAt) m.deletedAt = win.deletedAt;
+        else delete m.deletedAt;
+        out[at] = m;
+      }
+    }
+    return out;
+  }
+  function mergeCatalog(local, incoming) {
+    const a = migrate(local || { v: 3, customers: [], contracts: [] }).data,
+      b = migrate(incoming).data,
+      report = { conflicts: [], kept: [] };
+    mergeCatalog.report = report;
+    for (const customer of b.customers || []) {
+      const index = a.customers.findIndex((x) => x.id === customer.id);
+      if (index < 0) a.customers.push(copy(customer));
+      else
+        a.customers[index] =
+          revOf(a.customers[index]) || revOf(customer)
+            ? mergeVersioned(a.customers[index], customer).rec
+            : overlay(a.customers[index], customer);
+    } // khách hàng chưa có phiên bản: giữ cách gộp cũ (bản nhập bổ sung / ghi đè ô có giá trị)
+    for (const product of b.products || []) {
+      const at = (a.products || []).findIndex((x) => x.id === product.id);
+      if (at >= 0) a.products[at] = Object.assign({}, a.products[at], product);
+      else if (!(a.products || []).some((x) => goodsKey(x.name) === goodsKey(product.name))) a.products.push(copy(product));
+    }
+    for (const value of b.contracts) {
+      const index = a.contracts.findIndex((x) => x.id === value.id);
+      if (index < 0) {
+        a.contracts.push(copy(value));
+        continue;
+      }
+      const old = a.contracts[index],
+        mv = mergeVersioned(old, value),
+        combined = mv.rec;
+      mergeClosure(old, value, combined);
+      if (mv.conflict.length) report.conflicts.push({ id: old.id, no: old.no || '', fields: mv.conflict });
+      else if (!mv.incWins && revOf(old) > revOf(value) && diffKeys(old, value).length)
+        report.kept.push({ id: old.id, no: old.no || '', localRevision: revOf(old), incomingRevision: revOf(value) });
+      combined.contractFiles = Array.from(new Set([...(old.contractFiles || []), ...(value.contractFiles || [])]));
+      {
+        const ad = mergeById(old.addenda, value.addenda, mv.incWins);
+        if (ad.length || old.addenda !== undefined) combined.addenda = ad;
+        else delete combined.addenda;
+      }
+      combined.details = copy(old.details || []);
+      for (const d of value.details || []) {
+        const at = combined.details.findIndex((x) => x.id === d.id);
+        if (at < 0) combined.details.push(copy(d));
+        else {
+          const previous = combined.details[at],
+            dm = mergeVersioned(previous, d);
+          combined.details[at] = dm.rec;
+          combined.details[at].certificateFiles = Array.from(
+            new Set([...(previous.certificateFiles || []), ...(d.certificateFiles || [])])
+          );
+          if (dm.conflict.length) report.conflicts.push({ id: old.id, no: old.no || '', detail: d.id, fields: dm.conflict });
+        }
+      }
+      applyAddenda(combined);
+      if (old.addenda === undefined && !combined.addenda.length) delete combined.addenda;
+      if (old.contractFiles === undefined && !combined.contractFiles.length) delete combined.contractFiles;
+      const before = copy(old),
+        after = copy(combined);
+      delete before.revision;
+      delete after.revision;
+      combined.revision = stable(before) === stable(after) ? old.revision : Math.max(revOf(old), revOf(value)) + 1;
+      a.contracts[index] = combined;
+    }
+    if (HAK.CustomsModel && (a.customs || b.customs)) a.customs = HAK.CustomsModel.merge(a.customs || [], b.customs || []);
+    for (const c of a.contracts) {
+      const error = validate(c, a);
+      if (error) throw Error(error);
+    }
+    return a;
+  }
+  HAK.ContractModel = {
+    closeRevOf,
+    closeContract,
+    reopenContract,
+    originalQty,
+    auditOriginal,
+    newAddendum,
+    addendaOf,
+    applyAddenda,
+    valuation,
+    ensureGoods,
+    upsertGoods,
+    goodsKey,
+    childFields,
+    child,
+    parent,
+    migrate,
+    active,
+    sum,
+    roles,
+    projection,
+    choices,
+    resolve,
+    validate,
+    upsert,
+    archiveChild,
+    mergeCatalog,
+    copy,
+  };
+  if (typeof module === 'object' && module.exports) module.exports = HAK.ContractModel;
+})(typeof window !== 'undefined' ? window : globalThis);
