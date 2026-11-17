@@ -269,3 +269,32 @@ test('KL gốc có số: giữ qua phụ lục; bỏ phụ lục → trả KL g�
   assert.match(M.auditOriginal(bad), /[Đđ]ối chiếu/);
   assert.equal(M.originalQty({ contractQty: 700, addenda: [] }), 700, 'chưa có phụ lục → KL gốc = KL hợp đồng');
 });
+
+test('KL gốc bằng 0 khác KL gốc để trống: phụ lục 500 giữ gốc 0; bỏ phụ lục → về 0 (không thành trống)', () => {
+  const M = require('../app/js/contract-model.js');
+  const zero = M.parent({
+    type: 'xuatban',
+    no: 'HD-0',
+    contractQty: 0,
+    details: [{ ship: 'A' }],
+    addenda: [{ no: 'PL1', date: '2026-09-01', qty: 500 }],
+  });
+  M.applyAddenda(zero);
+  assert.equal(zero.qtyOrig, 0);
+  assert.equal(M.originalQty(zero), 0, 'gốc 0 ≠ trống');
+  assert.equal(zero.contractQty, 500);
+  const again = M.parent(JSON.parse(JSON.stringify(zero)));
+  assert.equal(M.originalQty(again), 0, 'qua lưu / đọc lại vẫn là 0');
+  zero.addenda[0].deletedAt = '2026-10-01';
+  M.applyAddenda(zero);
+  assert.equal(zero.contractQty, 0);
+  const blank = M.parent({
+    type: 'xuatban',
+    no: 'HD-B',
+    contractQty: null,
+    details: [{ ship: 'A' }],
+    addenda: [{ no: 'PL1', date: '2026-09-01', qty: 500 }],
+  });
+  M.applyAddenda(blank);
+  assert.equal(M.originalQty(blank), null);
+});

@@ -436,6 +436,34 @@ async function login(p) {
   check(decl.sort().join('|') === '0/20|20/0', 'mẫu 4: hai tờ khai — một nợ 20, một nộp thừa 20, hiện riêng', JSON.stringify(decl));
   check(/Số dư ròng[^.]*không bù trừ/i.test(body4), 'mẫu 4: số dư ròng ghi đúng tên, kèm "không bù trừ giữa các tờ khai"');
 
+  console.log('E) Sao lưu của dữ liệu thử: rà soát toàn vẹn cha–con (hợp đồng, chi tiết, tờ khai, khoản nộp, hồ sơ cân)');
+  {
+    const text = await p.evaluate(async () => (await HAK.Backup.buildFull()).parts.join(''));
+    const j = JSON.parse(text);
+    global.window = global;
+    global.HAK = global.HAK || {};
+    global.HAK.ContractModel = require('../app/js/contract-model.js');
+    global.HAK.CustomsModel = require('../app/js/customs-model.js');
+    const Integ = require('../app/js/integrity-model.js'),
+      data = global.HAK.ContractModel.migrate(j.keys['hak.catalog.v1']).data,
+      metas = (j.archive || []).map((x) => x.meta);
+    const findings = Integ.audit(data, metas, { attachmentIds: (j.attachments || []).map((x) => x.id) });
+    const rep = { errors: findings.filter((f) => f.level === 'error').length, findings, relations: Integ.relations(data, metas) };
+    check(
+      rep.errors === 0,
+      'sao lưu: 0 lỗi toàn vẹn cha–con',
+      rep.findings
+        .filter((f) => f.level === 'error')
+        .map((f) => f.code)
+        .join(',')
+    );
+    check(
+      rep.relations.contracts >= 1 && rep.relations.declarations >= 2 && rep.relations.archiveLinked >= 1,
+      'bảng quan hệ: có hợp đồng, tờ khai và hồ sơ cân gắn chi tiết',
+      JSON.stringify(rep.relations)
+    );
+  }
+
   console.log('D) PDF báo cáo dài: tiêu đề bảng lặp lại khi sang trang, tiếng Việt đủ dấu');
   {
     await p.evaluate(() => {

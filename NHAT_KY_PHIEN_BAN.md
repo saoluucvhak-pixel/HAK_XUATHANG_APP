@@ -9,6 +9,14 @@
 - `npm run accept:release`: chế độ phát hành bắt buộc Word và PDF, đọc lại DOCX (JSZip) và PDF (pdfjs-dist) không cần công cụ ngoài nên chạy như nhau trên Windows và Linux; kiểm tra tiêu đề lặp mọi trang, đủ dòng, cột trong khổ trang; báo Đạt / Lỗi / Bỏ qua riêng. `HAK_BROWSER_CHANNEL=msedge` để dùng Edge.
 - CI chạy e2e, e2e:carrier, e2e:reports và accept:release.
 
+## v2.21.3 — Rà soát toàn vẹn cha–con
+- **Sửa lỗi sai số liệu thuế khi nhập bổ sung:** cùng một giấy nộp tiền nhập ở hai máy (khác id) trước đây bị cộng đôi "đã nộp" (nộp thừa giả). Nay gộp theo giấy nộp tiền (cùng quy tắc nhận diện giấy trùng đã xác nhận); khoản thiếu số giấy mà cùng số tiền được giữ cả hai và báo "nghi trùng". Khai bổ sung cùng số cũng gộp một. Kết quả khôi phục nêu số khoản đã bỏ / nghi trùng.
+- **Phiên bản hợp đồng** khi nhập bản cùng nội dung nhưng phiên bản cao hơn không còn tụt xuống dưới bản nhập (tránh xung đột giả giữa hai máy).
+- **Ngừng dùng chi tiết / hợp đồng** còn tờ khai hoặc hồ sơ cân gắn vào: giữ liên kết lịch sử như cũ và nay có thông báo nêu số bản ghi cần đối soát.
+- Mở rộng `HAK.Integrity.audit` (`integrity-model.js`, giữ nguyên cách gọi cũ; thêm `opts.attachmentIds` và `HAK.Integrity.relations`) + mới `tools/integrity-audit.cjs` (rà soát toàn vẹn cha–con trên file sao lưu: khóa trùng, bản ghi mồ côi, con trỏ ngừng dùng, liên kết nhầm công ty, tệp đính kèm thiếu, KL phụ lục lệch, tờ khai bổ sung trùng); `accept` kiểm 0 lỗi toàn vẹn trên sao lưu của dữ liệu thử; test hồi quy (`merge-version`, `contract-model`, `integrity-parent-child`).
+- **Quy trình phát hành:** workflow `build-setup.yml` trước đây dựng lại và GHI ĐÈ file cài / SHA-256 / ghi chú của Release đã đăng mỗi khi có commit mới vào main dù số phiên bản không đổi (tag giữ commit cũ nhưng Release trỏ commit mới). Nay kiểm tra Release `v<phiên bản>` đã có thì KHÔNG đăng lại; muốn phát hành bản mới phải nâng số phiên bản.
+- Quy tắc nghiệp vụ còn mơ hồ ghi ở `docs/QUY_TAC_NGHIEP_VU_CAN_XAC_NHAN.md` (mục 17–24).
+
 ## v2.21.2 — Bảng chéo kho × hình thức
 - Mẫu "Phân tích theo tàu / kho / ĐVVC" có thêm bảng **Kho xuất × hình thức** (thực giao kg theo từng ô, tổng hàng / cột, tra về hồ sơ và phiếu cân), cùng tập phiếu đã xác minh với bảng nhóm nên tổng khớp; có trong màn hình, Excel (trang Tổng hợp) và PDF. Chưa có số liệu nhập kho.
 

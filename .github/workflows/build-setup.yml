@@ -79,8 +79,20 @@ jobs:
         with:
           name: HAK_QuanLyXuatHang_Setup
           path: HAK_QuanLyXuatHang_Setup_v*.exe
+      - name: Check release already published
+        id: rel
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Không ghi đè bản phát hành đã đăng: cùng số phiên bản thì tag giữ nguyên commit cũ nhưng file cài / SHA-256 / ghi chú sẽ bị thay bằng bản dựng mới.
+          gh release view "v$env:VERSION" --repo "$env:GITHUB_REPOSITORY" *> $null
+          $exists = ($LASTEXITCODE -eq 0)
+          "EXISTS=$($exists.ToString().ToLower())" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          if ($exists) { Write-Host "Release v$env:VERSION đã có — KHÔNG ghi đè. Muốn phát hành bản mới: nâng số phiên bản (version.js + installer/setup.nsi)." }
+          $global:LASTEXITCODE = 0
       - name: Publish release
-        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+        if: steps.rel.outputs.EXISTS != 'true' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.VERSION }}

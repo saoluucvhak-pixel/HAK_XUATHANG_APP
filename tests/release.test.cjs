@@ -26,3 +26,10 @@ test('bộ cài NSIS loại đúng các file khôi phục / cấu hình dev như
   for (const pat of ['MoKhoa_1Lan*.html', 'XoaSach_DuLieu*.html', '.hakquality.json'])
     assert.ok(line.includes('/x "' + pat + '"'), 'setup.nsi phải loại ' + pat + ' — dòng: ' + line);
 });
+
+test('workflow bộ cài không ghi đè Release đã đăng cùng số phiên bản (file cài / SHA-256 / ghi chú không đổi sau khi công bố)', () => {
+  const y = fs.readFileSync(path.resolve('.github/workflows/build-setup.yml'), 'utf8');
+  assert.match(y, /gh release view "v\$env:VERSION"/, 'phải kiểm tra Release đã tồn tại');
+  const publish = y.slice(y.indexOf('- name: Publish release'));
+  assert.match(publish, /if: steps\.rel\.outputs\.EXISTS != 'true'/, 'bước đăng Release chỉ chạy khi chưa có Release cùng phiên bản');
+});

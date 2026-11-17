@@ -314,6 +314,26 @@
       return { error: e.message };
     }
   }
+  /** Số tờ khai và hồ sơ cân còn gắn vào các chi tiết (mã chi tiết) — dùng để BÁO khi ngừng dùng; không gỡ liên kết, không xóa chứng từ đã lưu. */
+  async function linkedTo(detailIds) {
+    const ids = new Set(detailIds);
+    const decls = (state.data.customs || []).filter((d) => !d.deletedAt && d.detailId && ids.has(d.detailId)).length;
+    let metas = 0;
+    try {
+      if (HAK.Archive) metas = (await HAK.Archive.list()).filter((m) => m.contract && ids.has(m.contract)).length;
+    } catch (e) {
+      /* không đọc được Lưu trữ → chỉ báo phần tờ khai */
+    }
+    return { decls, metas };
+  }
+  const stopNotice = (what, n) =>
+    n.decls || n.metas
+      ? 'Đã ngừng dùng ' +
+        what +
+        ' nhưng còn ' +
+        [n.decls ? n.decls + ' tờ khai' : '', n.metas ? n.metas + ' hồ sơ cân' : ''].filter(Boolean).join(' và ') +
+        ' gắn vào. Liên kết lịch sử được GIỮ NGUYÊN (không xóa chứng từ đã lưu) — cần đối soát nếu muốn chuyển sang chi tiết khác.'
+      : '';
   function removeContract(id) {
     const c = contract(id);
     if (!c) return { error: 'Không tìm thấy hợp đồng.' };
@@ -1642,6 +1662,8 @@
         await persist();
         renderRows();
         changed();
+        const note = stopNotice('chi tiết hợp đồng', await linkedTo([stop.dataset.detailArchive]));
+        if (note) HAK.UI.toast(note, 'warning');
       } catch (error) {
         state.data = before;
         HAK.UI.toast(error.message, 'error');
@@ -1683,6 +1705,11 @@
               renderRows();
               changed();
               HAK.UI.toast('Đã cập nhật danh mục.', 'info');
+              if (state.tab !== 'customers') {
+                const c = contract(del.dataset.del) || (state.data.contracts || []).find((x) => x.id === del.dataset.del);
+                const note = c ? stopNotice('hợp đồng', await linkedTo((c.details || []).map((d) => d.id))) : '';
+                if (note) HAK.UI.toast(note, 'warning');
+              }
             } catch (error) {
               state.data = before;
               HAK.UI.toast(error.message, 'error');

@@ -140,3 +140,56 @@ test('tờ khai: bản cũ nhập lại không ghi đè tờ khai mới (trạng
   const newerD = mk(8, { taxVnd: 200 });
   assert.equal(CM.merge([m], [newerD])[0].taxVnd, 200);
 });
+
+test('hồi quy: nhập bản cùng nội dung nhưng phiên bản cao hơn → không tăng thêm, nhưng phiên bản KHÔNG tụt xuống dưới bản nhập', () => {
+  const local = cat({ contractQty: 2000, revision: 2 }),
+    incoming = cat({ contractQty: 2000, revision: 3 });
+  const m = M.mergeCatalog(local, incoming);
+  assert.equal(one(m).revision, 3, 'trước khi sửa: 2 (tụt dưới bản nhập → hai máy cùng "phiên bản 3" khác nội dung bị báo xung đột giả)');
+  const again = M.mergeCatalog(m, incoming);
+  assert.equal(one(again).revision, 3, 'nhập lặp cho cùng kết quả');
+  assert.equal(one(M.mergeCatalog(cat({ revision: 5 }), cat({ revision: 3 }))).revision, 5, 'bản nhập thấp hơn: giữ phiên bản máy này');
+});
+test('hồi quy: cùng một giấy nộp tiền nhập ở hai máy (khác id) → gộp không cộng đôi "đã nộp"; khoản nghi trùng được báo để đối soát', () => {
+  const mk = (id, payId, extra) =>
+    CM.newDecl({
+      id,
+      no: '308629701721',
+      status: 'cleared',
+      taxVnd: 1000000,
+      contractId: 'hd1',
+      revision: 2,
+      payments: [Object.assign({ id: payId, receiptNo: 'DN0206/26', kind: 'tax', amount: 1000000, date: '2026-06-12' }, extra || {})],
+    });
+  let m = CM.merge([mk('tk-A', 'pay-A')], [mk('tk-B', 'pay-B')]);
+  assert.equal(m.length, 1);
+  assert.equal(m[0].payments.length, 1, 'trước khi sửa: 2 khoản (đã nộp 2.000.000, nộp thừa 1.000.000 giả)');
+  assert.equal(CM.totals(m[0]).paidTax, 1000000);
+  assert.equal(CM.totals(m[0]).over, 0);
+  assert.equal(CM.merge.report.duplicatePayments.length, 1);
+  // giấy khác → khoản khác, giữ cả hai
+  m = CM.merge([mk('tk-A', 'pay-A')], [mk('tk-B', 'pay-B', { receiptNo: 'DN0207/26' })]);
+  assert.equal(m[0].payments.length, 2);
+  // thiếu số giấy ở hai bên, cùng số tiền → không tự quyết: giữ cả hai và báo nghi trùng
+  m = CM.merge([mk('tk-A', 'pay-A', { receiptNo: '' })], [mk('tk-B', 'pay-B', { receiptNo: '' })]);
+  assert.equal(m[0].payments.length, 2);
+  assert.equal(CM.merge.report.maybe.length, 1);
+  // nhập lặp cùng bản: ổn định
+  const once = CM.merge([mk('tk-A', 'pay-A')], [mk('tk-B', 'pay-B')]);
+  assert.deepEqual(CM.merge(once, [mk('tk-B', 'pay-B')])[0].payments.length, 1);
+});
+test('hồi quy: cùng số tờ khai bổ sung nhập ở hai máy (khác id) → một lần khai bổ sung', () => {
+  const mk = (id, sid) =>
+    CM.newDecl({
+      id,
+      no: '308629701721',
+      status: 'cleared',
+      taxVnd: 1000,
+      contractId: 'hd1',
+      revision: 2,
+      supplements: [{ id: sid, no: '308629701799', date: '2026-06-20', round: 2, taxVnd: 1500 }],
+    });
+  const m = CM.merge([mk('tk-A', 'bs-A')], [mk('tk-B', 'bs-B')]);
+  assert.equal(m[0].supplements.length, 1);
+  assert.equal(CM.merge.report.duplicateSupplements.length, 1);
+});

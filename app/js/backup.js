@@ -418,6 +418,8 @@
       mode,
       keptNewer: 0,
       conflicts: 0,
+      dupPayments: 0,
+      maybePayments: 0,
     };
     const merge = mode === 'merge',
       fillOnly = async (store, items) => {
@@ -447,6 +449,8 @@
                 rp = HAK.ContractModel.mergeCatalog.report || {};
               out.keptNewer = (rp.kept || []).length;
               out.conflicts = (rp.conflicts || []).length;
+              out.dupPayments = ((rp.customs || {}).duplicatePayments || []).length;
+              out.maybePayments = ((rp.customs || {}).maybe || []).length;
               if (HAK.Store.set(CAT, merged) === false) throw new Error('Không ghi được danh mục.');
               out.keys++;
               return;
@@ -677,6 +681,8 @@
         const rp = (HAK.ContractModel.mergeCatalog && HAK.ContractModel.mergeCatalog.report) || {};
         r.keptNewer = (rp.kept || []).length;
         r.conflicts = (rp.conflicts || []).length;
+        r.dupPayments = ((rp.customs || {}).duplicatePayments || []).length;
+        r.maybePayments = ((rp.customs || {}).maybe || []).length;
       } else throw new Error('Thiếu mô hình dữ liệu hợp đồng.');
     }
     const gsIn = j.gsync || {},
@@ -715,6 +721,8 @@
     (r.users.station ? ' — máy trạm (' + r.users.station.length + ' công ty)' : '') +
     (r.keptNewer ? ' · giữ nguyên ' + r.keptNewer + ' hợp đồng trên máy này vì mới hơn bản trong gói' : '') +
     (r.conflicts ? ' · ⚠ ' + r.conflicts + ' mục cùng phiên bản nhưng khác nội dung — đã giữ bản trên máy này, cần đối chiếu' : '') +
+    (r.dupPayments ? ' · bỏ ' + r.dupPayments + ' khoản nộp thuế trùng giấy nộp tiền đã có (không cộng đôi)' : '') +
+    (r.maybePayments ? ' · ⚠ ' + r.maybePayments + ' khoản nộp nghi trùng (thiếu số giấy) — đã giữ cả hai, cần đối soát' : '') +
     '. Trang sẽ tải lại…';
   /** Ô chọn công ty của gói. Tick đủ mọi công ty (máy chính) = gói đầy đủ; tick 1 phần = gói máy trạm. */
   function pkCosHtml() {
@@ -1486,6 +1494,8 @@
             (r.skipped ? ', bỏ qua ' + r.skipped : '') +
             (r.keptNewer ? ' · giữ ' + r.keptNewer + ' hợp đồng trên máy vì mới hơn bản sao' : '') +
             (r.conflicts ? ' · ⚠ ' + r.conflicts + ' hợp đồng cùng phiên bản nhưng khác nội dung (đã giữ bản trên máy)' : '') +
+            (r.dupPayments ? ' · bỏ ' + r.dupPayments + ' khoản nộp thuế trùng giấy đã có' : '') +
+            (r.maybePayments ? ' · ⚠ ' + r.maybePayments + ' khoản nộp nghi trùng cần đối soát' : '') +
             '.',
           r.conflicts ? 'warning' : 'success'
         );
