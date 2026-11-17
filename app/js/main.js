@@ -58,96 +58,8 @@
   }
   /** Gộp các đợt của 1 loại thành sl.ds. 1 đợt → dùng thẳng ds của đợt đó. ≥ 2 đợt → nối dòng, khử phiếu trùng, tính lại thống kê. */
   function mergeSlot(sl) {
-    const ok = sl.batches.filter((b) => b.ds && b.ds.ok);
-    if (!sl.batches.length) {
-      sl.ds = null;
-      return;
-    }
-    // Mã duy nhất cho từng xe (tên file + số dòng Excel): r.idx trùng nhau giữa các file → không dùng idx để nhận diện "xe trả về".
-    ok.forEach((b) =>
-      b.ds.rows.forEach((r) => {
-        r.uid = b.fileName + '#' + r.idx;
-      })
-    );
-    if (!ok.length) {
-      sl.ds = (sl.batches[sl.sel] || sl.batches[0]).ds;
-      return;
-    }
-    if (ok.length === 1) {
-      sl.ds = ok[0].ds;
-      return;
-    }
-    // v2.12.1: gom các dòng cùng khóa (số phiếu|biển số|giờ cân vào) từ mọi đợt. Mặc định giữ dòng của đợt NẠP TRƯỚC (như cũ);
-    // phiếu trùng giữa các file mà KHÁC khối lượng → ghi vào conflicts để người dùng chọn dùng số của đợt sau (lưu theo loại, bền qua lần mở app).
-    const type = Object.keys(App.slots).find((t) => App.slots[t] === sl) || '',
-      useNew = new Set(preferNewKeys(type));
-    const groups = new Map(),
-      warnings = [];
-    let total = 0;
-    ok.forEach((b) => {
-      b.ds.rows.forEach((r) => {
-        const k = G.omitKey(r);
-        total++;
-        if (!groups.has(k)) groups.set(k, []);
-        groups.get(k).push({ r, file: b.fileName });
-      });
-      (b.ds.warnings || []).forEach((w) => warnings.push('[' + b.fileName + '] ' + w));
-    });
-    const rows = [],
-      conflicts = [],
-      sig = (r) => [r.net, r.gross, r.tare].join('/');
-    groups.forEach((g, k) => {
-      const files = new Set(g.map((x) => x.file));
-      if (files.size === 1) {
-        // Chỉ một file có khóa này: giữ NGUYÊN các dòng (lặp trong cùng file không phải trùng giữa các đợt; như khi chỉ có 1 đợt).
-        g.forEach((x) => rows.push(x.r));
-        return;
-      }
-      // Nhiều file cùng khóa: giữ toàn bộ dòng của MỘT đợt (đợt nạp trước, hoặc đợt sau nếu người dùng chọn), bỏ dòng của đợt còn lại.
-      const pickNew = useNew.has(k),
-        keepFile = pickNew ? g[g.length - 1].file : g[0].file,
-        kept = g.filter((x) => x.file === keepFile);
-      kept.forEach((x) => rows.push(x.r));
-      if (g.some((x) => sig(x.r) !== sig(kept[0].r))) {
-        conflicts.push({
-          key: k,
-          ticket: g[0].r.ticket || '',
-          plate: g[0].r.plate,
-          time: g[0].r.time1,
-          useNew: pickNew,
-          items: g.map((x) => ({ file: x.file, net: x.r.net, gross: x.r.gross, tare: x.r.tare })),
-        });
-      }
-    });
-    const dup = total - rows.length;
-    if (dup) warnings.unshift('ℹ Đã bỏ ' + dup + ' phiếu trùng giữa các đợt (cùng số phiếu, biển số, ngày giờ cân).');
-    if (conflicts.length)
-      warnings.unshift(
-        '⚠ ' +
-          conflicts.length +
-          ' phiếu trùng giữa các đợt nhưng KHÁC khối lượng — kiểm tra ở mục Nhập liệu → "Xem & chọn" để dùng đúng số.'
-      );
-    const t = (r) => (r.ts1 !== null && r.ts1 !== undefined ? r.ts1 : Infinity);
-    rows.sort((a, b) => (t(a) === t(b) ? 0 : t(a) < t(b) ? -1 : 1));
-    sl.ds = {
-      ok: true,
-      merged: true,
-      batchCount: ok.length,
-      dup,
-      conflicts,
-      rows,
-      stats: X.computeStats(rows),
-      warnings,
-      errors: [],
-      meta: {},
-      columns: [],
-      mapping: {},
-      autoMapping: {},
-      missing: [],
-      missingOptional: [],
-      skipped: 0,
-      reconciled: false,
-    };
+    const type = Object.keys(App.slots).find((t) => App.slots[t] === sl) || '';
+    HAK.BatchMerge.merge(sl, new Set(preferNewKeys(type)));
   }
   const PAGE_SIZE = 25;
 
@@ -652,33 +564,20 @@
         for (const n of info.sheetNames) {
           const r = X.parseSheet(info.workbook, n, { autoSwap: HAK.Config.data.general.autoSwap });
           if (r.ok) {
-            probe = r;
+            probe = Object.assign({ sheetName: n }, r);
             break;
           }
         }
         const dups = probe ? G.duplicateRows(probe.rows) : [];
         if (dups.length) {
           Loading.hide();
-          const nExtra = dups.reduce((a, g) => a + g.rows.length - 1, 0),
-            sample = dups
-              .slice(0, 5)
-              .map(
-                (g) =>
-                  (g.rows[0].ticket ? 'phiếu ' + g.rows[0].ticket + ' · ' : '') +
-                  g.rows[0].plate +
-                  ' (dòng Excel ' +
-                  g.rows.map((r) => r.idx).join(', ') +
-                  ')'
-              )
-              .join('; ');
           toast(
             '⛔ Chưa nạp "' +
               file.name +
-              '": có ' +
-              nExtra +
-              ' dòng trùng hoàn toàn (cùng số phiếu, biển số, giờ cân) — ' +
-              sample +
-              (dups.length > 5 ? '… và ' + (dups.length - 5) + ' nhóm khác' : '') +
+              '": sheet "' +
+              probe.sheetName +
+              '" có ' +
+              HAK.ReadConfig.dupSummary(dups) +
               '. Xóa dòng thừa trong file Excel rồi nạp lại.',
             'error'
           );
@@ -773,6 +672,38 @@
       sl.ds = { ok: false, errors: [e.message], warnings: [], columns: [], mapping: {}, autoMapping: {}, rows: [] };
     }
     if (sl.ds.ok) HAK.Vehicles.enrich(sl.ds, sl.veh || null); // v2.7.2: điền Tài xế / ĐVVC theo danh sách xe RIÊNG của đợt (null → cảnh báo)
+  }
+  /**
+   * Đổi cách đọc của đợt đang xem (đổi sheet, dòng tiêu đề, ánh xạ cột, nhận diện lại cột): đọc thử TRƯỚC khi áp dụng (xem read-config.js).
+   * Từ chối thì vẽ lại màn hình để các ô chọn về đúng giá trị đang dùng. Trả true nếu đã áp dụng.
+   */
+  function applyReadConfig(mutate) {
+    const b = App.cur();
+    if (!b || !b.wb) return false;
+    const RC = HAK.ReadConfig,
+      prev = { sheet: b.sheet, mapping: JSON.parse(JSON.stringify(b.mapping || {})), headerRow: b.headerRow || null },
+      next = JSON.parse(JSON.stringify(prev));
+    mutate(next);
+    const wasOk = !!(b.ds && b.ds.ok),
+      verdict = RC.decide(wasOk, RC.probeRead(b.wb, next, HAK.Config.data.general.autoSwap));
+    if (!verdict.apply) {
+      toast(
+        '⛔ Chưa áp dụng: ' +
+          verdict.why +
+          '. Giữ nguyên cách đọc đang dùng' +
+          (wasOk ? ' (sheet "' + prev.sheet + '")' : '') +
+          '. ' +
+          verdict.hint,
+        'error'
+      );
+      renderFile();
+      return false;
+    }
+    App.sheet = next.sheet;
+    App.mapping = next.mapping;
+    App.headerRow = next.headerRow;
+    parseCurrent(true);
+    return true;
   }
   /** Phân tích lại sheet của loại đang chọn. */
   function parseCurrent(resetPages) {
@@ -1293,8 +1224,9 @@
     body.innerHTML = html;
     $$('#mapBody [data-map]').forEach((s) =>
       s.addEventListener('change', () => {
-        App.mapping[s.dataset.map] = +s.value;
-        parseCurrent(true);
+        applyReadConfig((c) => {
+          c.mapping[s.dataset.map] = +s.value;
+        });
       })
     );
     bindHdr();
@@ -1304,9 +1236,10 @@
     if (!b) return;
     b.addEventListener('click', () => {
       const v = parseInt($('#hdrRow').value, 10);
-      App.headerRow = v > 0 ? v : null;
-      App.mapping = {};
-      parseCurrent(true);
+      applyReadConfig((c) => {
+        c.headerRow = v > 0 ? v : null;
+        c.mapping = {};
+      });
     });
   }
 
@@ -1499,18 +1432,23 @@
     renderVehicles();
 
     $('#sheetSelect').addEventListener('change', (e) => {
-      App.sheet = e.target.value;
-      App.mapping = {};
-      App.headerRow = null;
-      parseCurrent(true);
+      const name = e.target.value;
+      applyReadConfig((c) => {
+        c.sheet = name;
+        c.mapping = {};
+        c.headerRow = null;
+      });
     });
-    $('#btnReparse').addEventListener('click', () => parseCurrent(true));
+    $('#btnReparse').addEventListener('click', () => applyReadConfig(() => {}));
     $('#btnUseScope').addEventListener('click', useViewScope);
     $('#btnResetMap').addEventListener('click', () => {
-      App.mapping = {};
-      App.headerRow = null;
-      parseCurrent(true);
-      toast('Đã nhận diện lại các cột.', 'info');
+      if (
+        applyReadConfig((c) => {
+          c.mapping = {};
+          c.headerRow = null;
+        })
+      )
+        toast('Đã nhận diện lại các cột.', 'info');
     });
     $('#plateSearch').addEventListener(
       'input',

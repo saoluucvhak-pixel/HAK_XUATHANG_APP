@@ -137,20 +137,20 @@ test('chi tiết chuyến xe (xhTrips) khớp tổng khi tính theo ngày cân: 
   );
   assert.equal(lot.kg, 25000);
 });
-test('phiếu thiếu ngày cân dùng ngày bắt đầu hồ sơ; hồ sơ không đọc được phiếu lùi về ngày bắt đầu', () => {
+test('phiếu thiếu ngày cân và hồ sơ không đọc được phiếu: chưa phân bổ, không lùi về ngày bắt đầu hồ sơ', () => {
   const rows = [row(1, 1000, ''), row(2, 2000, '05/01/2027')];
   const { metas, tickets } = setup([
     { meta: meta('A', '30/12/2026', '05/01/2027'), rows },
     { meta: meta('B', '10/01/2027', '11/01/2027', { kg: 7000, trips: 1 }), rows: [] },
   ]);
   tickets.delete('B');
+  Object.assign(metas[1], { kg: 7000, trips: 1 }); // setup() tính lại kg từ rows; đặt lại số liệu của hồ sơ B (7 tấn, không đọc được phiếu)
   const m = R.compute(metas, { tickets, basis: 'weigh' });
   assert.deepEqual(
     m.months.map(([k, v]) => [k, v.xuatkhau]),
-    [
-      ['2026-12', 1000],
-      ['2027-01', 2000],
-    ],
-    'hồ sơ B không có phiếu nên không nằm trong months (chỉ trong used khi không lọc ngày)'
+    [['2027-01', 2000]],
+    'chỉ phiếu đã xác minh ngày cân (05/01/2027) vào tháng; phiếu thiếu ngày không tự vào tháng 12/2026'
   );
+  assert.equal(m.unallocated.n, 2);
+  assert.equal(m.unallocated.kg, 8000, 'phiếu thiếu ngày 1.000 kg + hồ sơ B không đọc được 7.000 kg');
 });
