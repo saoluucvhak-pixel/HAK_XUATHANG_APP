@@ -328,29 +328,39 @@
     if (!W) return out;
     const recs = metas.map((m) => Object.assign({}, m, { fromTs: dmyToTs(m.from), toTs: dmyToTs(m.to) || dmyToTs(m.from) }));
     // all = true (kỳ theo ngày cân): đọc phiếu của MỌI hồ sơ để phân bổ từng phiếu theo ngày; mặc định chỉ hồ sơ trong cụm giao nhau cần đối soát.
-    for (const r of all ? recs : W.clusters(recs).flat()) {
+    // Giải nén các hồ sơ song song theo lô (gunzip là phần tốn nhất khi đọc báo cáo kỳ theo ngày cân); kết quả vẫn đặt vào `out` theo thứ tự cũ.
+    const todo = all ? recs : W.clusters(recs).flat();
+    const results = new Array(todo.length);
+    const readOne = async (r, i) => {
       const hit = cache.get(r.id);
       if (hit && hit.u === r.updatedAt) {
-        out.set(r.id, hit.t);
-        continue;
+        results[i] = { t: hit.t };
+        return;
       }
       try {
         const d = await HAK.Archive.load(r.id);
         if (!d || !Array.isArray(d.rows)) {
-          out.errors.set(r.id, { code: 'no-rows', message: 'hồ sơ không có danh sách phiếu cân' });
-          continue;
+          results[i] = { err: { code: 'no-rows', message: 'hồ sơ không có danh sách phiếu cân' } };
+          return;
         }
         const p = d.params || {},
           rows = G().filterRows(d.rows || [], p.filter),
           ret = new Set(HAS_RET[r.type] ? p.returned || [] : []);
         const t = recTickets(r, p, rows, ret);
         cache.set(r.id, { u: r.updatedAt, t });
-        out.set(r.id, t);
+        results[i] = { t };
       } catch (e) {
         console.warn('Không đọc được phiếu cân của hồ sơ', r.id, e);
-        out.errors.set(r.id, { code: 'load-error', message: (e && e.message) || String(e) });
+        results[i] = { err: { code: 'load-error', message: (e && e.message) || String(e) } };
       }
-    }
+    };
+    const LOT = 8;
+    for (let i = 0; i < todo.length; i += LOT) await Promise.all(todo.slice(i, i + LOT).map((r, k) => readOne(r, i + k)));
+    todo.forEach((r, i) => {
+      const x = results[i];
+      if (x.err) out.errors.set(r.id, x.err);
+      else out.set(r.id, x.t);
+    });
     return out;
   }
 
