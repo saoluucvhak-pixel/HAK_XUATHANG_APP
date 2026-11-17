@@ -1,6 +1,10 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
-## Chưa phát hành (Đợt 1–4 nâng cấp nền)
+## Chưa phát hành (Đợt 1–4 nâng cấp nền + rà soát dữ liệu)
+- Sửa gộp nhiều đợt Excel của một loại: không còn loại dòng lặp trong CÙNG một file (trước đây thêm một đợt không liên quan làm mất dòng của đợt cũ, tổng kg/phiếu lệch và cảnh báo "trùng giữa các đợt" sai). Chỉ loại phiếu trùng GIỮA các file.
+- Sửa đọc số dạng chữ: ".500" / "-.250" đọc 500 / -250 (sai 1.000 lần) → 0,5 / -0,25; "1.5E3" đọc 1,53 → 1500.
+- Sửa đọc ngày giờ: ngày không tồn tại (29/02 năm không nhuận, 32/01, tháng 13, giờ 25…) không còn bị tràn sang ngày khác; dòng đó được cảnh báo "Thiếu/sai ngày cân" kèm số dòng Excel.
+- Thêm test: tests/merge-batches.test.cjs, tests/parse-edge.test.cjs.
 - Đợt 4: định dạng toàn bộ JS (app/js, tests, tools) bằng Prettier + .editorconfig; CI chạy npm run format:check; npm run format để tự sửa. Đã kiểm chứng cây cú pháp 109/109 file tương đương bản trước (chỉ khác cách viết: khóa đối tượng bỏ nháy, bỏ ngoặc thừa trong chuỗi &&). Tệp sinh tự động/thư viện không định dạng (.prettierignore). Ngưỡng long-file của quality đặt 2.200 dòng (app/.hakquality.json, không đóng gói vào bản phát hành) vì số dòng tăng sau khi định dạng.
 - Đợt 2: tách pages.js (1.694 → 903 dòng) thành pages-modals.js, pages-contract.js, pages-filter.js, pages-bkls.js (không đổi hành vi; nạp trước pages.js). Báo cáo quality không còn cảnh báo.
 - Test thứ tự nạp script (tests/script-order.test.cjs): mỗi file chỉ đọc HAK.<Tên> lúc nạp khi tên đã được file nạp trước gán.
