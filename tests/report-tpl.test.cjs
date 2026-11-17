@@ -649,3 +649,50 @@ test('định dạng số / ngày kiểu Việt, làm tròn half-up; biểu đ�
   assert.equal(T.chartSvg(null), '');
   assert.match(T.chartSvg({ type: 'bar', title: 'A<b>', unit: 'tấn', scale: 1000, points: [{ label: 'x', value: 5000 }] }), /A&lt;b&gt;/);
 });
+
+/* ---------- Bảng chéo kho xuất × hình thức (mẫu 2) ---------- */
+test('bảng chéo kho × hình thức: ô = thực giao, tổng hàng / cột khớp bảng theo kho, có trả về và chưa phân bổ nằm ngoài', async () => {
+  const s = setup([
+    {
+      meta: meta('A', '03/02/2026', '03/02/2026', { kho: 'w1>w2' }),
+      rows: [row(1, 10000, '03/02/2026'), row(3, 5000, '03/02/2026')],
+      ret: ['f#3'],
+    },
+    { meta: meta('B', '03/02/2026', '03/02/2026', { kho: 'w2>w1', type: 'uythac', ship: 'TÀU B' }), rows: [row(2, 7000, '03/02/2026')] },
+    { meta: meta('C', '04/02/2026', '04/02/2026', { kho: 'w1>w2', type: 'uythac', ship: 'TÀU C' }), rows: [row(4, 3000, '04/02/2026')] },
+  ]);
+  s.metas.push(meta('U', '05/02/2026', '05/02/2026', { kho: 'w1>w2', ship: 'TÀU U', kg: 9000, trips: 1 })); // không đọc được phiếu
+  const ctx = ctxOf(s, { ticketErrors: new Map([['U', { code: 'load-error', message: 'x' }]]) });
+  const doc = T.breakdownReport(ctx, { groupBy: 'ship' }),
+    x = sec(doc, 'khoType'),
+    byKho = sec(T.breakdownReport(ctx, { groupBy: 'kho' }), 'groups');
+  assert.ok(x, 'có bảng chéo');
+  const row1 = x.rows.find((r) => r.c.kho === 'Kho Quế Sơn').c,
+    row2 = x.rows.find((r) => r.c.kho === 'Kho Đà Nẵng').c;
+  assert.equal(row1.t_xuatkhau, 10000, 'Quế Sơn × Xuất khẩu: 15.000 − trả về 5.000');
+  assert.equal(row1.t_uythac, 3000);
+  assert.equal(row2.t_uythac, 7000);
+  assert.equal(row2.t_xuatkhau, 0);
+  assert.equal(row1.retKg, 5000);
+  assert.equal(x.totals.delKg, 20000, 'tổng thực giao toàn bảng');
+  assert.equal(x.totals.delKg, sec(doc, 'groups').totals.delKg, 'khớp tổng bảng theo tàu');
+  assert.equal(x.totals.delKg, byKho.totals.delKg, 'khớp tổng bảng theo kho');
+  // hàng + cột
+  x.rows.forEach((r) =>
+    assert.equal(
+      r.c.delKg,
+      Object.keys(r.c)
+        .filter((k) => k.indexOf('t_') === 0)
+        .reduce((a, k) => a + r.c[k], 0)
+    )
+  );
+  assert.equal(x.totals.t_xuatkhau + x.totals.t_uythac, x.totals.delKg);
+  assert.match(x.note, /không có số liệu nhập kho/);
+  assert.match(x.note, /Chưa phân bổ/);
+  assert.equal(x.rows[0].drill.tickets.length > 0, true, 'mở được phiếu nguồn từ dòng kho');
+  // xuất Excel và bản in cùng bảng
+  const cols = x.columns.map((c) => c.h);
+  assert.ok(cols.includes('Xuất khẩu') || cols.some((h) => /xuất khẩu/i.test(h)));
+  const spec = T.toPrintSpec(doc);
+  assert.ok(spec.tables.some((t) => t.caption && /Kho xuất × hình thức/.test(t.caption)));
+});

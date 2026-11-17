@@ -1,5 +1,8 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## Chưa phát hành — Bảng chéo kho × hình thức
+- Mẫu "Phân tích theo tàu / kho / ĐVVC" có thêm bảng **Kho xuất × hình thức** (thực giao kg theo từng ô, tổng hàng / cột, tra về hồ sơ và phiếu cân), cùng tập phiếu đã xác minh với bảng nhóm nên tổng khớp; có trong màn hình, Excel (trang Tổng hợp) và PDF. Chưa có số liệu nhập kho.
+
 ## v2.21.1 — Đổi nhãn cột BDMT ở mẫu Tiến độ hợp đồng
 - Mẫu báo cáo "Tiến độ hợp đồng": đổi nhãn cột "BDMT theo chứng thư" thành "BDMT theo chi tiết hợp đồng (gồm cả chi tiết chưa có chứng thư)" (và các cột còn lại / % / MT / chênh lệch đi kèm) vì số này vốn cộng mọi chi tiết, không chỉ chi tiết đã có số chứng thư. Cách tính KHÔNG đổi.
 

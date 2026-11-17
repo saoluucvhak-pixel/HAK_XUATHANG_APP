@@ -171,6 +171,11 @@ async function login(p) {
   await pick('breakdown');
   let r = await rows('Theo tàu');
   check(r && r.length === 2, 'mẫu 2: hai tàu');
+  const kt = await rows('Kho xuất × hình thức');
+  check(
+    kt && kt.length === 1 && kt[0][1] === '163.000' && kt[0][5] === '163.000',
+    'mẫu 2: bảng chéo kho × hình thức — 1 kho, Ủy thác 163.000 kg thực giao = tổng bảng theo tàu'
+  );
   const a = r.find((x) => x[0] === 'TÀU A');
   check(a && a[2] === '4' && a[3] === '82.000' && a[6] === '61.000', 'tàu A: 4 xe · 82.000 kg qua cân · 61.000 kg thực giao');
   check(a[7] === '25,0%', 'tàu A: tỷ lệ xe trả về = 1 ÷ 4 = 25,0%');
@@ -209,6 +214,10 @@ async function login(p) {
   const xw = XLSX.read(fs.readFileSync(xf), { cellDates: true });
   const flat = JSON.stringify(XLSX.utils.sheet_to_json(xw.Sheets['Chi tiết'], { header: 1, blankrows: false, defval: '' }));
   check(xw.SheetNames.join() === 'Tổng hợp,Chi tiết', 'Excel có trang Tổng hợp và Chi tiết');
+  check(
+    JSON.stringify(XLSX.utils.sheet_to_json(xw.Sheets['Tổng hợp'], { header: 1 })).includes('Kho xuất × hình thức'),
+    'Excel: trang Tổng hợp có bảng chéo kho × hình thức'
+  );
   check(
     SHIP.A.every((x) => flat.includes('"' + x + '"')) && !SHIP.B.some((x) => flat.includes('"' + x + '"')),
     'Excel: cùng 4 phiếu của tàu A, không có phiếu tàu B'

@@ -17,6 +17,7 @@ Kỳ, năm, căn cứ tính kỳ ("Ngày bắt đầu hồ sơ" hoặc "Ngày c�
 - Sắp xếp theo thực giao, qua cân, số xe, tỷ lệ xe trả về, tỷ trọng hoặc tên; **Top N** giữ N nhóm đầu và gộp phần còn lại thành dòng **"Khác (k nhóm)"** nên tổng vẫn đủ.
 - Mẫu số hiển thị rõ: *tỷ lệ xe trả về* = xe (hoặc kg) trả về ÷ xe (hoặc kg) qua cân của **chính dòng đó**; *tỷ trọng thực giao* = thực giao của dòng ÷ **tổng thực giao của bảng** (cột "Mẫu số tỷ trọng").
 - Tra về nguồn: bấm **Hồ sơ** hoặc **Phiếu cân** ở một dòng (kể cả dòng Khác) → đúng các hồ sơ / phiếu tạo ra số liệu; bảng "Phiếu cân tạo ra số liệu" bên dưới là cùng tập phiếu. Đơn vị vận chuyển lấy từ từng phiếu cân; hồ sơ chưa đọc được phiếu không lọt vào nhóm ĐVVC nào mà nằm ở phần chưa phân bổ.
+- **Bảng chéo kho × hình thức** (ngay dưới bảng nhóm, cũng có trong Excel và PDF): mỗi hàng là một **kho xuất**, mỗi cột là một **hình thức** (Xuất khẩu, Ủy thác, Điều chuyển…); ô = thực giao (kg, đã trừ xe trả về). Tổng cộng bằng tổng thực giao của bảng nhóm phía trên; bấm **Hồ sơ / Phiếu cân** ở dòng kho để tra về nguồn. Bảng chỉ có phần đã xác minh — hồ sơ chưa đọc được phiếu hay phiếu thiếu ngày nằm ở "Chưa phân bổ". App chưa có số liệu **nhập** kho; kho ở đây là kho xuất của hồ sơ.
 - Hai tàu cân xen kẽ cùng ngày: lọc một tàu bằng ô tìm kiếm → bảng, biểu đồ, phiếu chi tiết, Excel và PDF cùng số phiếu và khối lượng.
 
 **3. Tiến độ và đối chiếu hợp đồng** — *Mỗi hợp đồng đã thực hiện bao nhiêu BDMT, còn lại bao nhiêu, có thiếu chứng thư / vượt khối lượng / lệch / chưa gắn tờ khai không?*
