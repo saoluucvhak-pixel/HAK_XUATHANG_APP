@@ -604,7 +604,7 @@
       }
       $('#leaveMsg').textContent = message;
       const inst = bootstrap.Modal.getOrCreateInstance(m, { backdrop: 'static', keyboard: false });
-      const onClick = (e) => { const b = e.target.closest('[data-choice]'); if (!b) return; m.removeEventListener('click', onClick); inst.hide(); ok(b.dataset.choice); };
+      const onClick = (e) => { const b = e.target.closest('[data-choice]'); if (!b) return; m.removeEventListener('click', onClick); inst._isTransitioning ? m.addEventListener('shown.bs.modal', () => inst.hide(), { once: true }) : inst.hide(); ok(b.dataset.choice); };
       m.addEventListener('click', onClick); inst.show();
     });
   }

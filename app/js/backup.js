@@ -565,7 +565,7 @@
         '</div><div class="modal-footer"><button class="btn btn-primary" data-choice="merge" type="button">Nhập bổ sung</button><button class="btn btn-outline-danger" data-choice="replace" type="button">Khôi phục (ghi đè)</button><button class="btn btn-outline-secondary" data-choice="cancel" type="button">Hủy</button></div></div></div>';
       document.body.appendChild(m);
       const inst = bootstrap.Modal.getOrCreateInstance(m, { backdrop: 'static', keyboard: false });
-      m.addEventListener('click', (e) => { const b = e.target.closest('[data-choice]'); if (!b) return; inst.hide(); ok(b.dataset.choice === 'cancel' ? null : b.dataset.choice); });
+      m.addEventListener('click', (e) => { const b = e.target.closest('[data-choice]'); if (!b) return; inst._isTransitioning ? m.addEventListener('shown.bs.modal', () => inst.hide(), { once: true }) : inst.hide(); ok(b.dataset.choice === 'cancel' ? null : b.dataset.choice); });
       inst.show();
     });
   }

@@ -167,7 +167,7 @@
    * "Thực giao đã lập hồ sơ": dùng ĐÚNG engine của Báo cáo tổng hợp (Report.prepareTickets + compute: loại trùng ở cấp phiếu, trừ xe trả về)
    * nên khớp số "Thực giao" của Báo cáo (toàn bộ kỳ, mọi hình thức). Tính sau khi vẽ trang và nhớ kết quả theo trạng thái Lưu trữ.
    */
-  let delCache = { key: '', html: '' };
+  let delCache = { key: '', html: '', tk: new Map() };
   function drawDelivered() {
     const el = $('#dashDel'); if (!el || !HAK.Archive || !HAK.Report || !HAK.Report.prepareTickets) return;
     if (delCache.html) el.innerHTML = delCache.html;
@@ -175,10 +175,10 @@
       try {
         const list = await HAK.Archive.list(), sc = HAK.Auth && HAK.Auth.scopeIds ? HAK.Auth.scopeIds('report') : null, key = list.length + '|' + list.reduce((a, m) => Math.max(a, m.updatedAt || 0), 0) + '|' + (sc ? sc.join(',') : '*');
         if (delCache.key === key && delCache.html) return;
-        const all = await HAK.Archive.ensureStats(list), tickets = await HAK.Report.prepareTickets(all, {}), scope = HAK.Auth && HAK.Auth.scopeIds ? HAK.Auth.scopeIds('report') : null;
+        const all = await HAK.Archive.ensureStats(list), tickets = await HAK.Report.prepareTickets(all, delCache.tk), scope = HAK.Auth && HAK.Auth.scopeIds ? HAK.Auth.scopeIds('report') : null;
         const metas = scope ? all.filter((x) => scope.indexOf(HAK.Auth.companyOfMeta(x)) >= 0) : all, m = HAK.Report.compute(metas, { tickets });   // cùng phạm vi công ty như Báo cáo tổng hợp
         const del = Object.keys(m.byType).reduce((a, t) => a + (m.byType[t].delKg || 0), 0);
-        delCache = { key, html: '<a class="stat d-block text-decoration-none" href="#/report" title="Cùng cách tính với Báo cáo tổng hợp: loại phiếu trùng giữa các hồ sơ, trừ xe trả về"><div class="v">' + fmtTon(del) + '</div><div class="l">Thực giao đã lập hồ sơ (tấn)</div><div class="s">khớp Báo cáo tổng hợp</div></a>' };
+        delCache = { key, tk: delCache.tk, html: '<a class="stat d-block text-decoration-none" href="#/report" title="Cùng cách tính với Báo cáo tổng hợp: loại phiếu trùng giữa các hồ sơ, trừ xe trả về"><div class="v">' + fmtTon(del) + '</div><div class="l">Thực giao đã lập hồ sơ (tấn)</div><div class="s">khớp Báo cáo tổng hợp</div></a>' };
         const now = $('#dashDel'); if (now) now.innerHTML = delCache.html;
       } catch (e) { console.warn('Không tính được thực giao theo hồ sơ:', e); }
     }, 250);
@@ -217,7 +217,7 @@
     if (HAK.Backup && HAK.Backup.health) HAK.Backup.health().then(renderHealth).catch((e) => console.warn('Sức khỏe dữ liệu:', e));
     // hồ sơ lưu trữ (bất đồng bộ — không chặn việc vẽ)
     drawDelivered();
-    if (HAK.Archive) HAK.Archive.list().then((l) => { const el = $('#dashArch'); if (el) el.innerHTML = '<a class="stat d-block text-decoration-none" href="#/archive"><div class="v">' + fmtInt(l.length) + '</div><div class="l">Hồ sơ đã lưu</div></a>'; }).catch(() => {});
+    if (HAK.Archive) HAK.Archive.list().then((l) => { const el = $('#dashArch'); if (el) el.innerHTML = '<a class="stat d-block text-decoration-none" href="#/archive"><div class="v">' + fmtInt(l.length) + '</div><div class="l">Hồ sơ đã xuất (Lưu trữ)</div></a>'; }).catch(() => {});
   }
 
   /** v2.7.5 🩺 Sức khỏe dữ liệu: 5 ô (bộ nhớ, localStorage, Lưu trữ, sao lưu gần nhất, tự sao lưu) — xanh / vàng / đỏ. */

@@ -29,3 +29,7 @@ test('Tổng quan có ô "Thực giao đã lập hồ sơ" dùng cùng engine B�
   assert.match(p, /function confirmScope/); assert.match(p, /if \(!src && !confirmScope\(type\)\) return;/);
   const order = ['① Chuẩn bị dữ liệu', '② Lập hồ sơ', '③ Xuất chứng từ', '④ Báo cáo &amp; theo dõi'].map((k) => h.indexOf(k)); assert.ok(order.every((x, i) => x > 0 && (i === 0 || x > order[i - 1])), 'thứ tự menu');
 });
+test('hồi quy: ô thực giao Tổng quan truyền Map làm bộ nhớ đệm cho prepareTickets; hộp hỏi đóng được khi bấm nhanh', () => {
+  assert.match(read('js/dashboard.js'), /tk: new Map\(\)/); assert.match(read('js/dashboard.js'), /prepareTickets\(all, delCache\.tk\)/);
+  assert.match(read('js/pages.js'), /_isTransitioning \? m\.addEventListener\('shown\.bs\.modal'/); assert.match(read('js/backup.js'), /_isTransitioning \? m\.addEventListener\('shown\.bs\.modal'/);
+});

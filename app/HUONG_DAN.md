@@ -85,6 +85,8 @@ Muốn lập đúng điều đang xem: ở Nhập liệu bấm **Dùng phạm vi
 - Dán danh sách số phiếu: khớp **đúng số** trước; chỉ khớp hậu tố khi duy nhất một phiếu; còn lại hiện bảng để bạn xác nhận (vd. dán `123` chỉ chọn phiếu 123, không chọn `99123`).
 - Mỗi phiếu có trạng thái: *Đang kiểm tra…*, *Chưa gán*, *Đã gán · tên hồ sơ*, *⚠ Chưa xác minh được* (lỗi đọc kho). Bấm tên hồ sơ để mở hồ sơ nguồn; khi lưu mà phiếu đã gán nơi khác sẽ có hộp xác nhận.
 
+**Lưu hồ sơ khác Lưu trữ:** *Lưu hồ sơ* ghi vào Sổ hồ sơ năm (bản làm việc, mở lại sửa được). Hồ sơ vào **Lưu trữ** khi bạn **xuất** (Word / PDF / Excel). **Báo cáo tổng hợp, Báo cáo thực hiện hợp đồng và ô "Thực giao đã lập hồ sơ" ở Tổng quan chỉ tính hồ sơ đã xuất (Lưu trữ)** — hồ sơ mới chỉ "Lưu hồ sơ" chưa xuất thì chưa có trong báo cáo.
+
 **Đối chiếu sau khi lưu / xuất:** thông báo thành công kèm một dòng *công ty · tàu · số phiếu · bỏ · xe trả về · thực giao (tấn)* — cùng tập phiếu với màn hình và file vừa xuất; đối chiếu với thanh *Đang làm việc* ở đầu trang.
 
 **3b. Một ngày chạy hai tàu (cùng nguồn cân)**
