@@ -1,5 +1,8 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.19.3 (bản vá)
+- Menu sắp theo quy trình; Tổng quan thêm ô Thực giao đã lập hồ sơ (cùng engine Báo cáo) và giải thích chênh lệch; xác nhận phạm vi trước khi xuất; sửa hộp hỏi kẹt khi bấm nhanh.
+
 ## v2.19.2 (bản vá)
 - Tiếp tục đóng năm: chọn đúng lần đóng dở theo SHA-256 khi cùng năm có nhiều lần đóng dở.
 
