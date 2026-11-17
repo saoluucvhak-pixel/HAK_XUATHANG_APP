@@ -1,5 +1,10 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## Chưa phát hành (Đợt 1 nâng cấp nền)
+- Test thứ tự nạp script (tests/script-order.test.cjs): mỗi file chỉ đọc HAK.<Tên> lúc nạp khi tên đã được file nạp trước gán.
+- Smoke test trình duyệt (npm run smoke) + job CI "smoke": mở app thật, không được có lỗi script.
+- CI: npm run quality chặn khi có lỗi cấp error (--fail-on error).
+
 ## v2.19.6 (bản vá)
 - Bộ lọc nâng cao: khi kho bộ lọc đã lưu bị lỗi, hiện cảnh báo + nút "Tải bản sao" và "Sao lưu kho cũ và tạo kho mới"; bản sao lưu có mốc thời gian nên lần hỏng thứ hai không còn ghi đè bản đầu; báo rõ khi xóa bộ lọc không thành công.
 - Công cụ chất lượng (npm run quality) nâng lên bản HAK_CODE_QUALITY_TEST mới (phân tích cú pháp bằng acorn, cổng chất lượng, bỏ cảnh báo vòng phụ thuộc giả của util.js). Thêm devDependency acorn 8.15.0.
