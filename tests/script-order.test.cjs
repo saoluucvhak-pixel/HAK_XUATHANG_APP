@@ -22,5 +22,5 @@ test('mỗi file chỉ đọc HAK.<Tên> lúc nạp khi tên đã được gán 
   assert.deepEqual(bad, []);
 });
 test('các module tách từ pages.js nạp trước pages.js', () => {
-  ['js/pages-modals.js', 'js/pages-contract.js', 'js/pages-filter.js'].forEach((f) => assert.ok(order.indexOf(f) >= 0 && order.indexOf(f) < order.indexOf('js/pages.js'), f));
+  ['js/pages-modals.js', 'js/pages-contract.js', 'js/pages-filter.js', 'js/pages-bkls.js'].forEach((f) => assert.ok(order.indexOf(f) >= 0 && order.indexOf(f) < order.indexOf('js/pages.js'), f));
 });

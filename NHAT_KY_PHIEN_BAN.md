@@ -1,6 +1,7 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
-## Chưa phát hành (Đợt 1 nâng cấp nền)
+## Chưa phát hành (Đợt 1–2 nâng cấp nền)
+- Đợt 2: tách pages.js (1.694 → 903 dòng) thành pages-modals.js, pages-contract.js, pages-filter.js, pages-bkls.js (không đổi hành vi; nạp trước pages.js). Báo cáo quality không còn cảnh báo.
 - Test thứ tự nạp script (tests/script-order.test.cjs): mỗi file chỉ đọc HAK.<Tên> lúc nạp khi tên đã được file nạp trước gán.
 - Smoke test trình duyệt (npm run smoke) + job CI "smoke": mở app thật, không được có lỗi script.
 - CI: npm run quality chặn khi có lỗi cấp error (--fail-on error).
