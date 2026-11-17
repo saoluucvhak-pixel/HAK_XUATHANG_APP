@@ -340,9 +340,12 @@
       if (d.moisture != null && d.moisture >= 100) return 'Độ ẩm phải nhỏ hơn 100%.';
       if (d.fromDate && d.toDate && d.fromDate > d.toDate) return 'Ngày cân từ đang sau ngày đến.';
       if (d.tkhq) {
-        const all = (catalog.contracts || []).filter((x) => !x.deletedAt && x.id !== c.id).flatMap((x) => x.details || []);
-        if (all.some((x) => !x.deletedAt && x.id !== d.id && x.tkhq === d.tkhq))
+        const tk = (v) => String(v == null ? '' : v).trim(),
+          mine = tk(d.tkhq),
+          all = (catalog.contracts || []).filter((x) => !x.deletedAt && x.id !== c.id).flatMap((x) => x.details || []);
+        if (all.some((x) => !x.deletedAt && x.id !== d.id && tk(x.tkhq) === mine))
           return 'Số TKHQ ' + d.tkhq + ' đã có ở dòng chi tiết khác.';
+        // Nhiều dòng hàng hóa được dùng chung một TKHQ TRONG cùng hợp đồng (quy tắc nghiệp vụ) — chỉ kiểm trùng với hợp đồng khác.
       }
     }
     if (!c.deletedAt && (catalog.contracts || []).some((x) => !x.deletedAt && x.id !== c.id && x.type === c.type && x.no && x.no === c.no))
