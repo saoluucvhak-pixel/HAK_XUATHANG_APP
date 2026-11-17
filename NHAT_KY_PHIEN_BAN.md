@@ -1,5 +1,8 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.21.1 — Đổi nhãn cột BDMT ở mẫu Tiến độ hợp đồng
+- Mẫu báo cáo "Tiến độ hợp đồng": đổi nhãn cột "BDMT theo chứng thư" thành "BDMT theo chi tiết hợp đồng (gồm cả chi tiết chưa có chứng thư)" (và các cột còn lại / % / MT / chênh lệch đi kèm) vì số này vốn cộng mọi chi tiết, không chỉ chi tiết đã có số chứng thư. Cách tính KHÔNG đổi.
+
 ## v2.21.0 — Mẫu báo cáo
 - Trang Báo cáo tổng hợp có ô **Mẫu báo cáo** với 5 mẫu: (1) Tổng hợp xuất hàng theo kỳ (ngày / tháng / quý / năm / tự chọn; nhóm theo công ty, hình thức, kho; so sánh kỳ trước cùng độ dài, có trạng thái khi kỳ gốc bằng 0 / thiếu dữ liệu); (2) Phân tích theo tàu, kho, đơn vị vận chuyển (tỷ lệ xe trả về và tỷ trọng có mẫu số, sắp xếp, Top N + "Khác"); (3) Tiến độ và đối chiếu hợp đồng (BDMT gốc / hiện hành / chứng thư, MT thực giao, còn lại; lọc thiếu chứng thư / vượt khối lượng / lệch / chưa gắn tờ khai); (4) Hải quan và công nợ thuế (công ty → hợp đồng → tờ khai; phải nộp / đã nộp / đã hoàn / còn nợ / nộp thừa / lệ phí / chưa xác định; giấy nộp tiền và khai bổ sung làm căn cứ); (5) Ngoại lệ cần đối soát.
 - Mỗi mẫu dựng MỘT kết quả (`doc`, module `report-tpl.js`) dùng chung cho màn hình, Excel và PDF; tra từ dòng tổng về hồ sơ / phiếu cân / hợp đồng / giấy nộp tiền. Excel: trang Tổng hợp + Chi tiết, ô số / ngày đúng kiểu, số phiếu và số tờ khai giữ dạng văn bản. PDF: khổ giấy và cỡ chữ theo số cột, lặp tiêu đề bảng, biểu đồ cạnh bảng tổng hợp.
