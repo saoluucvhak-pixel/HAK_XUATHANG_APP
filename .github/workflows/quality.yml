@@ -24,3 +24,16 @@ jobs:
         with:
           name: hak-quality-node-${{ matrix.node }}
           path: reports/quality/
+
+  smoke:
+    # Mở app thật trên Chromium: không được có lỗi script (bắt lỗi thứ tự nạp / tách file)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm i --no-save playwright@1.63.0   # chỉ dùng trong CI, không thêm vào dependencies
+      - run: npx playwright install --with-deps chromium
+      - run: npm run smoke
