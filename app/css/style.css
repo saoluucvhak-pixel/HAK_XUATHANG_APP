@@ -449,3 +449,12 @@ svg.i { width: 1.1em; height: 1.1em; vertical-align: -.18em; flex: none; }
 .sb-link { white-space: normal; line-height: 1.25; padding-top: 7px; padding-bottom: 7px; }
 .sb-title, .sb-sub { white-space: normal; }
 #page-contractstatus .tbl-wrap .table td, #page-contractstatus .tbl-wrap .table th { padding-left: .22rem; padding-right: .22rem; }
+
+/* Mẫu báo cáo (report-tpl-ui.js) */
+.rt-hide { display: none !important; }
+.rt-chart { width: 100%; max-width: 720px; height: auto; color: var(--ink); }
+.rt-table th { white-space: normal; vertical-align: bottom; }
+.rt-table tr.main > td { background: var(--brand-soft); font-weight: 600; }
+.rt-table tr.sub > td { background: rgba(0, 0, 0, 0.03); }
+.rt-table tr.other > td { font-style: italic; }
+.rt-meta dd { overflow-wrap: anywhere; }

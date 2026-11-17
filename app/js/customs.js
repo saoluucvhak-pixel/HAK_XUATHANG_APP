@@ -2253,6 +2253,7 @@
           .map(
             (t) =>
               (t.caption ? '<div class="rp-c' + (t.pageBreak ? ' rp-pb' : '') + '">' + esc(t.caption) + '</div>' : '') +
+              (t.svg ? '<div class="rp-chart">' + t.svg + '</div>' : '') + // biểu đồ SVG do report-tpl.js dựng (đã thoát nội dung)
               '<table class="rp-t"><thead><tr>' +
               t.cols.map((c) => '<th>' + esc(c.h) + '</th>').join('') +
               '</tr></thead><tbody>' +
@@ -2279,7 +2280,17 @@
       document.body.appendChild(host);
       css = document.createElement('style');
       css.id = 'printPageStyle';
-      css.textContent = '@page { size: A4 landscape; margin: 10mm; }' + PRINT_CSS;
+      // spec.orientation: 'portrait' | 'landscape' (mặc định ngang); spec.fontPt: cỡ chữ bảng theo số cột. Tiêu đề bảng lặp lại ở mỗi trang, dòng không bị tách đôi.
+      const orient = spec.orientation === 'portrait' ? 'portrait' : 'landscape',
+        fpt = Number(spec.fontPt) > 0 ? Number(spec.fontPt) : 7.5;
+      css.textContent =
+        '@page { size: A4 ' +
+        orient +
+        '; margin: 10mm; }' +
+        PRINT_CSS +
+        '.rp-t{font-size:' +
+        fpt +
+        'pt}.rp-t thead{display:table-header-group}.rp-t tfoot{display:table-footer-group}.rp-t tr{break-inside:avoid}.rp-chart svg{width:100%;max-height:60mm;color:#222}';
       document.head.appendChild(css);
       document.body.classList.add('printing');
       document.title = spec.file;

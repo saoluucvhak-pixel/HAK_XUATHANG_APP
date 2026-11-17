@@ -2,6 +2,46 @@
 
 Chạy offline: mở `index.html` bằng Chrome/Edge (không cần server, không cần cài đặt).
 
+## Mẫu báo cáo (📊 Báo cáo tổng hợp → ô "Mẫu báo cáo", v2.21.0)
+
+Ô **Mẫu báo cáo** ở đầu trang Báo cáo cho chọn báo cáo theo mục đích; để trống là báo cáo hiện có (tất cả các phần như trước). Mỗi mẫu có: tiêu đề, công ty, kỳ, **căn cứ tính kỳ**, bộ lọc đang áp dụng, đơn vị, thời điểm lập; nút **📊 Xuất Excel** và **📄 PDF / In** (PDF = hộp thoại in, chọn "Lưu dưới dạng PDF"). Màn hình, Excel và PDF của cùng một mẫu **dùng chung một kết quả tính** — cùng phạm vi lọc, cùng quy tắc phiên bản, phân quyền công ty, đối soát phiếu trùng và làm tròn.
+
+Kỳ, năm, căn cứ tính kỳ ("Ngày bắt đầu hồ sơ" hoặc "Ngày cân từng phiếu"), ô tìm kiếm và phạm vi công ty lấy từ phần đầu trang (mẫu 1, 2, 5). Đơn vị: **kg** = kilôgam qua cân; **MT** = tấn tươi; **BDMT** = tấn khô quy đổi; tiền **VND** / **USD** ghi rõ ở từng cột.
+
+**1. Tổng hợp xuất hàng theo kỳ** — *Mỗi kỳ / mỗi công ty, hình thức, kho đã xuất bao nhiêu và so với kỳ trước ra sao?*
+- Chọn độ chi tiết: ngày, tháng, quý, năm hoặc kỳ tự chọn; nhóm theo công ty, hình thức hoặc kho xuất. Cột: số phiếu, qua cân, xe trả về, thực giao và **chưa phân bổ** (số liệu chưa xác minh được ngày cân).
+- **So sánh kỳ trước cùng độ dài:** kỳ chọn N ngày → so với N ngày liền trước. Hiện mức chênh tuyệt đối và %; nếu kỳ trước **bằng 0** hoặc **chưa có dữ liệu** hoặc **chưa chọn kỳ có đủ hai đầu**, app ghi đúng trạng thái đó và không tính %.
+- Dữ liệu: hồ sơ trong 🗄️ Lưu trữ và phiếu cân của hồ sơ. Tra về nguồn: bấm **Hồ sơ** ở một dòng nhóm / kỳ → danh sách hồ sơ tạo ra số liệu, bấm **Mở hồ sơ** để tới Lưu trữ. Biểu đồ đường: thực giao theo kỳ.
+
+**2. Phân tích theo tàu, kho, đơn vị vận chuyển** — *Tàu / kho / ĐVVC nào xuất nhiều, tỷ lệ xe trả về bao nhiêu, chiếm bao nhiêu phần trăm?*
+- Sắp xếp theo thực giao, qua cân, số xe, tỷ lệ xe trả về, tỷ trọng hoặc tên; **Top N** giữ N nhóm đầu và gộp phần còn lại thành dòng **"Khác (k nhóm)"** nên tổng vẫn đủ.
+- Mẫu số hiển thị rõ: *tỷ lệ xe trả về* = xe (hoặc kg) trả về ÷ xe (hoặc kg) qua cân của **chính dòng đó**; *tỷ trọng thực giao* = thực giao của dòng ÷ **tổng thực giao của bảng** (cột "Mẫu số tỷ trọng").
+- Tra về nguồn: bấm **Hồ sơ** hoặc **Phiếu cân** ở một dòng (kể cả dòng Khác) → đúng các hồ sơ / phiếu tạo ra số liệu; bảng "Phiếu cân tạo ra số liệu" bên dưới là cùng tập phiếu. Đơn vị vận chuyển lấy từ từng phiếu cân; hồ sơ chưa đọc được phiếu không lọt vào nhóm ĐVVC nào mà nằm ở phần chưa phân bổ.
+- Hai tàu cân xen kẽ cùng ngày: lọc một tàu bằng ô tìm kiếm → bảng, biểu đồ, phiếu chi tiết, Excel và PDF cùng số phiếu và khối lượng.
+
+**3. Tiến độ và đối chiếu hợp đồng** — *Mỗi hợp đồng đã thực hiện bao nhiêu BDMT, còn lại bao nhiêu, có thiếu chứng thư / vượt khối lượng / lệch / chưa gắn tờ khai không?*
+- Hiện riêng: **BDMT gốc** (trước phụ lục), **BDMT hiện hành** (sau phụ lục), **BDMT theo chứng thư**, **còn lại** = hiện hành − chứng thư, **MT thực giao qua cân** (sau trừ xe trả về) và chênh lệch MT chứng thư − thực giao. BDMT và MT là hai đơn vị khác nhau nên không so trực tiếp. **Đóng hợp đồng** và **Thông quan** là hai cột riêng.
+- Bộ lọc (chọn nhiều = thỏa một trong các điều kiện): *Thiếu chứng thư* (có chi tiết chưa có số chứng thư); *Vượt khối lượng* (BDMT chứng thư > hiện hành); *Lệch đối chiếu* (tờ khai ↔ chứng thư hoặc chứng thư ↔ thực giao lệch, hoặc có tờ khai chưa gắn chi tiết); *Chưa gắn tờ khai* (Xuất khẩu / Ủy thác chưa có tờ khai hoặc có chi tiết chưa gắn). Bốn điều kiện không chồng lên nhau.
+- Tra về nguồn: **Hồ sơ hợp đồng** (mở hồ sơ hợp đồng), **Phiếu cân** (danh sách phiếu cân của hợp đồng). Dữ liệu: Danh mục hợp đồng + phụ lục, chứng thư, tờ khai (🧭 Báo cáo thực hiện hợp đồng) và phiếu cân.
+
+**4. Hải quan và công nợ thuế** — *Thuế phải nộp, đã nộp, đã hoàn, còn nợ, nộp thừa của từng công ty → hợp đồng → tờ khai?*
+- Bảng 3 cấp: **công ty → hợp đồng → tờ khai**. Cột riêng: thuế phải nộp, đã nộp (trước hoàn), **đã hoàn**, **còn nợ**, **nộp thừa (chờ hoàn)**, lệ phí, số tờ khai **chưa xác định nghĩa vụ**. Còn nợ / nộp thừa được tính **riêng từng tờ khai, không bù trừ**: tờ khai nợ 20 và tờ khai nộp thừa 20 vẫn hiện đủ hai khoản dù "Số dư ròng (phải nộp − đã nộp sau hoàn; chỉ để tham khảo, không bù trừ giữa các tờ khai)" bằng 0.
+- Tra về nguồn: bấm **Giấy nộp tiền · khai bổ sung** ở một tờ khai → từng giấy nộp tiền / hoàn thuế và từng lần khai bổ sung, kèm câu nêu **căn cứ thuế phải nộp** (tờ khai gốc hay khai bổ sung lần mấy). Dữ liệu: Danh mục → 🛃 Tờ khai hải quan.
+
+**5. Ngoại lệ cần đối soát** — *Còn những phiếu / hồ sơ / hợp đồng nào chưa chắc chắn cần kiểm tra lại?*
+- Luôn dò **theo từng phiếu** (ngày cân). Liệt kê: phiếu trùng có xung đột (tính tạm theo hồ sơ mới nhất), hồ sơ lỗi đọc, phiếu thiếu / sai ngày cân, phiếu trong đợt Excel đang nạp **chưa gắn hồ sơ**, hồ sơ **chưa gắn hợp đồng**, chênh lệch chứng thư – thực giao. Mỗi dòng nêu **nguồn dữ liệu**, **lý do cần kiểm tra**, **tình trạng** (Tạm tính / Chưa phân bổ / Chưa gắn…) và nút **Mở bản ghi nguồn** (hồ sơ, hợp đồng hoặc đợt Excel).
+- Phần đầu bảng tách rõ **đã xác minh** với **tạm tính** và **chưa phân bổ**. Nếu có hồ sơ không đọc được phiếu thì app **không khẳng định** phiếu nào chưa gắn hồ sơ và ghi cảnh báo.
+
+**Ví dụ hai tàu cân xen kẽ cùng ngày:** tàu A và tàu B cùng cân ngày 03/02, số phiếu có thể trùng đuôi. Ở mẫu 2, ô tìm kiếm lọc "TÀU A" → bảng, biểu đồ, phiếu cân chi tiết, Excel và PDF đều chỉ có phiếu của A. Bấm **Phiếu cân** ở dòng tổng để thấy đúng các phiếu tạo ra số; bấm **Hồ sơ** để mở hồ sơ nguồn.
+
+**Khối lượng chưa phân bổ:** là phần chưa xác minh được ngày cân (hồ sơ không đọc được phiếu, hoặc phiếu thiếu / sai ngày). App không đoán theo ngày bắt đầu hồ sơ mà tách riêng, nêu trong ghi chú đầu báo cáo, ở dòng "Chưa phân bổ" và ở mẫu 5 kèm nút mở hồ sơ để sửa. Sau khi sửa phiếu thì phần này tự chuyển vào đúng kỳ.
+
+**Chi tiết theo đơn vị vận chuyển** (ngay dưới báo cáo): chỉ gồm các phiếu đã được báo cáo tổng hợp chấp nhận, nên tổng khớp bảng trên; đổi kỳ, công ty hoặc tàu thì tải lại tập phiếu mới.
+
+**Phạm vi công ty:** hồ sơ, hợp đồng và tờ khai trong mọi mẫu chỉ gồm các công ty bạn được cấp (và công ty đang làm việc, trừ khi bật "Xem tất cả công ty" nếu được phép); bảng, biểu đồ, tra cứu, Excel và PDF đều theo cùng phạm vi.
+
+**Excel:** có trang *Tổng hợp* và trang *Chi tiết* khi phù hợp; ô số và ô ngày đúng kiểu (SUM ở dòng tổng); **số phiếu, số tờ khai, biển số giữ dạng văn bản** nên không mất số 0 đầu. **PDF:** khổ dọc khi ít cột, khổ ngang khi nhiều cột, cỡ chữ theo số cột, tiêu đề bảng lặp lại ở mỗi trang.
+
 ## Hoàn thuế và nạp file có dòng trùng (v2.20.0)
 - **Nộp thừa thuế:** tờ khai nộp thừa hiện cảnh báo "cần làm thủ tục hoàn thuế". Khi nhận tiền hoàn, mở tờ khai → bấm **↩ Nhập hoàn thuế** (số tiền điền sẵn bằng số nộp thừa, sửa được) → tờ khai tất toán. Có thể hoàn từng phần; phần chưa hoàn vẫn báo nộp thừa. Không bù trừ giữa các tờ khai.
 - **File Excel có dòng trùng hoàn toàn** (cùng số phiếu, biển số, giờ cân): app không nạp và báo số dòng Excel; xóa dòng thừa rồi nạp lại.

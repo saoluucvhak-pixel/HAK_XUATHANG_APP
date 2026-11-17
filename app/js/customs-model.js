@@ -213,6 +213,7 @@
     const o = {
       payable: 0,
       paidTax: 0,
+      paidGross: 0,
       refunded: 0,
       paidFee: 0,
       owed: 0,
@@ -230,6 +231,7 @@
       const t = totals(d);
       o.nDecl++;
       o.paidTax += t.paidTax;
+      o.paidGross += t.paidGross;
       o.refunded += t.refunded;
       o.paidFee += t.paidFee;
       if (t.staleSupplement) o.nStale++;
