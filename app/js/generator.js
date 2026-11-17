@@ -69,6 +69,24 @@
   /** Khóa nhận diện 1 phiếu để bỏ tay: số phiếu | biển số | giờ cân vào (cùng khóa khử trùng đợt) — bền khi nạp lại file đổi thứ tự dòng. */
   const omitKey = (r) =>
     (r.ticket || '') + '|' + r.plate + '|' + (r.ts1 !== null && r.ts1 !== undefined ? r.ts1 : r.time1) + (r.ticket ? '' : '|' + r.net);
+  /**
+   * Dòng TRÙNG HOÀN TOÀN trong cùng một file: cùng khóa omitKey (số phiếu + biển số + giờ cân vào; không có số phiếu thì thêm khối lượng).
+   * Chỉ xét dòng nhận diện được (có số phiếu hoặc có thời điểm cân) — dòng thiếu cả hai không bị coi là trùng.
+   * @returns {{key:string, rows:object[]}[]} mỗi nhóm có ≥ 2 dòng
+   */
+  function duplicateRows(rows) {
+    const groups = new Map();
+    (rows || []).forEach((r) => {
+      const hasId = (r.ticket && String(r.ticket).trim()) || (r.ts1 !== null && r.ts1 !== undefined);
+      if (!hasId) return;
+      const k = omitKey(r);
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(r);
+    });
+    return Array.from(groups.entries())
+      .filter(([, list]) => list.length > 1)
+      .map(([key, list]) => ({ key, rows: list }));
+  }
   /** Mô tả phần lọc "tách trong ngày" ('' nếu không dùng) — ghi vào tóm tắt hồ sơ / Excel để biết phiếu của tàu nào. */
   function filterSplitText(f) {
     f = f || {};
@@ -889,6 +907,7 @@
     detailRows,
     retKey,
     omitKey,
+    duplicateRows,
     build(type, ds, params) {
       if (!ds || !ds.ok)
         return { files: [], summary: {}, warnings: [], errors: ['Chưa có dữ liệu Excel hợp lệ. Hãy thêm file ở mục "Nhập liệu".'] };

@@ -1393,6 +1393,22 @@
           if (tax && !result.c.tax && !result.c.companyId) result.c.tax = tax;
           c[key] = result.c.id;
         }
+        // Số hợp đồng gần giống hợp đồng khác (chỉ khác hoa/thường, khoảng trắng, dấu gạch): hỏi xác nhận; OK = lưu như hợp đồng KHÁC.
+        const prev = base.id ? contract(base.id) : null;
+        if (!prev || prev.no !== base.no) {
+          const near = M.similarNo(base, state.data);
+          if (
+            near.length &&
+            !(typeof confirm === 'function' ? confirm : () => true)(
+              '⚠ Số hợp đồng "' +
+                base.no +
+                '" gần giống hợp đồng đã có: ' +
+                near.map((x) => '"' + x.no + '"').join(', ') +
+                ' (chỉ khác chữ hoa/thường, khoảng trắng hoặc dấu gạch).\n\nBấm OK nếu đây là hợp đồng KHÁC và vẫn muốn lưu; Hủy để quay lại sửa.'
+            )
+          )
+            return;
+        }
         c.contractFiles = await HAK.Documents.commit();
         res = upsertContract(c, ed.revision);
       } else if (ed.kind === 'exec') {

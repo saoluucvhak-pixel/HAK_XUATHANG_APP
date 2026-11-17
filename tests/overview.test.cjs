@@ -99,7 +99,7 @@ test('thuế: còn nợ 20 và nộp thừa 20 hiển thị riêng dù ròng = 0
   assert.equal(m.tax.over, 20);
   assert.equal(m.tax.net, 0);
   assert.equal(m.tax.fee, 7);
-  assert.equal(m.tax.text, 'Còn nợ 20 đ (1 tờ khai) · Nộp thừa 20 đ (1 tờ khai)');
+  assert.equal(m.tax.text, 'Còn nợ 20 đ (1 tờ khai) · Nộp thừa 20 đ (1 tờ khai) — cần làm thủ tục hoàn thuế');
   const rows = O.rowsOf(fx2()),
     main = rows[0].c;
   assert.equal(main[O.IX.owing], '20');

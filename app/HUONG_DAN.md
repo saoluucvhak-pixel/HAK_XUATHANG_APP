@@ -2,6 +2,11 @@
 
 Chạy offline: mở `index.html` bằng Chrome/Edge (không cần server, không cần cài đặt).
 
+## Hoàn thuế và nạp file có dòng trùng (v2.20.0)
+- **Nộp thừa thuế:** tờ khai nộp thừa hiện cảnh báo "cần làm thủ tục hoàn thuế". Khi nhận tiền hoàn, mở tờ khai → bấm **↩ Nhập hoàn thuế** (số tiền điền sẵn bằng số nộp thừa, sửa được) → tờ khai tất toán. Có thể hoàn từng phần; phần chưa hoàn vẫn báo nộp thừa. Không bù trừ giữa các tờ khai.
+- **File Excel có dòng trùng hoàn toàn** (cùng số phiếu, biển số, giờ cân): app không nạp và báo số dòng Excel; xóa dòng thừa rồi nạp lại.
+- **Số hợp đồng gần giống** hợp đồng đã có (vd "hd-01" và "HD-01"): app hỏi xác nhận; chọn OK để lưu như hợp đồng khác.
+
 ## Cách dùng
 1. **Nhập liệu** → ① chọn **hình thức** (loại biên bản/chứng từ) → ② thêm file Excel cân **từng đợt** (mỗi file = 1 đợt, chọn được nhiều file cùng lúc; trùng tên file thì thay đợt cũ) → bấm dòng một đợt để xem/chỉnh sheet, dòng tiêu đề, ánh xạ cột. **Mỗi hình thức có dữ liệu riêng**: các trang biên bản dùng dữ liệu **gộp tất cả đợt** của đúng hình thức đó (tự bỏ phiếu trùng giữa các đợt: cùng số phiếu, biển số, ngày giờ cân), hình thức khác không thấy. Xóa một đợt bằng nút Xóa. Danh sách xe & tài xế dùng chung, áp cho mọi đợt. Chấm xanh ở menu = hình thức đã có dữ liệu.
 2. Vào loại chứng từ: **Trung chuyển gửi kho** (chọn mẫu theo đợt hoặc theo tháng) / **Xuất hàng kho gửi** (Bảng xác nhận hàng gửi kho xuất khẩu, theo từng tàu) / **Xuất khẩu** (Bảng tổng hợp hàng xuất khẩu qua cân) / **Ủy thác xuất khẩu** / **Điều chuyển** / **Trao đổi hàng hóa** / **Xuất bán** (Biên bản giao nhận hàng hóa + đơn giá, thành tiền).
