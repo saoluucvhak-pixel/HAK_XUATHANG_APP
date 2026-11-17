@@ -194,3 +194,36 @@ test('Excel: khi mọi hồ sơ đều chưa phân bổ vẫn xuất được, s
   assert.equal(sh.getCell('F5').value, 30);
   assert.equal(out.getWorksheet('Theo tháng').rowCount <= 5, true, 'không có tháng nào được dựng từ hồ sơ chưa xác minh');
 });
+
+test('prepareTickets đọc song song theo lô: thứ tự kết quả giữ nguyên dù hồ sơ xong lệch nhau, song song tối đa 8, dùng lại bộ nhớ đệm', async () => {
+  let live = 0,
+    peak = 0;
+  const loads = [];
+  HAK.Archive = {
+    async load(id) {
+      loads.push(id);
+      live++;
+      peak = Math.max(peak, live);
+      await new Promise((ok) => setTimeout(ok, id === 'M0' ? 30 : 1)); // hồ sơ đầu xong SAU các hồ sơ sau
+      live--;
+      return { params: { filter: {} }, rows: [row(1, 1000, '05/01/2026')] };
+    },
+  };
+  try {
+    const metas = Array.from({ length: 20 }, (_, i) => meta('M' + i, '05/01/2026', '05/01/2026', 1000));
+    const cache = new Map();
+    const out = await R.prepareTickets(metas, cache, true);
+    assert.deepEqual(
+      Array.from(out.keys()),
+      metas.map((m) => m.id),
+      'thứ tự khóa như danh sách đầu vào'
+    );
+    assert.ok(peak > 1 && peak <= 8, 'có song song nhưng không quá 8 (đo được ' + peak + ')');
+    const n = loads.length;
+    const again = await R.prepareTickets(metas, cache, true);
+    assert.equal(loads.length, n, 'lần 2 dùng bộ nhớ đệm, không đọc lại');
+    assert.equal(again.size, 20);
+  } finally {
+    delete HAK.Archive;
+  }
+});

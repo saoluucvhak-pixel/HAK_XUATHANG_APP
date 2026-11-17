@@ -76,12 +76,19 @@
       return;
     }
     return new Promise((ok, no) => {
+      let tx = null;
       try {
-        const tx = db.transaction(['meta', 'data'], 'readwrite');
-        work(tx);
+        tx = db.transaction(['meta', 'data'], 'readwrite');
         tx.oncomplete = () => ok();
         tx.onerror = tx.onabort = () => no(tx.error || new Error('Không ghi được dữ liệu lưu trữ'));
+        work(tx);
       } catch (e) {
+        // Lỗi đồng bộ GIỮA hai lần ghi (vd meta đã put, data chưa) → phải HỦY giao dịch, nếu không phần đã ghi sẽ được commit → meta mồ côi.
+        try {
+          if (tx) tx.abort();
+        } catch (e2) {
+          /* giao dịch đã kết thúc */
+        }
         no(e);
       }
     });
@@ -289,9 +296,15 @@
 
   /** v2.7.4: KHÔNG tự xóa nữa (trước: giữ 500 hồ sơ mới nhất) — chỉ nhắc 1 lần mỗi phiên khi vượt SOFT_WARN. */
   let warned = false;
+  /** Đếm bản ghi mà không đọc nội dung (trước đây getAll('meta') mỗi lần lưu: tốn thời gian tăng theo số hồ sơ). */
+  async function countAll(store) {
+    const db = await openDb();
+    if (!db) return mem[store].size;
+    return reqP(db.transaction(store, 'readonly').objectStore(store).count());
+  }
   async function trim() {
     try {
-      const n = (await getAll('meta')).length;
+      const n = await countAll('meta');
       if (n > SOFT_WARN && !warned && HAK.UI) {
         warned = true;
         HAK.UI.toast(

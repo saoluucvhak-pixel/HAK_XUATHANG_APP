@@ -11,8 +11,16 @@ function fakeIdb(mode) {
       if (mode === 'throw' && access === 'readwrite') throw new DOMException('database connection is closing', 'InvalidStateError');
       const tx = { names: [].concat(names), access, ops: [] };
       txs.push(tx);
+      tx.abort = () => {
+        tx.aborted = true;
+        tx.pending = [];
+        tx.error = new Error('AbortError');
+        setTimeout(() => tx.onabort && tx.onabort());
+      };
       tx.objectStore = (n) => ({
         put(v, k) {
+          if (mode === 'put2' && access === 'readwrite' && tx.ops.length === 1)
+            throw new DOMException('Mô phỏng hết dung lượng', 'QuotaExceededError'); // lần ghi thứ 2 (data) ném lỗi ĐỒNG BỘ sau khi meta đã put
           tx.ops.push(['put', n]);
           tx.pending = (tx.pending || []).concat(() => stores[n].set(k !== undefined ? k : v.id, v));
         },
@@ -41,6 +49,7 @@ function fakeIdb(mode) {
       });
       if (access === 'readwrite')
         setTimeout(() => {
+          if (tx.aborted) return;
           if (mode === 'abort') {
             tx.error = new Error('QuotaExceededError');
             tx.onabort && tx.onabort();
@@ -130,4 +139,16 @@ test('lỗi đồng bộ khi mở giao dịch: báo lỗi chứ không treo', as
   const r = await Promise.race([A.save(...args()), new Promise((ok) => setTimeout(() => ok('TREO'), 1500))]);
   assert.equal(r, false);
   assert.match(A.lastError, /closing/);
+});
+
+test('lỗi ĐỒNG BỘ ở lần ghi thứ 2 (meta đã put, data chưa): hủy giao dịch, không để lại meta mồ côi; lưu lại được', async () => {
+  const { f, A } = load('put2');
+  assert.equal(await A.save(...args()), false);
+  assert.match(A.lastError, /hết dung lượng|QuotaExceeded/i);
+  assert.equal(f.stores.meta.size, 0, 'không có meta mồ côi');
+  assert.equal(f.stores.data.size, 0);
+  assert.ok(
+    f.txs.filter((t) => t.access === 'readwrite').every((t) => t.aborted),
+    'giao dịch ghi đã bị hủy'
+  );
 });
