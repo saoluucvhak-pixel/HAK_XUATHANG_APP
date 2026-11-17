@@ -175,13 +175,20 @@
       stale = !!(newest && newest.taxVnd == null && (!last || byOrder(newest, last) > 0));
     const base = d.taxVnd == null ? null : Number(d.taxVnd);
     const payable = last ? Number(last.taxVnd) : base;
-    const paidTax = act(d.payments)
-      .filter((p) => p.kind === 'tax')
-      .reduce((a, p) => a + (Number(p.amount) || 0), 0);
-    const paidFee = act(d.payments)
-      .filter((p) => p.kind === 'fee')
-      .reduce((a, p) => a + (Number(p.amount) || 0), 0);
-    const remaining = payable == null ? null : payable - paidTax;
+    const cent0 = (n) => Math.round(n * 100) / 100;
+    const paidTax = cent0(
+      act(d.payments)
+        .filter((p) => p.kind === 'tax')
+        .reduce((a, p) => a + (Number(p.amount) || 0), 0)
+    );
+    const paidFee = cent0(
+      act(d.payments)
+        .filter((p) => p.kind === 'fee')
+        .reduce((a, p) => a + (Number(p.amount) || 0), 0)
+    );
+    // Làm tròn 0,01 đ để sai số số thực (0,1 + 0,2 ≠ 0,3) không biến tờ khai đã nộp đủ thành "còn nợ / nộp thừa" vài e-17 đồng.
+    const cent = (n) => Math.round(n * 100) / 100;
+    const remaining = payable == null ? null : cent(payable - paidTax);
     // owed = còn nợ (≥ 0), over = nộp thừa (≥ 0), undetermined = chưa xác định nghĩa vụ thuế (không có thuế gốc / bổ sung) → không được bù trừ giữa các tờ khai.
     return {
       base,

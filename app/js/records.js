@@ -259,9 +259,15 @@
     },
     /** Xung đột khi lập BKLS: số BKLS đã dùng cho đợt khác (cùng công ty). */
     checkBkls(o) {
-      const out = [];
+      const out = [],
+        nk = (x) =>
+          String(x == null ? '' : x)
+            .replace(/\s+/g, '')
+            .toUpperCase(), // "010/2026/bkls " ≡ "010/2026/BKLS"
+        want = nk(o.so);
+      if (!want) return out;
       this.list.forEach((r) => {
-        if (r.kind === 'bkls' && r.cid === o.cid && r.soBkls === o.so && !(r.type === o.type && r.batch === o.batch))
+        if (r.kind === 'bkls' && r.cid === o.cid && nk(r.soBkls) === want && !(r.type === o.type && r.batch === o.batch))
           out.push({ rec: r, why: 'sameNo' });
       });
       return out;
