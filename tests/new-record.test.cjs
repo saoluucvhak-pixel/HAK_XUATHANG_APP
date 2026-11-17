@@ -8,7 +8,7 @@ function boot() {
     Yearbook: { year: 2026, clear() { log.clears++; }, async save() { if (log.saveFails) throw new Error('Kho hồ sơ đã thay đổi'); log.saves++; }, active: () => null } } };
   const ctx = { window, document: { createElement: () => node('', 'OPTION') }, console, Set, Map, Date, JSON, Math };
   vm.createContext(ctx);
-  for (const file of ['excel.js', 'generator.js', 'pages-modals.js', 'pages.js']) { let src = fs.readFileSync(require.resolve('../app/js/' + file), 'utf8'); if (file === 'pages.js') src = src.replace('  HAK.Pages = {', '  renderFilter=()=>{};updateSummary=()=>{};HAK.Pages = {'); vm.runInContext(src, ctx); }
+  for (const file of ['excel.js', 'generator.js', 'pages-modals.js', 'pages-contract.js', 'pages.js']) { let src = fs.readFileSync(require.resolve('../app/js/' + file), 'utf8'); if (file === 'pages.js') src = src.replace('  HAK.Pages = {', '  renderFilter=()=>{};updateSummary=()=>{};HAK.Pages = {'); vm.runInContext(src, ctx); }
   const H = window.HAK, ts = (h) => Date.UTC(2026, 10, 12, h, 0), row = (n, h) => ({ idx: n, uid: 'f#' + n, ticket: 'P' + n, plate: '43C-' + n, ts1: ts(h), dateStr: '12/11/2026', time1: '12/11/2026 ' + h + ':00', net: 1000 * n, note: '', warn: [] });
   const rows = [row(1, 6), row(2, 8), row(3, 10)];
   H.App.slots.xuatkhau = { ds: { ok: true, rows, stats: H.Excel.computeStats(rows) } };
