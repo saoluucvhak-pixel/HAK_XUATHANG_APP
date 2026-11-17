@@ -25,7 +25,7 @@ Các quy tắc dưới đây đã được **suy ra từ mã nguồn / tài li�
 15. **Dòng sai ngày giờ.** — **ĐÃ XÁC NHẬN (17/11/2026): chỉ cảnh báo ("Thiếu/sai ngày cân"), không chặn.** Từ 17/11/2026 ngày không tồn tại (29/02 năm không nhuận, 32/01, tháng 13, giờ 25) bị coi là "Thiếu/sai ngày cân" (ts = trống) thay vì tự tràn sang ngày khác. Phiếu trống ngày vẫn được tính ở tổng không lọc ngày nhưng KHÔNG nằm trong biên bản/báo cáo có khoảng ngày. Cần xác nhận cách xử lý mong muốn (chặn lập hồ sơ cho tới khi sửa, hay chỉ cảnh báo như hiện tại).
 16. **Số tiền dạng chữ khi nạp vào mô hình tờ khai.** — **ĐÃ XÁC NHẬN (17/11/2026): giao diện luôn đổi thành số trước khi lưu; không có đường nhập chuỗi số có dấu nghìn.** Số thuế / số tiền nộp là chuỗi có dấu nghìn ("1.000.000") bị đọc thành "trống" (→ chưa xác định nghĩa vụ). Hiện giao diện luôn chuyển thành số trước khi lưu nên chưa gặp; cần xác nhận không có đường nhập nào (Google Sheet, sao lưu cũ) đưa chuỗi có dấu nghìn vào.
 
-## Đợt rà soát toàn vẹn cha–con (17/11/2026) — CHỜ XÁC NHẬN (chưa đổi hành vi nếu chưa ghi "đã xác nhận")
+## Đợt rà soát toàn vẹn cha–con (17/11/2026) — ĐÃ XÁC NHẬN: GIỮ NGUYÊN CẢ 8 MỤC (17–24)
 
 17. **Hợp đồng / tờ khai chưa gắn công ty.** — **ĐÃ XÁC NHẬN (17/11/2026): GIỮ NGUYÊN NHƯ APP HIỆN TẠI.** Hiện `relatedTo` coi hợp đồng không có bên nào thuộc nhóm công ty là "của mọi công ty" → công ty nào cũng thấy (tờ khai chưa gắn hợp đồng cũng vậy). *Câu hỏi:* giữ (tiện cho dữ liệu cũ) hay buộc gắn công ty rồi mới hiện?
 18. **Chọn hợp đồng của công ty khác khi lập hồ sơ.** — **ĐÃ XÁC NHẬN (17/11/2026): GIỮ NGUYÊN NHƯ APP HIỆN TẠI.** Ô chọn hợp đồng liệt kê cả "Hợp đồng công ty khác" (nhóm riêng) nên hồ sơ cân của công ty A có thể gắn hợp đồng của B. Rà soát toàn vẹn báo `ARCHIVE_CROSS_COMPANY` ở mức cảnh báo. *Câu hỏi:* giữ cho phép, hay chặn / bắt xác nhận?
@@ -37,4 +37,4 @@ Các quy tắc dưới đây đã được **suy ra từ mã nguồn / tài li�
 24. **Mỗi chi tiết một tờ khai.** — **ĐÃ XÁC NHẬN (17/11/2026): GIỮ NGUYÊN NHƯ APP HIỆN TẠI.** Nhập tờ khai tự bỏ liên kết chi tiết nếu chi tiết đã có tờ khai khác; thao tác tay vẫn cho phép hai tờ khai cùng chi tiết (rà soát báo `DECL_DETAIL_SHARED`). *Câu hỏi:* đây là quy tắc cứng hay cho phép nhiều tờ khai / chi tiết (khai bổ sung theo tờ khai mới)?
 25. **KL gốc bằng 0 khác KL gốc để trống (đã có, giữ).** 0 là giá trị thật (qua lưu / đọc lại, phụ lục, bỏ phụ lục đều giữ 0); trống = chưa nhập. Chỉ ghi lại để dễ đối chiếu.
 
-**Chờ xác nhận: mục 17–24** (mục 1–16 đã xác nhận ngày 17/11/2026).
+**Không còn mục nào chờ xác nhận** (mục 1–16 xác nhận ngày 17/11/2026; mục 17–24 xác nhận giữ nguyên).
