@@ -33,3 +33,18 @@ test('workflow bộ cài không ghi đè Release đã đăng cùng số phiên b
   const publish = y.slice(y.indexOf('- name: Publish release'));
   assert.match(publish, /if: steps\.rel\.outputs\.EXISTS != 'true'/, 'bước đăng Release chỉ chạy khi chưa có Release cùng phiên bản');
 });
+
+test('bộ cài chỉ dừng HAKDocs của thư mục cài (không dừng theo tên tiến trình làm ảnh hưởng bản cài / portable khác)', () => {
+  const nsi = fs.readFileSync(path.resolve('installer/setup.nsi'), 'utf8'),
+    ps = fs.readFileSync(path.resolve('installer/stop-hakdocs.ps1'), 'utf8');
+  assert.ok(!/taskkill[^\n]*\/IM\s+HAKDocs/i.test(nsi.replace(/^;.*$/gm, '')), 'không được taskkill theo tên HAKDocs.exe');
+  assert.match(nsi, /StopHakDocs "\$PLUGINSDIR\\stop-hakdocs\.ps1"/, 'cài / nâng cấp dùng stop-hakdocs.ps1');
+  assert.match(nsi, /StopHakDocs "\$INSTDIR\\stop-hakdocs\.ps1"/, 'gỡ cài đặt dùng bản sao trong thư mục cài');
+  assert.match(
+    ps,
+    /StartsWith\(\$native, \[System\.StringComparison\]::OrdinalIgnoreCase\)/,
+    'lọc theo đường dẫn, không phân biệt hoa thường'
+  );
+  assert.ok(ps.includes("TrimEnd('\\') + '\\'"), 'có dấu \\ cuối để hak-a không khớp hak-a2');
+  assert.ok(!/Get-Process[^\n]*\|\s*Stop-Process/.test(ps), 'phải lọc theo đường dẫn trước khi dừng');
+});

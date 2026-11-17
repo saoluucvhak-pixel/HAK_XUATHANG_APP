@@ -53,16 +53,21 @@ RequestExecutionLevel user
 ; Cai dat
 
 ; HAKDocs.exe chay ngam (--serve) sau khi dung app nen khoa file khi cap nhat -> dung truoc khi ghi de / go cai.
-!macro StopHakDocs
-  nsExec::Exec 'taskkill /F /T /IM HAKDocs.exe'
+; CHI dung HAKDocs cua thu muc cai nay (stop-hakdocs.ps1 loc theo duong dan $INSTDIR\native\), KHONG dung theo ten tien trinh de khong anh huong ban cai / ban portable khac.
+!macro StopHakDocs SCRIPT
+  nsExec::Exec 'powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${SCRIPT}" -InstallDir "$INSTDIR"'
   Pop $0
   Sleep 1200
 !macroend
 
 Section "Ung dung Quan ly xuat hang" SecApp
   SectionIn RO
-  !insertmacro StopHakDocs
+  InitPluginsDir
+  File "/oname=$PLUGINSDIR\stop-hakdocs.ps1" "stop-hakdocs.ps1"
+  !insertmacro StopHakDocs "$PLUGINSDIR\stop-hakdocs.ps1"
   SetOutPath "$INSTDIR"
+  ; ban sao de go cai dat dung (Uninstall khong co $PLUGINSDIR cua bo cai)
+  File "/oname=$INSTDIR\stop-hakdocs.ps1" "stop-hakdocs.ps1"
   ; Recovery/reset utilities must never ship to end users.
   File /r /x "MoKhoa_1Lan*.html" /x "XoaSach_DuLieu*.html" /x ".hakquality.json" "app\*.*"
 
@@ -88,7 +93,8 @@ SectionEnd
 ; Go cai (KHONG dong du lieu trinh duyet - chi xoa file chuong trinh)
 
 Section "Uninstall"
-  !insertmacro StopHakDocs
+  !insertmacro StopHakDocs "$INSTDIR\stop-hakdocs.ps1"
+  Delete "$INSTDIR\stop-hakdocs.ps1"
   Delete "$SMPROGRAMS\HAK\Quan ly xuat hang.lnk"
   RMDir "$SMPROGRAMS\HAK"
   Delete "$DESKTOP\HAK - Quan ly xuat hang.lnk"
