@@ -5,7 +5,7 @@ function boot() {
   const window = { XLSX: require('../app/libs/xlsx.full.min.js'), HAK: { UI: { $: () => node(), $$: () => [], esc: String, todayISO: () => '', toast() {}, Loading: {}, debounce: (f) => f }, App: { slots: {} }, Store: { get: (k, f) => f }, Config: { data: { companies: [], warehouses: [] }, custom: {} } } };
   const ctx = { window, document: { createElement: () => node() }, console, Set, Map, Date, JSON, Math };
   vm.createContext(ctx);
-  for (const file of ['excel.js', 'generator.js', 'pages-modals.js', 'pages.js']) { let src = fs.readFileSync(require.resolve('../app/js/' + file), 'utf8'); if (file === 'pages.js') src = src.replace('  HAK.Pages = {', '  renderFilter=()=>{};updateSummary=()=>{};HAK.Pages = {'); vm.runInContext(src, ctx); }
+  for (const file of ['excel.js', 'generator.js', 'pages-modals.js', 'pages-contract.js', 'pages-filter.js', 'pages-bkls.js', 'pages.js']) { let src = fs.readFileSync(require.resolve('../app/js/' + file), 'utf8'); if (file === 'pages.js') src = src.replace('  HAK.Pages = {', '  renderFilter=()=>{};updateSummary=()=>{};HAK.Pages = {'); vm.runInContext(src, ctx); }
   return window.HAK;
 }
 const R = (t) => ({ ticket: t, plate: 'P-' + t });

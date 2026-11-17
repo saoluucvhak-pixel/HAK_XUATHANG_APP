@@ -6,7 +6,7 @@ function boot(print, confirms) {
   const window = { XLSX: require('../app/libs/xlsx.full.min.js'), confirm: (m) => { confirms.push(m); return confirms.answers.length ? confirms.answers.shift() : true; }, HAK: { UI: { $: (s) => nodes.get(s), $$: () => [], esc: String, todayISO: () => '', toast: (m, t) => toasts.push([t, m]), Loading: {}, debounce: (f) => f }, App: { slots: {} }, Store: { get: (k, f) => f }, Config: { data: { companies: [], warehouses: [] }, custom: {} }, Word: { Pdf: { print } }, Bkls: { PDF_BATCH: 150 } } };
   const ctx = { window, confirm: window.confirm, document: { createElement: () => node('', 'OPTION') }, console, Set, Map, Date, JSON, Math, setTimeout, Promise };
   vm.createContext(ctx);
-  for (const file of ['excel.js', 'generator.js', 'pages-modals.js', 'pages.js']) { let src = fs.readFileSync(require.resolve('../app/js/' + file), 'utf8'); if (file === 'pages.js') src = src.replace('  HAK.Pages = {', '  renderFilter=()=>{};updateSummary=()=>{};HAK.Pages = {'); vm.runInContext(src, ctx); }
+  for (const file of ['excel.js', 'generator.js', 'pages-modals.js', 'pages-contract.js', 'pages-filter.js', 'pages-bkls.js', 'pages.js']) { let src = fs.readFileSync(require.resolve('../app/js/' + file), 'utf8'); if (file === 'pages.js') src = src.replace('  HAK.Pages = {', '  renderFilter=()=>{};updateSummary=()=>{};HAK.Pages = {'); vm.runInContext(src, ctx); }
   return { H: window.HAK, toasts };
 }
 const files = (n, w) => Array.from({ length: n }, (_, i) => ({ name: 'BKLS_xe_' + String(i + 1).padStart(4, '0') + '.docx', bytes: new Uint8Array(1) })).map((f) => Object.assign(f, { w }));
