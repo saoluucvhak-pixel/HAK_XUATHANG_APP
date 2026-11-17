@@ -55,6 +55,28 @@ jobs:
           node-version: 22
       - run: npm ci
       - run: npm i --no-save playwright@1.63.0
+      - name: Dừng HAKDocs theo thư mục cài (không ảnh hưởng bản cài khác)
+        shell: pwsh
+        run: |
+          # Ba "HAKDocs.exe" giả (bản sao ping.exe) ở ba thư mục: a, b và a2 (tên bắt đầu giống a). Dừng theo thư mục a chỉ được dừng a.
+          $ping = (Get-Command ping.exe).Source
+          $dirs = 'hak-a', 'hak-b', 'hak-a2' | ForEach-Object { Join-Path $env:RUNNER_TEMP $_ }
+          $procs = @{}
+          foreach ($d in $dirs) {
+            New-Item -ItemType Directory -Force (Join-Path $d 'native') | Out-Null
+            $exe = Join-Path $d 'native\HAKDocs.exe'
+            Copy-Item $ping $exe
+            $procs[$d] = Start-Process -FilePath $exe -ArgumentList '-n', '300', '127.0.0.1' -PassThru -WindowStyle Hidden
+          }
+          Start-Sleep -Seconds 2
+          function Stop-For($d) { & powershell.exe -NoProfile -ExecutionPolicy Bypass -File installer/stop-hakdocs.ps1 -InstallDir $d; Start-Sleep -Seconds 1 }
+          Stop-For $dirs[0]
+          if (-not $procs[$dirs[0]].HasExited) { throw 'không dừng được HAKDocs của thư mục a' }
+          if ($procs[$dirs[1]].HasExited) { throw 'dừng nhầm HAKDocs của thư mục b' }
+          if ($procs[$dirs[2]].HasExited) { throw 'dừng nhầm HAKDocs của thư mục a2 (tên bắt đầu giống a)' }
+          Stop-For $dirs[1]; Stop-For $dirs[2]
+          if (-not $procs[$dirs[1]].HasExited -or -not $procs[$dirs[2]].HasExited) { throw 'không dừng được HAKDocs còn lại' }
+          Write-Host 'Dừng theo thư mục cài: đúng'
       - name: Nghiệm thu phát hành (Edge)
         shell: pwsh
         env:
