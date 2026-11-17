@@ -1307,9 +1307,22 @@
             .join('')
         : '<tr><td colspan="8" class="muted">Chưa có khai bổ sung.</td></tr>') +
       '</tbody></table></div>' +
-      '<div class="d-flex flex-wrap gap-2 align-items-center mb-1"><h6 class="mb-0">Giấy nộp tiền</h6><span class="small muted">(bảng con)</span><span class="ms-auto"><button class="btn btn-sm btn-primary" type="button" data-cs="pay-add"' +
+      '<div class="d-flex flex-wrap gap-2 align-items-center mb-1"><h6 class="mb-0">Giấy nộp tiền</h6><span class="small muted">(bảng con)</span><span class="ms-auto d-flex gap-2">' +
+      (t.over > 0
+        ? '<button class="btn btn-sm btn-warning" type="button" data-cs="refund-add" title="Ghi nhận khoản NSNN hoàn lại để tất toán phần nộp thừa"' +
+          (off ? ' disabled' : '') +
+          '>↩ Nhập hoàn thuế (' +
+          esc(money(t.over)) +
+          ')</button>'
+        : '') +
+      '<button class="btn btn-sm btn-primary" type="button" data-cs="pay-add"' +
       (off ? ' disabled' : '') +
       '>＋ Thêm giấy nộp tiền</button></span></div>' +
+      (t.over > 0
+        ? '<div class="alert alert-warning py-1 px-2 small mb-1">⚠ Nộp thừa <b>' +
+          esc(money(t.over)) +
+          ' đ</b> — cần làm thủ tục hoàn thuế. Khi nhận được tiền hoàn, bấm “Nhập hoàn thuế” để tất toán.</div>'
+        : '') +
       '<div class="tbl-wrap"><table class="table table-sm align-middle"><thead><tr><th>Số giấy nộp tiền</th><th>Mã hiệu</th><th>Số tham chiếu</th><th>Ngày nộp</th><th>Kỳ thuế</th><th>Loại</th><th>Nội dung</th><th>Chương</th><th>NDKT</th><th class="num">Số tiền</th><th></th></tr></thead><tbody>' +
       (pays.length
         ? pays
@@ -1352,6 +1365,7 @@
       esc(money(t.payable)) +
       ' đ · đã nộp thuế ' +
       esc(money(t.paidTax)) +
+      (t.refunded > 0 ? ' đ (đã trừ hoàn ' + esc(money(t.refunded)) + ')' : '') +
       ' đ · lệ phí đã nộp ' +
       esc(money(t.paidFee)) +
       ' đ</th><th colspan="2" class="num ' +
@@ -1369,6 +1383,12 @@
         if (a === 'add') openDecl(null);
         else if (a === 'supp-add') openSupp(st.sel);
         else if (a === 'pay-add') openPay(st.sel);
+        else if (a === 'refund-add')
+          openPay(st.sel, null, {
+            kind: 'refund',
+            content: 'Hoàn thuế nộp thừa',
+            amount: CM().totals(customsList().find((x) => x.id === st.sel) || {}).over || null,
+          });
         else if (a === 'to-supp') HAK.UI.confirmClick(act, () => convertToSupp(st.sel), 'Chuyển?');
         return;
       }

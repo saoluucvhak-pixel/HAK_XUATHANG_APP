@@ -504,7 +504,7 @@ test('thuế: tờ khai còn nợ 20 và tờ khai nộp thừa 20 hiển thị 
   assert.equal(s.net, 0);
   assert.equal(s.nOwing, 1);
   assert.equal(s.nOver, 1);
-  assert.equal(M.taxText(s), 'Còn nợ 20 đ (1 tờ khai) · Nộp thừa 20 đ (1 tờ khai)');
+  assert.equal(M.taxText(s), 'Còn nợ 20 đ (1 tờ khai) · Nộp thừa 20 đ (1 tờ khai) — cần làm thủ tục hoàn thuế');
   const s2 = M.settlement([owing, over, none, fee]);
   assert.equal(s2.undetermined, 1);
   assert.equal(s2.paidUndetermined, 50);

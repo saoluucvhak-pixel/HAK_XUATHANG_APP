@@ -1,6 +1,12 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
-## Chưa phát hành (Đợt 1–4 nâng cấp nền + rà soát dữ liệu)
+## v2.20.0
+- Hoàn thuế: thêm loại khoản "Hoàn thuế" trong bảng Giấy nộp tiền và nút "↩ Nhập hoàn thuế" (điền sẵn số nộp thừa) ở tờ khai có nộp thừa. Hoàn trừ vào số đã nộp: hoàn đủ ⇒ tờ khai tất toán ("Đã nộp đủ"); không bù trừ giữa các tờ khai; nộp thừa hiển thị "chờ hoàn thuế".
+- Nạp file Excel có dòng trùng hoàn toàn (cùng số phiếu, biển số, giờ cân) bị cảnh báo và chặn, nêu số dòng Excel cần xóa.
+- Số hợp đồng gần giống hợp đồng khác (chỉ khác hoa/thường, khoảng trắng, dấu gạch) → hỏi xác nhận trước khi lưu.
+- Ghi các quy tắc nghiệp vụ đã xác nhận ngày 17/11/2026 vào docs/QUY_TAC_NGHIEP_VU_CAN_XAC_NHAN.md.
+
+## Đợt 1–4 nâng cấp nền + rà soát dữ liệu (đã gộp, tiền đề v2.20.0)
 - Sửa gộp nhiều đợt Excel của một loại: không còn loại dòng lặp trong CÙNG một file (trước đây thêm một đợt không liên quan làm mất dòng của đợt cũ, tổng kg/phiếu lệch và cảnh báo "trùng giữa các đợt" sai). Chỉ loại phiếu trùng GIỮA các file.
 - Sửa đọc số dạng chữ: ".500" / "-.250" đọc 500 / -250 (sai 1.000 lần) → 0,5 / -0,25; "1.5E3" đọc 1,53 → 1500.
 - Sửa đọc ngày giờ: ngày không tồn tại (29/02 năm không nhuận, 32/01, tháng 13, giờ 25…) không còn bị tràn sang ngày khác; dòng đó được cảnh báo "Thiếu/sai ngày cân" kèm số dòng Excel.

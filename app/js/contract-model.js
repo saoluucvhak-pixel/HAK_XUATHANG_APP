@@ -352,6 +352,25 @@
       return 'Số hợp đồng đã tồn tại trong cùng hình thức.';
     return '';
   }
+  /** Khóa so "gần giống" số hợp đồng: bỏ dấu tiếng Việt, chữ hoa, chỉ giữ chữ và số ("hd-01" ≡ "HD 01" ≡ "HD/01"). */
+  const noKey = (v) =>
+    String(v == null ? '' : v)
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/gi, 'd')
+      .replace(/[^0-9A-Za-z]/g, '')
+      .toUpperCase();
+  /**
+   * Hợp đồng cùng hình thức có số GẦN GIỐNG (chỉ khác hoa/thường, khoảng trắng, dấu gạch…) nhưng không giống hệt — để cảnh báo cho người dùng
+   * xác nhận (không chặn: "hd-01" và "HD-01" có thể là hai hợp đồng khác nhau). Giống hệt đã bị validate() chặn.
+   */
+  function similarNo(c, catalog) {
+    const k = noKey(c && c.no);
+    if (!k || !c || c.deletedAt) return [];
+    return (catalog.contracts || []).filter(
+      (x) => !x.deletedAt && x.id !== c.id && x.type === c.type && x.no && x.no !== c.no && noKey(x.no) === k
+    );
+  }
   function upsert(catalog, value, expectedRevision) {
     const next = copy(catalog),
       index = next.contracts.findIndex((c) => c.id === value.id),
@@ -566,6 +585,8 @@
     choices,
     resolve,
     validate,
+    similarNo,
+    noKey,
     upsert,
     archiveChild,
     mergeCatalog,

@@ -319,7 +319,7 @@
             ' · ' +
             nf(p.amount) +
             ' đ (' +
-            (p.kind === 'fee' ? 'lệ phí' : 'thuế XK') +
+            (p.kind === 'fee' ? 'lệ phí' : p.kind === 'refund' ? 'hoàn thuế' : 'thuế XK') +
             ') · tờ khai ' +
             d.no,
         ])
@@ -621,7 +621,7 @@
             nf(m.tax.payable) +
             ' · đã nộp ' +
             nf(m.tax.paid) +
-            (m.tax.over > 0 ? ' · NỘP THỪA ' + nf(m.tax.over) : '') +
+            (m.tax.over > 0 ? ' · NỘP THỪA ' + nf(m.tax.over) + ' — CHỜ HOÀN THUẾ' : '') +
             (m.tax.undetermined ? ' · ' + m.tax.undetermined + ' tờ khai chưa xác định nghĩa vụ' : ''),
         ],
       ]

@@ -646,6 +646,45 @@
         }
         Loading.show('Đang đọc file "' + file.name + '"…');
       }
+      // Dòng TRÙNG HOÀN TOÀN trong file (cùng số phiếu, biển số, giờ cân): cảnh báo và CHẶN nạp — làm trước khi đổi bất kỳ dữ liệu đợt nào.
+      {
+        let probe = null;
+        for (const n of info.sheetNames) {
+          const r = X.parseSheet(info.workbook, n, { autoSwap: HAK.Config.data.general.autoSwap });
+          if (r.ok) {
+            probe = r;
+            break;
+          }
+        }
+        const dups = probe ? G.duplicateRows(probe.rows) : [];
+        if (dups.length) {
+          Loading.hide();
+          const nExtra = dups.reduce((a, g) => a + g.rows.length - 1, 0),
+            sample = dups
+              .slice(0, 5)
+              .map(
+                (g) =>
+                  (g.rows[0].ticket ? 'phiếu ' + g.rows[0].ticket + ' · ' : '') +
+                  g.rows[0].plate +
+                  ' (dòng Excel ' +
+                  g.rows.map((r) => r.idx).join(', ') +
+                  ')'
+              )
+              .join('; ');
+          toast(
+            '⛔ Chưa nạp "' +
+              file.name +
+              '": có ' +
+              nExtra +
+              ' dòng trùng hoàn toàn (cùng số phiếu, biển số, giờ cân) — ' +
+              sample +
+              (dups.length > 5 ? '… và ' + (dups.length - 5) + ' nhóm khác' : '') +
+              '. Xóa dòng thừa trong file Excel rồi nạp lại.',
+            'error'
+          );
+          return;
+        }
+      }
       const keepRev = replaced ? sl.batches[bi].rev || 0 : 0;
       const keepAdded = replaced ? sl.batches[bi].addedAt : 0,
         keepConv = replaced ? sl.batches[bi].conv : null,

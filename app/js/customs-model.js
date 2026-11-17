@@ -11,7 +11,8 @@
   const HAK = (root.HAK = root.HAK || {});
   const STATUS = { opened: 'Đã mở tờ khai', waiting: 'Chờ thông quan', cleared: 'Đã thông quan' };
   const STATUS_ORDER = ['opened', 'waiting', 'cleared'];
-  const PAY_KIND = { tax: 'Thuế xuất khẩu', fee: 'Lệ phí / khác' };
+  const PAY_KIND = { tax: 'Thuế xuất khẩu', fee: 'Lệ phí / khác', refund: 'Hoàn thuế' };
+  const kindOf = (p) => (p && p.kind === 'fee' ? 'fee' : p && p.kind === 'refund' ? 'refund' : 'tax');
   const copy = (x) => JSON.parse(JSON.stringify(x));
   const uid = (p) =>
     p +
@@ -94,7 +95,7 @@
       receiptNo: String(v.receiptNo || '').trim(),
       date: v.date || '',
       amount: numOrNull(v.amount),
-      kind: v.kind === 'fee' ? 'fee' : 'tax',
+      kind: kindOf(v),
       content: v.content || '',
       note: v.note || '',
       formCode: v.formCode || '',
@@ -129,7 +130,7 @@
     if (!sameDoc) return false;
     if (ra && rb && ra !== rb) return false;
     if (fa && fb && fa !== fb) return false;
-    if ((a.kind === 'fee' ? 'fee' : 'tax') !== (b.kind === 'fee' ? 'fee' : 'tax')) return false;
+    if (kindOf(a) !== kindOf(b)) return false;
     if (numOrNull(a.amount) !== numOrNull(b.amount)) return false;
     return ['ndkt', 'chapter', 'dbhc', 'periodDate'].every((k) => {
       const x = String(a[k] || '').trim(),
@@ -143,12 +144,7 @@
    */
   function maybeSamePayment(a, b) {
     if (!a || !b || samePayment(a, b)) return false;
-    if (
-      (a.kind === 'fee' ? 'fee' : 'tax') !== (b.kind === 'fee' ? 'fee' : 'tax') ||
-      numOrNull(a.amount) === null ||
-      numOrNull(a.amount) !== numOrNull(b.amount)
-    )
-      return false;
+    if (kindOf(a) !== kindOf(b) || numOrNull(a.amount) === null || numOrNull(a.amount) !== numOrNull(b.amount)) return false;
     const ra = recKey(a.receiptNo),
       rb = recKey(b.receiptNo),
       fa = digits(a.refNo),
@@ -176,16 +172,17 @@
     const base = d.taxVnd == null ? null : Number(d.taxVnd);
     const payable = last ? Number(last.taxVnd) : base;
     const cent0 = (n) => Math.round(n * 100) / 100;
-    const paidTax = cent0(
-      act(d.payments)
-        .filter((p) => p.kind === 'tax')
-        .reduce((a, p) => a + (Number(p.amount) || 0), 0)
-    );
-    const paidFee = cent0(
-      act(d.payments)
-        .filter((p) => p.kind === 'fee')
-        .reduce((a, p) => a + (Number(p.amount) || 0), 0)
-    );
+    const sumKind = (k) =>
+      cent0(
+        act(d.payments)
+          .filter((p) => kindOf(p) === k)
+          .reduce((a, p) => a + (Number(p.amount) || 0), 0)
+      );
+    const paidGross = sumKind('tax'),
+      refunded = sumKind('refund'),
+      paidFee = sumKind('fee');
+    // Hoàn thuế (v2.20): khoản NSNN đã hoàn lại cho doanh nghiệp → trừ vào số đã nộp. paidTax = đã nộp ròng sau hoàn (nên nộp thừa được hoàn đủ ⇒ tất toán).
+    const paidTax = cent0(paidGross - refunded);
     // Làm tròn 0,01 đ để sai số số thực (0,1 + 0,2 ≠ 0,3) không biến tờ khai đã nộp đủ thành "còn nợ / nộp thừa" vài e-17 đồng.
     const cent = (n) => Math.round(n * 100) / 100;
     const remaining = payable == null ? null : cent(payable - paidTax);
@@ -195,11 +192,14 @@
       payable,
       extra: last && base != null ? Number(last.taxVnd) - base : null,
       paidTax,
+      paidGross,
+      refunded,
       paidFee,
       remaining,
       owed: remaining != null && remaining > 0 ? remaining : 0,
       over: remaining != null && remaining < 0 ? -remaining : 0,
       undetermined: payable == null,
+      refundExceeds: refunded > paidGross, // hoàn nhiều hơn đã nộp → số liệu cần kiểm tra
       staleSupplement: stale,
       lastSupplement: last,
     };
@@ -213,6 +213,7 @@
     const o = {
       payable: 0,
       paidTax: 0,
+      refunded: 0,
       paidFee: 0,
       owed: 0,
       over: 0,
@@ -229,6 +230,7 @@
       const t = totals(d);
       o.nDecl++;
       o.paidTax += t.paidTax;
+      o.refunded += t.refunded;
       o.paidFee += t.paidFee;
       if (t.staleSupplement) o.nStale++;
       if (t.undetermined) {
@@ -252,14 +254,19 @@
     if (!st.nDecl) return 'Chưa có tờ khai';
     const p = [];
     if (st.owed > 0) p.push('Còn nợ ' + mny(st.owed) + ' đ (' + st.nOwing + ' tờ khai)');
-    if (st.over > 0) p.push('Nộp thừa ' + mny(st.over) + ' đ (' + st.nOver + ' tờ khai)');
+    if (st.over > 0) p.push('Nộp thừa ' + mny(st.over) + ' đ (' + st.nOver + ' tờ khai) — cần làm thủ tục hoàn thuế');
     if (st.undetermined)
       p.push(
         st.undetermined +
           ' tờ khai chưa xác định nghĩa vụ thuế' +
           (st.paidUndetermined ? ' (đã nộp ' + mny(st.paidUndetermined) + ' đ)' : '')
       );
-    if (!p.length) p.push(st.payable > 0 || st.paidTax > 0 ? 'Đã nộp đủ thuế' : 'Chưa có thuế phát sinh');
+    if (!p.length)
+      p.push(
+        st.payable > 0 || st.paidTax > 0
+          ? 'Đã nộp đủ thuế' + (st.refunded > 0 ? ' (đã hoàn ' + mny(st.refunded) + ' đ)' : '')
+          : 'Chưa có thuế phát sinh'
+      );
     if (st.nStale) p.push('⚠ ' + st.nStale + ' tờ khai có khai bổ sung mới nhất chưa nhập số thuế (đang tính theo lần trước)');
     return p.join(' · ');
   }
@@ -302,7 +309,7 @@
         : st.undetermined
           ? { code: 'undetermined', label: 'Chưa xác định nghĩa vụ', text: taxText(st) }
           : st.over > 0
-            ? { code: 'over', label: 'Nộp thừa', text: taxText(st) }
+            ? { code: 'over', label: 'Nộp thừa — chờ hoàn thuế', text: taxText(st) }
             : { code: 'paid', label: st.payable > 0 || st.paidTax > 0 ? 'Đã nộp đủ' : 'Chưa có thuế', text: taxText(st) };
     const mtCert = x.mtCert != null ? Number(x.mtCert) : null,
       delT = (x.delKg || 0) / 1000;
