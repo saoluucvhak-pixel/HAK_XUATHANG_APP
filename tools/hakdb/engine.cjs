@@ -113,6 +113,14 @@ class HakDb {
     if (this.db) this.db.close();
     this.db = null;
   }
+  /** Giá trị meta (vd active_backend); ghi bằng quy trình kích hoạt có đối chiếu (di trú). */
+  meta(key) {
+    const r = this.db.prepare('SELECT value FROM meta WHERE key=?').get(key);
+    return r ? r.value : null;
+  }
+  setMeta(key, value) {
+    this.db.prepare('INSERT INTO meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(key, String(value));
+  }
   schemaVersion() {
     return Number(this.db.prepare("SELECT value FROM meta WHERE key='schema_version'").get().value);
   }
@@ -220,6 +228,12 @@ class HakDb {
       }
       const r = this._stmt('DELETE FROM ' + table + ' WHERE ' + wsql).run(...wargs);
       return { table, deleted: Number(r.changes) };
+    }
+    if (op.op === 'clear') {
+      if (op.confirm !== true) throw new HakDbError('bad-request', 'Xóa toàn bảng cần confirm:true');
+      if (table === 'audit_log' || table === 'quarantine') throw new HakDbError('bad-request', 'Bảng ' + table + ' không được xóa toàn bộ');
+      if (t.company && ctx && ctx.scope) throw new HakDbError('scope', 'Tài khoản giới hạn công ty không được xóa toàn bảng ' + table);
+      return { table, deleted: Number(this._stmt('DELETE FROM ' + table).run().changes) };
     }
     if (op.op === 'guard') {
       const kw = this._keyWhere(t, table, op.key);

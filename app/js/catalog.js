@@ -99,26 +99,14 @@
     }
     if (JSON.stringify(HAK.Store.get(KEY, null)) !== persistedSnapshot)
       throw Error('Danh mục đã thay đổi ở cửa sổ khác. Tải lại trang trước khi lưu.');
-    if (HAK.DB.usable()) {
-      const db = await HAK.DB.open();
-      await new Promise((resolve, reject) => {
-        const tx = db.transaction('kv', 'readwrite'),
-          store = tx.objectStore('kv'),
-          read = store.get(KEY);
-        let conflict = false;
-        read.onsuccess = () => {
-          if (read.result && JSON.stringify(read.result.val) !== persistedSnapshot) {
-            conflict = true;
-            tx.abort();
-            return;
-          }
-          store.put({ key: KEY, val: M.copy(state.data), ls: false, ts: Date.now() });
-        };
-        tx.oncomplete = resolve;
-        tx.onerror = tx.onabort = () =>
-          reject(Error(conflict ? 'Danh mục đã thay đổi. Mở lại trước khi lưu.' : 'Không ghi được danh mục.'));
+    if (HAK.DB.usable())
+      await HAK.DB.kvCas(
+        KEY,
+        (cur) => (cur !== undefined && JSON.stringify(cur) !== persistedSnapshot ? 'Danh mục đã thay đổi. Mở lại trước khi lưu.' : null),
+        M.copy(state.data)
+      ).catch((e) => {
+        throw e && e.conflict ? e : Error('Không ghi được danh mục.');
       });
-    }
     if (HAK.Store.set(KEY, M.copy(state.data), { dbCommitted: HAK.DB.usable() }) === false) throw Error('Không lưu được danh mục.');
     migrationBackup = null;
     persistedSnapshot = JSON.stringify(state.data);

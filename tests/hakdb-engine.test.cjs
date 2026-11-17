@@ -324,3 +324,22 @@ test('mất tiến trình giữa giao dịch (SIGKILL): không còn dữ liệu 
   assert.equal(db.counts().contracts, 1);
   db.close();
 });
+
+test('clear: cần confirm; bảng nhật ký không xóa được; tài khoản giới hạn công ty bị chặn; khóa ngoại vẫn áp dụng', () => {
+  const db = open();
+  db.tx([
+    { op: 'put', table: 'kv', row: { key: 'a', val: '1', updated_at: 1 } },
+    { op: 'put', table: 'kv', row: { key: 'b', val: '2', updated_at: 1 } },
+  ]);
+  throwsCode(() => db.tx([{ op: 'clear', table: 'kv' }]), 'bad-request');
+  throwsCode(() => db.tx([{ op: 'clear', table: 'audit_log', confirm: true }]), 'bad-request');
+  throwsCode(() => db.tx([{ op: 'clear', table: 'archive_records', confirm: true }], { scope: ['hak'] }), 'scope');
+  assert.equal(db.tx([{ op: 'clear', table: 'kv', confirm: true }])[0].deleted, 2);
+  db.tx([
+    { op: 'put', table: 'contracts', row: contract('hd1') },
+    { op: 'put', table: 'contract_details', row: { id: 'ct1', contract_id: 'hd1', doc: '{}' } },
+  ]);
+  throwsCode(() => db.tx([{ op: 'clear', table: 'contracts', confirm: true }]), 'fk');
+  assert.equal(db.counts().contracts, 1, 'xóa toàn bảng hỏng thì không mất gì');
+  db.close();
+});

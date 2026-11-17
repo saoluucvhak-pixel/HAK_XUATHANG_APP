@@ -117,9 +117,19 @@ function idb(h) {
       return tx;
     },
   };
-  h.H.DB = {
-    usable: () => true,
-    open: async () => db,
+  // db.js THẬT (kvCas / open / usable) chạy trên IndexedDB giả; chỉ kvPut và get được thay để ghi lại thứ tự thao tác.
+  h.ctx.window.indexedDB = {
+    open: () => {
+      const rq = {};
+      queueMicrotask(() => {
+        rq.result = db;
+        rq.onsuccess();
+      });
+      return rq;
+    },
+  };
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../app/js/db.js'), 'utf8'), h.ctx);
+  Object.assign(h.H.DB, {
     kvPut: async (key, val) => {
       operations.push('backup-write');
       records.set(key, { key, val: JSON.parse(JSON.stringify(val)) });
@@ -128,7 +138,7 @@ function idb(h) {
       operations.push('backup-read');
       return records.get(key);
     },
-  };
+  });
   return { records, operations, fail: () => (rejectWrites = true) };
 }
 test('IndexedDB migration verifies backup then atomically commits the catalog snapshot', async () => {

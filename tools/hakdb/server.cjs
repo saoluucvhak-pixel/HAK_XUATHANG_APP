@@ -106,7 +106,16 @@ function createServer(opt) {
         return reply(
           res,
           200,
-          { app: 'hak-db', backend: 'sqlite', schema: db.schemaVersion(), file: dbFile, dataDir, size: st.size, counts: db.counts() },
+          {
+            app: 'hak-db',
+            backend: 'sqlite',
+            active: db.meta('active_backend'),
+            schema: db.schemaVersion(),
+            file: dbFile,
+            dataDir,
+            size: st.size,
+            counts: db.counts(),
+          },
           cors
         );
       }

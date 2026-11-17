@@ -56,39 +56,22 @@
     return out;
   }
   async function read() {
-    const db = await H.DB.open();
-    if (!db) throw Error('Cần IndexedDB để lưu hồ sơ lâu dài; không lưu tạm vào RAM.');
-    return new Promise((ok, no) => {
-      const q = db.transaction('kv', 'readonly').objectStore('kv').get(KEY);
-      q.onsuccess = () => ok(q.result ? q.result.val : empty());
-      q.onerror = () => no(q.error);
-    });
+    if (!H.DB.usable()) throw Error('Cần IndexedDB hoặc SQLite để lưu hồ sơ lâu dài; không lưu tạm vào RAM.');
+    const v = await H.DB.kvGet(KEY);
+    return v === undefined ? empty() : v;
   }
   async function commit(expected, change) {
-    const db = await H.DB.open();
-    if (!db) throw Error('Không mở được kho dữ liệu.');
-    return new Promise((ok, no) => {
-      const tx = db.transaction('kv', 'readwrite'),
-        store = tx.objectStore('kv'),
-        q = store.get(KEY);
-      let result, error;
-      q.onsuccess = () => {
-        try {
-          const before = q.result ? q.result.val : empty();
-          if (before.revision !== expected) throw Error('Hồ sơ đã thay đổi ở cửa sổ khác. Mở lại trước khi lưu.');
-          const next = change(copy(before));
-          next.records.forEach(validate);
-          next.revision = before.revision + 1;
-          store.put({ key: KEY, val: next, ls: false, ts: Date.now() });
-          result = next;
-        } catch (e) {
-          error = e;
-          tx.abort();
-        }
-      };
-      tx.oncomplete = () => ok(result);
-      tx.onabort = tx.onerror = () => no(error || tx.error || Error('Chưa ghi được hồ sơ.'));
-    });
+    if (!H.DB.usable()) throw Error('Không mở được kho dữ liệu.');
+    const stale = 'Hồ sơ đã thay đổi ở cửa sổ khác. Mở lại trước khi lưu.';
+    const raw = await H.DB.kvGet(KEY),
+      before = raw === undefined ? empty() : raw;
+    if (before.revision !== expected) throw Error(stale);
+    const next = change(copy(before));
+    next.records.forEach(validate);
+    next.revision = before.revision + 1;
+    // kiểm lại phiên bản NGAY khi ghi (cửa sổ khác chen giữa lúc đọc và ghi → từ chối)
+    await H.DB.kvCas(KEY, (cur) => ((cur === undefined ? empty() : cur).revision !== before.revision ? stale : null), next);
+    return next;
   }
   let workingYear = new Date().getFullYear(),
     active = {},

@@ -77,7 +77,6 @@ function harness() {
     location: {},
     localStorage: { getItem: () => null, setItem() {} },
     HAK: {
-      DB: { open: async () => db, getAll: async () => [] },
       Store: { get: () => ({ v: 3, contracts: [], customers: [], products: [] }) },
       Catalog: { contract: () => null },
       Config: { data: { companies: [], warehouses: [] }, custom: {} },
@@ -98,6 +97,8 @@ function harness() {
     document: { readyState: 'loading', addEventListener() {}, getElementById: () => null },
     console,
     Blob,
+    setTimeout,
+    clearTimeout,
     Date,
     Math,
     JSON,
@@ -107,6 +108,18 @@ function harness() {
     Error,
   };
   vm.createContext(ctx);
+  window.indexedDB = {
+    open: () => {
+      const rq = {};
+      queueMicrotask(() => {
+        rq.result = db;
+        rq.onsuccess();
+      });
+      return rq;
+    },
+  };
+  vm.runInContext(fs.readFileSync(require.resolve('../app/js/db.js'), 'utf8'), ctx); // db.js THẬT trên IndexedDB giả
+  window.HAK.DB.getAll = async () => [];
   vm.runInContext(fs.readFileSync(require.resolve('../app/js/yearbook.js'), 'utf8'), ctx);
   return {
     Y: window.HAK.Yearbook,
