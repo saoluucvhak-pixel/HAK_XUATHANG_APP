@@ -3,6 +3,7 @@
 Các quy tắc dưới đây đã được **suy ra từ mã nguồn / tài liệu hiện có** để app chạy nhất quán; chưa có tài liệu nghiệp vụ chính thức. Cần người phụ trách xác nhận.
 
 1. **"Hoàn thành" của hợp đồng — ĐÃ XÁC NHẬN (14/11/2026): hợp đồng hoàn thành khi mọi tờ khai đã thông quan.** App hiển thị "Đã hoàn thành" (kèm lý do "Mọi tờ khai đã thông quan"); người dùng bấm đóng thủ công thì hiện "Đã đóng hợp đồng". Tiến độ BDMT, thực giao và thuế vẫn hiển thị riêng, không ảnh hưởng nhãn này.
+1b. **Hợp đồng "Đã hoàn thành" khi có chi tiết chưa có tờ khai (phát hiện 17/11/2026 khi nghiệm thu).** Hợp đồng có 2 chi tiết (tàu A có tờ khai thông quan, tàu B đã xuất 250 tấn nhưng chưa có tờ khai) hiện hiển thị **"Đã hoàn thành"** vì mọi tờ khai HIỆN CÓ đều đã thông quan, đồng thời vẫn báo ⚠ thiếu tờ khai và còn nợ thuế. Cần xác nhận: hoàn thành có đòi hỏi MỌI chi tiết (đã có phiếu cân / chứng thư) đều có tờ khai thông quan không? Và có cần nộp đủ thuế mới coi là hoàn thành không?
 2. **Nhận diện phiếu cân trùng.** Phiếu = công ty + số phiếu + ngày cân + biển số (có số phiếu); không có số → công ty + ngày + giờ cân 1 + biển số; thiếu cả hai → không nhận diện, luôn tính.
    Cần xác nhận: số phiếu có lặp lại theo ngày / theo trạm cân không? Có trường "nguồn cân / trạm cân" riêng nào không (app chưa lưu)? Nếu có, nên đưa vào khóa nhận diện.
 3. **Xung đột phiếu.** Khác khối lượng / cờ xe trả về / liên kết hợp đồng + tàu → tính tạm theo hồ sơ mới nhất, báo "chờ đối soát". Cần xác nhận hồ sơ nào được coi là đúng khi chưa đối soát.
