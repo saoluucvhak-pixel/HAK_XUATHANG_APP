@@ -621,6 +621,55 @@
         points: rows.map((r) => ({ label: r.c.grp, value: r.c.delKg })),
       },
     });
+    // Bảng chéo kho xuất × hình thức: cùng tập phiếu (facts) với bảng trên nên tổng khớp nhau; mỗi ô = thực giao (kg) của kho đó ở hình thức đó
+    if (facts.length) {
+      const khoMap = new Map(),
+        typeTot = new Map();
+      facts.forEach((f) => {
+        const kid = khoId(f.rec),
+          ty = f.rec.type || '';
+        if (!khoMap.has(kid))
+          khoMap.set(kid, { label: N.kho(kid), types: new Map(), recs: new Map(), tickets: [], trips: 0, kg: 0, retKg: 0 });
+        const kx = khoMap.get(kid);
+        kx.types.set(ty, (kx.types.get(ty) || 0) + f.kg - f.retKg);
+        typeTot.set(ty, (typeTot.get(ty) || 0) + f.kg - f.retKg);
+        kx.recs.set(f.rec.id, f.rec);
+        if (f.ticket) kx.tickets.push(ticketRow(f));
+        kx.trips += f.trips;
+        kx.kg += f.kg;
+        kx.retKg += f.retKg;
+      });
+      const types = Array.from(typeTot.keys()).sort((a, b) => typeTot.get(b) - typeTot.get(a) || N.type(a).localeCompare(N.type(b), 'vi'));
+      const mcols = [col('kho', 'Kho xuất')]
+        .concat(types.map((ty) => col('t_' + ty, N.type(ty), 'int', { u: 'kg thực giao', sum: 1 })))
+        .concat([
+          col('trips', 'Số xe qua cân', 'int', { sum: 1 }),
+          col('kg', 'Qua cân', 'int', { u: 'kg', sum: 1 }),
+          col('retKg', 'Xe trả về', 'int', { u: 'kg', sum: 1 }),
+          col('delKg', 'Tổng thực giao', 'int', { u: 'kg', sum: 1 }),
+        ]);
+      const mrows = Array.from(khoMap.values())
+        .sort((a, b) => b.kg - b.retKg - (a.kg - a.retKg) || a.label.localeCompare(b.label, 'vi'))
+        .map((kx) => {
+          const c = { kho: kx.label, trips: kx.trips, kg: kx.kg, retKg: kx.retKg, delKg: kx.kg - kx.retKg };
+          types.forEach((ty) => {
+            c['t_' + ty] = kx.types.get(ty) || 0;
+          });
+          return { c, drill: { recs: recRows({ recs: kx.recs }), tickets: kx.tickets, members: null } };
+        });
+      doc.sections.push({
+        id: 'khoType',
+        sheet: 'Tổng hợp',
+        title: 'Kho xuất × hình thức (thực giao, kg)',
+        note:
+          'Mỗi ô là thực giao (qua cân trừ xe trả về) của kho ở hình thức đó; ô trống = 0. Cùng tập phiếu đã xác minh với bảng trên nên tổng cộng bằng tổng thực giao ' +
+          fmtNum(totalDel, 0) +
+          ' kg. Hồ sơ chưa đọc được phiếu hoặc phiếu thiếu ngày nằm ở phần "Chưa phân bổ", không có trong bảng này. Kho = kho xuất của hồ sơ; không có số liệu nhập kho.',
+        columns: mcols,
+        rows: mrows,
+        totals: Object.assign(sumRow(mcols, mrows), { kho: 'TỔNG CỘNG (đã xác minh)' }),
+      });
+    }
     // chi tiết phiếu của toàn bộ nhóm (sheet Chi tiết) — mở được từ một dòng tổng
     const tcols = [
       col('grp', BY_TEXT[p.groupBy].charAt(0).toUpperCase() + BY_TEXT[p.groupBy].slice(1)),
