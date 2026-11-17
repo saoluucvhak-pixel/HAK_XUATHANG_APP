@@ -551,10 +551,15 @@
         after = copy(combined);
       delete before.revision;
       delete after.revision;
-      combined.revision = stable(before) === stable(after) ? old.revision : Math.max(revOf(old), revOf(value)) + 1;
+      // Nội dung không đổi → KHÔNG tăng phiên bản, nhưng cũng không để phiên bản tụt xuống dưới bản nhập (cùng nội dung, phiên bản cao hơn):
+      // nếu để như cũ thì sau này hai máy cùng "phiên bản N" mà khác nội dung bị báo xung đột giả và có thể giữ nhầm bản.
+      combined.revision = stable(before) === stable(after) ? Math.max(revOf(old), revOf(value)) : Math.max(revOf(old), revOf(value)) + 1;
       a.contracts[index] = combined;
     }
-    if (HAK.CustomsModel && (a.customs || b.customs)) a.customs = HAK.CustomsModel.merge(a.customs || [], b.customs || []);
+    if (HAK.CustomsModel && (a.customs || b.customs)) {
+      a.customs = HAK.CustomsModel.merge(a.customs || [], b.customs || []);
+      report.customs = HAK.CustomsModel.merge.report || { duplicatePayments: [], duplicateSupplements: [], maybe: [] }; // khoản nộp / khai bổ sung trùng đã bỏ; khoản nghi trùng cần đối soát
+    }
     for (const c of a.contracts) {
       const error = validate(c, a);
       if (error) throw Error(error);

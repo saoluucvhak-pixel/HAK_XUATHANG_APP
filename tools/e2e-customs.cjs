@@ -247,6 +247,36 @@ async function login(p) {
     );
   } else check(false, 'có nút "Ghi nhận hoàn thuế" khi tờ khai nộp thừa');
 
+  console.log('4b) Ngừng dùng chi tiết / hợp đồng còn tờ khai gắn vào: giữ liên kết lịch sử và BÁO cần đối soát');
+  await p.evaluate(() => {
+    location.hash = '#/catalog';
+  });
+  await p.waitForTimeout(700);
+  await p.click('[data-ctab="contracts"]');
+  await p.waitForTimeout(700);
+  const ids = await p.evaluate(() => {
+    const c = HAK.Catalog.core.get().contracts.find((x) => x.no === 'HD-CE-01');
+    return { cid: c.id, did: c.details[0].id };
+  });
+  await p.click('[data-master="' + ids.cid + '"]');
+  await p.waitForTimeout(500);
+  await clear();
+  await p.click('[data-detail-archive="' + ids.did + '"]');
+  await p.waitForTimeout(1200);
+  const tStop = (await toasts()).join(' ');
+  check(
+    /ngừng dùng chi tiết hợp đồng/i.test(tStop) && /1 tờ khai/.test(tStop) && /GIỮ NGUYÊN/.test(tStop),
+    'ngừng dùng chi tiết còn tờ khai: có báo, nêu giữ liên kết lịch sử',
+    tStop
+  );
+  d = await decls();
+  check(
+    d.length === 1 && d[0].detailId === ids.did && d[0].contractId === ids.cid,
+    'tờ khai vẫn gắn đúng chi tiết / hợp đồng (không bị gỡ hay xóa dây chuyền)'
+  );
+  const stopped = await p.evaluate((did) => HAK.Catalog.core.get().contracts[0].details.find((x) => x.id === did).deletedAt, ids.did);
+  check(!!stopped, 'chi tiết được đánh dấu ngừng dùng (không xóa cứng)');
+
   console.log('5) Phạm vi công ty: công ty khác không thấy tờ khai của HAK trong báo cáo');
   await p.evaluate(() => document.getElementById('btnCompany').click());
   await p.waitForTimeout(800);

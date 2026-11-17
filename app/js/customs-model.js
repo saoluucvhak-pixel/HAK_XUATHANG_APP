@@ -427,6 +427,7 @@
   /** Gộp danh sách tờ khai khi nhập bản sao lưu: theo id, ô trống không ghi đè; bảng con gộp theo id. */
   function merge(local, incoming) {
     const out = copy(local || []);
+    merge.report = { duplicatePayments: [], duplicateSupplements: [], maybe: [] };
     const keep = (old, v) => {
       const r = Object.assign({}, old);
       Object.keys(v).forEach((k) => {
@@ -444,12 +445,43 @@
       else delete m.deletedAt;
       return m;
     };
-    const byId = (a, b, incWins) => {
+    // Khoản nộp: ghép theo id như trước; khoản KHÁC id nhưng CÙNG giấy nộp tiền (số giấy / tham chiếu, loại, số tiền, mã…) đã có trên máy thì BỎ (cùng một giấy được nhập ở hai máy → không cộng đôi "đã nộp");
+    // khoản nghi trùng (thiếu số giấy để chắc chắn) giữ cả hai và ghi vào merge.report.maybe để đối soát.
+    // Khai bổ sung: cùng SỐ tờ khai bổ sung (số riêng của lần khai) nhập ở hai máy với id khác nhau = cùng một lần khai → giữ một.
+    const mergeSupplements = (a, b, incWins, declNo) => {
       const r = a.slice();
       (b || []).forEach((x) => {
         const i = r.findIndex((y) => y.id === x.id);
-        if (i < 0) r.push(copy(x));
-        else r[i] = pick(r[i], x, incWins);
+        if (i >= 0) {
+          r[i] = pick(r[i], x, incWins);
+          return;
+        }
+        const k = digits(x.no);
+        if (!x.deletedAt && k && r.some((y) => !y.deletedAt && digits(y.no) === k)) {
+          merge.report.duplicateSupplements.push({ declNo, no: x.no });
+          return;
+        }
+        r.push(copy(x));
+      });
+      return r;
+    };
+    const mergePayments = (a, b, incWins, declNo) => {
+      const r = a.slice();
+      (b || []).forEach((x) => {
+        const i = r.findIndex((y) => y.id === x.id);
+        if (i >= 0) {
+          r[i] = pick(r[i], x, incWins);
+          return;
+        }
+        if (!x.deletedAt) {
+          if (r.some((y) => !y.deletedAt && samePayment(y, x))) {
+            merge.report.duplicatePayments.push({ declNo, receiptNo: x.receiptNo || '', amount: x.amount });
+            return;
+          }
+          const maybe = r.find((y) => !y.deletedAt && maybeSamePayment(y, x));
+          if (maybe) merge.report.maybe.push({ declNo, receiptNo: x.receiptNo || maybe.receiptNo || '', amount: x.amount });
+        }
+        r.push(copy(x));
       });
       return r;
     };
@@ -462,8 +494,8 @@
       const old = out[i],
         incWins = rev(d) > rev(old),
         m = pick(old, d, incWins);
-      m.supplements = byId(old.supplements || [], d.supplements, incWins);
-      m.payments = byId(old.payments || [], d.payments, incWins);
+      m.supplements = mergeSupplements(old.supplements || [], d.supplements, incWins, old.no || d.no);
+      m.payments = mergePayments(old.payments || [], d.payments, incWins, old.no || d.no);
       m.statusLog = (old.statusLog || []).length >= (d.statusLog || []).length ? old.statusLog : d.statusLog;
       if (Math.max(rev(old), rev(d)) > 0) m.revision = Math.max(rev(old), rev(d));
       out[i] = m;
