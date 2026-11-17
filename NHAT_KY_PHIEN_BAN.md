@@ -1,5 +1,11 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.19.6 (bản vá)
+- Bộ lọc nâng cao: khi kho bộ lọc đã lưu bị lỗi, hiện cảnh báo + nút "Tải bản sao" và "Sao lưu kho cũ và tạo kho mới"; bản sao lưu có mốc thời gian nên lần hỏng thứ hai không còn ghi đè bản đầu; báo rõ khi xóa bộ lọc không thành công.
+- Công cụ chất lượng (npm run quality) nâng lên bản HAK_CODE_QUALITY_TEST mới (phân tích cú pháp bằng acorn, cổng chất lượng, bỏ cảnh báo vòng phụ thuộc giả của util.js). Thêm devDependency acorn 8.15.0.
+- Thêm test kho bộ lọc hỏng (321 test).
+- Bảo trì: tách hộp thoại Bỏ phiếu / Chọn phiếu / Xe trả về từ pages.js sang js/pages-modals.js (không đổi hành vi; pages.js giảm ~250 dòng); nạp pages-modals.js trước pages.js.
+
 ## v2.19.5 (bản vá)
 - Đọc hợp đồng / Purchase Order tiếng Anh bố cục nhiều cột: đúng bên bán – bên mua (Messrs, Seller/Buyer), số PO "2 -2026CY", ngày "03 February 2026", hàng hóa, khối lượng, tàu "V-31".
 

@@ -8,7 +8,7 @@ function boot() {
   const window = { XLSX: require('../app/libs/xlsx.full.min.js'), HAK: { UI: { $: (s) => nodes.get(s), $$: () => [], esc: String, todayISO: () => '', toast() {}, Loading: {}, debounce: (f) => f }, App: { slots: {} }, Store: { get: (k, f) => f }, Config: { data: { companies: [], warehouses: [] }, custom: {} } } };
   const ctx = { window, document: { createElement: () => node('', 'OPTION') }, console, Set, Map, Date, JSON, Math };
   vm.createContext(ctx);
-  for (const file of ['excel.js', 'generator.js', 'pages.js']) { let src = fs.readFileSync(require.resolve('../app/js/' + file), 'utf8'); if (file === 'pages.js') src = src.replace('  HAK.Pages = {', '  renderFilter=()=>{};updateSummary=()=>{};HAK.Pages = {'); vm.runInContext(src, ctx); }
+  for (const file of ['excel.js', 'generator.js', 'pages-modals.js', 'pages.js']) { let src = fs.readFileSync(require.resolve('../app/js/' + file), 'utf8'); if (file === 'pages.js') src = src.replace('  HAK.Pages = {', '  renderFilter=()=>{};updateSummary=()=>{};HAK.Pages = {'); vm.runInContext(src, ctx); }
   return { H: window.HAK, nodes };
 }
 const rec = (params) => ({ type: 'xuatkhau', year: 2025, revision: 1, params: Object.assign({ filter: { from: '', to: '' }, returned: [] }, params), rows: [{ idx: 1, net: 1500, note: '', plate: 'QA', ts1: Date.UTC(2025, 11, 30) }] });

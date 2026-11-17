@@ -8,7 +8,7 @@ function boot(store) {
     Catalog: { TYPES: { uythac: { label: 'Ủy thác' } }, contract: () => cat.detail, label: (c) => c.no, customer: () => null, contracts: () => [cat.detail], util: { vnDate: (s) => s }, relatedTo: () => true } } };
   const ctx = { window, document: { createElement: () => node('', 'OPTION') }, console, Set, Map, Date, JSON, Math };
   vm.createContext(ctx);
-  for (const file of ['excel.js', 'generator.js', 'pages.js']) { let src = fs.readFileSync(require.resolve('../app/js/' + file), 'utf8'); if (file === 'pages.js') src = src.replace('  HAK.Pages = {', '  renderFilter=()=>{};updateSummary=()=>{};HAK.Pages = {'); vm.runInContext(src, ctx); }
+  for (const file of ['excel.js', 'generator.js', 'pages-modals.js', 'pages.js']) { let src = fs.readFileSync(require.resolve('../app/js/' + file), 'utf8'); if (file === 'pages.js') src = src.replace('  HAK.Pages = {', '  renderFilter=()=>{};updateSummary=()=>{};HAK.Pages = {'); vm.runInContext(src, ctx); }
   return { H: window.HAK, nodes, cat };
 }
 test('đổi tàu / số lượng trong Danh mục khi form đang mở: báo từng ô với giá trị cũ → mới; ô nhập tay được giữ', () => {

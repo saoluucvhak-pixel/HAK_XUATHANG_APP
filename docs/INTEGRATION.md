@@ -17,3 +17,10 @@ Node.js 18+; không cần cài package: npm test, npm run check, npm run quality
 NSIS có script trong installer/setup.nsi nhưng công cụ NSIS không chạy được trên máy dựng hiện tại. Bộ cài Windows x64 được dựng từ installer/windows/HAKSetup.cs và payload đã kiểm tra checksum. Bản source ZIP kèm payload.zip và build.ps1 để dựng lại bằng trình biên dịch .NET Framework của Windows.
 
 Không đổi thư mục cài cũ hoặc trình duyệt đang dùng; sao lưu trong app trước khi cập nhật. Không ghi dữ liệu nghiệp vụ lên repo. Các giới hạn nghiệm thu được ghi trong HAK_DESIGN_SMART_FILTER.md.
+
+## Đối chiếu 17/11/2026 (v2.19.6)
+- HAK_SMART_FILTER: đã ghép bản sửa kho bộ lọc hỏng (sao lưu có mốc thời gian, cảnh báo + nút tải/sao lưu). Giữ nguyên các chỉnh riêng của app (khôi phục tiêu điểm, nhãn "Kỳ báo cáo", commit ô tìm kiếm khi blur).
+- HAK_CODE_QUALITY_TEST: tools/hak-quality dùng bản mới (acorn); cần npm ci.
+- HAK-Enterprise-Design-System: CSS thành phần giống hệt; hak-enterprise-theme.css là bản chuyển thể cho Bootstrap, không đổi.
+- HAK_ACCOUNTING_REPORT_STANDARD: bộ định dạng BigInt chỉ để hiển thị, khác numfmt.js (đọc số nhập); không ghép.
+- Commit ghim trong HAK_SOURCES.json cập nhật theo các bản đã đối chiếu.
