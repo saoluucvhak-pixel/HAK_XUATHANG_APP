@@ -1,5 +1,9 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## Chưa phát hành — Tái cấu trúc phần hải quan (chỉ tách mã, không đổi công thức / giao diện / lưu trữ)
+- `customs.js` (2.618 dòng) tách thành: `customs-common.js` (truy cập dữ liệu, nhãn, bộ lọc, ô số liệu dùng chung), `customs-report.js` (báo cáo hải quan trên màn hình), `customs-contract-report.js` (báo cáo thực hiện hợp đồng + `contractReportModel`), `customs-export.js` (Excel), `customs-print.js` (`printReport`, đặc tả PDF), `customs-receipt.js` (duyệt giấy nộp tiền), `customs-import.js` (nhập Excel / OCR). `customs.js` giữ lõi ghi dữ liệu (`commit`), biểu mẫu, liên kết hợp đồng và facade `HAK.Customs` (23 hàm, giữ nguyên tên).
+- Thêm `npm run e2e:customs`, `npm run snapshot:customs` (đối chiếu trước / sau), test `customs-split`. Số liệu màn hình, Excel, bản in PDF, `contractReportModel` và phạm vi công ty giống hệt trước khi tách.
+
 ## Chưa phát hành — Nghiệm thu phát hành
 - Mẫu "Tiến độ hợp đồng": thêm hai cột "Trong đó" tách BDMT chi tiết ĐÃ có / CHƯA có số chứng thư (4.000 + 1.000 = 5.000); chỉ tiêu và nhãn thống nhất ở màn hình, Excel, PDF. Cách tính tổng và "Còn lại" không đổi.
 - `npm run accept:release`: chế độ phát hành bắt buộc Word và PDF, đọc lại DOCX (JSZip) và PDF (pdfjs-dist) không cần công cụ ngoài nên chạy như nhau trên Windows và Linux; kiểm tra tiêu đề lặp mọi trang, đủ dòng, cột trong khổ trang; báo Đạt / Lỗi / Bỏ qua riêng. `HAK_BROWSER_CHANNEL=msedge` để dùng Edge.

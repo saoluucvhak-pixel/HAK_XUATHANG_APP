@@ -45,9 +45,15 @@ function dom() {
 }
 const toasts = [];
 const spec = (rows) => ({ file: 'Bao_cao', title: 'T', sub: 'S', tables: [{ cols: [{ h: 'A' }], rows }] });
+// customs.js ghép API HAK.Customs từ các mô-đun con (nạp theo đúng thứ tự trong index.html)
+const CUSTOMS_PARTS = ['customs-common', 'customs-report', 'customs-contract-report', 'customs-export', 'customs-print', 'customs'];
 function loadCustoms() {
-  delete require.cache[require.resolve('../app/js/customs.js')];
-  return require('../app/js/customs.js');
+  let last;
+  for (const f of CUSTOMS_PARTS) {
+    delete require.cache[require.resolve('../app/js/' + f + '.js')];
+    last = require('../app/js/' + f + '.js');
+  }
+  return last;
 }
 test('hộp thoại in ném lỗi → promise bị từ chối, khôi phục trang, bỏ chế độ in', async () => {
   const d = dom();
