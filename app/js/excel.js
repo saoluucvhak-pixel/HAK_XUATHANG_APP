@@ -78,7 +78,13 @@
   function parseNum(v) {
     if (typeof v === 'number') return isFinite(v) ? v : null;
     if (isBlank(v)) return null;
-    let s = String(v).replace(/[^\d.,\-]/g, '');
+    const raw = String(v).trim();
+    if (/^[+-]?\d+(?:\.\d+)?e[+-]?\d+$/i.test(raw)) {
+      // dạng khoa học (1.5E3) chuyển thành chữ: đọc đúng thay vì bỏ chữ E
+      const sci = Number(raw);
+      return isFinite(sci) ? sci : null;
+    }
+    let s = raw.replace(/[^\d.,\-]/g, '');
     if (!s || s === '-') return null;
     const dots = (s.match(/\./g) || []).length,
       commas = (s.match(/,/g) || []).length;
@@ -91,7 +97,7 @@
     } else if (commas === 1) {
       s = /,\d{3}$/.test(s) && !/^-?0,/.test(s) ? s.replace(',', '') : s.replace(',', '.'); // "0,123" = số thập phân (không bao giờ là dấu nghìn)
     } else if (dots === 1) {
-      if (/\.\d{3}$/.test(s) && !/^-?0\./.test(s)) s = s.replace('.', '');
+      if (/\.\d{3}$/.test(s) && !/^-?0?\./.test(s)) s = s.replace('.', ''); // ".500" / "0.500" luôn là số thập phân
     }
     const n = parseFloat(s);
     return isFinite(n) ? n : null;
@@ -117,6 +123,14 @@
    *   "16/08/2026", "16/08/2026 11:43:33", "2026-01-22 06:28:43", "16-08-2026", "11:43:33", số serial, Date.
    * Trả về {y,m,d,hh,mm,ss,hasDate,hasTime} hoặc null.
    */
+  /** Ngày giờ có tồn tại không (28/29/30/31 ngày, tháng 1–12, giờ 0–23; cho phép 24:00:00 = nửa đêm)? */
+  function validParts(p) {
+    if (p.m < 1 || p.m > 12 || p.d < 1) return false;
+    const dim = new Date(Date.UTC(p.y, p.m, 0)).getUTCDate();
+    if (p.d > dim) return false;
+    if (p.mm > 59 || p.ss > 59) return false;
+    return p.hh < 24 || (p.hh === 24 && p.mm === 0 && p.ss === 0);
+  }
   function parseDT(v) {
     if (isBlank(v)) return null;
     if (v instanceof Date) {
@@ -132,10 +146,11 @@
       };
     }
     if (typeof v === 'number') return v >= 0 ? serialToParts(v) : null; // v2.7.2: 0 < v < 1 = ô GIỜ của Excel (07:05 = 0,295…) → chỉ có giờ
+    const chk = (p) => (validParts(p) ? p : null); // ngày/giờ không tồn tại → null (dòng được cảnh báo "Thiếu/sai ngày cân")
     const s = String(v).trim();
     let m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})(?:[ T]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
     if (m)
-      return {
+      return chk({
         y: +m[3],
         m: +m[2],
         d: +m[1],
@@ -144,10 +159,10 @@
         ss: +(m[6] || 0),
         hasDate: true,
         hasTime: m[4] !== undefined,
-      };
+      });
     m = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})(?:[ T]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
     if (m)
-      return {
+      return chk({
         y: +m[1],
         m: +m[2],
         d: +m[3],
@@ -156,7 +171,7 @@
         ss: +(m[6] || 0),
         hasDate: true,
         hasTime: m[4] !== undefined,
-      };
+      });
     m = s.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
     if (m) return { y: 0, m: 0, d: 0, hh: +m[1], mm: +m[2], ss: +(m[3] || 0), hasDate: false, hasTime: true };
     return null;
