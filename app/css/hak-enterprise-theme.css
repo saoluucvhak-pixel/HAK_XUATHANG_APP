@@ -47,3 +47,29 @@ body {background:var(--page-bg);color:var(--ink);font-family:'Be Vietnam Pro','S
 :focus-visible {outline:3px solid var(--brand);outline-offset:3px;}
 @media(max-width:767px){.topbar{flex-wrap:wrap;gap:8px}.hak-theme-select{max-width:135px}.hero{padding:22px}.hero h2{font-size:1.25rem}.zone-tab{min-width:100px}.content{min-width:0}}
 @media print{.sf,.hak-theme-select{display:none!important}}
+
+/* Tương phản WCAG AA (4,5:1) cho màu ngữ cảnh của Bootstrap — kiểm bằng tools/ui-audit (4 chủ đề × sáng/tối).
+   Mặc định của Bootstrap (xanh #0d6efd, lá #198754, đỏ #dc3545, xám #6c757d, vàng #ffc107) chỉ đạt 3,2–4,5:1 trên nền ngà / nền navy tối. */
+.btn-outline-primary { --bs-btn-color:#0a58ca; --bs-btn-border-color:#0a58ca; --bs-btn-hover-bg:#0a58ca; --bs-btn-hover-border-color:#0a58ca; --bs-btn-active-bg:#0a58ca; --bs-btn-active-border-color:#0a58ca; --bs-btn-disabled-color:#0a58ca; --bs-btn-disabled-border-color:#0a58ca; }
+.btn-outline-success { --bs-btn-color:#146c43; --bs-btn-border-color:#146c43; --bs-btn-hover-bg:#146c43; --bs-btn-hover-border-color:#146c43; --bs-btn-active-bg:#146c43; --bs-btn-active-border-color:#146c43; --bs-btn-disabled-color:#146c43; --bs-btn-disabled-border-color:#146c43; }
+.btn-outline-danger { --bs-btn-color:#b02a37; --bs-btn-border-color:#b02a37; --bs-btn-hover-bg:#b02a37; --bs-btn-hover-border-color:#b02a37; --bs-btn-active-bg:#b02a37; --bs-btn-active-border-color:#b02a37; --bs-btn-disabled-color:#b02a37; --bs-btn-disabled-border-color:#b02a37; }
+.btn-outline-secondary { --bs-btn-color:#565e64; --bs-btn-border-color:#565e64; --bs-btn-hover-bg:#565e64; --bs-btn-hover-border-color:#565e64; --bs-btn-active-bg:#565e64; --bs-btn-active-border-color:#565e64; --bs-btn-disabled-color:#565e64; --bs-btn-disabled-border-color:#565e64; }
+.text-warning { --bs-warning-rgb:122,82,0; }
+[data-bs-theme="dark"] .btn-outline-primary { --bs-btn-color:#6ea8fe; --bs-btn-border-color:#6ea8fe; --bs-btn-hover-color:#000; --bs-btn-hover-bg:#6ea8fe; --bs-btn-hover-border-color:#6ea8fe; --bs-btn-active-color:#000; --bs-btn-active-bg:#6ea8fe; --bs-btn-active-border-color:#6ea8fe; --bs-btn-disabled-color:#6ea8fe; --bs-btn-disabled-border-color:#6ea8fe; }
+[data-bs-theme="dark"] .btn-outline-success { --bs-btn-color:#75b798; --bs-btn-border-color:#75b798; --bs-btn-hover-color:#000; --bs-btn-hover-bg:#75b798; --bs-btn-hover-border-color:#75b798; --bs-btn-active-color:#000; --bs-btn-active-bg:#75b798; --bs-btn-active-border-color:#75b798; --bs-btn-disabled-color:#75b798; --bs-btn-disabled-border-color:#75b798; }
+[data-bs-theme="dark"] .btn-outline-danger { --bs-btn-color:#ea868f; --bs-btn-border-color:#ea868f; --bs-btn-hover-color:#000; --bs-btn-hover-bg:#ea868f; --bs-btn-hover-border-color:#ea868f; --bs-btn-active-color:#000; --bs-btn-active-bg:#ea868f; --bs-btn-active-border-color:#ea868f; --bs-btn-disabled-color:#ea868f; --bs-btn-disabled-border-color:#ea868f; }
+[data-bs-theme="dark"] .btn-outline-secondary { --bs-btn-color:#adb5bd; --bs-btn-border-color:#adb5bd; --bs-btn-hover-color:#000; --bs-btn-hover-bg:#adb5bd; --bs-btn-hover-border-color:#adb5bd; --bs-btn-active-color:#000; --bs-btn-active-bg:#adb5bd; --bs-btn-active-border-color:#adb5bd; --bs-btn-disabled-color:#adb5bd; --bs-btn-disabled-border-color:#adb5bd; }
+[data-bs-theme="dark"] .text-warning { --bs-warning-rgb:255,193,7; }
+/* Liên kết thường dùng màu thương hiệu của chủ đề (Bootstrap giữ --bs-link-color-rgb xanh mặc định → 4,06:1 trên nền ngà). */
+:root { --bs-link-color-rgb:var(--bs-primary-rgb); --bs-link-hover-color-rgb:var(--bs-primary-rgb); }
+.text-success { --bs-success-rgb:20,108,67; }
+.text-danger { --bs-danger-rgb:176,42,55; }
+[data-bs-theme="dark"] .text-success { --bs-success-rgb:117,183,152; }
+[data-bs-theme="dark"] .text-danger { --bs-danger-rgb:234,134,143; }
+/* Nút chính ở chế độ tối: nền thương hiệu sáng → chữ tối (trắng trên vàng nhạt chỉ đạt 1,7:1). */
+[data-bs-theme="dark"] .btn-primary { --bs-btn-color:#14202e; --bs-btn-hover-color:#14202e; --bs-btn-active-color:#14202e; --bs-btn-disabled-color:#14202e; }
+[data-bs-theme="dark"] .nav-pills { --bs-nav-pills-link-active-color:#14202e; }
+[data-bs-theme="dark"] .list-group { --bs-list-group-active-color:#14202e; }
+[data-bs-theme="dark"] .pagination { --bs-pagination-active-color:#14202e; }
+[data-bs-theme="dark"] .dropdown-menu { --bs-dropdown-link-active-color:#14202e; }
+[data-bs-theme="dark"] .text-bg-primary { color:#14202e !important; }

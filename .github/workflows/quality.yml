@@ -38,3 +38,4 @@ jobs:
       - run: npm i --no-save playwright@1.63.0   # chỉ dùng trong CI, không thêm vào dependencies
       - run: npx playwright install --with-deps chromium
       - run: npm run smoke
+      - run: npm run ui-audit   # tràn ngang, tương phản WCAG AA (4 chủ đề × sáng/tối), nhãn truy cập

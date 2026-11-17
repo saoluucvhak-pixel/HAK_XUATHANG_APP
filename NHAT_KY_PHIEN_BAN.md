@@ -1,5 +1,9 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.20.2 (bản vá)
+- Giao diện: sửa tương phản WCAG AA ở cả 4 chủ đề × sáng/tối (nút viền, chữ cảnh báo vàng, nút chính chế độ tối, liên kết, tab đang chọn): 86 → 0 vi phạm trên 80 màn hình; thêm nhãn truy cập cho ô chọn danh sách xe.
+- Thêm `npm run ui-audit` (tràn ngang ở 3 kích thước, tương phản, nhãn truy cập, lỗi script) và chạy trong CI; ghi kết quả rà soát vào docs/RA_SOAT_THIET_KE_SO_LIEU_2026-11.md.
+
 ## v2.20.1 (bản vá)
 - Đọc số âm trong ngoặc kiểu kế toán: "(1.200)" = −1200 (trước đây mất dấu âm thành +1200).
 
