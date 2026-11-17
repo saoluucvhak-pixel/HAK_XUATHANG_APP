@@ -79,6 +79,12 @@
     if (typeof v === 'number') return isFinite(v) ? v : null;
     if (isBlank(v)) return null;
     const raw = String(v).trim();
+    // Số âm kiểu kế toán trong ngoặc: "(1.200)" = -1200, "(1.200,50)" = -1200,5
+    const paren = raw.match(/^\(([^()]*)\)$/);
+    if (paren) {
+      const inner = parseNum(paren[1]);
+      return inner === null ? null : -Math.abs(inner);
+    }
     if (/^[+-]?\d+(?:\.\d+)?e[+-]?\d+$/i.test(raw)) {
       // dạng khoa học (1.5E3) chuyển thành chữ: đọc đúng thay vì bỏ chữ E
       const sci = Number(raw);

@@ -1,5 +1,8 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.20.1 (bản vá)
+- Đọc số âm trong ngoặc kiểu kế toán: "(1.200)" = −1200 (trước đây mất dấu âm thành +1200).
+
 ## v2.20.0
 - Hoàn thuế: thêm loại khoản "Hoàn thuế" trong bảng Giấy nộp tiền và nút "↩ Nhập hoàn thuế" (điền sẵn số nộp thừa) ở tờ khai có nộp thừa. Hoàn trừ vào số đã nộp: hoàn đủ ⇒ tờ khai tất toán ("Đã nộp đủ"); không bù trừ giữa các tờ khai; nộp thừa hiển thị "chờ hoàn thuế".
 - Nạp file Excel có dòng trùng hoàn toàn (cùng số phiếu, biển số, giờ cân) bị cảnh báo và chặn, nêu số dòng Excel cần xóa.

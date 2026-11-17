@@ -47,3 +47,15 @@ test('ngày hợp lệ (kể cả 29/02 năm nhuận và 24:00) vẫn đọc đ�
   assert.equal(parseDT('2026-02-03 08:15:30').ss, 30);
   assert.equal(parseDT('03.02.2026').m, 2);
 });
+
+test('số âm trong ngoặc kiểu kế toán đọc thành số âm', () => {
+  assert.equal(parseNum('(1.200)'), -1200);
+  assert.equal(parseNum('( 1.200 )'), -1200);
+  assert.equal(parseNum('(1.200,50)'), -1200.5);
+  assert.equal(parseNum('(0,5)'), -0.5);
+  assert.equal(parseNum('(1.200 đ)'), -1200);
+  assert.equal(parseNum('(-5)'), -5);
+  assert.equal(parseNum('()'), null);
+  assert.equal(parseNum('(abc)'), null);
+  assert.equal(parseNum('1.200'), 1200);
+});
