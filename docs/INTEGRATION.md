@@ -30,4 +30,4 @@ Không đổi thư mục cài cũ hoặc trình duyệt đang dùng; sao lưu tr
 - Tệp `app/native/hakdocs-token.js` (do bộ cài Windows ghi) và mã chép nguyên từ repo gốc `tools/hak-quality/**` được giữ nguyên xuống dòng (`-text`).
 - Prettier đặt `endOfLine: "auto"`: bản checkout cũ còn CRLF vẫn qua `format:check`. Muốn chuyển bản đang có sang LF: `git add --renormalize .` rồi commit, hoặc xóa và checkout lại.
 - Test không còn đọc mã nguồn để tìm hàm (`tests/merge-batches.test.cjs` gọi trực tiếp `HAK.BatchMerge.merge`), nên không phụ thuộc kiểu xuống dòng.
-- Kiểm thử trên trình duyệt: `npm run smoke`, `npm run ui-audit`, `npm run e2e` (luồng xuyên màn hình hai tàu cân xen kẽ). Đặt `HAK_CHROMIUM` để dùng Edge/Chrome khác.
+- Kiểm thử trên trình duyệt: `npm run smoke`, `npm run ui-audit`, `npm run e2e` (luồng xuyên màn hình hai tàu cân xen kẽ), `npm run e2e:carrier` (chi tiết ĐVVC khớp bảng tổng khi lọc ngày cân), `npm run e2e:reports` (5 mẫu báo cáo: hai tàu, tra cứu, Excel, bản in, phạm vi công ty). Đặt `HAK_CHROMIUM` để dùng Edge/Chrome khác.

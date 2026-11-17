@@ -782,7 +782,19 @@
       card('Số phiếu / hồ sơ', int(new Set(all.map((x) => x.ticket).filter(Boolean)).size) + ' / ' + new Set(all.map((x) => x.rec)).size);
   }
   async function showTrips(gi, li) {
-    const g = filtered()[gi];
+    return showTripsOfGroup(filtered()[gi], li);
+  }
+  /** Mở danh sách phiếu cân của MỘT hợp đồng (theo mã), không phụ thuộc bộ lọc đang chọn ở màn hình này — dùng từ các mẫu báo cáo. */
+  async function openTrips(key) {
+    if (!state.groups.length) await load();
+    const g = state.groups.find((x) => x.key === key);
+    if (!g) {
+      toast('Không tìm thấy hợp đồng trong dữ liệu báo cáo.', 'warning');
+      return;
+    }
+    return showTripsOfGroup(g);
+  }
+  async function showTripsOfGroup(g, li) {
     if (!g) return;
     const lots = li === undefined ? g.lots.filter((L) => L.recs.length) : [g.lots[li]].filter((L) => L && L.recs.length);
     if (!lots.length) {
@@ -1207,5 +1219,5 @@
       if (!host.hidden) render();
     });
   }
-  HAK.ContractStatus = { render, init, load, state, khoOf, weighNote };
+  HAK.ContractStatus = { render, init, load, state, khoOf, weighNote, openTrips };
 })(window);

@@ -595,7 +595,12 @@
       } else if (e.target.closest('#coReload')) render();
     });
   }
-  HAK.ContractOverview = { render, init, rowsOf, COLS, BANDS, IX, PART1, PART2 };
+  /** Danh sách hợp đồng đã dựng (g, m, f) dùng chung cho các mẫu báo cáo (report-tpl-ui.js). */
+  async function items() {
+    await load();
+    return state.items;
+  }
+  HAK.ContractOverview = { render, init, rowsOf, COLS, BANDS, IX, PART1, PART2, items };
   if (typeof module === 'object' && module.exports) module.exports = HAK.ContractOverview;
   if (typeof module === 'object' && module.exports) module.exports = HAK.ContractOverview;
 })(typeof window !== 'undefined' ? window : globalThis);

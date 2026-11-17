@@ -185,6 +185,9 @@
             id: r.id,
             title: r.title,
             type: r.type,
+            cid: r.cid,
+            kho: r.kho,
+            ship: r.ship,
             from: r.from,
             to: r.to,
             whole: true,
@@ -220,6 +223,9 @@
             id: r.id,
             title: r.title,
             type: r.type,
+            cid: r.cid,
+            kho: r.kho,
+            ship: r.ship,
             from: r.from,
             to: r.to,
             whole: false,
@@ -611,13 +617,14 @@
     return wb;
   }
   /** sheetRows: [[tàu/đợt, ngày, ĐVVC, số xe, tấn, xe trả về, tấn trả về], …] (đã gộp theo ngày+ĐVVC, xem aggCarrierDaily). */
-  async function toExcelCarrier(sheetRows, rangeText) {
+  async function toExcelCarrier(sheetRows, rangeText, unText) {
     if (!root.ExcelJS && HAK.UI && HAK.UI.needLib) await HAK.UI.needLib('exceljs'); // v2.6.4: sửa sót — trước đây chỉ chạy khi ExcelJS đã được nạp bởi nút Excel khác
     const wb = newWorkbook();
     const note =
       'Nguồn: các dòng phiếu cân của hồ sơ trong Lưu trữ (' +
       (rangeText || 'toàn bộ thời gian') +
-      '), gộp theo tàu/đợt · ngày · đơn vị vận chuyển. Tàu (Xuất khẩu/Ủy thác/Xuất hàng kho gửi) gộp theo tên; các loại còn lại (Trung chuyển gửi kho/Điều chuyển nội bộ/Trao đổi hàng hóa/Xuất bán) không có tàu nên mỗi hồ sơ là 1 đợt riêng. Đơn vị vận chuyển đọc từ cột ĐVVC/nhà xe/chủ xe trong Excel cân — dòng không có sẽ gộp vào "(Không xác định)".';
+      '), gộp theo tàu/đợt · ngày · đơn vị vận chuyển. Tàu (Xuất khẩu/Ủy thác/Xuất hàng kho gửi) gộp theo tên; các loại còn lại (Trung chuyển gửi kho/Điều chuyển nội bộ/Trao đổi hàng hóa/Xuất bán) không có tàu nên mỗi hồ sơ là 1 đợt riêng. Đơn vị vận chuyển đọc từ cột ĐVVC/nhà xe/chủ xe trong Excel cân — dòng không có sẽ gộp vào "(Không xác định)". Chỉ gồm phiếu đã được báo cáo tổng hợp chấp nhận (đúng kỳ, loại phiếu trùng, hồ sơ đã chọn).' +
+      (unText ? ' ' + unText : '');
     buildSheet(
       wb,
       'ĐVVC theo tàu-đợt',
@@ -1087,37 +1094,78 @@
   /** Khóa 1 lượt cân (như khử trùng khi gộp đợt ở main.js mergeSlot). */
   const tripKey = (r) =>
     (r.ticket || '') + '|' + r.plate + '|' + (r.ts1 !== null && r.ts1 !== undefined ? r.ts1 : r.time1) + (r.ticket ? '' : '|' + r.net);
-  /** Tải (có cache) toàn bộ dòng phiếu cân của 1 nhóm ("ship:<tên tàu>" gộp mọi hồ sơ cùng tên, hoặc "rec:<id>" đúng 1 đợt). */
+  /**
+   * Phiếu mà mô hình báo cáo (compute) ĐÃ CHẤP NHẬN của 1 hồ sơ đang tính: bỏ phiếu ngoài kỳ (kỳ theo ngày cân), phiếu bị loại vì trùng / xung đột.
+   * null = hồ sơ chưa có danh sách phiếu (tính nguyên hồ sơ) → người gọi đọc toàn bộ dòng của hồ sơ như số tổng.
+   */
+  function acceptedTickets(r, tk) {
+    if (r.wTickets) return r.wTickets;
+    const list = tk && tk.get(r.id);
+    if (!list) return null;
+    const sk = r.skipIdx ? (r.skipIdx instanceof Set ? r.skipIdx : new Set(r.skipIdx)) : null;
+    return sk ? list.filter((t) => !sk.has(t.i)) : list;
+  }
+  /**
+   * Dòng chi tiết theo đơn vị vận chuyển của một nhóm hồ sơ — CÙNG tập phiếu với bảng tổng. Hàm thuần: loadRows(id) → Promise<{rows, returned:Set}> chỉ dùng khi hồ sơ chưa có danh sách phiếu.
+   * Phiếu xuất hiện ở nhiều hồ sơ (kho gửi + xuất khẩu / ủy thác) chỉ tính một lần, hồ sơ đích trước, kho gửi sau.
+   */
+  async function tripRowsOf(recs, tk, loadRows, retOf) {
+    const out = [],
+      seen = new Set();
+    const ordered = recs.slice().sort((a, b) => (a.type === 'xuatkhogui') - (b.type === 'xuatkhogui'));
+    const hasRet = (type) => HAS_RET[type];
+    for (const r of ordered) {
+      const list = acceptedTickets(r, tk);
+      if (list) {
+        list.forEach((t) => {
+          const k = t.id || 'rec:' + r.id + '#' + t.i;
+          if (seen.has(k)) return;
+          seen.add(k);
+          out.push({
+            date: t.date || '(không rõ ngày)',
+            carrier: (t.carrier || '').trim() || '(Không xác định)',
+            kg: t.net || 0,
+            ret: hasRet(r.type) && !!t.ret,
+            k,
+            t: r.type,
+          });
+        });
+        continue;
+      }
+      const d = await loadRows(r.id);
+      (d.rows || []).forEach((row) => {
+        const k = tripKey(row);
+        if (seen.has(k)) return;
+        seen.add(k);
+        out.push({
+          date: row.dateStr || '(không rõ ngày)',
+          carrier: (row.carrier || '').trim() || '(Không xác định)',
+          kg: row.net || 0,
+          ret: hasRet(r.type) && retOf(d, row),
+          k,
+          t: r.type,
+        });
+      });
+    }
+    return out;
+  }
+  /** Tải (có cache) dòng phiếu cân đã được mô hình chấp nhận của 1 nhóm ("ship:<tên tàu>" gộp mọi hồ sơ cùng tên, hoặc "rec:<id>" đúng 1 đợt). */
   function loadGroupRows(key) {
     if (carrierCache.has(key)) return carrierCache.get(key);
     const recs =
       key.indexOf('ship:') === 0
         ? model.ships.filter((r) => (r.ship || r.title) === key.slice(5))
         : model.used.filter((r) => r.id === key.slice(4));
-    const p = (async () => {
-      const out = [],
-        seen = new Set();
-      // v2.6.7: cùng một xe có thể nằm ở hồ sơ Xuất hàng kho gửi VÀ hồ sơ Xuất khẩu / Ủy thác chuyển từ nó → hồ sơ đích tính trước, kho gửi bỏ phiếu trùng
-      const ordered = recs.slice().sort((a, b) => (a.type === 'xuatkhogui') - (b.type === 'xuatkhogui'));
-      for (const r of ordered) {
-        const d = await HAK.Archive.load(r.id);
-        const ret = new Set((d.params && d.params.returned) || []);
-        (d.rows || []).forEach((row) => {
-          const k = tripKey(row);
-          if (seen.has(k)) return;
-          seen.add(k);
-          out.push({
-            date: row.dateStr || '(không rõ ngày)',
-            carrier: (row.carrier || '').trim() || '(Không xác định)',
-            kg: row.net || 0,
-            ret: ret.has(HAK.Generator.retKey(row)),
-            k,
-            t: r.type,
-          });
-        });
-      }
-      return out;
-    })();
+    const tk = opts().tickets;
+    const p = tripRowsOf(
+      recs,
+      tk,
+      async (id) => {
+        const d = await HAK.Archive.load(id);
+        return { rows: d.rows, ret: new Set((d.params && d.params.returned) || []) };
+      },
+      (d, row) => d.ret.has(HAK.Generator.retKey(row))
+    );
     carrierCache.set(key, p);
     return p;
   }
@@ -1138,14 +1186,17 @@
     }
     if ($('#repCarrierShip').value !== key) return; // người dùng đã đổi lựa chọn khi đang tải
     const { byDate, byCarrier } = aggCarrierDaily(rows);
+    const unNote = unallocatedNote(model);
+    const unBox = unNote ? '<div class="alert alert-warning small py-2 mb-2">' + unNote + '</div>' : '';
     if (!byDate.length) {
-      box.innerHTML = '<div class="muted small">Chưa có dòng phiếu cân nào.</div>';
+      box.innerHTML = unBox + '<div class="muted small">Chưa có dòng phiếu cân nào trong kỳ / bộ lọc đang chọn.</div>';
       return;
     }
     const hasRet = byCarrier.some((c) => c.retTrips);
     const retTh = hasRet ? '<th class="num">Trong đó trả về</th>' : '';
     const retTd = (a) => (hasRet ? '<td class="num">' + (a.retTrips ? a.retTrips + ' xe · ' + ton(a.retKg) : '—') + '</td>' : '');
     box.innerHTML =
+      unBox +
       '<div class="tbl-wrap mb-3"><table class="table table-sm"><thead><tr><th>Ngày</th><th>Đơn vị vận chuyển</th><th class="num">Số xe</th><th class="num">Tấn</th>' +
       retTh +
       '</tr></thead><tbody>' +
@@ -1352,6 +1403,41 @@
     );
   }
 
+  /**
+   * Ngữ cảnh DÙNG CHUNG cho các mẫu báo cáo (report-tpl.js / report-tpl-ui.js): hồ sơ ĐÃ lọc theo phạm vi công ty được cấp (áp MỘT lần ở đây nên
+   * bảng, biểu đồ, chi tiết, Excel và PDF cùng phạm vi), danh sách phiếu của mọi hồ sơ, kỳ / bộ lọc đang chọn ở đầu trang.
+   */
+  async function tplContext() {
+    const A = HAK.Auth,
+      scope = A && A.scopeIds ? A.scopeIds('report') : null,
+      cos = (HAK.Config && HAK.Config.data && HAK.Config.data.companies) || [],
+      whs = (HAK.Config && HAK.Config.data && HAK.Config.data.warehouses) || [];
+    const scoped = HAK.ReportTpl.scopeMetas(metas, scope, (m) => (A && A.companyOfMeta ? A.companyOfMeta(m) : m.cid));
+    if (!ticketMapAll) ticketMapAll = await prepareTickets(metas, ticketCache, true);
+    const o = opts(),
+      coName = (id) => {
+        const c = cos.find((x) => x.id === id);
+        return c ? c.short || c.name : id || '(chưa rõ công ty)';
+      };
+    return {
+      scope,
+      metas: scoped,
+      tickets: ticketMapAll,
+      ticketErrors: ticketMapAll.errors,
+      params: { from: o.from, to: o.to, q: o.q, type: o.type, types: o.types, manual: o.manual, basis: basisNow() },
+      companyText: scope ? scope.map(coName).join(', ') : 'Tất cả công ty được phép',
+      names: {
+        company: coName,
+        kho: (id) => {
+          const w = whs.find((x) => x.id === id);
+          return w ? w.short || w.name : id || '(chưa chọn kho)';
+        },
+        type: (t) => typeName(t).replace(/^\S+\s/, ''),
+      },
+      now: new Date(),
+    };
+  }
+
   function draw() {
     if (HAK.Customs && HAK.Customs.drawReport) {
       try {
@@ -1387,6 +1473,7 @@
     model.rangeText =
       rangeText(model.basis) + ' · ' + model.filterText + ' · Công ty: ' + (scope ? scope.join(', ') : 'tất cả công ty được phép');
     $('#repFilterSummary').textContent = model.used.length + ' hồ sơ đang tính · ' + model.rangeText;
+    if (HAK.ReportTplUI && HAK.ReportTplUI.onDraw) HAK.ReportTplUI.onDraw(); // mẫu báo cáo đang chọn dựng lại theo kỳ / bộ lọc mới
     {
       const w = $('#repWeighWarn'),
         CSx = HAK.ContractStatus,
@@ -1640,6 +1727,7 @@
   function init() {
     if (!$('#page-report')) return;
     if (HAK.Customs && HAK.Customs.initReport) HAK.Customs.initReport();
+    if (HAK.ReportTplUI && HAK.ReportTplUI.init) HAK.ReportTplUI.init();
     $('#repType').innerHTML += TYPES.map(([key, , name]) => '<option value="' + key + '">' + esc(name) + '</option>').join('');
     ['#repFrom', '#repTo', '#repType'].forEach((s) => $(s).addEventListener('change', draw));
     $('#repBasis').addEventListener('change', async () => {
@@ -1722,7 +1810,7 @@
           toast('Không có dữ liệu đơn vị vận chuyển trong khoảng đã chọn.', 'warning');
           return;
         }
-        const wb = await toExcelCarrier(sheetRows, model.rangeText);
+        const wb = await toExcelCarrier(sheetRows, model.rangeText, unallocatedText(model));
         const buf = await wb.xlsx.writeBuffer();
         const name = 'BaoCaoDVVC_TheoTau_' + fileTag() + '.xlsx';
         if (
@@ -1903,8 +1991,13 @@
     init,
     TYPES,
     prepareTickets,
+    tplContext,
+    typeName,
+    HAS_RET,
     unallocatedText,
     unallocatedNote,
+    acceptedTickets,
+    tripRowsOf,
     xhLots,
     xhTrips,
     xhSheetRows,

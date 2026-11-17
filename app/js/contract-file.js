@@ -50,6 +50,8 @@
       tax = {
         payable: st.payable,
         paid: st.paidTax,
+        paidGross: st.paidGross,
+        refunded: st.refunded,
         fee: st.paidFee,
         remaining: st.owed,
         owed: st.owed,

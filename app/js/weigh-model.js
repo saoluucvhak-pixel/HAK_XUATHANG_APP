@@ -55,6 +55,8 @@
         date: row.dateStr || '',
         plate: String(row.plate || '').trim(),
         net: Number(row.net) || 0,
+        carrier: String(row.carrier == null ? '' : row.carrier).trim(), // đơn vị vận chuyển (phân tích theo ĐVVC)
+        uid: row.uid,
         ret: !!(isRet && isRet(row)),
         link,
       };

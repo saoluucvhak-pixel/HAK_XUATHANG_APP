@@ -156,6 +156,8 @@ const probe = () => {
   return out;
 };
 
+const TPL = ['period', 'breakdown', 'contracts', 'tax', 'exceptions'].map((id) => '#/report::' + id),
+  TPL_THEME = ['#/report::breakdown', '#/report::tax'];
 const ROUTES = [
   '#/home',
   '#/catalog',
@@ -177,10 +179,15 @@ const ROUTES = [
   page.on('pageerror', (e) => errs.push('pageerror: ' + e.message));
   await login(page);
   const visit = async (label, r) => {
+    const [hash, tpl] = r.split('::'); // 'route::mẫu' = vào trang Báo cáo rồi chọn mẫu báo cáo
     await page.evaluate((x) => {
       location.hash = x;
-    }, r);
+    }, hash);
     await page.waitForTimeout(350);
+    if (tpl) {
+      await page.selectOption('#repTpl', tpl);
+      await page.waitForTimeout(1200);
+    }
     const res = await page.evaluate(probe);
     if (res.overflowX) bad.push(label + ' ' + r + ': tràn ngang ' + res.scrollW + ' > ' + res.clientW);
     if (res.offscreenN)
@@ -199,7 +206,7 @@ const ROUTES = [
     [390, 844],
   ]) {
     await page.setViewportSize({ width: w, height: h });
-    for (const r of ROUTES) await visit(w + 'x' + h, r);
+    for (const r of ROUTES.concat(TPL)) await visit(w + 'x' + h, r);
   }
   await page.setViewportSize({ width: 1366, height: 768 });
   for (const theme of ['luxe', 'classic', 'neutral', 'champagne'])
@@ -211,10 +218,17 @@ const ROUTES = [
         },
         [theme, mode]
       );
-      for (const r of ROUTES) await visit(theme + '/' + mode, r);
+      for (const r of ROUTES.concat(TPL_THEME)) await visit(theme + '/' + mode, r);
     }
   await browser.close();
-  console.log('Đã kiểm ' + (3 * ROUTES.length + 8 * ROUTES.length) + ' màn hình; lỗi script: ' + errs.length + '; vi phạm: ' + bad.length);
+  console.log(
+    'Đã kiểm ' +
+      (3 * (ROUTES.length + TPL.length) + 8 * (ROUTES.length + TPL_THEME.length)) +
+      ' màn hình; lỗi script: ' +
+      errs.length +
+      '; vi phạm: ' +
+      bad.length
+  );
   errs.concat(bad).forEach((m) => console.error(' - ' + m));
   if (errs.length || bad.length) process.exit(1);
 })().catch((e) => {
