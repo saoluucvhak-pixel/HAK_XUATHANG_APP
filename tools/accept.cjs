@@ -348,8 +348,8 @@ async function login(p) {
   );
   check(r3[col3(/THÔNG QUAN/)] === '2/2 đã thông quan', 'mẫu 3: thông quan 2/2 tờ khai, hiện riêng với cột đóng hợp đồng');
   console.log(
-    '   (ghi nhận) BDMT theo chứng thư hiện ' +
-      r3[col3(/BDMT THEO CHỨNG THƯ/)] +
+    '   (ghi nhận) BDMT theo chi tiết hợp đồng hiện ' +
+      r3[col3(/BDMT THEO CHI TIẾT HỢP ĐỒNG/)] +
       ' — gồm cả chi tiết chưa có số chứng thư (4.000 có chứng thư + 1.000 chưa có); cần xác nhận nghiệp vụ'
   );
   await p.selectOption('#repTpl', 'tax');
