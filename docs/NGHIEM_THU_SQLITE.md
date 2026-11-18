@@ -7,7 +7,7 @@
 Phần đã kiểm chứng (Linux, Node + Chromium thật, dữ liệu mẫu): lõi SQLite, backend trong app, di trú có đối chiếu / kích hoạt / quay lui qua giao diện, bảng cha–con có khóa ngoại, nhật ký thao tác, bộ cài giữ dữ liệu. Phần **chưa xác minh** và bắt buộc trước khi phát hành: `HAKDocs.exe` (C# + `winsqlite3.dll`) chưa được biên dịch và chạy ở đâu cả; cài mới / nâng cấp / lối tắt / đường dẫn có dấu / Edge với SQLite chưa thử trên Windows thật; một số hạng mục yêu cầu chưa làm (§7).
 
 Điều kiện cụ thể để chuyển thành "Sẵn sàng phát hành":
-1. Duyệt diff 8 commit cục bộ (§1) — **chưa đẩy GitHub**.
+1. Duyệt diff các commit cục bộ (§1) — **chưa đẩy GitHub**.
 2. Chạy CI Windows (đẩy nhánh để job `accept-windows` chạy): biên dịch `HAKDocs.exe`, bộ hợp đồng `tools/hakdb/contract.cjs` trên `HAKDocs.exe` thật (thư mục dữ liệu có dấu tiếng Việt), e2e hải quan + `accept:release` trên Edge với SQLite. Hiện các bước này **mới viết, chưa chạy**.
 3. Thử tay theo bảng Windows (`docs/KIEM_THU_WINDOWS_V2.21.3.md`, thêm các bước SQLite ở §6) bằng đúng `.exe` do CI dựng.
 4. Trả lời các câu hỏi nghiệp vụ ở `docs/SQLITE_KIEN_TRUC.md` §11 (cấp số chứng từ, quyền ép ở máy chủ, chính sách gỡ…).
@@ -17,9 +17,9 @@ Phần đã kiểm chứng (Linux, Node + Chromium thật, dữ liệu mẫu): l
 | Mục | Giá trị |
 |---|---|
 | Nhánh / nền | `claude/sqlite-windows` từ `origin/main` = `d10bb9d` (v2.21.4, đã phát hành) |
-| Commit (8, cục bộ, chưa push) | `8fb2ed1` `faa2c5a` `a517a8d` `51c5a0e` `c416132` `ee60d0f` `1538a75` `766078e` (+ commit sửa báo cáo này) |
+| Commit (cục bộ, chưa push) | 12 commit từ `8fb2ed1` đến commit cuối của nhánh (`git log origin/main..HEAD`); mã nguồn cuối `a71e916` |
 | Phiên bản | `app/js/version.js` = `installer/setup.nsi` = **2.22.0** (chưa phát hành; gộp vào main sẽ tự đăng Release) |
-| Gói dựng ở Linux | `dist/nghiem-thu-2.22.0/` (bị `.gitignore`): `HAK_Portable_v2.22.0.zip` SHA-256 `4d6d3fb2…acb7`, `HAK_QuanLyXuatHang_Setup_v2.22.0.exe` SHA-256 `c247e486…da2e`; kê khai đầy đủ ở `MANIFEST.txt`, `SHA256SUMS.txt` |
+| Gói dựng ở Linux | `dist/nghiem-thu-2.22.0/` (bị `.gitignore`): `HAK_Portable_v2.22.0.zip` SHA-256 `da7948bf…3812`, `HAK_QuanLyXuatHang_Setup_v2.22.0.exe` SHA-256 `2363b6cd…396f` (dựng lại sau các thay đổi phiên bản hồ sơ / giao diện); kê khai đầy đủ ở `MANIFEST.txt`, `SHA256SUMS.txt` |
 | **Giới hạn của gói** | `app/native/HAKDocs.exe` trong kho là bản dựng **cũ (44 KB, chưa có SQLite)**. Bộ cài chính thức dựng lại bằng `installer/native/build.ps1` trên Windows. Gói Linux **không dùng được để thử SQLite**; chỉ để đối chiếu nội dung app và SHA-256 |
 | Actions trên commit | **Chưa có** (chưa đẩy nhánh). Commit nền `d10bb9d` có CI xanh |
 
@@ -30,10 +30,11 @@ Loại dữ liệu: **M** = dữ liệu mẫu tự sinh (không dùng dữ liệ
 | Ca | Backend | Dữ liệu | Kết quả |
 |---|---|---|---|
 | `check`, `format:check`, `lint`, `quality`, `git diff --check` | — | — | **Đạt** |
-| `npm test` (nền 441 → **506**) | IDB + SQL | M | **Đạt** 506/506 |
+| `npm test` (nền 441 → **512**) | IDB + SQL | M | **Đạt** 512/512 |
 | `npm ci` | — | — | **Chưa chạy** (sẽ xóa Playwright cài riêng); `node_modules` có sẵn |
 | `smoke` | IDB | M | **Lỗi lần đầu → đã sửa → Đạt** (§4, lỗi 4) |
-| `ui-audit` (141 màn hình) | IDB | M | **Đạt** 0 lỗi script, 0 vi phạm |
+| `ui-audit` (141 màn hình + vùng bấm, dấu focus, tiêu đề bảng cố định) | IDB | M | **Đạt** 0 lỗi script, 0 vi phạm (3/3 lần chạy) |
+| `tools/e2e-versions.cjs` (phiên bản hồ sơ, 13 kiểm tra) | IDB | M | **Đạt** |
 | `e2e`, `e2e:carrier`, `e2e:reports`, `e2e:customs`, `accept:release` | IDB (đối chứng) | M | **Đạt** (accept 27/27) |
 | Cùng 5 kịch bản trên | **SQL** | M | **Đạt** (accept 27/27); toàn vẹn SQLite (`integrity_check` + `foreign_key_check`) đạt sau mỗi lần |
 | Di trú qua giao diện (`tools/e2e-migrate.cjs`, 35 kiểm tra) | IDB → SQL | M | **Đạt** |
@@ -146,7 +147,7 @@ Xem `docs/HUONG_DAN_SQLITE.md` (chuyển, sao lưu, quay lui, chuyển máy, khi
 ## 8. Cách chạy lại
 
 ```bash
-npm test                                              # 506 test
+npm test                                              # 512 test
 node tools/e2e-sqlite.cjs tools/e2e-reports.cjs       # bất kỳ e2e nào trên SQLite (máy chủ tham chiếu)
 node tools/e2e-migrate.cjs                            # di trú qua giao diện (HAK_SHOT_DIR=<thư mục> để chụp ảnh)
 node tools/hakdb/contract.cjs http://127.0.0.1:31879 <token>   # bộ hợp đồng trên HAKDocs.exe thật (Windows)
