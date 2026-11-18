@@ -24,7 +24,7 @@
         return b;
       },
       toast: (s) => HAK.UI.toast(s, 'warning'),
-      storage: () => root.localStorage,
+      storage: () => presetStorage, // bền như mọi khóa hak.* (HAK.Store → kv của SQLite / IndexedDB); KHÔNG ghi thẳng localStorage (hydrate SQLite sẽ xóa)
       dateField: (iso, attrs) => h('input', Object.assign({ type: 'date', value: iso || '' }, attrs)),
       dateIso: (el) => (!el.validity.valid ? null : el.value),
       askText: (title, label, opt, done) => {
@@ -79,6 +79,28 @@
     const d = day(value);
     return !!d && (!from || d >= from) && (!to || d <= to);
   }
+  /** Kho bộ lọc đã lưu cho thư viện Smart Filter: đọc nguyên văn từ localStorage (giữ phát hiện kho hỏng), GHI qua HAK.Store để vào kv (SQLite / IndexedDB) và sao lưu. */
+  const presetStorage = {
+    getItem(k) {
+      try {
+        const v = root.localStorage.getItem(k);
+        if (v !== null) return v;
+      } catch (e) {
+        /* localStorage bị chặn: đọc từ bộ nhớ của Store */
+      }
+      const g = HAK.Store ? HAK.Store.get(k, null) : null;
+      return g === null || g === undefined ? null : typeof g === 'string' ? g : JSON.stringify(g);
+    },
+    setItem(k, v) {
+      let val;
+      try {
+        val = JSON.parse(v);
+      } catch (e) {
+        val = String(v); // bản sao kho hỏng (văn bản thô) được giữ nguyên chữ
+      }
+      if (!HAK.Store || HAK.Store.set(k, val) === false) throw new Error('Không lưu được trên máy này');
+    },
+  };
   function mount(host, opt) {
     const el = typeof host === 'string' ? document.querySelector(host) : host;
     if (!el) throw Error('Missing filter host: ' + host);
@@ -185,5 +207,5 @@
         if (!allowed[kind].includes(key)) throw new RangeError('Điều kiện lọc không được hỗ trợ: ' + key);
     return root.HAKSmartFilter.createFilter(tripConfig(), { initialState: state }).filter(rows).rows;
   }
-  HAK.Filters = { mount, multi, day, dateMatch, assertState, core: SF, tripConfig, trips, plateHit };
+  HAK.Filters = { mount, multi, day, dateMatch, assertState, core: SF, tripConfig, trips, plateHit, presetStorage };
 })(typeof window !== 'undefined' ? window : globalThis);

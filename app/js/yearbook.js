@@ -79,13 +79,13 @@
     offlineView = null,
     needsReload = false;
   try {
-    workingYear = +root.localStorage.getItem('hak.workingYear') || workingYear;
+    workingYear = +H.Store.get('hak.workingYear', 0) || workingYear;
   } catch (e) {}
   function setYear(y) {
     if (!Number.isInteger(+y) || y < 1900 || y > 2200) throw Error('Năm không hợp lệ.');
     workingYear = +y;
     try {
-      root.localStorage.setItem('hak.workingYear', String(y));
+      H.Store.set('hak.workingYear', +y); // qua HAK.Store: bền trên SQLite / IndexedDB và có trong sao lưu
     } catch (e) {}
     const el = document.getElementById('hakWorkingYear');
     if (el) el.value = y;

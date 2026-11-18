@@ -49,6 +49,8 @@ jobs:
       - run: npm run e2e:export-parity   # màn hình = Excel = Word = PDF cùng tập phiếu (ca sát biên ngày/giờ, biển số chuẩn hóa, phiếu KL ≤ 0)
       - run: npm run e2e:dialogs   # hộp thoại: Tab không rơi ra nền, Esc đóng, tiêu điểm trả về nút đã mở, hộp chồng nhau
       - run: npm run e2e:roundtrip   # sao lưu → xóa → khôi phục vòng tròn (IndexedDB): số liệu trước = sau; khôi phục lặp không nhân đôi; file hỏng bị từ chối
+      - run: npm run e2e:persist-keys   # bộ lọc đã lưu · Năm làm việc · giao diện bền khi mở lại app, giữ khóa cũ khi nâng cấp, có trong sao lưu → khôi phục
+      - run: node tools/e2e-sqlite.cjs tools/e2e-persist-keys.cjs   # như trên trên SQLite (hydrate không được xóa khóa hak.*)
       - run: node tools/e2e-sqlite.cjs tools/e2e-roundtrip.cjs   # như trên trên SQLite (máy chủ tham chiếu)
       - run: npm run e2e:archive-ops   # lưu / lưu lặp / xóa hồ sơ Lưu trữ kèm lỗi giữa chừng; mục lục ↔ nội dung khớp (IndexedDB)
       - run: node tools/e2e-sqlite.cjs tools/e2e-archive-ops.cjs   # như trên trên SQLite, kể cả mất phản hồi sau khi đã ghi

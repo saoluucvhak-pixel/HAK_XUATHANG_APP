@@ -6,7 +6,7 @@
     if (!allowed.includes(name)) return;
     document.documentElement.dataset.hakTheme = name;
     try {
-      localStorage.setItem('hak.design.theme', JSON.stringify(name));
+      if (HAK.Store) HAK.Store.set('hak.design.theme', name); // qua HAK.Store: vào kv của SQLite / IndexedDB (không bị hydrate xóa)
     } catch (e) {}
     const select = document.getElementById('hakDesignTheme');
     if (select) select.value = name;
