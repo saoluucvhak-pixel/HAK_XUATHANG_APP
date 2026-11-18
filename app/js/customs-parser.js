@@ -36,12 +36,7 @@
   };
   /** Số theo kiểu hải quan Việt: "1.078.598,4" · "27.584.832.000" · "551696640" · "6.000". */
   function vn(s) {
-    const raw = String(s == null ? '' : s).trim();
-    if (/^\([^()]*\)$/.test(raw)) {
-      // số âm kế toán "(1.200)" = −1200 (quy tắc nghiệp vụ mục 14) — không được mất dấu âm
-      const inner = vn(raw.slice(1, -1));
-      return inner === null ? null : -Math.abs(inner);
-    }
+    const raw = String(s == null ? '' : s);
     let t = raw.replace(/[^\d.,\-]/g, '');
     if (!/\d/.test(t)) return null;
     if (/^-?0\.\d+$/.test(t)) return Number(t); // "0.500" luôn là số thập phân (không có nhóm nghìn nào bắt đầu bằng 0)
@@ -165,6 +160,18 @@
     out.certNo = (/CHUNG\s*THU[^:]{0,40}?SO\s*:?\s*([A-Z0-9][A-Z0-9\-]{5,})/.exec(marks) || [])[1] || '';
     out.relatedNo = (/\bTK\s*:?\s*(\d{12})/.exec(marks) || [])[1] || '';
     out.round = 1;
+    // Quyết định nghiệp vụ mục 28: CHƯA đọc ngoặc là số âm ở tờ khai — chỉ cảnh báo để người dùng đối chiếu file gốc.
+    const paren = [];
+    rows.forEach((row, ri) =>
+      (row || []).forEach((c) => {
+        if (typeof c === 'string' && /^\(\s*\d[\d.,\s]*\)$/.test(c.trim()) && paren.length < 5)
+          paren.push('dòng ' + (ri + 1) + ' "' + c.trim() + '"');
+      })
+    );
+    if (paren.length)
+      out.warnings.push(
+        'Có ô số dạng ngoặc (' + paren.join('; ') + '): app KHÔNG đọc ngoặc là số âm — kiểm tra lại số liệu trên file gốc.'
+      );
     if (!out.no) out.warnings.push('Chưa đọc được SỐ TỜ KHAI.');
     if (out.taxVnd === null) out.warnings.push('Chưa đọc được TỔNG SỐ TIỀN THUẾ XUẤT KHẨU.');
     if (!out.openDate) out.warnings.push('Chưa đọc được NGÀY ĐĂNG KÝ (ngày mở tờ khai).');

@@ -39,8 +39,21 @@ for (const [input, want] of Object.entries(SAME))
   test(`mọi bộ đọc số cùng đọc "${input}" = ${want}`, () => {
     for (const [name, fn] of Object.entries(readers)) assert.equal(fn(input), want, `${name}("${input}")`);
   });
-test('số âm trong ngoặc: bộ đọc nào hiểu ngoặc thì phải cho âm; không bộ nào được trả số dương', () => {
-  for (const name of ['excel', 'numfmt', 'customs']) assert.equal(readers[name]('(1.200)'), -1200, name);
-  const c = readers.cert('(1.200)');
-  assert.ok(c === null || c === -1200, 'cert: null hoặc âm, không được dương');
+test('số âm trong ngoặc: Excel / ô nhập đọc âm; Tờ khai / hợp đồng CHƯA đọc ngoặc là số âm (quyết định mục 28) — không bộ nào được trả số âm sai hoặc mất chữ số', () => {
+  for (const name of ['excel', 'numfmt']) assert.equal(readers[name]('(1.200)'), -1200, name);
+  assert.equal(readers.customs('(1.200)'), 1200, 'tờ khai: bỏ ngoặc như trước (không đổi hành vi), cảnh báo ở bước đọc tờ khai');
+  assert.equal(readers.cert('(1.200)'), null, 'chứng thư: không đọc được → trống');
+});
+test('đọc tờ khai có ô "(1.200)" → có cảnh báo nêu ô đó, giá trị không đổi thành số âm', () => {
+  const rows = [
+    ['Số tờ khai', '308629709001'],
+    ['Ngày đăng ký', '01/06/2026'],
+    ['Tổng số tiền thuế xuất khẩu', '(1.200)'],
+  ];
+  const out = CU.parseDeclarationRows(rows);
+  assert.ok(
+    out.warnings.some((w) => /ngoặc/.test(w) && /\(1\.200\)/.test(w)),
+    out.warnings.join(' | ')
+  );
+  assert.ok(!(out.taxVnd < 0));
 });
