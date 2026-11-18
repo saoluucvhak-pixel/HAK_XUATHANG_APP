@@ -207,15 +207,30 @@ test('blob: ghi / đọc nguyên byte; mặc định không trả cột blob; kh
   assert.equal(db.query({ table: 'batch_files' }).rows.length, 0, 'xóa đợt thì xóa tệp gốc đi kèm');
   db.close();
 });
-test('số tờ khai duy nhất trong các tờ khai đang dùng; ngừng dùng thì được lập lại số đó', () => {
+test('số tờ khai là chỉ mục thường: dữ liệu cũ có số trùng vẫn lưu được (không chặn mọi lần lưu Danh mục)', () => {
   const db = open();
-  db.tx([{ op: 'put', table: 'customs_decls', row: { id: 'tk1', no: '111', doc: '{}' } }]);
-  throwsCode(() => db.tx([{ op: 'put', table: 'customs_decls', row: { id: 'tk2', no: '111', doc: '{}' } }]), 'unique');
   db.tx([
-    { op: 'put', table: 'customs_decls', row: { id: 'tk1', deleted_at: '2026-01-01' } },
+    { op: 'put', table: 'customs_decls', row: { id: 'tk1', no: '111', doc: '{}' } },
     { op: 'put', table: 'customs_decls', row: { id: 'tk2', no: '111', doc: '{}' } },
   ]);
   assert.equal(db.query({ table: 'customs_decls', where: { no: '111' } }).rows.length, 2);
+  db.close();
+});
+test('append: máy chủ cấp seq tăng dần; không tự đặt seq; chỉ audit_log; vẫn chỉ-thêm', () => {
+  const db = open();
+  const a = db.tx([
+    {
+      op: 'append',
+      table: 'audit_log',
+      row: { at: 1, action: 'sua', entity: 'contract', entity_id: 'hd1', field: 'qty', before: '1', after: '2', reason: 'sửa' },
+    },
+  ])[0].seq;
+  const b = db.tx([{ op: 'append', table: 'audit_log', row: { at: 2, action: 'ngung', entity: 'contract', entity_id: 'hd1' } }])[0].seq;
+  assert.equal(b, a + 1);
+  throwsCode(() => db.tx([{ op: 'append', table: 'audit_log', row: { seq: 99, at: 3, action: 'x' } }]), 'bad-request');
+  throwsCode(() => db.tx([{ op: 'append', table: 'kv', row: { key: 'k', val: '1', updated_at: 1 } }]), 'bad-request');
+  throwsCode(() => db.tx([{ op: 'append', table: 'audit_log', row: { at: 3 } }]), 'bad-request'); // thiếu action (bắt buộc)
+  assert.equal(db.query({ table: 'audit_log', order: [['seq', 'asc']] }).rows.length, 2);
   db.close();
 });
 test('phạm vi công ty: bảng có company_id lọc khi đọc, chặn ghi / xóa ngoài phạm vi', () => {

@@ -147,6 +147,74 @@
     return (await S().call('/db/query', q)).rows.map(m.fromRow);
   }
 
+  /* ---------------- phần chiếu quan hệ của Danh mục ---------------- */
+  const CATALOG_KEY = 'hak.catalog.v1';
+  const cmp = (a, b) =>
+    Object.keys(a).every((k) => k === 'rev' || (a[k] === undefined ? null : a[k]) === (b[k] === undefined ? null : b[k]));
+  /** Các thao tác đưa bảng quan hệ về ĐÚNG như Danh mục `doc` (chỉ ghi dòng đổi; xóa dòng không còn; mồ côi / mất độ chính xác → quarantine). Cùng giao dịch với bản ghi kv. */
+  async function catalogOps(doc) {
+    const CR = HAK.CatalogRows;
+    if (!CR || !doc || typeof doc !== 'object' || !Array.isArray(doc.contracts)) return [];
+    const built = CR.build(doc);
+    const ops = [],
+      dels = [];
+    for (const t of CR.TABLES) {
+      const old = new Map((await S().call('/db/query', { table: t })).rows.map((r) => [r.id, r]));
+      const seen = new Set();
+      for (const row of built.tables[t]) {
+        seen.add(row.id);
+        const o = old.get(row.id);
+        if (!o || !cmp(row, o)) ops.push({ op: 'put', table: t, row });
+      }
+      for (const id of old.keys()) if (!seen.has(id)) dels.push({ op: 'del', table: t, key: id });
+    }
+    ops.push(...dels.reverse()); // xóa con trước cha
+    ops.push({ op: 'del', table: 'quarantine', where: { source: 'catalog' } });
+    built.orphans.forEach((o) =>
+      ops.push({
+        op: 'put',
+        table: 'quarantine',
+        row: {
+          id: ['catalog', o.table, o.id, o.field].join('|'),
+          source: 'catalog',
+          record_id: o.id,
+          reason: 'mồ côi: ' + o.field + ' trỏ tới ' + o.target + ' không tồn tại (giá trị gốc giữ trong doc)',
+          doc: J(o),
+        },
+      })
+    );
+    built.warnings.forEach((w) =>
+      ops.push({
+        op: 'put',
+        table: 'quarantine',
+        row: {
+          id: ['catalog', w.table, w.id, w.field, 'precision'].join('|'),
+          source: 'catalog',
+          record_id: w.id,
+          reason: 'độ chính xác: ' + w.field + ' ' + w.msg,
+          doc: J(w),
+        },
+      })
+    );
+    return ops;
+  }
+  /** Xóa toàn bộ phần chiếu (khi xóa / làm trống Danh mục). Con trước cha. */
+  function catalogClearOps() {
+    const CR = HAK.CatalogRows;
+    return CR
+      ? CR.TABLES.slice()
+          .reverse()
+          .map((t) => ({ op: 'clear', table: t, confirm: true }))
+      : [];
+  }
+  /** Mọi ghi vào khóa Danh mục đều đi kèm phần chiếu trong CÙNG giao dịch. */
+  async function kvWriteOps(rec, ifRev) {
+    const { table, row } = await rowsFor('kv', rec);
+    const ops = [Object.assign({ op: 'put', table, row }, ifRev === undefined ? {} : { ifRev })];
+    if (rec.key === CATALOG_KEY) ops.push(...(await catalogOps(rec.val)));
+    return ops;
+  }
+
   /* ---------------- ghi ---------------- */
   async function rowsFor(store, val, key) {
     const m = map(store);
@@ -155,6 +223,7 @@
   async function put(store, val, key) {
     S().assertOpen();
     try {
+      if (store === 'kv') return void (await S().call('/db/tx', { ops: await kvWriteOps(val) }));
       const { table, row } = await rowsFor(store, val, key);
       await S().call('/db/tx', { ops: [{ op: 'put', table, row }] });
     } catch (e) {
@@ -165,7 +234,9 @@
     S().assertOpen();
     const m = map(store);
     try {
-      await S().call('/db/tx', { ops: [{ op: 'del', table: m.table, key }] });
+      const ops = [{ op: 'del', table: m.table, key }];
+      if (store === 'kv' && key === CATALOG_KEY) ops.push(...catalogClearOps());
+      await S().call('/db/tx', { ops });
     } catch (e) {
       throw asError(e);
     }
@@ -173,7 +244,9 @@
   async function clear(store) {
     S().assertOpen();
     try {
-      await S().call('/db/tx', { ops: [{ op: 'clear', table: map(store).table, confirm: true }] });
+      const ops = [{ op: 'clear', table: map(store).table, confirm: true }];
+      if (store === 'kv') ops.push(...catalogClearOps());
+      await S().call('/db/tx', { ops });
     } catch (e) {
       throw asError(e);
     }
@@ -229,8 +302,7 @@
     const err = check(g ? g.rec.val : undefined);
     if (err) throw Object.assign(new Error(err), { conflict: true });
     try {
-      const { table, row } = await rowsFor('kv', { key, val: next, ts: Date.now() });
-      await S().call('/db/tx', { ops: [{ op: 'put', table, row, ifRev: g ? g.rev : null }] });
+      await S().call('/db/tx', { ops: await kvWriteOps({ key, val: next, ts: Date.now() }, g ? g.rev : null) });
     } catch (e) {
       throw asError(e);
     }

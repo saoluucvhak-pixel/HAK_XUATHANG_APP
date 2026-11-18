@@ -229,6 +229,19 @@ class HakDb {
       const r = this._stmt('DELETE FROM ' + table + ' WHERE ' + wsql).run(...wargs);
       return { table, deleted: Number(r.changes) };
     }
+    if (op.op === 'append') {
+      // Chỉ cho bảng nhật ký chỉ-thêm (khóa INTEGER tự tăng): máy chủ cấp seq, không bao giờ ghi đè.
+      if (table !== 'audit_log') throw new HakDbError('bad-request', 'append chỉ dùng cho audit_log');
+      const row = op.row || {};
+      for (const c of Object.keys(row)) this._col(t, c, table);
+      if (row.seq !== undefined) throw new HakDbError('bad-request', 'Không được tự đặt seq của nhật ký');
+      if (!this._inScope(t, row, ctx)) throw new HakDbError('scope', 'Ngoài phạm vi công ty được phép (' + table + ')', { table });
+      const cols = Object.keys(row);
+      const r = this._stmt('INSERT INTO ' + table + '(' + cols.join(',') + ') VALUES(' + cols.map(() => '?').join(',') + ')').run(
+        ...cols.map((c) => enc(row[c]))
+      );
+      return { table, seq: Number(r.lastInsertRowid) };
+    }
     if (op.op === 'clear') {
       if (op.confirm !== true) throw new HakDbError('bad-request', 'Xóa toàn bảng cần confirm:true');
       if (table === 'audit_log' || table === 'quarantine') throw new HakDbError('bad-request', 'Bảng ' + table + ' không được xóa toàn bộ');

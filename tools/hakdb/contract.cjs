@@ -133,14 +133,12 @@ async function run(base, token, log) {
       ['i1', 'i5']
     );
   });
-  await t('số tờ khai duy nhất trong tờ khai đang dùng; ngừng dùng thì lập lại được', async () => {
-    await tx([{ op: 'put', table: 'customs_decls', row: { id: 'u1', no: '777', doc: '{}' } }], admin);
-    eq((await tx([{ op: 'put', table: 'customs_decls', row: { id: 'u2', no: '777', doc: '{}' } }], admin)).body.error.code, 'unique');
+  await t('số tờ khai là chỉ mục thường (cho phép số trùng của dữ liệu cũ)', async () => {
     eq(
       (
         await tx(
           [
-            { op: 'put', table: 'customs_decls', row: { id: 'u1', deleted_at: 'x' } },
+            { op: 'put', table: 'customs_decls', row: { id: 'u1', no: '777', doc: '{}' } },
             { op: 'put', table: 'customs_decls', row: { id: 'u2', no: '777', doc: '{}' } },
           ],
           admin
@@ -148,6 +146,14 @@ async function run(base, token, log) {
       ).status,
       200
     );
+  });
+  await t('nhật ký: append cấp seq tăng dần, không tự đặt seq', async () => {
+    const a = (await tx([{ op: 'append', table: 'audit_log', row: { at: 1, action: 'sua', entity: 'contract', entity_id: 'hd1' } }], admin))
+      .body.results[0].seq;
+    const b = (await tx([{ op: 'append', table: 'audit_log', row: { at: 2, action: 'sua', entity: 'contract', entity_id: 'hd1' } }], admin))
+      .body.results[0].seq;
+    eq(b, a + 1);
+    eq((await tx([{ op: 'append', table: 'audit_log', row: { seq: 9, at: 3, action: 'x' } }], admin)).status, 400);
   });
   await t('phạm vi công ty: lọc khi đọc, chặn ghi / xóa ngoài phạm vi', async () => {
     await tx(

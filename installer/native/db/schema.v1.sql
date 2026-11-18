@@ -21,6 +21,7 @@ CREATE TABLE customers (
   name TEXT,
   rev INTEGER NOT NULL DEFAULT 1,
   deleted_at TEXT,
+  ord INTEGER NOT NULL DEFAULT 0,
   doc TEXT NOT NULL
 ) WITHOUT ROWID;
 
@@ -36,6 +37,7 @@ CREATE TABLE contracts (
   reopened_at TEXT,
   rev INTEGER NOT NULL DEFAULT 1,
   deleted_at TEXT,
+  ord INTEGER NOT NULL DEFAULT 0,
   doc TEXT NOT NULL
 ) WITHOUT ROWID;
 CREATE INDEX contracts_no ON contracts(no);
@@ -49,6 +51,7 @@ CREATE TABLE contract_details (
   cert_no TEXT,
   rev INTEGER NOT NULL DEFAULT 1,
   deleted_at TEXT,
+  ord INTEGER NOT NULL DEFAULT 0,
   doc TEXT NOT NULL
 ) WITHOUT ROWID;
 CREATE INDEX contract_details_contract ON contract_details(contract_id);
@@ -60,6 +63,7 @@ CREATE TABLE contract_addenda (
   date TEXT,
   rev INTEGER NOT NULL DEFAULT 1,
   deleted_at TEXT,
+  ord INTEGER NOT NULL DEFAULT 0,
   doc TEXT NOT NULL
 ) WITHOUT ROWID;
 CREATE INDEX contract_addenda_contract ON contract_addenda(contract_id);
@@ -74,12 +78,14 @@ CREATE TABLE customs_decls (
   tax_vnd INTEGER,
   rev INTEGER NOT NULL DEFAULT 1,
   deleted_at TEXT,
+  ord INTEGER NOT NULL DEFAULT 0,
   doc TEXT NOT NULL
 ) WITHOUT ROWID;
 CREATE INDEX customs_decls_contract ON customs_decls(contract_id);
 CREATE INDEX customs_decls_detail ON customs_decls(detail_id);
--- Số tờ khai duy nhất trong các tờ khai đang dùng (ngừng dùng thì được lập lại).
-CREATE UNIQUE INDEX customs_decls_no_live ON customs_decls(no) WHERE deleted_at IS NULL;
+-- Số tờ khai: CHỈ MỤC thường (không duy nhất). Dữ liệu cũ có thể có số trùng (HAK.Integrity báo 'dup-decl-no'); ràng buộc cứng ở đây sẽ chặn MỌI lần lưu Danh mục sau di trú.
+-- Việc không cho nhập trùng do ứng dụng đảm nhiệm; việc phát hiện trùng do HAK.Integrity.
+CREATE INDEX customs_decls_no ON customs_decls(no);
 
 CREATE TABLE customs_supplements (
   id TEXT PRIMARY KEY,
@@ -88,6 +94,7 @@ CREATE TABLE customs_supplements (
   tax_vnd INTEGER,
   rev INTEGER NOT NULL DEFAULT 1,
   deleted_at TEXT,
+  ord INTEGER NOT NULL DEFAULT 0,
   doc TEXT NOT NULL
 ) WITHOUT ROWID;
 CREATE INDEX customs_supplements_decl ON customs_supplements(decl_id);
@@ -101,6 +108,7 @@ CREATE TABLE customs_payments (
   date TEXT,
   rev INTEGER NOT NULL DEFAULT 1,
   deleted_at TEXT,
+  ord INTEGER NOT NULL DEFAULT 0,
   doc TEXT NOT NULL
 ) WITHOUT ROWID;
 CREATE INDEX customs_payments_decl ON customs_payments(decl_id);
@@ -231,9 +239,10 @@ CREATE TABLE record_versions (
 
 -- Bản ghi không nhập được khi di trú (mồ côi, vi phạm khóa ngoại…): giữ nguyên để người dùng đối chiếu.
 CREATE TABLE quarantine (
-  seq INTEGER PRIMARY KEY AUTOINCREMENT,
-  source TEXT NOT NULL,
+  id TEXT PRIMARY KEY,       -- nguồn|bảng|mã bản ghi|trường: ghi lại được nhiều lần (idempotent)
+  source TEXT NOT NULL,      -- 'catalog' (phần chiếu) | 'migration' (di trú)
   record_id TEXT,
   reason TEXT NOT NULL,
   doc TEXT NOT NULL
-);
+) WITHOUT ROWID;
+CREATE INDEX quarantine_source ON quarantine(source);

@@ -21,7 +21,10 @@ global.HAK_DOCS_TOKEN = TOKEN;
 const { createServer } = require('../tools/hakdb/server.cjs');
 require('../app/js/storage.js');
 require('../app/js/db.js');
+require('../app/js/catalog-rows.js');
 require('../app/js/db-sqlite.js');
+HAK.ContractModel = require('../app/js/contract-model.js');
+HAK.CustomsModel = require('../app/js/customs-model.js');
 const S = HAK.Storage,
   DB = HAK.DB;
 
@@ -253,5 +256,139 @@ test('phiên có phạm vi công ty: tài khoản giới hạn không ghi đư�
     (await DB.getAll('issued')).map((x) => x.id),
     ['ok1']
   );
+  await b.close();
+});
+
+const catalogDoc = () => {
+  const M = HAK.ContractModel,
+    CM = HAK.CustomsModel;
+  const c1 = M.parent({
+    id: 'hd1',
+    type: 'uythac',
+    no: '000123/HĐ',
+    contractQty: 5000,
+    exporterId: 'k1',
+    details: [
+      { id: 'ct-a', ship: 'A', qty: 1000, bdmt: 4000.5 },
+      { id: 'ct-b', ship: 'B', qty: 0 },
+    ],
+    addenda: [{ id: 'pl-1', no: 'PL1', date: '2026-01-01', qty: 4500 }],
+  });
+  return {
+    v: 3,
+    products: [],
+    customers: [{ id: 'k1', name: 'HAK', companyId: 'hak' }],
+    contracts: [c1],
+    customs: [
+      CM.newDecl({
+        id: 'tk1',
+        no: '308629701000',
+        contractId: 'hd1',
+        detailId: 'ct-a',
+        taxVnd: 1000,
+        payments: [{ id: 'p1', receiptNo: 'DN1', amount: 1000, kind: 'tax' }],
+        supplements: [{ id: 'bs1', no: '2', taxVnd: 900 }],
+      }),
+    ],
+  };
+};
+const projected = (srv) => {
+  const rows = {};
+  for (const t of HAK.CatalogRows.TABLES) rows[t] = srv.hakdb.query({ table: t }).rows;
+  return rows;
+};
+test('Danh mục: lưu bằng kvCas ghi cả tài liệu và bảng quan hệ trong MỘT giao dịch; dựng lại từ bảng = tài liệu', async () => {
+  const b = await boot(true);
+  const doc = catalogDoc();
+  await DB.kvCas('hak.catalog.v1', () => null, doc);
+  assert.deepEqual(await DB.kvGet('hak.catalog.v1'), doc);
+  const rows = projected(b.srv);
+  assert.equal(rows.contract_details.length, 2);
+  assert.equal(rows.customs_payments[0].amount_vnd, 1000);
+  assert.deepEqual(HAK.CatalogRows.assemble(rows, { v: 3, products: [] }), doc, 'bảng quan hệ khớp tài liệu');
+  assert.ok(b.srv.hakdb.check().ok, 'khóa ngoại toàn vẹn');
+  await b.close();
+});
+test('Danh mục: sửa chỉ ghi dòng đổi (rev các dòng khác giữ nguyên); ngừng dùng giữ dòng; xóa con rồi cha đúng thứ tự', async () => {
+  const b = await boot(true);
+  const doc = catalogDoc();
+  await DB.kvCas('hak.catalog.v1', () => null, doc);
+  const rev0 = Object.fromEntries(projected(b.srv).contract_details.map((r) => [r.id, r.rev]));
+  const d2 = JSON.parse(JSON.stringify(doc));
+  d2.contracts[0].details[0].ship = 'A SỬA';
+  d2.contracts[0].details[1].deletedAt = '2026-02-01'; // ngừng dùng: giữ dòng
+  await DB.kvCas('hak.catalog.v1', () => null, d2);
+  const r1 = Object.fromEntries(projected(b.srv).contract_details.map((r) => [r.id, r]));
+  assert.equal(r1['ct-a'].rev, rev0['ct-a'] + 1);
+  assert.equal(r1['ct-b'].deleted_at, '2026-02-01');
+  const d3 = JSON.parse(JSON.stringify(d2));
+  d3.customs = []; // bỏ tờ khai (con của hợp đồng + chi tiết)
+  d3.contracts[0].details = d3.contracts[0].details.slice(1);
+  await DB.kvCas('hak.catalog.v1', () => null, d3);
+  const rows = projected(b.srv);
+  assert.equal(rows.customs_decls.length, 0);
+  assert.equal(rows.customs_payments.length, 0);
+  assert.equal(rows.contract_details.length, 1);
+  assert.deepEqual(HAK.CatalogRows.assemble(rows, { v: 3, products: [] }), d3);
+  await b.close();
+});
+test('Danh mục: khôi phục qua kvPut (đường sao lưu) cũng cập nhật bảng quan hệ; xóa khóa Danh mục dọn sạch phần chiếu', async () => {
+  const b = await boot(true);
+  const doc = catalogDoc();
+  await DB.kvPut('hak.catalog.v1', doc);
+  assert.equal(projected(b.srv).contracts.length, 1);
+  await DB.kvDel('hak.catalog.v1');
+  const rows = projected(b.srv);
+  assert.ok(
+    HAK.CatalogRows.TABLES.every((t) => rows[t].length === 0),
+    'phần chiếu sạch'
+  );
+  await b.close();
+});
+test('Danh mục: tờ khai mồ côi KHÔNG chặn lưu — FK = NULL, ghi vào quarantine kèm lý do, tài liệu giữ nguyên; sửa xong thì quarantine tự sạch', async () => {
+  const b = await boot(true);
+  const doc = catalogDoc();
+  doc.customs[0].contractId = 'hd-khong-con';
+  await DB.kvCas('hak.catalog.v1', () => null, doc);
+  assert.deepEqual(await DB.kvGet('hak.catalog.v1'), doc);
+  const qs = b.srv.hakdb.query({ table: 'quarantine' }).rows;
+  assert.equal(qs.length, 1);
+  assert.match(qs[0].reason, /mồ côi: contractId trỏ tới hd-khong-con/);
+  assert.equal(qs[0].record_id, 'tk1');
+  assert.equal(projected(b.srv).customs_decls[0].contract_id, null);
+  doc.customs[0].contractId = 'hd1';
+  await DB.kvCas('hak.catalog.v1', () => null, doc);
+  assert.equal(b.srv.hakdb.query({ table: 'quarantine' }).rows.length, 0);
+  await b.close();
+});
+test('Danh mục: hai tờ khai cùng số (dữ liệu cũ) vẫn lưu được; giá trị > 3 chữ số lẻ → quarantine cảnh báo, doc giữ nguyên', async () => {
+  const b = await boot(true);
+  const doc = catalogDoc();
+  doc.customs.push(HAK.CustomsModel.newDecl({ id: 'tk2', no: '308629701000', contractId: 'hd1' }));
+  doc.contracts[0].details[0].bdmt = 1.23456;
+  await DB.kvCas('hak.catalog.v1', () => null, doc);
+  assert.equal(projected(b.srv).customs_decls.length, 2);
+  assert.deepEqual(await DB.kvGet('hak.catalog.v1'), doc);
+  assert.ok(b.srv.hakdb.query({ table: 'quarantine' }).rows.some((r) => /độ chính xác: bdmt/.test(r.reason)));
+  await b.close();
+});
+test('Danh mục: kvCas xung đột thì cả tài liệu lẫn bảng quan hệ không đổi', async () => {
+  const b = await boot(true);
+  const doc = catalogDoc();
+  await DB.kvCas('hak.catalog.v1', () => null, doc);
+  const d2 = JSON.parse(JSON.stringify(doc));
+  d2.contracts[0].no = 'KHAC';
+  const e = await rejects(
+    DB.kvCas(
+      'hak.catalog.v1',
+      () => {
+        b.srv.hakdb.tx([{ op: 'put', table: 'kv', row: { key: 'hak.catalog.v1', val: '{"v":3}', updated_at: 9 } }]);
+        return null;
+      },
+      d2
+    )
+  );
+  assert.equal(e.conflict, true);
+  assert.equal(projected(b.srv).contracts[0].no, '000123/HĐ', 'phần chiếu không bị ghi dở');
   await b.close();
 });

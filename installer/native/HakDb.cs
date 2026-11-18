@@ -189,6 +189,15 @@ class HakDb : IDisposable {
    if(t.Company&&scope!=null){var a=new List<object>(wargs);a.AddRange(scope.Cast<object>());var bad=Rows("SELECT COUNT(*) AS n FROM "+table+" WHERE ("+wsql+") AND company_id IS NOT NULL AND company_id NOT IN ("+(scope.Count>0?String.Join(",",scope.Select(x=>"?")):"''")+")",a);if(Convert.ToInt64(bad[0]["n"])>0)throw new HakDbException("scope","Có bản ghi ngoài phạm vi công ty được phép").With("table",table);}
    return new Dictionary<string,object>{{"table",table},{"deleted",Run("DELETE FROM "+table+" WHERE "+wsql,wargs)}};
   }
+  if(kind=="append"){
+   if(table!="audit_log")throw new HakDbException("bad-request","append chỉ dùng cho audit_log");
+   var arow=D(op["row"])??new Dictionary<string,object>();foreach(var c in arow.Keys)ChkCol(t,c,table);
+   if(arow.ContainsKey("seq"))throw new HakDbException("bad-request","Không được tự đặt seq của nhật ký");
+   if(!InScope(t,arow,scope))throw new HakDbException("scope","Ngoài phạm vi công ty được phép ("+table+")").With("table",table);
+   var acols=arow.Keys.ToList();Run("INSERT INTO "+table+"("+String.Join(",",acols)+") VALUES("+String.Join(",",acols.Select(x=>"?"))+")",acols.Select(x=>arow[x]).ToList());
+   var seqRows=Rows("SELECT last_insert_rowid() AS s",new List<object>());
+   return new Dictionary<string,object>{{"table",table},{"seq",Convert.ToInt64(seqRows[0]["s"])}};
+  }
   if(kind=="clear"){
    if(!(op.ContainsKey("confirm")&&op["confirm"] is bool&&(bool)op["confirm"]))throw new HakDbException("bad-request","Xóa toàn bảng cần confirm:true");
    if(table=="audit_log"||table=="quarantine")throw new HakDbException("bad-request","Bảng "+table+" không được xóa toàn bộ");
