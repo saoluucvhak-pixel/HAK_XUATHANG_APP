@@ -152,6 +152,22 @@ const probe = () => {
   });
   out.smallN = tinyTargets.length;
   out.small = tinyTargets.slice(0, 5);
+  // phần tử CHỈ bấm được bằng chuột (con trỏ bàn tay) nhưng không vào được bằng Tab: người dùng bàn phím không thao tác được
+  const mouseOnly = [];
+  const NATIVE = 'a[href], button, input:not([type=hidden]), select, textarea, summary, label, [tabindex], [contenteditable=true]';
+  document.querySelectorAll('body *').forEach((e) => {
+    if (!vis(e) || e.closest(NATIVE) || e.closest('[aria-hidden=true], .modal:not(.show), template')) return;
+    if (getComputedStyle(e).cursor !== 'pointer') return;
+    // chỉ phần tử "lá" bấm được (con của nó không tự là phần tử bấm được khác)
+    if (Array.from(e.children).some((c) => getComputedStyle(c).cursor === 'pointer')) return;
+    mouseOnly.push(
+      e.tagName.toLowerCase() +
+        (e.id ? '#' + e.id : '') +
+        (typeof e.className === 'string' && e.className ? '.' + e.className.split(' ')[0] : '')
+    );
+  });
+  out.mouseOnlyN = mouseOnly.length;
+  out.mouseOnly = Array.from(new Set(mouseOnly)).slice(0, 5);
   // bảng dài (> 8 dòng) phải có tiêu đề cố định khi cuộn
   const longNoSticky = [];
   document.querySelectorAll('table').forEach((t) => {
@@ -204,6 +220,17 @@ const ROUTES = [
       bad.push(label + ' ' + r + ': ' + res.offscreenN + ' phần tử ngoài khung nhìn (' + res.offscreen.slice(0, 3).join(', ') + ')');
     if (res.unnamedN)
       bad.push(label + ' ' + r + ': ' + res.unnamedN + ' điều khiển không có nhãn truy cập (' + res.unnamed.slice(0, 3).join(', ') + ')');
+    if (res.mouseOnlyN)
+      bad.push(
+        label +
+          ' ' +
+          r +
+          ': ' +
+          res.mouseOnlyN +
+          ' phần tử chỉ bấm được bằng chuột, không vào được bằng Tab (' +
+          res.mouseOnly.slice(0, 3).join(', ') +
+          ')'
+      );
     if (res.smallN) bad.push(label + ' ' + r + ': ' + res.smallN + ' vùng bấm nhỏ hơn 24×24 px (' + res.small.slice(0, 3).join(', ') + ')');
     if (res.noStickyN) bad.push(label + ' ' + r + ': bảng dài thiếu tiêu đề cố định (' + res.noSticky.join(', ') + ')');
     if (res.lowN)
