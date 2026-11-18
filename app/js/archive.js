@@ -105,10 +105,19 @@
       }
     });
   }
+  /** Báo cho các màn phụ thuộc Lưu trữ (vd. trạng thái hợp đồng cần biết chi tiết nào đã có phiếu cân) rằng kho vừa đổi. */
+  const changed = () => {
+    try {
+      root.dispatchEvent(new Event('hak:archive'));
+    } catch (e) {
+      /* môi trường không có sự kiện */
+    }
+  };
   const putBoth = async (meta, data) => {
     const q = await sq();
-    if (q) return q.put(meta, data);
-    return putBothIdb(meta, data);
+    const r = q ? await q.put(meta, data) : await putBothIdb(meta, data);
+    changed();
+    return r;
   };
   const putBothIdb = (meta, data) =>
     writeTx(
@@ -123,8 +132,9 @@
     );
   const delOne = async (id) => {
     const q = await sq();
-    if (q) return q.del(id);
-    return delOneIdb(id);
+    const r = q ? await q.del(id) : await delOneIdb(id);
+    changed();
+    return r;
   };
   const delOneIdb = (id) =>
     writeTx(
@@ -139,8 +149,9 @@
     );
   const clearAll = async () => {
     const q = await sq();
-    if (q) return q.clear();
-    return clearAllIdb();
+    const r = q ? await q.clear() : await clearAllIdb();
+    changed();
+    return r;
   };
   const clearAllIdb = () =>
     writeTx(
@@ -420,6 +431,7 @@
     if (q) {
       await q.closeVerified(items);
       updateBadge();
+      changed();
       return;
     }
     const db = await openDb();
@@ -456,6 +468,7 @@
       }
       tx.oncomplete = () => {
         updateBadge();
+        changed();
         ok();
       };
       tx.onabort = tx.onerror = () => no(error || tx.error || Error('Chưa dọn được kho cũ.'));

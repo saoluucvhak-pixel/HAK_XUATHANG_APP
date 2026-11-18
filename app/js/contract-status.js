@@ -28,7 +28,7 @@
     dupTickets: { trips: 0, kg: 0 },
     overall: null,
   };
-  const ticketCache = new Map();
+  const ticketCache = HAK.TripDetails ? HAK.TripDetails.ticketCache : new Map(); // dùng chung bộ đệm phiếu với nguồn trạng thái hợp đồng
   /** Câu cảnh báo phiếu cân trùng / xung đột (dùng chung màn hình Chi tiết xuất hàng, Báo cáo thực hiện, Báo cáo tổng hợp). */
   function weighNote(st) {
     st = st || state;
@@ -1216,6 +1216,9 @@
       if (u) HAK.UI.confirmClick(u, () => unassign(u.dataset.csrUn).catch((x) => toast(x.message || String(x), 'error')), 'Gỡ?');
     });
     root.addEventListener('hak:catalog', () => {
+      if (!host.hidden) render();
+    });
+    root.addEventListener('hak:tripdetails', () => {
       if (!host.hidden) render();
     });
   }

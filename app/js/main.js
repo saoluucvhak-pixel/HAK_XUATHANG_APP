@@ -1326,6 +1326,7 @@
     if (HAK.Auth) HAK.Auth.init();
     if (HAK.Report) HAK.Report.init();
     if (HAK.ContractStatus) HAK.ContractStatus.init();
+    if (HAK.TripDetails) HAK.TripDetails.start(); // nguồn chung "chi tiết hợp đồng đã có phiếu cân" cho trạng thái hợp đồng
     if (HAK.ContractOverview) HAK.ContractOverview.init();
     if (HAK.Chungtu) HAK.Chungtu.init();
     if (HAK.Backup) HAK.Backup.init();
