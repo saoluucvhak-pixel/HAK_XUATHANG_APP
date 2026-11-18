@@ -79,6 +79,26 @@ Module._load = function (request) {
         await c.route('**/native/hakdocs-token.js', (r) =>
           r.fulfill({ contentType: 'application/javascript', body: "window.HAK_DOCS_TOKEN='" + TOKEN + "';" })
         );
+        // Chẩn đoán khi lỗi: lỗi console, yêu cầu /db/ bị từ chối hoặc chậm > 3 giây (để biết lỗi nằm ở máy chủ hay ở trang).
+        c.on('page', (pg) => {
+          pg.on('console', (m) => {
+            if (m.type() === 'error' || m.type() === 'warning') console.log('[e2e-sqlite] console.' + m.type() + ': ' + m.text().slice(0, 300));
+          });
+          pg.on('pageerror', (e) => console.log('[e2e-sqlite] pageerror: ' + String(e.message).slice(0, 300)));
+          pg.on('requestfailed', (r) => console.log('[e2e-sqlite] request lỗi: ' + r.method() + ' ' + r.url().slice(0, 120) + ' ' + (r.failure() || {}).errorText));
+          pg.on('response', async (r) => {
+            if (!/\/db\//.test(r.url())) return;
+            if (r.status() >= 400) {
+              let b = '';
+              try {
+                b = (await r.text()).slice(0, 300);
+              } catch (e) {
+                /* đã đóng */
+              }
+              console.log('[e2e-sqlite] ' + r.status() + ' ' + r.request().method() + ' ' + r.url().replace(/^.*\/db\//, '/db/') + ' ' + b);
+            }
+          });
+        });
         return c;
       };
       return b;
