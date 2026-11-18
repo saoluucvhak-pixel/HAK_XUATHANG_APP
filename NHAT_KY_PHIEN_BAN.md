@@ -11,6 +11,12 @@
 - **Lập BKLS:** hiện hộp xác nhận phạm vi (công ty · tàu · số phiếu · thực giao) trước khi chọn mẫu, giống Word / PDF / Excel. Dựng lại từ Lưu trữ không hỏi.
 - Công cụ: `ui-audit` thêm khổ 768×1024; `npm run e2e:bkls-scope`, `npm run e2e:contract-status`; test chéo bộ đọc số và khóa nhận diện phiếu.
 
+## v2.22.2 — Cài đè có quay lui và nghiệm thu chính bộ cài
+- Giải nén đầy đủ vào thư mục tạm trước khi thay thư mục chương trình; không ghi đè từng tệp trong bản đang dùng. Giữ toàn bộ bản cũ tại thư mục `.previous-v...` cạnh thư mục cài, gồm tệp người dùng tự thêm.
+- Nếu chưa thay bản mới thành công thì quay lại thư mục cũ; lỗi cài/gỡ trả mã khác 0. Gỡ chưa hết tệp thì giữ thông tin gỡ cài đặt để thử lại.
+- Bổ sung DisplayVersion và đặt đường dẫn gỡ trong dấu ngoặc kép.
+- Workflow thử chính bộ cài: cài mới, cài đè, giữ tệp cũ, lỗi đích không hợp lệ, gỡ và cài lại; chỉ đưa lên artifact/Release khi các bước này đạt. Dữ liệu SQLite tiếp tục nằm ngoài thư mục cài.
+
 ## v2.22.1 — Đóng năm đúng nguồn SQLite và kiểm tra trước khi phát hành
 - Đóng năm và tiếp tục đóng năm dùng giao dịch SQLite khi SQLite đang là nguồn chính. Sổ hồ sơ năm, thông số đợt và file Excel gốc được kiểm tra phiên bản trước khi dọn cùng một giao dịch.
 - Có thay đổi từ cửa sổ khác hoặc file cân không khớp bản ZIP thì chặn dọn, giữ dữ liệu để đối soát.
