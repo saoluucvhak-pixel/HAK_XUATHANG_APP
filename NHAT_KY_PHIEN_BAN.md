@@ -1,5 +1,13 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.22.5 — Rà soát vòng 3: bền dữ liệu cấu hình trên SQLite, đóng năm, nhập tờ khai, thông báo lỗi
+- **Đóng năm:** đóng lại cùng năm sau khi lần trước bị ngắt (bấm "Đóng năm" thay vì "Tiếp tục đóng năm") không còn để biên nhận "đang dở" của lần trước tồn tại mãi (năm vẫn hiện "đang dở" dù đã đóng xong); biên nhận cũ được giữ làm bằng chứng và ghi bị lần nào thay thế. Kiểm cả IndexedDB và SQLite.
+- **Nhập tờ khai từ Excel / khai bổ sung từ Excel:** cảnh báo của bộ đọc (ô thuế dạng ngoặc "(1.200)" theo quy tắc 28, thiếu số tiền thuế / ngày đăng ký) nay HIỆN ra như ở đường OCR; trước đây bị bỏ qua và chỉ báo "Đã nhập 1 tờ khai".
+- **Kiểm tra mục lục ↔ nội dung hồ sơ Lưu trữ:** `HAK.Archive.verifyIndex()` (số phiếu, tổng kg, phiếu KL ≤ 0 đã loại); `HAK.Archive.remove` xuất ra để kiểm thử.
+- Công cụ: `npm run e2e:archive-ops` (lưu / lưu lặp / xóa kèm lỗi giữa chừng, IndexedDB và SQLite), `npm run e2e:gsync-parity` (Google Sheet GIẢ LẬP chạy đúng Code.gs; chưa kiểm Sheet thật), `npm run e2e:import-warn`; chạy trong CI.
+- **Thông báo lỗi:** lỗi thô của trình duyệt / JS ("Cannot read properties…", khung stack, đường dẫn tệp, ERR_…) không còn hiện nguyên cho người dùng; thông báo tiếng Việt của app giữ nguyên, bản gốc ghi ở Console.
+- Công cụ: `ui-audit` kiểm phần tử chỉ bấm được bằng chuột mà không vào được bằng Tab (bàn phím).
+
 ## v2.22.4 — Rà soát vòng 2: bộ lọc, lưu trữ, khôi phục, giao diện bàn phím
 - **Hộp thoại:** đóng bằng Esc hoặc nút Đóng nay TRẢ tiêu điểm về đúng nút đã mở hộp thoại (trước đây rơi về đầu trang, người dùng bàn phím mất vị trí); hộp thoại chồng nhau chỉ trả khi hộp cuối đóng. Tìm kiếm chung (Ctrl+K) cũng trả tiêu điểm khi đóng; khi đang có hộp thoại mở thì không mở chồng (trước đây tiêu điểm bị giật khỏi ô tìm, gõ nhầm ô).
 - **Trạng thái hợp đồng khi đang đối chiếu phiếu cân:** lúc nguồn "chi tiết đã có phiếu cân" chưa tính xong, hợp đồng có thể đổi kết quả hiện "Đang kiểm tra…" (thay vì hiện "Đã hoàn thành" rồi đổi); không tính được thì ghi rõ "chưa đối chiếu được phiếu cân".
@@ -7,10 +15,6 @@
 - **Bộ lọc:** ô tìm khớp biển số theo dạng chuẩn hóa ("43C11111" tìm ra "43C-111.11") ở bộ lọc phiếu và Chi tiết xuất hàng theo HĐ; bộ lọc đã lưu tham chiếu mục đã xóa / đổi tên nay báo rõ "điều kiện hết hiệu lực" (không rò mã nội bộ).
 - **Chọn phiếu / Xe trả về:** hộp dán danh sách mã phiếu phân biệt "đã LOẠI vì khối lượng ≤ 0" với "không tìm thấy".
 - Công cụ: `npm run e2e:export-parity` (màn hình = Excel = Word = PDF), `npm run e2e:dialogs`; cả hai chạy trong CI.
-- **Đóng năm:** đóng lại cùng năm sau khi lần trước bị ngắt (bấm "Đóng năm" thay vì "Tiếp tục đóng năm") không còn để biên nhận "đang dở" của lần trước tồn tại mãi (năm vẫn hiện "đang dở" dù đã đóng xong); biên nhận cũ được giữ làm bằng chứng và ghi bị lần nào thay thế. Kiểm cả IndexedDB và SQLite.
-- **Nhập tờ khai từ Excel / khai bổ sung từ Excel:** cảnh báo của bộ đọc (ô thuế dạng ngoặc "(1.200)" theo quy tắc 28, thiếu số tiền thuế / ngày đăng ký) nay HIỆN ra như ở đường OCR; trước đây bị bỏ qua và chỉ báo "Đã nhập 1 tờ khai".
-- **Kiểm tra mục lục ↔ nội dung hồ sơ Lưu trữ:** `HAK.Archive.verifyIndex()` (số phiếu, tổng kg, phiếu KL ≤ 0 đã loại); `HAK.Archive.remove` xuất ra để kiểm thử.
-- Công cụ: `npm run e2e:archive-ops` (lưu / lưu lặp / xóa kèm lỗi giữa chừng, IndexedDB và SQLite), `npm run e2e:gsync-parity` (Google Sheet GIẢ LẬP chạy đúng Code.gs; chưa kiểm Sheet thật), `npm run e2e:import-warn`; chạy trong CI.
 
 ## v2.22.3 — Rà soát số liệu: một nguồn trạng thái hợp đồng, bộ đọc số, khử trùng phiếu, báo dòng bị bỏ, xác nhận phạm vi BKLS
 - **Trạng thái hợp đồng một nguồn:** "Đã hoàn thành" chỉ khi mọi tờ khai đã thông quan VÀ mọi chi tiết đã có chứng thư **hoặc phiếu cân** đều có tờ khai thông quan. Danh mục, tab Tờ khai, Báo cáo tổng hợp, Chi tiết xuất hàng theo HĐ, Báo cáo thực hiện HĐ, Hồ sơ hợp đồng, Excel / PDF và Google Sheet nay cùng lấy "chi tiết đã có phiếu cân" từ Lưu trữ (tính nền, tự cập nhật khi Lưu trữ / Danh mục / công ty đổi; lần đầu chưa tính xong thì hiện như cũ rồi tự cập nhật). Trước đây Danh mục và vài báo cáo bỏ sót phiếu cân nên báo "Đã hoàn thành" trong khi Báo cáo thực hiện HĐ báo "Đang thực hiện".
