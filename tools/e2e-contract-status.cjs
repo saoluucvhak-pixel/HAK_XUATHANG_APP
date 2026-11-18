@@ -234,6 +234,15 @@ async function login(p) {
           );
         const tSave = performance.now() - t0;
         HAK.TripDetails.ticketCache.clear();
+        // đo các tác vụ dài (> 50 ms) làm đứng giao diện trong lúc nguồn tính nền
+        const longs = [];
+        let obs = null;
+        try {
+          obs = new PerformanceObserver((l) => l.getEntries().forEach((e) => longs.push(e.duration)));
+          obs.observe({ entryTypes: ['longtask'] });
+        } catch (e) {
+          obs = null;
+        }
         const t1 = performance.now();
         await HAK.TripDetails.refresh();
         const cold = performance.now() - t1,
@@ -245,7 +254,27 @@ async function login(p) {
         HAK.Catalog.render && HAK.Catalog.render();
         const draw = performance.now() - t3;
         await HAK.Archive.closeVerified(await HAK.Archive.collectItems());
-        return { n, saveMs: Math.round(tSave), coldMs: Math.round(cold), warmMs: Math.round(warm), drawMs: Math.round(draw) };
+        const metas = await HAK.Archive.ensureStats(await HAK.Archive.list());
+        const t4 = performance.now();
+        HAK.Report.compute(metas, { tickets: await HAK.Report.prepareTickets(metas, HAK.TripDetails.ticketCache) });
+        const reportMs = performance.now() - t4;
+        const t5 = performance.now();
+        HAK.Search.run('PERF99', { idx: HAK.Search.index(), archive: metas });
+        const searchMs = performance.now() - t5;
+        await new Promise((ok) => setTimeout(ok, 200));
+        if (obs) obs.disconnect();
+        return {
+          n,
+          saveMs: Math.round(tSave),
+          coldMs: Math.round(cold),
+          warmMs: Math.round(warm),
+          drawMs: Math.round(draw),
+          reportMs: Math.round(reportMs),
+          searchMs: Math.round(searchMs),
+          longTasks: longs.length,
+          longestTaskMs: Math.round(Math.max(0, ...longs)),
+          blockedMs: Math.round(longs.reduce((a, b) => a + b, 0)),
+        };
       }, n);
       console.log('    ' + JSON.stringify(r));
     }

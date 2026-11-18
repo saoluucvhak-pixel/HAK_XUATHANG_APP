@@ -138,5 +138,26 @@
     if (L && !root[L[0]]) await loadScript(L[1]);
   }
 
+  /* ---------- Trả tiêu điểm về nút đã mở hộp thoại (người dùng bàn phím không bị mất vị trí) ---------- */
+  const openers = new WeakMap();
+  if (typeof document !== 'undefined') {
+    document.addEventListener('show.bs.modal', (e) => {
+      const a = document.activeElement;
+      if (a && a !== document.body && !e.target.contains(a)) openers.set(e.target, a);
+    });
+    document.addEventListener('hidden.bs.modal', (e) => {
+      const a = openers.get(e.target);
+      openers.delete(e.target);
+      // hộp thoại khác (chồng lên) vẫn đang mở thì để hộp đó giữ tiêu điểm
+      if (document.querySelector('.modal.show')) return;
+      if (a && document.contains(a) && !a.disabled && a.getClientRects().length) {
+        try {
+          a.focus({ preventScroll: true });
+        } catch (err) {
+          /* phần tử không nhận tiêu điểm */
+        }
+      }
+    });
+  }
   HAK.UI = { $, $$, esc, toast, Loading, setTheme, toggleTheme, confirmClick, debounce, todayISO, loadScript, needLib };
 })(window);

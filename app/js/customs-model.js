@@ -369,20 +369,43 @@
     tripProvider = typeof fn === 'function' ? fn : null;
   };
   function contractStatus(customs, contractId, contract, opt) {
-    if (!opt || opt.tripDetails === undefined) opt = Object.assign({}, opt, { tripDetails: tripProvider ? tripProvider() : null });
+    // Nguồn chung trả: Set (đã tính) · null (đang tính) · 'error' (không tính được). Không có nguồn đăng ký (kiểm thử / dùng riêng) → như trước.
+    let src;
+    if (!opt || opt.tripDetails === undefined) {
+      src = tripProvider ? tripProvider() : undefined;
+      opt = Object.assign({}, opt, { tripDetails: src === 'error' ? null : src === undefined ? null : src });
+    }
+    const pending = src === null,
+      unverified = src === 'error';
     const list = act(customs).filter((d) => d.contractId === contractId);
     const cleared = list.filter((d) => d.status === 'cleared').length;
     // Đóng thủ công (hợp đồng Xuất bán / Trao đổi không có tờ khai, hoặc đã giao đủ): contract.closedAt = ngày đóng.
     if (contract && contract.closedAt)
       return { code: 'done', label: 'Đã đóng hợp đồng', total: list.length, cleared, manual: true, closedAt: contract.closedAt };
     const missing = contract && list.length > 0 && cleared === list.length ? detailsWithoutClearance(list, contract, opt) : [];
-    const done = list.length > 0 && cleared === list.length && !missing.length;
+    let done = list.length > 0 && cleared === list.length && !missing.length;
+    // Đang đối chiếu phiếu cân (chưa tính xong): nếu còn chi tiết CÓ THỂ bị phiếu cân làm đổi kết quả thì KHÔNG hiện "Đã hoàn thành" rồi mới đổi — hiện "Đang kiểm tra…"
+    if (done && pending && contract) {
+      const allIds = new Set(((contract && contract.details) || []).map((d) => d.id));
+      if (detailsWithoutClearance(list, contract, { tripDetails: allIds }).length)
+        return {
+          code: 'running',
+          label: 'Đang kiểm tra…',
+          pending: true,
+          basis: 'Đang đối chiếu phiếu cân trong Lưu trữ để xác định chi tiết nào cần tờ khai thông quan',
+          total: list.length,
+          cleared,
+          missingDetails: [],
+        };
+    }
     // Quy tắc nghiệp vụ ĐÃ XÁC NHẬN (14/11/2026): hợp đồng "Đã hoàn thành" khi mọi tờ khai đã thông quan. Không bao hàm đủ KL / đã nộp thuế / đã giao hết — các chỉ tiêu đó hiển thị riêng (axes).
     return {
       code: done ? 'done' : 'running',
       label: done ? 'Đã hoàn thành' : 'Đang thực hiện',
+      unverified: unverified && done ? true : undefined,
       basis: done
-        ? 'Mọi tờ khai đã thông quan và mọi chi tiết đã có chứng thư / phiếu cân đều có tờ khai thông quan'
+        ? 'Mọi tờ khai đã thông quan và mọi chi tiết đã có chứng thư / phiếu cân đều có tờ khai thông quan' +
+          (unverified ? ' (CHƯA đối chiếu được phiếu cân trong Lưu trữ — chỉ xét chứng thư)' : '')
         : missing.length
           ? 'Còn ' + missing.length + ' chi tiết chưa có tờ khai thông quan: ' + missing.map((d) => d.ship || d.certNo || d.id).join(', ')
           : '',

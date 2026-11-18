@@ -104,6 +104,20 @@ const file = path.join(tmp, 'can.xlsx');
   await p.click('#page-' + T + ' [data-year-save]');
   await p.waitForTimeout(1500);
 
+  console.log('2b) Hộp dán danh sách mã phiếu: phân biệt "đã loại vì KL ≤ 0" với "không tìm thấy"');
+  await goto('#/' + T);
+  await p.click('#btnPick-' + T);
+  await p.waitForTimeout(500);
+  await p.fill('#pickPaste', 'N101\nN102\nN999');
+  await p.click('#pickApply');
+  await p.waitForTimeout(400);
+  const pm = await p.evaluate(() => document.getElementById('pickPasteMsg').innerText.replace(/\s+/g, ' '));
+  check(/không tìm thấy: N999/.test(pm) && !/không tìm thấy: [^;]*N102/.test(pm), 'N999 là "không tìm thấy"');
+  check(/LOẠI vì khối lượng ≤ 0[^:]*: N102/.test(pm), 'N102 báo "đã LOẠI vì khối lượng ≤ 0" (' + pm + ')');
+  await p.click('#pickModal button:has-text("Xong")');
+  await p.waitForTimeout(500);
+  await p.evaluate((t) => HAK.Pages && HAK.Pages._clearPick && HAK.Pages._clearPick(t), T);
+
   console.log('3) Lưu trữ + Báo cáo: meta ghi phiếu đã loại; Ngoại lệ cần đối soát liệt kê; Báo cáo tổng hợp cùng số xe / kg');
   const meta = await p.evaluate(async () => {
     const l = await HAK.Archive.list();

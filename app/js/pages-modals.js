@@ -6,6 +6,28 @@
 (function (root) {
   'use strict';
   const HAK = (root.HAK = root.HAK || {});
+  /**
+   * Tách các số phiếu "không có trong danh sách" thành: bị LOẠI vì KL ≤ 0 (quy tắc 29: nằm trong ds.excluded — khớp đúng số phiếu hoặc đuôi số phiếu)
+   * và thật sự KHÔNG TÌM THẤY. Hàm thuần: excluded = ds.excluded, tokens = các số đã dán.
+   */
+  const splitMissing = (excluded, tokens) => {
+    const low = (v) =>
+      String(v == null ? '' : v)
+        .trim()
+        .toLowerCase();
+    const ex = (excluded || []).map((x) => low(x.ticket)).filter(Boolean),
+      out = { excluded: [], notFound: [] };
+    (tokens || []).forEach((t) => {
+      const k = low(t);
+      (k && ex.some((e) => e === k || e.endsWith(k)) ? out.excluded : out.notFound).push(t);
+    });
+    return out;
+  };
+  const missText = (esc, parts) =>
+    (parts.notFound.length ? '; không tìm thấy: ' + esc(parts.notFound.join(', ')) : '') +
+    (parts.excluded.length
+      ? '; đã LOẠI vì khối lượng ≤ 0 (không cộng vào tổng, xem Báo cáo › Ngoại lệ cần đối soát): ' + esc(parts.excluded.join(', '))
+      : '');
   HAK.PagesModals = function (ctx) {
     const { G, ST, $, esc, toast, debounce, fmtInt, getDs } = ctx;
     // Hàm dùng chung gọi qua ctx tại thời điểm dùng (giữ nguyên ngữ nghĩa khi pages.js gán lại hàm)
@@ -233,14 +255,15 @@
           else if (r.kind === 'many') pickAmb.push({ token: t, hits: r.hits });
           else miss.push(t);
         });
-        const added = addKeys(auto);
+        const added = addKeys(auto),
+          parts = splitMissing((getDs(pickType) || {}).excluded, miss);
         $('#pickPasteMsg').innerHTML =
           '<span class="' +
           (miss.length || pickAmb.length ? 'text-warning' : 'text-success') +
           '">Đã chọn ' +
           added +
           ' phiếu' +
-          (miss.length ? '; không tìm thấy: ' + esc(miss.join(', ')) : '') +
+          missText(esc, parts) +
           (pickAmb.length ? '; ' + pickAmb.length + ' số khớp NHIỀU phiếu — xác nhận bên dưới' : '') +
           '</span>';
         renderPickAmb();
@@ -611,14 +634,9 @@
               }
             });
         });
+        const parts = splitMissing((getDs(retType) || {}).excluded, miss);
         $('#retPasteMsg').innerHTML =
-          '<span class="' +
-          (miss.length ? 'text-warning' : 'text-success') +
-          '">Đã thêm ' +
-          add +
-          ' xe' +
-          (miss.length ? '; không tìm thấy: ' + esc(miss.join(', ')) : '') +
-          '</span>';
+          '<span class="' + (miss.length ? 'text-warning' : 'text-success') + '">Đã thêm ' + add + ' xe' + missText(esc, parts) + '</span>';
         renderReturnList();
         updateSummary(retType);
       });
@@ -636,4 +654,5 @@
       resolveTicket,
     };
   };
+  HAK.PagesModals.splitMissing = splitMissing;
 })(window);

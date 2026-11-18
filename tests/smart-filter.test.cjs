@@ -131,3 +131,46 @@ test('report supports several types while retaining deduplication and export mod
 test('unknown archived smart conditions fail closed instead of exporting extra rows', () => {
   assert.throws(() => F.trips(rows, { sel: { future: ['yes'] } }), /không được hỗ trợ/);
 });
+test('M2.1: bộ lọc đã lưu tham chiếu mục không còn tồn tại → báo "hết hiệu lực" (stale), không im lặng; giá trị còn lại giữ nguyên', () => {
+  const cfg = {
+    screenId: 's',
+    fields: [{ key: 'contract', label: 'Hợp đồng', type: 'multi', options: () => [{ value: 'hd-1', label: 'HD-1' }], match: () => true }],
+  };
+  const r = F.core.applyPreset(cfg, { state: { sel: { contract: ['hd-1', 'hd-da-xoa'] } } });
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.stale, [{ key: 'contract', label: 'Hợp đồng', count: 1, total: 2 }]);
+  assert.deepEqual(r.state.sel.contract, ['hd-1', 'hd-da-xoa'], 'giữ điều kiện (không tự rộng ra thành "tất cả")');
+  assert.deepEqual(r.dropped, [], 'không rò mã nội bộ vào thông báo');
+  const ok = F.core.applyPreset(cfg, { state: { sel: { contract: ['hd-1'] } } });
+  assert.deepEqual(ok.stale, []);
+});
+test('M2.4: ô tìm — biển số chuẩn hóa (quy tắc 26), dấu tiếng Việt / NFD, ký tự đặc biệt, rỗng, rất dài đều không lỗi và cho kết quả nhất quán', () => {
+  const mk = (t, plate, driver) => ({
+    ticket: t,
+    plate,
+    driver,
+    dateStr: '05/01/2026',
+    ts1: Date.UTC(2026, 0, 5, 8),
+    net: 1000,
+    note: 'TÀU (A) [1]',
+    carrier: 'Đà Nẵng',
+  });
+  const rows = [
+    mk('1', '43C-111.11', 'Nguyễn Văn Đức'),
+    mk('2', '43C-222.22', 'NGUYỄN VĂN ĐỨC'),
+    mk('3', '51C-333.33', 'Trần Thị Hoa'),
+    mk('4', '43c 44444', 'Le Van A'),
+  ];
+  const ids = (q) =>
+    F.trips(rows, { q })
+      .map((r) => r.ticket)
+      .join(',');
+  assert.equal(ids(''), '1,2,3,4');
+  assert.equal(ids('   '), '1,2,3,4');
+  for (const q of ['43C11111', '43c-111.11', '43C 111 11']) assert.equal(ids(q), '1', q);
+  assert.equal(ids('43c44444'), '4');
+  for (const q of ['nguyen van duc', 'NGUYỄN VĂN ĐỨC', 'Nguyễn Văn Đức'.normalize('NFD'), 'đức', 'duc']) assert.equal(ids(q), '1,2', q);
+  for (const q of ['.*', '\\', '(', '[', '%', '\u0000', 'a|b', '"', '-']) assert.doesNotThrow(() => ids(q), q);
+  assert.equal(ids('-'), '1,2,3', 'chỉ dấu gạch: khớp theo chuỗi con như cũ (biển số có gạch), không khớp nhầm cả ô không có gạch');
+  assert.equal(ids('x'.repeat(50000)), '');
+});

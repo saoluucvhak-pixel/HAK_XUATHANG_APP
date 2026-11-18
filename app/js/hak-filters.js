@@ -163,11 +163,17 @@
     ),
     { key: 'warnings', label: 'Chỉ dòng có cảnh báo', type: 'bool', match: (r) => !!(r.warn && r.warn.length) },
   ];
+  /** Khớp biển số theo khóa chuẩn hóa (quy tắc 26): "43C11111" ≡ "43c-111.11" ≡ "43C 111 11" — cùng khóa với Tìm kiếm chung. */
+  const plateKey = (v) => SF.fold(v == null ? '' : String(v)).replace(/[^a-z0-9]+/g, '');
+  const plateHit = (plate, q) => {
+    const k = plateKey(q);
+    return !!k && plateKey(plate).includes(k);
+  };
   function tripConfig(options) {
     return {
       screenId: 'trips',
       fields: tripFields(options || (() => [])),
-      matchQ: (r, q) => SF.hay([r.ticket, r.plate, r.driver, r.carrier, r.note, r.weigher]).includes(q),
+      matchQ: (r, q) => SF.hay([r.ticket, r.plate, r.driver, r.carrier, r.note, r.weigher]).includes(q) || plateHit(r.plate, q),
       matchDate: (r, f, t) => dateMatch(r.dateStr || r.ts1, f, t),
     };
   }
@@ -179,5 +185,5 @@
         if (!allowed[kind].includes(key)) throw new RangeError('Điều kiện lọc không được hỗ trợ: ' + key);
     return root.HAKSmartFilter.createFilter(tripConfig(), { initialState: state }).filter(rows).rows;
   }
-  HAK.Filters = { mount, multi, day, dateMatch, assertState, core: SF, tripConfig, trips };
+  HAK.Filters = { mount, multi, day, dateMatch, assertState, core: SF, tripConfig, trips, plateHit };
 })(typeof window !== 'undefined' ? window : globalThis);
