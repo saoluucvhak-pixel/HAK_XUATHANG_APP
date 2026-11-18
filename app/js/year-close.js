@@ -70,6 +70,10 @@
     return { state, bundle, skipped };
   }
   async function finalize(expected, bundle, proof) {
+    if (H.Storage && H.Storage.mode !== 'idb') {
+      H.Storage.assertOpen();
+      return H.DBSqlite.finalizeYear(expected, bundle, proof);
+    }
     const db = await H.DB.open();
     if (!db) throw Error('Không mở được kho dữ liệu.');
     return new Promise((ok, no) => {

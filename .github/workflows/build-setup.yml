@@ -7,6 +7,7 @@ on:
     tags: ['v*']
 permissions:
   contents: write
+  actions: read
 jobs:
   setup:
     runs-on: windows-latest
@@ -91,6 +92,25 @@ jobs:
           "EXISTS=$($exists.ToString().ToLower())" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           if ($exists) { Write-Host "Release v$env:VERSION đã có — KHÔNG ghi đè. Muốn phát hành bản mới: nâng số phiên bản (version.js + installer/setup.nsi)." }
           $global:LASTEXITCODE = 0
+      - name: Wait for quality acceptance of this commit
+        if: steps.rel.outputs.EXISTS != 'true' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $deadline = (Get-Date).AddMinutes(25)
+          do {
+            $json = gh api "repos/$env:GITHUB_REPOSITORY/actions/workflows/quality.yml/runs?head_sha=$env:GITHUB_SHA&event=push&per_page=10"
+            if ($LASTEXITCODE -ne 0) { throw 'Cannot read quality workflow results' }
+            $run = ($json | ConvertFrom-Json).workflow_runs | Sort-Object created_at -Descending | Select-Object -First 1
+            if ($run -and $run.status -eq 'completed') {
+              if ($run.conclusion -ne 'success') { throw "Quality acceptance failed: $($run.conclusion) $($run.html_url)" }
+              Write-Host "Quality acceptance passed: $($run.html_url)"
+              break
+            }
+            if ((Get-Date) -ge $deadline) { throw 'Timed out waiting for quality acceptance; setup has not been published' }
+            Start-Sleep -Seconds 20
+          } while ($true)
       - name: Publish release
         if: steps.rel.outputs.EXISTS != 'true' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
         uses: softprops/action-gh-release@v2

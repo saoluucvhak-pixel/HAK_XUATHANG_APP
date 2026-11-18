@@ -52,6 +52,71 @@ const rejects = async (p, test) => {
   assert.fail('phải bị từ chối');
 };
 
+test('đóng năm trên SQLite: chốt sổ và xóa đợt nguyên tử, giữ năm khác và bản đóng dở khác', async () => {
+  await boot(true);
+  require('../app/js/year-close.js');
+  const meta = { id: 'batch-close', fileName: '2025.xlsx', type: 'xuatkhau', rev: 1 };
+  const bytes = new Uint8Array([1, 2, 3]).buffer;
+  const bundle = { year: 2025, records: [{ id: 'old' }], archive: [], batches: [{ meta, b64: 'AQID' }] };
+  const proof = { sha256: 'qa-close', path: 'year.zip', size: 3 };
+  await DB.put('batches', meta);
+  await DB.put('batchdata', bytes, meta.id);
+  await DB.kvPut('hak.yearbook.v1', {
+    revision: 4,
+    records: [
+      { id: 'old', year: 2025 },
+      { id: 'keep', year: 2026 },
+    ],
+    closed: [{ sha256: 'other', pending: true }],
+  });
+  await HAK.YearClose.finalize(4, bundle, proof);
+  const state = await DB.kvGet('hak.yearbook.v1');
+  assert.equal(state.revision, 5);
+  assert.deepEqual(state.records, [{ id: 'keep', year: 2026 }]);
+  assert.equal(state.closed.find((c) => c.sha256 === proof.sha256).pending, false);
+  assert.equal(state.closed.find((c) => c.sha256 === 'other').pending, true);
+  assert.equal(await DB.get('batches', meta.id), undefined);
+  assert.equal(await DB.get('batchdata', meta.id), undefined);
+});
+
+test('đóng năm SQLite: file cân đổi hoặc sổ năm cũ không được xóa dữ liệu', async () => {
+  await boot(true);
+  const meta = { id: 'batch-conflict', fileName: '2025.xlsx', rev: 1 };
+  const bundle = { year: 2025, records: [{ id: 'old' }], archive: [], batches: [{ meta, b64: 'AQID' }] };
+  await DB.put('batches', meta);
+  await DB.put('batchdata', new Uint8Array([9]).buffer, meta.id);
+  await DB.kvPut('hak.yearbook.v1', { revision: 4, records: [{ id: 'old' }] });
+  for (const expected of [3, 4]) await assert.rejects(HAK.DBSqlite.finalizeYear(expected, bundle, { sha256: 'qa' }), /thay đổi/);
+  assert.equal((await DB.kvGet('hak.yearbook.v1')).revision, 4);
+  assert.ok(await DB.get('batches', meta.id));
+  assert.deepEqual(Array.from(new Uint8Array(await DB.get('batchdata', meta.id))), [9]);
+});
+
+test('đóng năm SQLite: cửa sổ khác thay đợt sau khi đọc thì toàn bộ giao dịch bị hủy', async () => {
+  await boot(true);
+  const meta = { id: 'batch-race', fileName: '2025.xlsx', rev: 1 };
+  const bundle = { year: 2025, records: [{ id: 'old' }], archive: [], batches: [{ meta, b64: 'AQID' }] };
+  await DB.put('batches', meta);
+  await DB.put('batchdata', new Uint8Array([1, 2, 3]).buffer, meta.id);
+  await DB.kvPut('hak.yearbook.v1', { revision: 4, records: [{ id: 'old' }] });
+  const call = S.call;
+  S.call = async (path, body, options) => {
+    if (path === '/db/tx' && body.ops.some((op) => op.op === 'del' && op.table === 'batches')) {
+      const row = (await call('/db/query', { table: 'batches', where: { id: meta.id } })).rows[0];
+      await call('/db/tx', { ops: [{ op: 'put', table: 'batches', row: { ...row, doc: JSON.stringify({ ...meta, rev: 2 }) } }] });
+    }
+    return call(path, body, options);
+  };
+  try {
+    await assert.rejects(HAK.DBSqlite.finalizeYear(4, bundle, { sha256: 'qa' }), { code: 'conflict' });
+  } finally {
+    S.call = call;
+  }
+  assert.equal((await DB.kvGet('hak.yearbook.v1')).revision, 4);
+  assert.equal((await DB.get('batches', meta.id)).rev, 2);
+  assert.ok(await DB.get('batchdata', meta.id));
+});
+
 test('chưa kích hoạt SQLite: chế độ IndexedDB nhưng báo HAKDocs-SQLite có sẵn (cho màn di trú); không gợi ý nhớ', async () => {
   const b = await boot(false);
   assert.equal(S.mode, 'idb');

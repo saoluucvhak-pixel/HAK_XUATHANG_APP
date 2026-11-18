@@ -1,5 +1,11 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.22.1 — Đóng năm đúng nguồn SQLite và kiểm tra trước khi phát hành
+- Đóng năm và tiếp tục đóng năm dùng giao dịch SQLite khi SQLite đang là nguồn chính. Sổ hồ sơ năm, thông số đợt và file Excel gốc được kiểm tra phiên bản trước khi dọn cùng một giao dịch.
+- Có thay đổi từ cửa sổ khác hoặc file cân không khớp bản ZIP thì chặn dọn, giữ dữ liệu để đối soát.
+- Bổ sung kiểm thử trên SQLite cho đóng năm, sai dữ liệu và xung đột giữa hai cửa sổ.
+- Bộ cài chỉ được công bố sau khi workflow HAK quality của đúng commit thành công.
+
 ## v2.21.4 — Bộ cài chỉ dừng HAKDocs của đúng thư mục cài; công cụ đối soát dữ liệu
 - **Bộ cài:** trước đây khi cài / nâng cấp / gỡ, bộ cài dừng MỌI tiến trình `HAKDocs.exe` theo tên (`taskkill /IM`), có thể làm dừng HAKDocs của một bản cài khác trên cùng máy. Nay `installer/stop-hakdocs.ps1` chỉ dừng tiến trình HAKDocs nằm trong `<thư mục cài>\native\`; bản cài khác không bị ảnh hưởng. CI Windows kiểm bằng 3 bản giả lập (dừng a, còn nguyên b và a2).
 - **Công cụ đối soát dữ liệu** `npm run audit:data` (chỉ đọc, không sửa dữ liệu): liệt kê phiếu lặp cùng phạm vi báo cáo, phiếu cùng nhận diện khác khối lượng / cờ xe trả về / liên kết, phiếu đi qua bước nghiệp vụ hợp lệ (kho gửi → hồ sơ đích), phiếu thiếu ngày / thiếu nhận diện, giấy nộp tiền nghi trùng, bản ghi mồ côi, hồ sơ không đọc được — kèm mã hồ sơ nguồn. Có bộ dữ liệu thử đủ ca (`--sample`, `--write-sample`).
