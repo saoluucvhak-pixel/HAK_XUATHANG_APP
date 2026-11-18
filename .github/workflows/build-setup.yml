@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['app/**', 'installer/setup.nsi', 'installer/native/**', '.github/workflows/build-setup.yml']
+    paths: ['app/**', 'installer/**', '.github/workflows/build-setup.yml']
     tags: ['v*']
 permissions:
   contents: write
@@ -75,6 +75,10 @@ jobs:
           Get-FileHash "HAK_QuanLyXuatHang_Setup_v$ver.exe" -Algorithm SHA256 | Format-List
           "SETUP=HAK_QuanLyXuatHang_Setup_v$ver.exe" | Out-File -FilePath $env:GITHUB_ENV -Append
           "SHA256=$((Get-FileHash "HAK_QuanLyXuatHang_Setup_v$ver.exe" -Algorithm SHA256).Hash.ToLower())" | Out-File -FilePath $env:GITHUB_ENV -Append   # ghi vào ghi chú phát hành để đối chiếu toàn vẹn file tải về
+      - name: Accept install, upgrade, failure and uninstall of this setup
+        shell: pwsh
+        run: |
+          & ./installer/test-setup.ps1 -SetupPath "$env:SETUP" -ExpectedVersion "$env:VERSION"
       - uses: actions/upload-artifact@v4
         continue-on-error: true   # hết dung lượng artifact của GitHub không được chặn việc đăng bản phát hành (file cài đặt vẫn đính kèm ở Release)
         with:
