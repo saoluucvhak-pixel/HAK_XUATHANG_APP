@@ -397,6 +397,44 @@
     return unpack(s);
   }
 
+  /**
+   * Kiểm tra mục lục (meta) ↔ nội dung (data) của MỘT hồ sơ — thuần, không ghi gì. Trả mảng lỗi (rỗng = khớp).
+   * Số phiếu / tổng kg phải bằng dữ liệu phiếu; phiếu KL ≤ 0 đã loại (meta.nonPos*): số lượng khớp danh sách (tối đa 50 dòng được giữ), mọi dòng KL ≤ 0, tổng kg khớp khi danh sách đủ.
+   * Dữ liệu trống (hồ sơ cũ chưa có data) không phải lỗi ở đây — do kiểm tra khác ("thiếu dữ liệu").
+   */
+  function indexIssues(meta, payload) {
+    const out = [],
+      rows = payload && Array.isArray(payload.rows) ? payload.rows : null;
+    if (!rows) return ['không đọc được dòng phiếu của hồ sơ'];
+    if (meta.trips !== rows.length) out.push('mục lục ghi ' + meta.trips + ' phiếu, nội dung có ' + rows.length);
+    const kg = Math.round(rows.reduce((a, r) => a + (Number(r.net) || 0), 0) * 1000) / 1000;
+    if (Math.abs((Number(meta.kg) || 0) - kg) > 0.0005) out.push('mục lục ghi ' + meta.kg + ' kg, nội dung có ' + kg + ' kg');
+    if (meta.nonPos !== undefined || meta.nonPosTrips !== undefined) {
+      const list = Array.isArray(meta.nonPos) ? meta.nonPos : [];
+      if (!(meta.nonPosTrips >= list.length) || (list.length < 50 && meta.nonPosTrips !== list.length))
+        out.push('phiếu KL ≤ 0: mục lục ghi ' + meta.nonPosTrips + ' phiếu nhưng danh sách có ' + list.length);
+      if (list.some((x) => !(Number(x.kg) <= 0))) out.push('phiếu KL ≤ 0: có dòng khối lượng dương trong danh sách loại');
+      if (list.length < 50 && Math.abs((Number(meta.nonPosKg) || 0) - list.reduce((a, x) => a + (Number(x.kg) || 0), 0)) > 0.0005)
+        out.push('phiếu KL ≤ 0: tổng kg trong mục lục không khớp danh sách');
+    }
+    return out;
+  }
+  /** Kiểm toàn bộ kho Lưu trữ đang dùng (chỉ đọc): { checked, issues:[{id,title,problems[]}] }. */
+  async function verifyIndex() {
+    const metas = await list(),
+      issues = [];
+    for (const m of metas) {
+      let problems;
+      try {
+        problems = indexIssues(m, await load(m.id));
+      } catch (e) {
+        problems = [e && e.message ? e.message : String(e)];
+      }
+      if (problems.length) issues.push({ id: m.id, title: m.title || m.id, problems });
+    }
+    return { checked: metas.length, issues };
+  }
+
   /** Gắn / gỡ hợp đồng cho các hồ sơ (đợt giao hàng): detailId = mã chi tiết hợp đồng (rỗng = gỡ). Chỉ sửa meta; dữ liệu phiếu cân giữ nguyên. */
   async function setContract(ids, detailId) {
     let n = 0;
@@ -920,6 +958,9 @@
     },
     setContract,
     closeVerified,
+    indexIssues,
+    remove: delOne,
+    verifyIndex,
     decode: unpack,
     SOFT_WARN,
     save,
