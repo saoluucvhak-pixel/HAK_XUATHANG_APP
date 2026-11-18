@@ -22,6 +22,7 @@
     "e2e:dialogs": "node tools/e2e-dialogs.cjs",
     "e2e:roundtrip": "node tools/e2e-roundtrip.cjs",
     "e2e:archive-ops": "node tools/e2e-archive-ops.cjs",
+    "e2e:gsync-parity": "node tools/e2e-gsync-parity.cjs",
     "snapshot:customs": "node tools/customs-snapshot.cjs",
     "audit:data": "node tools/data-audit.cjs",
     "accept": "node tools/accept.cjs",
