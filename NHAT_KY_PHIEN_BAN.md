@@ -3,6 +3,7 @@
 ## v2.22.4 — Rà soát vòng 2: bộ lọc, lưu trữ, khôi phục, giao diện bàn phím
 - **Hộp thoại:** đóng bằng Esc hoặc nút Đóng nay TRẢ tiêu điểm về đúng nút đã mở hộp thoại (trước đây rơi về đầu trang, người dùng bàn phím mất vị trí); hộp thoại chồng nhau chỉ trả khi hộp cuối đóng. Tìm kiếm chung (Ctrl+K) cũng trả tiêu điểm khi đóng; khi đang có hộp thoại mở thì không mở chồng (trước đây tiêu điểm bị giật khỏi ô tìm, gõ nhầm ô).
 - **Trạng thái hợp đồng khi đang đối chiếu phiếu cân:** lúc nguồn "chi tiết đã có phiếu cân" chưa tính xong, hợp đồng có thể đổi kết quả hiện "Đang kiểm tra…" (thay vì hiện "Đã hoàn thành" rồi đổi); không tính được thì ghi rõ "chưa đối chiếu được phiếu cân".
+- **Khôi phục:** file sao lưu dùng định dạng phiên bản mới hơn bản app đang chạy bị từ chối bằng thông báo rõ (trước đây vẫn chạy và có thể khôi phục thiếu dữ liệu). Kiểm vòng tròn sao lưu → xóa → khôi phục → khôi phục lặp trên cả IndexedDB và SQLite: số liệu trước = sau, không nhân đôi.
 - **Bộ lọc:** ô tìm khớp biển số theo dạng chuẩn hóa ("43C11111" tìm ra "43C-111.11") ở bộ lọc phiếu và Chi tiết xuất hàng theo HĐ; bộ lọc đã lưu tham chiếu mục đã xóa / đổi tên nay báo rõ "điều kiện hết hiệu lực" (không rò mã nội bộ).
 - **Chọn phiếu / Xe trả về:** hộp dán danh sách mã phiếu phân biệt "đã LOẠI vì khối lượng ≤ 0" với "không tìm thấy".
 - Công cụ: `npm run e2e:export-parity` (màn hình = Excel = Word = PDF), `npm run e2e:dialogs`; cả hai chạy trong CI.

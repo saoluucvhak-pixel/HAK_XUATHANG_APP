@@ -48,6 +48,9 @@ jobs:
       - run: npm run e2e:nonpositive   # phiếu KL ≤ 0 không cộng vào tổng, liệt kê ở Ngoại lệ cần đối soát
       - run: npm run e2e:export-parity   # màn hình = Excel = Word = PDF cùng tập phiếu (ca sát biên ngày/giờ, biển số chuẩn hóa, phiếu KL ≤ 0)
       - run: npm run e2e:dialogs   # hộp thoại: Tab không rơi ra nền, Esc đóng, tiêu điểm trả về nút đã mở, hộp chồng nhau
+      - run: npm run e2e:roundtrip   # sao lưu → xóa → khôi phục vòng tròn (IndexedDB): số liệu trước = sau; khôi phục lặp không nhân đôi; file hỏng bị từ chối
+      - run: node tools/e2e-sqlite.cjs tools/e2e-roundtrip.cjs   # như trên trên SQLite (máy chủ tham chiếu)
+      - run: node tools/e2e-sqlite.cjs tools/e2e-contract-status.cjs   # trạng thái hợp đồng một nguồn trên SQLite
       - run: npm run accept:release   # Word và PDF BẮT BUỘC: thiếu / không đọc lại được file → lỗi (chưa xác minh)
 
   accept-windows:

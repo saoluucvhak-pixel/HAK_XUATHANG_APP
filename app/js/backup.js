@@ -291,6 +291,13 @@
   function validateBackup(j) {
     if (!j || j.app !== APP || typeof j.keys !== 'object' || !Array.isArray(j.archive))
       throw new Error('Đây không phải file sao lưu toàn bộ của app.');
+    // Định dạng sao lưu do bản app MỚI HƠN tạo ra: không đoán — từ chối để không khôi phục thiếu / sai dữ liệu
+    if (j.v !== undefined && j.v !== 1)
+      throw new Error(
+        'File sao lưu này dùng định dạng phiên bản ' +
+          j.v +
+          ' mà bản app hiện tại chưa hỗ trợ. Hãy cập nhật app lên bản mới nhất rồi thử lại; dữ liệu hiện có chưa bị thay đổi.'
+      );
     for (const store of ['attachments', 'bklsTemplates']) {
       if (j[store] !== undefined && !Array.isArray(j[store])) throw new Error('Kho tệp sao lưu không hợp lệ');
       for (const item of j[store] || []) {
