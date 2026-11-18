@@ -51,3 +51,28 @@ test('biển số khác hoa/thường hoặc khoảng trắng ở hai hình th�
   const r = both({ xuatkhau: [row({ ticket: '7', plate: '43C-111.11' })], uythac: [row({ ticket: '7', plate: '43c-111.11 ' })] });
   agree(r);
 });
+test('mục 26: mọi nơi dùng CÙNG một khóa biển số (Excel computeStats, Weigh, Tìm kiếm chung, Danh sách xe)', () => {
+  global.HAK.Excel || require('../app/js/excel.js');
+  HAK.Store = HAK.Store || { get: () => null, set() {}, remove() {} };
+  require('../app/js/vehicles.js');
+  const variants = ['43C-111.11', '43c-111.11', ' 43C 11111 ', '43C.111.11', '43c11111', '43Đ-123.45', '43d-12345'];
+  const keys = variants.map((v) => HAK.Weigh.plateKey(v));
+  assert.equal(new Set(keys.slice(0, 5)).size, 1);
+  assert.equal(keys[5], keys[6], 'Đ ≡ D');
+  variants.forEach((v) => {
+    assert.equal(HAK.Excel.util.plateKey(v), HAK.Weigh.plateKey(v), 'Excel ≡ Weigh: ' + v);
+    assert.equal(HAK.Search.key(v), HAK.Weigh.plateKey(v).toLowerCase(), 'Tìm kiếm ≡ Weigh: ' + v);
+    assert.equal(HAK.Vehicles.normPlate(v.replace(/[đĐ]/g, 'D')), HAK.Weigh.plateKey(v), 'Danh sách xe: ' + v);
+  });
+  // computeStats đếm số xe theo khóa chuẩn hóa
+  const rows = ['43C-111.11', '43c-111.11', '43C 11111', '51C-222.22'].map((p, i) => ({
+    plate: p,
+    net: 1000,
+    ts1: null,
+    ticket: 'T' + i,
+    note: '',
+  }));
+  const st = HAK.Excel.computeStats(rows);
+  assert.equal(st.plates, 2);
+  assert.equal(st.byPlate.find((x) => HAK.Weigh.plateKey(x.plate) === '43C11111').trips, 3);
+});

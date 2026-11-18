@@ -72,6 +72,14 @@
       .replace(/\s+/g, ' ')
       .trim();
   }
+  /** Khóa biển số để đếm / gộp xe: không phân biệt hoa/thường, khoảng trắng, dấu gạch, dấu chấm, dấu tiếng Việt ("43c-111.11" ≡ "43C 11111"). Cùng quy tắc HAK.Weigh.plateKey / Tìm kiếm chung (có test đối chiếu). */
+  const plateKey = (s) =>
+    String(s == null ? '' : s)
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[đĐ]/g, 'D')
+      .toUpperCase()
+      .replace(/[^0-9A-Z]/g, '');
   const isBlank = (v) => v === null || v === undefined || (typeof v === 'string' && v.trim() === '');
 
   /** Đọc số từ ô Excel: hỗ trợ "13.770", "13,770", "1,979", "36,042,650", "12.5", "12,5". */
@@ -686,10 +694,11 @@
         if (r.ts1 < minTs) minTs = r.ts1;
         if (r.ts1 > maxTs) maxTs = r.ts1;
       }
-      let p = plates.get(r.plate);
+      const pk = plateKey(r.plate);
+      let p = plates.get(pk);
       if (!p) {
         p = { plate: r.plate, trips: 0, kg: 0, minTs: Infinity, maxTs: -Infinity };
-        plates.set(r.plate, p);
+        plates.set(pk, p);
       }
       p.trips++;
       p.kg += r.net;
@@ -734,6 +743,6 @@
     readBuffer,
     parseSheet,
     computeStats,
-    util: { norm, parseNum, parseDT, partsToTs, tsToParts, fmtDate, fmtDateTime, normTicket, colName, isBlank },
+    util: { norm, parseNum, parseDT, partsToTs, tsToParts, fmtDate, fmtDateTime, normTicket, plateKey, colName, isBlank },
   };
 })(typeof window !== 'undefined' ? window : globalThis);

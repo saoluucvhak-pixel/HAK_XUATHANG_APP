@@ -90,7 +90,7 @@
         const k =
           nk(r.ticket) +
           '|' +
-          nk(r.plate) +
+          key(r.plate) +
           '|' +
           (r.ts1 !== null && r.ts1 !== undefined ? r.ts1 : r.time1) +
           (r.ticket ? '' : '|' + r.net);
