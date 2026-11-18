@@ -37,4 +37,10 @@ Các quy tắc dưới đây đã được **suy ra từ mã nguồn / tài li�
 24. **Mỗi chi tiết một tờ khai.** — **ĐÃ XÁC NHẬN (17/11/2026): GIỮ NGUYÊN NHƯ APP HIỆN TẠI.** Nhập tờ khai tự bỏ liên kết chi tiết nếu chi tiết đã có tờ khai khác; thao tác tay vẫn cho phép hai tờ khai cùng chi tiết (rà soát báo `DECL_DETAIL_SHARED`). *Câu hỏi:* đây là quy tắc cứng hay cho phép nhiều tờ khai / chi tiết (khai bổ sung theo tờ khai mới)?
 25. **KL gốc bằng 0 khác KL gốc để trống (đã có, giữ).** 0 là giá trị thật (qua lưu / đọc lại, phụ lục, bỏ phụ lục đều giữ 0); trống = chưa nhập. Chỉ ghi lại để dễ đối chiếu.
 
+## Đợt rà soát vòng 1 (v2.22.2) — CHỜ XÁC NHẬN (chưa đổi hành vi)
+
+26. **Số có dấu phẩy + đúng 3 chữ số ("1,200") — CHỜ XÁC NHẬN.** Bộ đọc Excel / ô nhập coi là 1200 (dấu nghìn); bộ đọc Tờ khai / Chứng thư coi là 1,2 (dấu phẩy thập phân kiểu Việt). Hai kiểu đúng với nguồn của từng bộ đọc nên GIỮ NGUYÊN; cần xác nhận không có file Tờ khai / Chứng thư nào dùng dấu phẩy làm dấu nghìn.
+27. **"Đã hoàn thành" ở Danh mục chưa tính phiếu cân — CHỜ XÁC NHẬN.** Báo cáo thực hiện hợp đồng xét cả chi tiết mới có phiếu cân (chưa chứng thư); Danh mục chỉ xét chứng thư (phiếu cân nằm trong Lưu trữ, đọc bất đồng bộ). Đã ghi chú trên màn hình; cần quyết định có nạp bộ nhớ đệm "chi tiết nào đã có phiếu cân" cho Danh mục hay không.
+28. **Làm tròn kg ở SQLite — CHỜ XÁC NHẬN.** Cột chỉ mục `kg_milli` làm tròn 1/1000 kg; nội dung hồ sơ vẫn giữ nguyên số gốc. Danh sách hồ sơ trên SQLite hiển thị kg đã làm tròn gram, IndexedDB hiển thị số gốc; chênh < 0,0005 kg mỗi hồ sơ, không ảnh hưởng số tấn hiển thị.
+
 **Không còn mục nào chờ xác nhận** (mục 1–16 xác nhận ngày 17/11/2026; mục 17–24 xác nhận giữ nguyên).

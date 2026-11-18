@@ -255,3 +255,6 @@ Danh sách đầy đủ: Cài đặt → Mẫu Word.
 
 ## Dựng lại mẫu mặc định
 `python3 tools/build_templates.py <thư_mục_file_mẫu> templates && python3 tools/embed_templates.py`
+
+## Xác nhận phạm vi trước khi xuất (từ v2.22.2)
+Bấm **Word / PDF / Excel** hoặc **Lập BKLS** trên trang biên bản đều hiện hộp xác nhận: công ty · tàu · số phiếu · phiếu bỏ · xe trả về · thực giao. Bấm *Hủy* để chỉnh lại phạm vi; BKLS dựng lại từ **Lưu trữ** không hỏi lại (dùng đúng phạm vi đã lưu).
