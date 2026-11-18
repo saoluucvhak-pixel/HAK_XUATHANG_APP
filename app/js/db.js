@@ -22,6 +22,14 @@
     bklsTemplates: { keyPath: 'id' },
   };
   const memStores = {}; // dự phòng khi không có IndexedDB
+  /** Backend SQLite (HAKDocs) khi HAK.Storage.mode === 'sqlite'; kho "handles" luôn ở IndexedDB (tay cầm thư mục không tuần tự hóa được). null = dùng IndexedDB. Bị chặn → ném lỗi. */
+  const sqlite = async (store) => {
+    const S = HAK.Storage;
+    if (!S) return null;
+    await S.whenReady();
+    S.assertOpen();
+    return S.mode === 'sqlite' && store !== 'handles' && HAK.DBSqlite ? HAK.DBSqlite : null;
+  };
   const state = { backend: root.indexedDB ? 'idb' : 'mem', error: null };
   let dbp = null;
 
@@ -97,6 +105,8 @@
     });
 
   async function kvPut(key, val, ls) {
+    const q = await sqlite('kv');
+    if (q) return q.kvPut(key, val);
     const db = await open();
     if (!db) return;
     const tx = db.transaction('kv', 'readwrite');
@@ -104,6 +114,8 @@
     return txDone(tx);
   }
   async function kvDel(key) {
+    const q = await sqlite('kv');
+    if (q) return q.kvDel(key);
     const db = await open();
     if (!db) return;
     const tx = db.transaction('kv', 'readwrite');
@@ -111,11 +123,15 @@
     return txDone(tx);
   }
   async function kvAll() {
+    const q = await sqlite('kv');
+    if (q) return q.kvAll();
     const db = await open();
     if (!db) return [];
     return reqP(db.transaction('kv', 'readonly').objectStore('kv').getAll());
   }
   async function kvClear() {
+    const q = await sqlite('kv');
+    if (q) return q.kvClear();
     const db = await open();
     if (!db) return;
     const tx = db.transaction('kv', 'readwrite');
@@ -126,6 +142,8 @@
   /* ---- API chung cho các kho nghiệp vụ (put/get/getAll/del/clear); không có IndexedDB → Map trong RAM ---- */
   const mem = (st) => memStores[st] || (memStores[st] = new Map());
   async function put(store, val, key) {
+    const q = await sqlite(store);
+    if (q) return q.put(store, val, key);
     const db = await open();
     if (!db) {
       mem(store).set(key !== undefined ? key : val[STORES[store].keyPath], val);
@@ -137,16 +155,22 @@
     return txDone(tx);
   }
   async function get(store, key) {
+    const q = await sqlite(store);
+    if (q) return q.get(store, key);
     const db = await open();
     if (!db) return mem(store).get(key);
     return reqP(db.transaction(store, 'readonly').objectStore(store).get(key));
   }
   async function getAll(store) {
+    const q = await sqlite(store);
+    if (q) return q.getAll(store);
     const db = await open();
     if (!db) return Array.from(mem(store).values());
     return reqP(db.transaction(store, 'readonly').objectStore(store).getAll());
   }
   async function del(store, key) {
+    const q = await sqlite(store);
+    if (q) return q.del(store, key);
     const db = await open();
     if (!db) {
       mem(store).delete(key);
@@ -157,6 +181,8 @@
     return txDone(tx);
   }
   async function clear(store) {
+    const q = await sqlite(store);
+    if (q) return q.clear(store);
     const db = await open();
     if (!db) {
       mem(store).clear();
@@ -174,6 +200,8 @@
    * Lỗi xung đột (cửa sổ khác đã đổi bản ghi) có e.conflict = true.
    */
   async function guarded(stores, guardStore, guardKey, check, apply) {
+    const q = await sqlite(guardStore);
+    if (q) return q.guarded(stores, guardStore, guardKey, check, apply);
     const db = await open();
     if (!db) {
       const err = check(mem(guardStore).get(guardKey));
@@ -222,9 +250,68 @@
     });
   }
 
+  /** Đọc bản ghi kv (giá trị đã giải mã) hoặc undefined. */
+  async function kvGet(key) {
+    const q = await sqlite('kv');
+    if (q) return q.kvGet(key);
+    const db = await open();
+    if (!db) {
+      const m = mem('kv').get(key);
+      return m ? m.val : undefined;
+    }
+    const r = await reqP(db.transaction('kv', 'readonly').objectStore('kv').get(key));
+    return r ? r.val : undefined;
+  }
+  /**
+   * So sánh-và-ghi nguyên tử một khóa kv: check(giá trị hiện tại | undefined) → chuỗi lỗi (xung đột) hoặc null; null thì ghi `next`.
+   * Cửa sổ khác đổi bản ghi giữa lúc đọc và ghi → e.conflict = true. (Thay cho giao dịch IndexedDB tự mở ở catalog.js / yearbook.js.)
+   */
+  async function kvCas(key, check, next) {
+    const q = await sqlite('kv');
+    if (q) return q.kvCas(key, check, next);
+    const db = await open();
+    if (!db) {
+      const err = check(mem('kv').has(key) ? mem('kv').get(key).val : undefined);
+      if (err) throw Object.assign(new Error(err), { conflict: true });
+      mem('kv').set(key, { key, val: next, ls: false, ts: Date.now() });
+      return;
+    }
+    return new Promise((ok, no) => {
+      let tx,
+        conflict = null;
+      try {
+        tx = db.transaction('kv', 'readwrite');
+        const store = tx.objectStore('kv'),
+          g = store.get(key);
+        g.onsuccess = () => {
+          const err = check(g.result ? g.result.val : undefined);
+          if (err) {
+            conflict = err;
+            try {
+              tx.abort();
+            } catch (e) {
+              /* đã hủy */
+            }
+            return;
+          }
+          store.put({ key, val: next, ls: false, ts: Date.now() });
+        };
+        tx.oncomplete = () => ok();
+        tx.onabort = tx.onerror = () =>
+          no(conflict ? Object.assign(new Error(conflict), { conflict: true }) : tx.error || new Error('Không ghi được IndexedDB'));
+      } catch (e) {
+        no(e);
+      }
+    });
+  }
+
   /** Tình trạng bộ nhớ trình duyệt (để hiện ở Cài đặt). */
   async function status() {
     const out = { backend: state.backend, persisted: null, usage: null, quota: null };
+    if (HAK.Storage && HAK.Storage.mode === 'sqlite') {
+      const st = HAK.Storage.status || {};
+      return Object.assign(out, { backend: 'sqlite', persisted: true, usage: st.size == null ? null : st.size, file: st.file || '' });
+    }
     await open();
     out.backend = state.backend;
     try {
@@ -254,6 +341,8 @@
   HAK.DB = {
     guarded,
     open,
+    kvGet,
+    kvCas,
     kvPut,
     kvDel,
     kvAll,
@@ -265,9 +354,9 @@
     clear,
     status,
     requestPersist,
-    usable: () => state.backend === 'idb',
+    usable: () => (HAK.Storage && HAK.Storage.mode === 'sqlite') || state.backend === 'idb',
     get backend() {
-      return state.backend;
+      return HAK.Storage && HAK.Storage.mode === 'sqlite' ? 'sqlite' : state.backend;
     },
   };
 })(window);

@@ -1162,18 +1162,26 @@
       lsPct = (ls / (5 * 1048576)) * 100;
     const autoOk = a.on && a.dir && a.perm === 'granted' && !(a.last && a.last.ok === false); // tự sao lưu chạy tốt → "chưa cam kết giữ dữ liệu" không còn đáng lo
     const items = [
-      {
-        k: 'store',
-        label: 'Bộ nhớ trình duyệt',
-        val: st.backend !== 'idb' ? 'RAM tạm' : fmtBytes(st.usage) + (st.quota ? ' (' + pct.toFixed(1).replace('.', ',') + '%)' : ''),
-        lvl: st.backend !== 'idb' || pct > 80 ? 2 : pct > 50 || (st.persisted === false && !autoOk) ? 1 : 0,
-        hint:
-          st.backend !== 'idb'
-            ? 'Dữ liệu mất khi đóng trang'
-            : st.persisted === false
-              ? 'Trình duyệt chưa cam kết giữ dữ liệu' + (autoOk ? ' — đã có tự sao lưu' : ' → bật Tự sao lưu')
-              : 'Bền',
-      },
+      st.backend === 'sqlite'
+        ? {
+            k: 'store',
+            label: 'Cơ sở dữ liệu SQLite',
+            val: fmtBytes(st.usage),
+            lvl: 0,
+            hint: 'Nguồn dữ liệu chính, nằm ngoài thư mục cài và không phụ thuộc trình duyệt: ' + (st.file || ''),
+          }
+        : {
+            k: 'store',
+            label: 'Bộ nhớ trình duyệt',
+            val: st.backend !== 'idb' ? 'RAM tạm' : fmtBytes(st.usage) + (st.quota ? ' (' + pct.toFixed(1).replace('.', ',') + '%)' : ''),
+            lvl: st.backend !== 'idb' || pct > 80 ? 2 : pct > 50 || (st.persisted === false && !autoOk) ? 1 : 0,
+            hint:
+              st.backend !== 'idb'
+                ? 'Dữ liệu mất khi đóng trang'
+                : st.persisted === false
+                  ? 'Trình duyệt chưa cam kết giữ dữ liệu' + (autoOk ? ' — đã có tự sao lưu' : ' → bật Tự sao lưu')
+                  : 'Bền',
+          },
       {
         k: 'ls',
         label: 'Cài đặt (localStorage)',
@@ -1334,7 +1342,11 @@
     box.innerHTML =
       '<ul class="sum-list mb-3">' +
       '<li><span>Nơi lưu dữ liệu</span><b>' +
-      (st.backend === 'idb' ? ok(true, 'IndexedDB (bền)') : ok(false, 'RAM tạm — mất khi đóng trang')) +
+      (st.backend === 'sqlite'
+        ? ok(true, 'SQLite (HAKDocs) — ' + esc(st.file || ''))
+        : st.backend === 'idb'
+          ? ok(true, 'IndexedDB (bền, gắn với trình duyệt đang mở)')
+          : ok(false, 'RAM tạm — mất khi đóng trang')) +
       '</b></li>' +
       '<li><span>Trình duyệt cam kết giữ dữ liệu</span><b>' +
       (st.persisted === null ? '—' : ok(st.persisted, st.persisted ? 'Có' : 'Chưa (có thể bị xóa khi thiếu dung lượng)')) +
@@ -1387,6 +1399,7 @@
       '</div>' +
       (await autoHtml());
     bindAuto();
+    if (HAK.MigrateUI) HAK.MigrateUI.mount(box); // khu "Nơi lưu dữ liệu" (SQLite / trình duyệt)
     const b1 = $('#bkSave'),
       b2 = $('#bkRestore'),
       b3 = $('#bkPersist'),

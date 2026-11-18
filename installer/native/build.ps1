@@ -8,6 +8,9 @@ $references = @('System.Windows.Forms.dll','System.Drawing.dll','System.Web.Exte
 foreach ($namespace in @('Foundation','Media','Data','Storage','Graphics','Globalization')) { $references += Join-Path $metadata "Windows.$namespace.winmd" }
 $compilerArgs = @('/nologo','/target:winexe','/platform:x64','/optimize+',"/out:$output")
 foreach ($reference in $references) { $compilerArgs += "/reference:$reference" }
+$schemaSql = Join-Path $PSScriptRoot 'db\schema.v1.sql'
+$compilerArgs += "/resource:$schemaSql,hak.schema.v1.sql"   # schema SQLite nhúng vào HAKDocs.exe
 $compilerArgs += Join-Path $PSScriptRoot 'HAKDocs.cs'
+$compilerArgs += Join-Path $PSScriptRoot 'HakDb.cs'
 & $compiler $compilerArgs
 if ($LASTEXITCODE -ne 0) { throw 'Windows OCR build failed' }

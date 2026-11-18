@@ -1479,11 +1479,23 @@
 
   // Khôi phục khóa còn thiếu từ bản sao IndexedDB (nếu có) TRƯỚC khi dựng giao diện
   // v2.6.1: đăng nhập (HAK.Auth) trước khi dựng giao diện — màn đăng nhập che toàn app, dữ liệu cũ giữ nguyên.
+  // Nguồn dữ liệu (SQLite / trình duyệt) quyết định TRƯỚC mọi thứ: bị chặn thì dừng hẳn, không dựng giao diện trên nguồn sai.
+  const storageGate = () =>
+    (HAK.Storage ? HAK.Storage.whenReady() : Promise.resolve()).then(() => {
+      if (HAK.Storage && HAK.Storage.mode === 'blocked') {
+        HAK.Storage.showBlocked();
+        return false;
+      }
+      return true;
+    });
   const start = () =>
-    (HAK.Backup ? HAK.Backup.boot() : Promise.resolve())
-      .catch((e) => console.warn('Backup.boot:', e))
-      .then(() => (HAK.Auth ? HAK.Auth.require() : null))
-      .then(init);
+    storageGate().then((open) => {
+      if (!open) return null;
+      return (HAK.Backup ? HAK.Backup.boot() : Promise.resolve())
+        .catch((e) => console.warn('Backup.boot:', e))
+        .then(() => (HAK.Auth ? HAK.Auth.require() : null))
+        .then(init);
+    });
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
   else start();
 })(window);

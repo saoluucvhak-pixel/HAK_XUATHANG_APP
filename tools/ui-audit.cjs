@@ -86,16 +86,6 @@ const probe = () => {
   });
   out.offscreen = off.slice(0, 8);
   out.offscreenN = off.length;
-  // vùng bấm nhỏ
-  const small = [];
-  document.querySelectorAll('button, a[href], input[type=checkbox], input[type=radio], select, [role=button]').forEach((e) => {
-    if (!vis(e)) return;
-    const r = e.getBoundingClientRect();
-    if (r.width < 24 || r.height < 24)
-      small.push((e.id || e.className || e.tagName).toString().split(' ')[0] + ' ' + Math.round(r.width) + 'x' + Math.round(r.height));
-  });
-  out.smallN = small.length;
-  out.small = small.slice(0, 6);
   // tương phản
   const lum = (c) => {
     const a = c.map((v) => {
@@ -151,6 +141,26 @@ const probe = () => {
       }
     }
   });
+  // vùng bấm tối thiểu 24×24 px (WCAG 2.5.8) cho nút / liên kết dạng nút / ô nhập / công tắc; hộp kiểm và nút chọn gốc được miễn
+  const tinyTargets = [];
+  document.querySelectorAll('button, a.btn, a.sb-link, input:not([type=hidden]), select, [role=button], summary').forEach((e) => {
+    if (!vis(e) || ((e.type === 'checkbox' || e.type === 'radio') && !e.closest('.form-switch') && e.getAttribute('role') !== 'switch'))
+      return;
+    const r = e.getBoundingClientRect();
+    if (r.width < 24 || r.height < 24)
+      tinyTargets.push((e.id ? '#' + e.id : e.tagName.toLowerCase()) + ' ' + Math.round(r.width) + '×' + Math.round(r.height));
+  });
+  out.smallN = tinyTargets.length;
+  out.small = tinyTargets.slice(0, 5);
+  // bảng dài (> 8 dòng) phải có tiêu đề cố định khi cuộn
+  const longNoSticky = [];
+  document.querySelectorAll('table').forEach((t) => {
+    const th = t.querySelector('thead th');
+    if (!vis(t) || !th || t.querySelectorAll('tbody tr').length <= 8) return;
+    if (getComputedStyle(th).position !== 'sticky') longNoSticky.push(t.id ? '#' + t.id : 'table');
+  });
+  out.noStickyN = longNoSticky.length;
+  out.noSticky = longNoSticky.slice(0, 3);
   out.lowContrast = low.slice(0, 8);
   out.lowN = low.length;
   return out;
@@ -194,6 +204,8 @@ const ROUTES = [
       bad.push(label + ' ' + r + ': ' + res.offscreenN + ' phần tử ngoài khung nhìn (' + res.offscreen.slice(0, 3).join(', ') + ')');
     if (res.unnamedN)
       bad.push(label + ' ' + r + ': ' + res.unnamedN + ' điều khiển không có nhãn truy cập (' + res.unnamed.slice(0, 3).join(', ') + ')');
+    if (res.smallN) bad.push(label + ' ' + r + ': ' + res.smallN + ' vùng bấm nhỏ hơn 24×24 px (' + res.small.slice(0, 3).join(', ') + ')');
+    if (res.noStickyN) bad.push(label + ' ' + r + ': bảng dài thiếu tiêu đề cố định (' + res.noSticky.join(', ') + ')');
     if (res.lowN)
       bad.push(
         label + ' ' + r + ': ' + res.lowN + ' cặp màu thiếu tương phản (vd "' + res.lowContrast[0].t + '" ' + res.lowContrast[0].r + ':1)'
@@ -208,7 +220,37 @@ const ROUTES = [
     await page.setViewportSize({ width: w, height: h });
     for (const r of ROUTES.concat(TPL)) await visit(w + 'x' + h, r);
   }
+  // Dấu focus khi dùng bàn phím: Tab qua 25 điều khiển đầu tiên của mỗi màn hình, phần tử nhận focus phải có viền / bóng nhìn thấy
   await page.setViewportSize({ width: 1366, height: 768 });
+  for (const r of ROUTES) {
+    await page.evaluate((x) => (location.hash = x), r);
+    await page.waitForTimeout(400);
+    await page.evaluate(() => document.activeElement && document.activeElement.blur());
+    const noRing = [];
+    for (let i = 0; i < 25; i++) {
+      await page.keyboard.press('Tab');
+      await page.waitForTimeout(150); // chờ hết chuyển tiếp CSS (outline-style là thuộc tính rời rạc: chỉ đổi sau ~nửa thời gian chuyển tiếp)
+      const f = await page.evaluate(() => {
+        const e = document.activeElement;
+        if (!e || e === document.body) return null;
+        const cs = getComputedStyle(e),
+          b = e.getBoundingClientRect();
+        const ring = (cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) > 0) || (cs.boxShadow && cs.boxShadow !== 'none');
+        return {
+          ring,
+          fv: e.matches(':focus-visible'),
+          vis: b.width > 0 && b.height > 0,
+          l: (e.id ? '#' + e.id : e.tagName.toLowerCase()) + ' "' + (e.textContent || '').trim().slice(0, 14) + '"',
+        };
+      });
+      // fv=false: tiêu điểm nằm trong phần tử con do trình duyệt vẽ (vd nút chọn giờ của ô time) — trình duyệt tự có dấu focus riêng
+      if (f && f.vis && f.fv && !f.ring) noRing.push(f.l);
+    }
+    if (noRing.length)
+      bad.push(
+        'bàn phím ' + r + ': ' + noRing.length + ' điều khiển nhận focus nhưng không có dấu focus (' + noRing.slice(0, 3).join(', ') + ')'
+      );
+  }
   for (const theme of ['luxe', 'classic', 'neutral', 'champagne'])
     for (const mode of ['light', 'dark']) {
       await page.evaluate(

@@ -84,7 +84,23 @@ async function login(p) {
     await p.evaluate((t) => {
       HAK.Documents.ocr = async () => ({ pages: [{ text: t, rowsText: t, supplementalText: '' }] });
     }, text);
-    await p.setInputFiles('#csOcrPay', { name: 'giay-nop-tien.png', mimeType: 'image/png', buffer: Buffer.from('x') });
+    const pick = () => p.setInputFiles('#csOcrPay', { name: 'giay-nop-tien.png', mimeType: 'image/png', buffer: Buffer.from('x') });
+    await pick();
+    // Chẩn đoán trên máy thật: nếu màn duyệt không mở trong 4 giây, in trạng thái trang rồi chọn lại tệp đúng một lần.
+    const opened = await p.waitForSelector('#csModal.show', { timeout: 4000 }).then(
+      () => true,
+      () => false
+    );
+    if (!opened) {
+      const st = await p.evaluate(() => ({
+        input: !!document.querySelector('#csOcrPay'),
+        modal: (document.querySelector('#csModal') || {}).className,
+        toasts: Array.from(document.querySelectorAll('.toast')).map((e) => e.textContent.trim().replace(/\s+/g, ' ')),
+        backend: (HAK.Storage && HAK.Storage.backend && HAK.Storage.backend()) || null,
+      }));
+      console.log('  [chẩn đoán] màn duyệt không mở sau 4 giây: ' + JSON.stringify(st));
+      await pick();
+    }
   };
 
   console.log('0) Dữ liệu thử: hợp đồng Ủy thác có chi tiết tàu M/V CONDOR EXPRESS V.2609 (để tự gắn khi nhập tờ khai)');

@@ -55,12 +55,24 @@
       rq.onsuccess = () => ok(rq.result);
       rq.onerror = () => no(rq.error);
     });
+  /** Backend SQLite (HAKDocs) khi HAK.Storage.mode === 'sqlite'; null → IndexedDB. Bị chặn → ném lỗi (không quay về IndexedDB). */
+  const sq = async () => {
+    const S = HAK.Storage;
+    if (!S) return null;
+    await S.whenReady();
+    S.assertOpen();
+    return S.mode === 'sqlite' && HAK.DBSqlite ? HAK.DBSqlite.archive : null;
+  };
   const getAll = async (store) => {
+    const q = await sq();
+    if (q) return store === 'meta' ? q.metas() : Promise.reject(Error('getAll không áp dụng cho kho data ở SQLite'));
     const db = await openDb();
     if (!db) return Array.from(mem[store].values());
     return reqP(db.transaction(store, 'readonly').objectStore(store).getAll());
   };
   const getOne = async (store, k) => {
+    const q = await sq();
+    if (q) return store === 'meta' ? q.meta(k) : q.data(k);
     const db = await openDb();
     if (!db) return mem[store].get(k);
     return reqP(db.transaction(store, 'readonly').objectStore(store).get(k));
@@ -93,7 +105,12 @@
       }
     });
   }
-  const putBoth = (meta, data) =>
+  const putBoth = async (meta, data) => {
+    const q = await sq();
+    if (q) return q.put(meta, data);
+    return putBothIdb(meta, data);
+  };
+  const putBothIdb = (meta, data) =>
     writeTx(
       (tx) => {
         tx.objectStore('meta').put(meta);
@@ -104,7 +121,12 @@
         if (data !== undefined) mem.data.set(meta.id, data);
       }
     );
-  const delOne = (id) =>
+  const delOne = async (id) => {
+    const q = await sq();
+    if (q) return q.del(id);
+    return delOneIdb(id);
+  };
+  const delOneIdb = (id) =>
     writeTx(
       (tx) => {
         tx.objectStore('meta').delete(id);
@@ -115,7 +137,12 @@
         mem.data.delete(id);
       }
     );
-  const clearAll = () =>
+  const clearAll = async () => {
+    const q = await sq();
+    if (q) return q.clear();
+    return clearAllIdb();
+  };
+  const clearAllIdb = () =>
     writeTx(
       (tx) => {
         tx.objectStore('meta').clear();
@@ -298,6 +325,8 @@
   let warned = false;
   /** Đếm bản ghi mà không đọc nội dung (trước đây getAll('meta') mỗi lần lưu: tốn thời gian tăng theo số hồ sơ). */
   async function countAll(store) {
+    const q = await sq();
+    if (q) return q.count();
     const db = await openDb();
     if (!db) return mem[store].size;
     return reqP(db.transaction(store, 'readonly').objectStore(store).count());
@@ -387,6 +416,12 @@
     return items;
   }
   async function closeVerified(items) {
+    const q = await sq();
+    if (q) {
+      await q.closeVerified(items);
+      updateBadge();
+      return;
+    }
     const db = await openDb();
     if (!db) throw Error('Không dọn kho lưu trữ trong chế độ RAM.');
     return new Promise((ok, no) => {

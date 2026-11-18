@@ -1001,7 +1001,7 @@
         if (e.target.hasAttribute('data-year-save')) {
           e.target.disabled = true;
           if (!(await confirmPickConflicts(type))) return;
-          await HAK.Yearbook.save(type);
+          await HAK.Yearbook.saveAsk(type);
           markClean(type);
           $('#year-note-' + type).textContent = 'Đã lưu năm ' + HAK.Yearbook.year;
         }
@@ -1355,7 +1355,7 @@
     if (c === 'discard') return true;
     if (c === 'save') {
       try {
-        await HAK.Yearbook.save(type);
+        await HAK.Yearbook.saveAsk(type);
         markClean(type);
         return true;
       } catch (err) {
@@ -1660,7 +1660,7 @@
       fail(e && e.message ? e.message : String(e));
     }
     try {
-      if (HAK.Yearbook && ds === getDs(type)) await HAK.Yearbook.save(type, true);
+      if (HAK.Yearbook && ds === getDs(type)) await HAK.Yearbook.saveAsk(type, true);
     } catch (e) {
       // sổ năm là kho riêng: lỗi ở đây không làm mất trạng thái lưu của Lưu trữ
       console.warn('Sổ hồ sơ năm:', e);
