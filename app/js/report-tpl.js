@@ -1058,6 +1058,31 @@
         open: { kind: 'record', id: u.id },
       })
     );
+    // Quy tắc 29: phiếu KL ≤ 0 đã loại khỏi mọi tổng — liệt kê riêng (số phiếu + kg bị loại) để đối soát với file gốc.
+    (m.used || []).forEach((r) => {
+      const list = r.nonPos || [];
+      list.forEach((x) =>
+        push({
+          kind: 'Phiếu KL ≤ 0 đã loại khỏi tổng',
+          source: 'Hồ sơ: ' + (r.title || r.id),
+          target: [x.t && 'Phiếu ' + x.t, x.p, x.d].filter(Boolean).join(' · '),
+          why: 'Khối lượng hàng ≤ 0 nên KHÔNG cộng vào số xe / khối lượng ở mọi màn hình và bản xuất',
+          kg: x.kg,
+          status: 'Đối chiếu với file gốc',
+          open: { kind: 'record', id: r.id },
+        })
+      );
+      if ((r.nonPosTrips || 0) > list.length)
+        doc.warnings.push(
+          'Hồ sơ "' +
+            (r.title || r.id) +
+            '": có ' +
+            r.nonPosTrips +
+            ' phiếu KL ≤ 0 bị loại, danh sách chỉ lưu ' +
+            list.length +
+            ' phiếu đầu.'
+        );
+    });
     if (ctx.unassignedSkipped)
       doc.warnings.push(
         'Chưa kiểm được phiếu chưa gắn hồ sơ vì ' +

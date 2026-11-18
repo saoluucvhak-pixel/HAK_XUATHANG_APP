@@ -451,6 +451,7 @@
     const rows = [];
     const issues = { swap: [], mismatch: [], noDate: [], dupTicket: [], nonPos: [], plate: [], noWeight: [] };
     const seenTicket = new Map();
+    const excluded = []; // phiếu KL ≤ 0 (kể cả âm): KHÔNG cộng vào tổng, KHÔNG đưa vào biên bản — liệt kê riêng để đối soát (quy tắc 29)
     const cancelled = []; // phiếu "BO" (bỏ cân — xe cân lại phiếu khác) → loại khỏi biên bản
     let skipped = 0;
     for (let r = hr + 1; r < G.length; r++) {
@@ -542,6 +543,11 @@
         cancelled.push({ idx: r + 1 + rowOff, ticket: normTicket(g('ticket')), net });
         continue;
       }
+      if (net <= 0) {
+        excluded.push({ idx: row.idx, ticket: row.ticket, plate, net, dateStr: row.dateStr });
+        issues.nonPos.push(row.idx);
+        continue;
+      }
       if (tare !== null && gross !== null) {
         if (tare > gross) {
           issues.swap.push(row.idx);
@@ -557,10 +563,6 @@
           issues.mismatch.push(row.idx);
           row.warn.push('KL hàng ≠ |lần 2 − lần 1|');
         }
-      }
-      if (net <= 0) {
-        issues.nonPos.push(row.idx);
-        row.warn.push('KL hàng ≤ 0');
       }
       row.tare = tare;
       row.gross = gross;
@@ -584,10 +586,13 @@
     ds.noWeightRows = issues.noWeight;
     ds.cancelled = cancelled;
     ds.cancelledKg = cancelled.reduce((a, c) => a + c.net, 0);
+    ds.excluded = excluded;
+    ds.excludedKg = excluded.reduce((a, c) => a + c.net, 0);
     if (!rows.length) {
       ds.errors.push(
         'Không có dòng dữ liệu hợp lệ sau dòng tiêu đề.' +
-          (issues.noWeight.length ? ' (' + issues.noWeight.length + ' dòng có biển số/số phiếu nhưng không đọc được khối lượng.)' : '')
+          (issues.noWeight.length ? ' (' + issues.noWeight.length + ' dòng có biển số/số phiếu nhưng không đọc được khối lượng.)' : '') +
+          (excluded.length ? ' (' + excluded.length + ' phiếu có KL ≤ 0 đã loại khỏi tổng.)' : '')
       );
       return ds;
     }
@@ -631,8 +636,18 @@
       ds.warnings.push(
         '⚠ ' + issues.mismatch.length + ' dòng có KL hàng ≠ |cân lần 2 − cân lần 1| (dòng Excel: ' + lim(issues.mismatch) + ').'
       );
-    if (issues.nonPos.length)
-      ds.warnings.push('⚠ ' + issues.nonPos.length + ' dòng có KL hàng ≤ 0 (dòng Excel: ' + lim(issues.nonPos) + ').');
+    if (excluded.length)
+      ds.warnings.push(
+        '⚠ ' +
+          excluded.length +
+          ' phiếu có KL hàng ≤ 0 (' +
+          excluded.reduce((a, c) => a + c.net, 0).toLocaleString('en-US') +
+          ' kg) đã LOẠI khỏi tổng và biên bản — số phiếu: ' +
+          lim(excluded.map((x) => x.ticket || 'dòng ' + x.idx)) +
+          ' (dòng Excel: ' +
+          lim(issues.nonPos) +
+          '). Đối chiếu với file gốc; danh sách nằm ở Báo cáo › Ngoại lệ cần đối soát.'
+      );
     if (issues.plate.length)
       ds.warnings.push('⚠ ' + issues.plate.length + ' dòng có biển số bất thường (dòng Excel: ' + lim(issues.plate) + ').');
     if (issues.dupTicket.length)
@@ -644,8 +659,8 @@
     // ---- Đối chiếu với dòng "Tổng số" trong tiêu đề báo cáo ----
     const mt = ds.meta;
     // (đối chiếu tính cả phiếu BO vì tiêu đề báo cáo của phần mềm cân vẫn đếm chúng)
-    const allTrips = ds.stats.trips + cancelled.length,
-      allKg = ds.stats.kg + ds.cancelledKg;
+    const allTrips = ds.stats.trips + cancelled.length + excluded.length,
+      allKg = ds.stats.kg + ds.cancelledKg + ds.excludedKg;
     if (mt.declaredTrips !== null && mt.declaredTrips !== allTrips)
       ds.warnings.push('⚠ Số xe đọc được (' + allTrips + ') khác "Tổng số" ghi ở tiêu đề báo cáo (' + mt.declaredTrips + ').');
     if (mt.declaredKg !== null && Math.abs(mt.declaredKg - allKg) > 1)
