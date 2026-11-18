@@ -9,6 +9,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Net;
 using System.Net.Sockets;
+using System.Reflection;
 using System.Web.Script.Serialization;
 using Windows.Foundation;
 using Windows.Data.Pdf;
@@ -96,6 +97,42 @@ class HAKDocs {
    return new {app="hak-windows-ocr",backend="Windows.Media.Ocr",language=lang.LanguageTag,totalPages=pdf.PageCount,from,to,pages,warnings=lang.LanguageTag.StartsWith("vi")?new string[0]:new[]{"Windows OCR language is "+lang.LanguageTag+". Verify Vietnamese text against the original PDF."}};
   }
  }
+ /* ===== SQLite (HAKDB): cùng hợp đồng với tools/hakdb/server.cjs. Tệp dữ liệu nằm NGOÀI thư mục cài. ===== */
+ class DbSession{public List<string> Scope;public string User;public DateTime Exp;}
+ static readonly Dictionary<string,DbSession> DbSessions=new Dictionary<string,DbSession>();
+ static HakDb dbInstance=null;static readonly object dbLock=new object();
+ static string DataDir{get{var e=Environment.GetEnvironmentVariable("HAK_DATA_DIR");return String.IsNullOrWhiteSpace(e)?Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"HAK_XUATHANG","data"):e;}}
+ static HakDb GetDb(){lock(dbLock){if(dbInstance!=null)return dbInstance;string schema;using(var rs=Assembly.GetExecutingAssembly().GetManifestResourceStream("hak.schema.v1.sql"))using(var rd=new StreamReader(rs,Encoding.UTF8))schema=rd.ReadToEnd();dbInstance=HakDb.Open(Path.Combine(DataDir,"hak.db"),schema);/* CHỈ để CI / thử nghiệm: kích hoạt SQLite khi có HAK_DB_ACTIVATE=1 VÀ thư mục dữ liệu thử HAK_DATA_DIR; bản dùng thật không bao giờ tự kích hoạt (phải qua di trú có đối chiếu). */if(Environment.GetEnvironmentVariable("HAK_DB_ACTIVATE")=="1"&&!String.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("HAK_DATA_DIR"))&&dbInstance.Meta("active_backend")==null)dbInstance.SetMeta("active_backend","sqlite");return dbInstance;}}
+ static Dictionary<string,object> DbErr(string code,string message,Dictionary<string,object> extra){var e=new Dictionary<string,object>{{"code",code},{"message",message}};if(extra!=null)foreach(var kv in extra)e[kv.Key]=kv.Value;return new Dictionary<string,object>{{"error",e}};}
+ static string SafeBackupName(string raw){var n=System.Text.RegularExpressions.Regex.Replace(String.IsNullOrEmpty(raw)?"hak-"+DateTime.UtcNow.ToString("yyyyMMdd-HHmmss"):raw,"[^A-Za-z0-9._-]","_");n=System.Text.RegularExpressions.Regex.Replace(n,@"\.{2,}","_").TrimStart('.');if(n.Length>80)n=n.Substring(0,80);if(n.Length==0)n="backup";return n.EndsWith(".db")?n:n+".db";}
+ static async Task HandleDb(Stream stream,string method,string path,Dictionary<string,string> headers,bool cors){
+  int code=200;object resp=null;
+  try{
+   if(!headers.ContainsKey("X-HAK-Client")||headers["X-HAK-Client"]!="documents-v1"){DrainBody(stream,headers);await Reply(stream,403,DbErr("client","Yêu cầu cục bộ không hợp lệ.",null),cors);return;}
+   if(!headers.ContainsKey("X-HAK-Token")||!TokenOk(headers["X-HAK-Token"])){DrainBody(stream,headers);await Reply(stream,403,DbErr("token","Thiếu hoặc sai mã bảo vệ của app. Hãy mở app bằng lối tắt HAK.",null),cors);return;}
+   var db=GetDb();
+   if(method=="GET"&&path=="/db/status"){var fi=new FileInfo(db.File);resp=new Dictionary<string,object>{{"app","hak-db"},{"backend","sqlite"},{"active",db.Meta("active_backend")},{"schema",db.SchemaVersion()},{"file",db.File},{"dataDir",DataDir},{"size",fi.Exists?fi.Length:0},{"counts",db.Counts()},{"sqlite",HakDb.LibVersion()}};}
+   else if(method!="POST"){code=405;resp=DbErr("bad-request","Phương thức không hỗ trợ",null);}
+   else{
+    int length;if(!headers.ContainsKey("Content-Length")||!Int32.TryParse(headers["Content-Length"],out length)||length<1||length>36*1024*1024){DrainBody(stream,headers);await Reply(stream,413,DbErr("too-large","Yêu cầu quá lớn (giới hạn 36 MB)",null),cors);return;}
+    var body=new byte[length];int count=0;while(count<length){int n=await stream.ReadAsync(body,count,length-count);if(n==0)throw new HakDbException("bad-request","Yêu cầu không đầy đủ");count+=n;}
+    Dictionary<string,object> data;try{data=Json.Deserialize<Dictionary<string,object>>(Encoding.UTF8.GetString(body));}catch{throw new HakDbException("bad-request","JSON không hợp lệ");}
+    if(path=="/db/session"){var id=BitConverter.ToString(System.Security.Cryptography.SHA256.Create().ComputeHash(Guid.NewGuid().ToByteArray())).Replace("-","").ToLowerInvariant().Substring(0,32);List<string> scope=null;object sc=Get(data,"scope",null);if(sc!=null){scope=new List<string>();var arr=sc as System.Collections.IEnumerable;if(arr!=null)foreach(var x in arr)scope.Add(Convert.ToString(x));}lock(DbSessions){DbSessions[id]=new DbSession{Scope=scope,User=Convert.ToString(Get(data,"user","")),Exp=DateTime.UtcNow.AddHours(8)};}resp=new Dictionary<string,object>{{"session",id},{"scope",scope}};}
+    else if(path=="/db/session/close"){string sid=headers.ContainsKey("X-HAK-Session")?headers["X-HAK-Session"]:"";lock(DbSessions)DbSessions.Remove(sid);resp=new{ok=true};}
+    else{
+     DbSession ses;string sk=headers.ContainsKey("X-HAK-Session")?headers["X-HAK-Session"]:"";lock(DbSessions){if(!DbSessions.TryGetValue(sk,out ses)||ses.Exp<DateTime.UtcNow)ses=null;}
+     if(ses==null){code=401;resp=DbErr("no-session","Chưa đăng nhập hoặc phiên đã hết hạn",null);}
+     else if(path=="/db/tx")resp=new Dictionary<string,object>{{"results",db.Tx(Get(data,"ops",null),ses.Scope)}};
+     else if(path=="/db/query")resp=db.Query(data,ses.Scope);
+     else if(path=="/db/check")resp=db.Check();
+     else if(path=="/db/backup"){if(ses.Scope!=null)throw new HakDbException("scope","Chỉ tài khoản toàn quyền mới sao lưu toàn bộ cơ sở dữ liệu");resp=db.Backup(Path.Combine(DataDir,"backups",SafeBackupName((string)Get(data,"name",""))));}
+     else{code=404;resp=DbErr("bad-request","Không có điểm cuối "+path,null);}
+    }
+   }
+  }catch(HakDbException e){code=e.Code=="conflict"||e.Code=="fk"||e.Code=="unique"?409:e.Code=="scope"?403:e.Code=="bad-request"?400:500;resp=DbErr(e.Code,e.Message,e.Extra);}
+  catch(Exception e){code=500;resp=DbErr("io",e.Message,null);}
+  await Reply(stream,code,resp,cors);
+ }
  static object Get(Dictionary<string,object> d,string k,object fallback){object v;return d.TryGetValue(k,out v)?v:fallback;}
  static async Task Handle(TcpClient client){
   using(client){client.ReceiveTimeout=15000;client.SendTimeout=15000;var stream=client.GetStream();var header=new List<byte>();int v;
@@ -107,6 +144,7 @@ class HAKDocs {
    string method=request.Length>0?request[0]:"",path=request.Length>1?request[1]:"";
    if(method=="OPTIONS"){await Reply(stream,200,new{ok=true},origin=="null");return;}
    if(method=="GET"&&path=="/status"){await Reply(stream,200,Status(),origin=="null");return;}
+   if(path.StartsWith("/db/")){await HandleDb(stream,method,path,headers,origin=="null");return;}
    if(method!="POST"||(path!="/ocr"&&path!="/downloads"&&path!="/save-download"&&path!="/download-files"&&path!="/verify-download")||!headers.ContainsKey("X-HAK-Client")||headers["X-HAK-Client"]!="documents-v1"){DrainBody(stream,headers);await Reply(stream,403,new{error="Invalid local OCR request."},origin=="null");return;}
    if(!headers.ContainsKey("X-HAK-Token")||!TokenOk(headers["X-HAK-Token"])){DrainBody(stream,headers);await Reply(stream,403,new{error="Thiếu hoặc sai mã bảo vệ của app. Hãy mở app bằng lối tắt HAK (không mở trực tiếp file index.html)."},origin=="null");return;}
    int length;if(!headers.ContainsKey("Content-Length")||!Int32.TryParse(headers["Content-Length"],out length)||length<1||length>36*1024*1024){int declared;if(headers.ContainsKey("Content-Length")&&Int32.TryParse(headers["Content-Length"],out declared)&&declared>0){var sink=new byte[65536];long left=Math.Min((long)declared,256L*1024*1024);try{while(left>0){int got=await stream.ReadAsync(sink,0,(int)Math.Min((long)sink.Length,left));if(got<=0)break;left-=got;}}catch{}}await Reply(stream,413,new{error="Request is too large (limit 36 MB)."},origin=="null");return;}
@@ -142,7 +180,7 @@ class HAKDocs {
  static bool TokenOk(string given){var want=EnsureToken();if(!tokenFileOk)return true;if(given==null||given.Length!=want.Length)return false;int diff=0;for(int i=0;i<want.Length;i++)diff|=want[i]^given[i];return diff==0;}
  /* Đọc bỏ phần thân yêu cầu trước khi trả lỗi: đóng kết nối khi còn dữ liệu chưa đọc làm Windows gửi RST → trình duyệt chỉ thấy "Failed to fetch" thay vì lỗi 403 rõ ràng. */
  static void DrainBody(Stream s,Dictionary<string,string> h){int n;if(h.ContainsKey("Content-Length")&&Int32.TryParse(h["Content-Length"],out n)&&n>0){var buf=new byte[65536];long left=Math.Min((long)n,64L*1024*1024);try{while(left>0){int r=s.Read(buf,0,(int)Math.Min((long)buf.Length,left));if(r<=0)break;left-=r;}}catch{}}}
- static async Task Reply(Stream s,int code,object data,bool cors){var bytes=Encoding.UTF8.GetBytes(Json.Serialize(data));var head="HTTP/1.1 "+code+" "+(code==200?"OK":"Error")+"\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-store\r\nConnection: close\r\nContent-Length: "+bytes.Length+"\r\n"+(cors?"Access-Control-Allow-Origin: null\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type, X-HAK-Client, X-HAK-Token\r\nAccess-Control-Allow-Private-Network: true\r\n":"")+"\r\n";var h=Encoding.ASCII.GetBytes(head);await s.WriteAsync(h,0,h.Length);await s.WriteAsync(bytes,0,bytes.Length);}
+ static async Task Reply(Stream s,int code,object data,bool cors){var bytes=Encoding.UTF8.GetBytes(Json.Serialize(data));var head="HTTP/1.1 "+code+" "+(code==200?"OK":"Error")+"\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-store\r\nConnection: close\r\nContent-Length: "+bytes.Length+"\r\n"+(cors?"Access-Control-Allow-Origin: null\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type, X-HAK-Client, X-HAK-Token, X-HAK-Session\r\nAccess-Control-Allow-Private-Network: true\r\n":"")+"\r\n";var h=Encoding.ASCII.GetBytes(head);await s.WriteAsync(h,0,h.Length);await s.WriteAsync(bytes,0,bytes.Length);}
  static void Serve(){EnsureToken();using(var single=new Mutex(false,"Local\\HAK.WindowsOCR.31879")){if(!single.WaitOne(0))return;try{var listener=new TcpListener(IPAddress.Loopback,Port);listener.Start();DateTime last=DateTime.UtcNow;while(DateTime.UtcNow-last<TimeSpan.FromHours(24)){if(!listener.Pending()){Thread.Sleep(200);continue;}var c=listener.AcceptTcpClient();last=DateTime.UtcNow;Task.Run(async()=>{try{await Handle(c);}catch{c.Close();}});}listener.Stop();}finally{single.ReleaseMutex();}}}
  [STAThread]static int Main(string[] args){try{
   if(args.Length>0&&args[0]=="--status"){Console.WriteLine(Json.Serialize(Status()));return 0;}

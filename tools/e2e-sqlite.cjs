@@ -14,11 +14,54 @@ if (!target) {
   console.error('Dùng: node tools/e2e-sqlite.cjs <script e2e> [tham số…]');
   process.exit(2);
 }
-const TOKEN = require('node:crypto').randomBytes(16).toString('hex');
+const EXTERNAL = !!process.env.HAK_DB_EXTERNAL_TOKEN; // máy chủ ngoài (HAKDocs.exe thật, đã kích hoạt SQLite): không tự dựng máy chủ tham chiếu
+const TOKEN = EXTERNAL ? process.env.HAK_DB_EXTERNAL_TOKEN : require('node:crypto').randomBytes(16).toString('hex');
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hak-e2e-sqlite-'));
-const srv = createServer({ dataDir: dir, token: TOKEN });
-srv.hakdb.setMeta('active_backend', 'sqlite');
+const srv = EXTERNAL ? null : createServer({ dataDir: dir, token: TOKEN });
+if (srv) srv.hakdb.setMeta('active_backend', 'sqlite');
 const port = Number(process.env.HAK_DB_PORT || 31879);
+
+// Xóa mọi dữ liệu nghiệp vụ (giữ meta, nhật ký chỉ-thêm).
+const CLEAR_ORDER = [
+  'customs_payments',
+  'customs_supplements',
+  'customs_decls',
+  'contract_addenda',
+  'contract_details',
+  'contracts',
+  'customers',
+  'archive_tickets',
+  'archive_data',
+  'archive_records',
+  'batch_files',
+  'batches',
+  'issued',
+  'attachments',
+  'bkls_templates',
+  'record_versions',
+  'kv',
+];
+async function resetData() {
+  if (!EXTERNAL) {
+    const db = srv.hakdb.db,
+      keep = new Set(['meta', 'audit_log', 'sqlite_sequence']);
+    db.exec('PRAGMA foreign_keys=OFF');
+    for (const t of srv.hakdb.tables.keys()) if (!keep.has(t)) db.exec('DELETE FROM ' + t);
+    db.exec('PRAGMA foreign_keys=ON');
+    return;
+  }
+  const base = process.env.HAK_DB_URL || 'http://127.0.0.1:' + Number(process.env.HAK_DB_PORT || 31879);
+  const h = { 'Content-Type': 'application/json', 'X-HAK-Client': 'documents-v1', 'X-HAK-Token': TOKEN };
+  const s = await (
+    await fetch(base + '/db/session', { method: 'POST', headers: h, body: JSON.stringify({ scope: null, user: 'e2e-reset' }) })
+  ).json();
+  const r = await fetch(base + '/db/tx', {
+    method: 'POST',
+    headers: Object.assign({ 'X-HAK-Session': s.session }, h),
+    body: JSON.stringify({ ops: CLEAR_ORDER.map((table) => ({ op: 'clear', table, confirm: true })) }),
+  });
+  if (!r.ok) throw new Error('Không xóa được dữ liệu thử: ' + (await r.text()));
+}
 
 // Chèn mã bảo vệ vào MỌI ngữ cảnh trình duyệt do script đích tạo (chặn tệp token trong thư mục app).
 const origLoad = Module._load;
@@ -31,6 +74,7 @@ Module._load = function (request) {
       const b = await launch(...a);
       const newContext = b.newContext.bind(b);
       b.newContext = async (...x) => {
+        await resetData(); // ngữ cảnh trình duyệt mới = hồ sơ trống: dữ liệu SQLite cũng phải trống (như IndexedDB của hồ sơ mới)
         const c = await newContext(...x);
         await c.route('**/native/hakdocs-token.js', (r) =>
           r.fulfill({ contentType: 'application/javascript', body: "window.HAK_DOCS_TOKEN='" + TOKEN + "';" })
@@ -43,11 +87,11 @@ Module._load = function (request) {
   return m;
 };
 
-srv.listen(port, '127.0.0.1', () => {
-  console.log('[e2e-sqlite] SQLite tham chiếu ' + 'http://127.0.0.1:' + port + ' · dữ liệu ' + dir);
+function runTarget() {
   const t = path.resolve(target);
   process.argv = [process.argv[0], t].concat(process.argv.slice(3).filter((x) => x !== '--keep'));
   process.on('exit', (code) => {
+    if (!srv) return console.log('[e2e-sqlite] (máy chủ ngoài) mã thoát ' + code);
     try {
       const c = srv.hakdb.counts();
       console.log(
@@ -67,8 +111,18 @@ srv.listen(port, '127.0.0.1', () => {
     }
   });
   require(t);
-});
-srv.on('error', (e) => {
-  console.error('[e2e-sqlite] không mở được cổng ' + port + ': ' + e.message);
-  process.exit(2);
-});
+}
+if (EXTERNAL) {
+  console.log('[e2e-sqlite] dùng máy chủ ngoài (HAKDocs) — cổng ' + port);
+  runTarget();
+} else {
+  srv.listen(port, '127.0.0.1', () => {
+    srv.unref(); // không giữ tiến trình sống sau khi script đích xong
+    console.log('[e2e-sqlite] SQLite tham chiếu http://127.0.0.1:' + port + ' · dữ liệu ' + dir);
+    runTarget();
+  });
+  srv.on('error', (e) => {
+    console.error('[e2e-sqlite] không mở được cổng ' + port + ': ' + e.message);
+    process.exit(2);
+  });
+}

@@ -77,8 +77,44 @@ jobs:
           Stop-For $dirs[1]; Stop-For $dirs[2]
           if (-not $procs[$dirs[1]].HasExited -or -not $procs[$dirs[2]].HasExited) { throw 'không dừng được HAKDocs còn lại' }
           Write-Host 'Dừng theo thư mục cài: đúng'
+      - name: Dựng HAKDocs.exe (SQLite) và thử hợp đồng cơ sở dữ liệu trên máy thật
+        shell: pwsh
+        run: |
+          & ./installer/native/build.ps1
+          if (-not (Test-Path app/native/HAKDocs.exe)) { throw 'HAKDocs.exe was not built' }
+          # Thư mục dữ liệu thử CÓ DẤU TIẾNG VIỆT và khoảng trắng (đường dẫn UTF-8 phải mở được).
+          $env:HAK_DATA_DIR = Join-Path $env:RUNNER_TEMP 'dữ liệu HAK ƯT'
+          $env:HAK_DB_ACTIVATE = '1'
+          $p = Start-Process -FilePath app/native/HAKDocs.exe -ArgumentList '--serve' -PassThru -WindowStyle Hidden
+          $up = $false
+          for ($i = 0; $i -lt 40 -and -not $up; $i++) { try { Invoke-RestMethod http://127.0.0.1:31879/status -TimeoutSec 2 | Out-Null; $up = $true } catch { Start-Sleep -Milliseconds 500 } }
+          if (-not $up) { throw 'HAKDocs không trả lời' }
+          $tok = [regex]::Match((Get-Content app/native/hakdocs-token.js -Raw), "HAK_DOCS_TOKEN='([0-9a-f]{32})'").Groups[1].Value
+          node tools/hakdb/contract.cjs http://127.0.0.1:31879 $tok
+          $code = $LASTEXITCODE
+          if (-not (Test-Path (Join-Path $env:HAK_DATA_DIR 'hak.db'))) { throw 'không thấy hak.db trong thư mục dữ liệu có dấu' }
+          Stop-Process -Id $p.Id -Force
+          if ($code -ne 0) { throw 'Hợp đồng cơ sở dữ liệu trên HAKDocs.exe có ca lỗi' }
       - name: Nghiệm thu phát hành (Edge)
         shell: pwsh
         env:
           HAK_BROWSER_CHANNEL: msedge
         run: npm run accept:release
+      - name: Nghiệm thu trên SQLite (HAKDocs.exe thật + Edge)
+        shell: pwsh
+        env:
+          HAK_BROWSER_CHANNEL: msedge
+        run: |
+          $env:HAK_DATA_DIR = Join-Path $env:RUNNER_TEMP 'dữ liệu HAK ƯT e2e'
+          $env:HAK_DB_ACTIVATE = '1'
+          $p = Start-Process -FilePath app/native/HAKDocs.exe -ArgumentList '--serve' -PassThru -WindowStyle Hidden
+          $up = $false
+          for ($i = 0; $i -lt 40 -and -not $up; $i++) { try { Invoke-RestMethod http://127.0.0.1:31879/status -TimeoutSec 2 | Out-Null; $up = $true } catch { Start-Sleep -Milliseconds 500 } }
+          if (-not $up) { throw 'HAKDocs không trả lời' }
+          $env:HAK_DB_EXTERNAL_TOKEN = [regex]::Match((Get-Content app/native/hakdocs-token.js -Raw), "HAK_DOCS_TOKEN='([0-9a-f]{32})'").Groups[1].Value
+          node tools/e2e-sqlite.cjs tools/e2e-customs.cjs
+          $a = $LASTEXITCODE
+          node tools/e2e-sqlite.cjs tools/accept.cjs --release
+          $b = $LASTEXITCODE
+          Stop-Process -Id $p.Id -Force
+          if ($a -ne 0 -or $b -ne 0) { throw "Nghiệm thu SQLite lỗi (e2e:customs=$a, accept:release=$b)" }
