@@ -714,7 +714,8 @@
       fields: tripFields(d.rows),
       searchPlaceholder: 'Tìm số phiếu, biển số, tài xế, đơn vị vận chuyển, hồ sơ…',
       quickFields: ['q', 'kho', 'plate', 'carrier'],
-      matchQ: (x, q) => F().core.hay([x.ticket, x.plate, x.driver, x.carrier, x.rec, x.bkls, x.date, x.kho]).includes(q),
+      matchQ: (x, q) =>
+        F().core.hay([x.ticket, x.plate, x.driver, x.carrier, x.rec, x.bkls, x.date, x.kho]).includes(q) || F().plateHit(x.plate, q),
       matchDate: (x, fr, to) => F().dateMatch(x.date, fr, to),
       onApply: () => drawTrips(),
       summary: (r) => [
