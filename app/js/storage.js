@@ -52,12 +52,23 @@
     const ctl = typeof AbortController === 'function' ? new AbortController() : null,
       timer = ctl ? setTimeout(() => ctl.abort(), opt.timeout || 120000) : null;
     try {
-      r = await fetch(url() + path, {
-        method: body === undefined ? 'GET' : 'POST',
-        headers,
-        body: body === undefined ? undefined : JSON.stringify(body),
-        signal: ctl ? ctl.signal : undefined,
-      });
+      // Yêu cầu CHỈ ĐỌC (đọc bảng, kiểm tra; KHÔNG áp dụng cho thăm dò trạng thái) gặp lỗi mạng tạm thời (vd Windows hết bộ đệm socket: ERR_NO_BUFFER_SPACE) thì thử lại ngắn.
+      // Yêu cầu GHI không thử lại: không biết đã tới máy chủ chưa → tránh ghi trùng (khóa lạc quan chỉ chặn ghi đè, không chặn thêm mới).
+      const readOnly = path === '/db/query' || path === '/db/check';
+      for (let attempt = 0; ; attempt++) {
+        try {
+          r = await fetch(url() + path, {
+            method: body === undefined ? 'GET' : 'POST',
+            headers,
+            body: body === undefined ? undefined : JSON.stringify(body),
+            signal: ctl ? ctl.signal : undefined,
+          });
+          break;
+        } catch (e) {
+          if (!readOnly || attempt >= 3 || (e && e.name === 'AbortError')) throw e;
+          await new Promise((ok) => setTimeout(ok, 150 * (attempt + 1)));
+        }
+      }
     } catch (e) {
       throw Object.assign(new Error('Không kết nối được cơ sở dữ liệu SQLite (HAKDocs). Hãy mở app bằng lối tắt HAK.'), {
         code: 'unreachable',

@@ -99,6 +99,14 @@ Module._load = function (request) {
           pg.on('requestfailed', (r) =>
             console.log('[e2e-sqlite] request lỗi: ' + r.method() + ' ' + r.url().slice(0, 120) + ' ' + (r.failure() || {}).errorText)
           );
+          pg.on('requestfinished', (r) => {
+            if (!/\/db\//.test(r.url())) return;
+            stats.n++;
+            const t = r.timing(),
+              ms = t.responseEnd >= 0 ? Math.round(t.responseEnd) : 0;
+            stats.ms += ms;
+            if (ms > 1500) console.log('[e2e-sqlite] chậm ' + ms + ' ms: ' + r.url().replace(/^.*\/db\//, '/db/'));
+          });
           pg.on('response', async (r) => {
             if (!/\/db\//.test(r.url())) return;
             if (r.status() >= 400) {
@@ -120,10 +128,12 @@ Module._load = function (request) {
   return m;
 };
 
+const stats = { n: 0, ms: 0 };
 function runTarget() {
   const t = path.resolve(target);
   process.argv = [process.argv[0], t].concat(process.argv.slice(3).filter((x) => x !== '--keep'));
   process.on('exit', (code) => {
+    console.log('[e2e-sqlite] yêu cầu /db/: ' + stats.n + ', tổng thời gian ' + stats.ms + ' ms');
     if (!srv) return console.log('[e2e-sqlite] (máy chủ ngoài) mã thoát ' + code);
     try {
       const c = srv.hakdb.counts();
