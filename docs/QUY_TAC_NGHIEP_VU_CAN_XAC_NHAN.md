@@ -46,4 +46,7 @@ Các quy tắc dưới đây đã được **suy ra từ mã nguồn / tài li�
 30. **Danh mục xét phiếu cân khi tính "Đã hoàn thành" — ĐÃ XÁC NHẬN (18/11/2026): CÓ; ĐÃ triển khai.** Danh mục, tab Tờ khai, Báo cáo tổng hợp, Chi tiết xuất hàng theo HĐ, Báo cáo thực hiện HĐ, Hồ sơ hợp đồng, Excel / PDF và Google Sheet dùng MỘT nguồn "chi tiết đã có phiếu cân" tính từ Lưu trữ (`HAK.TripDetails`). Đóng mục 1b.
 31. **Làm tròn kg ở SQLite — ĐÃ XÁC NHẬN (18/11/2026): GIỮ NGUYÊN.** Cột chỉ mục `kg_milli` làm tròn 1/1000 kg; nội dung hồ sơ vẫn giữ nguyên số gốc. Danh sách hồ sơ trên SQLite hiển thị kg đã làm tròn gram, IndexedDB hiển thị số gốc; chênh < 0,0005 kg mỗi hồ sơ, không ảnh hưởng số tấn hiển thị.
 
-**Không còn mục nào chờ xác nhận** (mục 1–16 xác nhận 17/11/2026; 17–24 giữ nguyên; 26–31 xác nhận 18/11/2026).
+## Đợt rà soát vòng 2 (v2.22.4) — CHỜ XÁC NHẬN (chưa đổi hành vi)
+32. **Bộ lọc đã lưu có tách theo tài khoản / công ty / năm không? — CHỜ.** Hiện tại (đọc mã `app/libs/hak-smart-filter/core.js`, khóa `hak.sf.presets`): bộ lọc đã lưu chỉ tách theo **màn hình**, dùng chung cho mọi tài khoản, công ty và năm trên cùng một trình duyệt. Hệ quả: tài khoản bị giới hạn một công ty vẫn thấy TÊN và điều kiện (tên tàu, mã hợp đồng, kho…) của bộ lọc do tài khoản khác / công ty khác lưu; đổi công ty / năm thì điều kiện cũ chỉ "không còn khớp" (đã có cảnh báo hết hiệu lực, không rò dữ liệu phiếu). Đề xuất: tách khóa theo tài khoản (và công ty đang làm việc), giữ bộ lọc cũ làm "bộ lọc chung" chỉ đọc cho tới khi người dùng lưu lại. **Chưa làm vì đổi hành vi người dùng đang quen; chưa kiểm bằng kịch bản hai tài khoản trên trình duyệt (mới kết luận từ mã).**
+
+**Chờ xác nhận: mục 32.** (Mục 1–16 xác nhận 17/11/2026; 17–24 giữ nguyên; 26–31 xác nhận 18/11/2026).
