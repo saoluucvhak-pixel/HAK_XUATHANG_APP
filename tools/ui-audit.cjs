@@ -1,5 +1,5 @@
 /* Kiểm tra giao diện tự động theo tiêu chí QA của HAK-Enterprise-Design-System (V10.4):
- *  - không tràn ngang ở 1366×768, 1920×1080 và điện thoại 390×844;
+ *  - không tràn ngang ở 1366×768, 1920×1080, máy tính bảng 768×1024 và điện thoại 390×844;
  *  - 4 chủ đề (luxe / classic / neutral / champagne) × sáng / tối: chữ đạt tương phản WCAG AA (4,5:1; 3:1 chữ lớn);
  *  - mọi nút / ô nhập đều có nhãn truy cập; không lỗi script.
  * Chạy: npm run ui-audit (cần playwright; trong CI cài riêng). Thoát mã 1 nếu có vi phạm. */
@@ -215,6 +215,7 @@ const ROUTES = [
   for (const [w, h] of [
     [1366, 768],
     [1920, 1080],
+    [768, 1024],
     [390, 844],
   ]) {
     await page.setViewportSize({ width: w, height: h });
@@ -265,7 +266,7 @@ const ROUTES = [
   await browser.close();
   console.log(
     'Đã kiểm ' +
-      (3 * (ROUTES.length + TPL.length) + 8 * (ROUTES.length + TPL_THEME.length)) +
+      (4 * (ROUTES.length + TPL.length) + 8 * (ROUTES.length + TPL_THEME.length)) +
       ' màn hình; lỗi script: ' +
       errs.length +
       '; vi phạm: ' +
