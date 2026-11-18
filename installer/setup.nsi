@@ -8,7 +8,7 @@ Unicode true
 
 Name "HAK - Quan ly xuat hang"
 !ifndef VERSION
-  !define VERSION "2.21.4"
+  !define VERSION "2.22.0"
 !endif
 OutFile "HAK_QuanLyXuatHang_Setup.exe"
 VIProductVersion "${VERSION}.0"
@@ -113,4 +113,7 @@ Section "Uninstall"
 
   DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\HAK_QuanLyXuatHang"
   DeleteRegKey HKCU "Software\HAK\QuanLyXuatHang"
+  ; CHINH SACH DU LIEU: co so du lieu SQLite nam NGOAI thu muc cai ($LOCALAPPDATA\HAK_XUATHANG\data) nen KHONG bao gio bi xoa khi go / nang cap.
+  IfSilent +2
+  MessageBox MB_OK|MB_ICONINFORMATION "Da go chuong trinh HAK - Quan ly xuat hang.$\r$\n$\r$\nDu lieu cua ban (SQLite) duoc GIU LAI tai:$\r$\n$LOCALAPPDATA\HAK_XUATHANG\data$\r$\n$\r$\nCai lai chuong trinh se dung lai du lieu nay. Chi xoa thu muc tren khi chac chan khong con can du lieu (hay sao luu truoc)."
 SectionEnd

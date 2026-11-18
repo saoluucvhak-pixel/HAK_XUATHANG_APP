@@ -1,0 +1,66 @@
+{
+ "môi_trường": {
+  "os": "linux 6.18.44-fc-v595",
+  "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+  "nhân": 4,
+  "ram_GB": 15.7,
+  "node": "v22.23.4",
+  "ghi_chú": "Node + HTTP localhost, KHÔNG phải trình duyệt / Edge / Windows"
+ },
+ "kết_quả": [
+  {
+   "mức": "nhỏ",
+   "hồ_sơ": 50,
+   "phiếu_mỗi_hồ_sơ": 40,
+   "tổng_phiếu": 2000,
+   "di_trú_nhập_và_đối_chiếu_ms": 298,
+   "đối_chiếu_đạt": true,
+   "đối_chiếu_riêng_ms": 29,
+   "dung_lượng_db_MB": 0,
+   "lưu_1_hồ_sơ_ms": 1.61,
+   "mở_1_hồ_sơ_ms": 0.76,
+   "danh_sách_hồ_sơ_ms": 1.09,
+   "đọc_và_giải_nén_mọi_hồ_sơ_ms": 2,
+   "sao_lưu_VACUUM_INTO_ms": 6,
+   "sao_lưu_MB": 0.71,
+   "kiểm_tra_toàn_vẹn_ms": 0,
+   "toàn_vẹn_đạt": true
+  },
+  {
+   "mức": "vừa",
+   "hồ_sơ": 500,
+   "phiếu_mỗi_hồ_sơ": 60,
+   "tổng_phiếu": 30000,
+   "di_trú_nhập_và_đối_chiếu_ms": 979,
+   "đối_chiếu_đạt": true,
+   "đối_chiếu_riêng_ms": 85,
+   "dung_lượng_db_MB": 2.51,
+   "lưu_1_hồ_sơ_ms": 1.49,
+   "mở_1_hồ_sơ_ms": 0.63,
+   "danh_sách_hồ_sơ_ms": 2.74,
+   "đọc_và_giải_nén_mọi_hồ_sơ_ms": 24,
+   "sao_lưu_VACUUM_INTO_ms": 15,
+   "sao_lưu_MB": 3.46,
+   "kiểm_tra_toàn_vẹn_ms": 2,
+   "toàn_vẹn_đạt": true
+  },
+  {
+   "mức": "lớn",
+   "hồ_sơ": 1500,
+   "phiếu_mỗi_hồ_sơ": 100,
+   "tổng_phiếu": 150000,
+   "di_trú_nhập_và_đối_chiếu_ms": 2066,
+   "đối_chiếu_đạt": true,
+   "đối_chiếu_riêng_ms": 99,
+   "dung_lượng_db_MB": 7.75,
+   "lưu_1_hồ_sơ_ms": 1.27,
+   "mở_1_hồ_sơ_ms": 0.49,
+   "danh_sách_hồ_sơ_ms": 7.01,
+   "đọc_và_giải_nén_mọi_hồ_sơ_ms": 80,
+   "sao_lưu_VACUUM_INTO_ms": 33,
+   "sao_lưu_MB": 8.22,
+   "kiểm_tra_toàn_vẹn_ms": 6,
+   "toàn_vẹn_đạt": true
+  }
+ ]
+}

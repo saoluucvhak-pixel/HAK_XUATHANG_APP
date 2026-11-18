@@ -460,3 +460,29 @@ test('nhật ký: giao dịch lỗi / xung đột thì không để lại dòng 
   assert.equal(auditRows(b.srv).length, n, 'không ghi nhật ký cho thao tác bị từ chối');
   await b.close();
 });
+
+test('bản portable / HTML (không có mã bảo vệ, chưa từng dùng SQLite): KHÔNG gọi mạng, không có lỗi kết nối; chế độ IndexedDB', async () => {
+  const oldFetch = global.fetch,
+    oldTok = global.HAK_DOCS_TOKEN;
+  let calls = 0;
+  global.fetch = async () => {
+    calls++;
+    throw new Error('không được gọi mạng');
+  };
+  global.HAK_DOCS_TOKEN = '';
+  ls.clear();
+  S._reset();
+  await S.start();
+  assert.equal(calls, 0);
+  assert.equal(S.mode, 'idb');
+  assert.equal(S.available, false);
+  // đã từng dùng SQLite nhưng nay mất mã bảo vệ: PHẢI thăm dò và bị chặn (không im lặng quay về IndexedDB)
+  ls.set('hak-storage-mode', 'sqlite');
+  S._reset();
+  await S.start();
+  assert.equal(calls, 1);
+  assert.equal(S.mode, 'blocked');
+  global.fetch = oldFetch;
+  global.HAK_DOCS_TOKEN = oldTok;
+  ls.clear();
+});

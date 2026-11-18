@@ -8,6 +8,14 @@ const { createServer } = require('./hakdb/server.cjs');
 const APP = 'file://' + path.resolve(__dirname, '../app/index.html');
 const TOKEN = require('node:crypto').randomBytes(16).toString('hex');
 const failures = [];
+const SHOT = process.env.HAK_SHOT_DIR; // đặt để chụp ảnh giao diện (trước / sau) cho báo cáo bàn giao
+const shot = async (p, name, sel) => {
+  if (!SHOT) return;
+  fs.mkdirSync(SHOT, { recursive: true });
+  const f = path.join(SHOT, name + '.png');
+  if (sel && (await p.$(sel))) await (await p.$(sel)).screenshot({ path: f });
+  else await p.screenshot({ path: f });
+};
 const check = (cond, msg) => {
   console.log((cond ? '  ✓ ' : '  ✗ ') + msg);
   if (!cond) failures.push(msg);
@@ -140,6 +148,7 @@ const openBackup = async (p) => {
     console.log('2) Chuyển qua giao diện');
     await openBackup(p);
     check(/IndexedDB/.test(await p.textContent('#storageCard')), 'thẻ "Nơi lưu dữ liệu" nêu rõ đang dùng IndexedDB / trình duyệt');
+    await shot(p, '1-truoc-chuyen-indexeddb', '#storageCard');
     await p.evaluate(() => {
       window.__bk = null;
       HAK.Backup.saveBackupBlob = async (blob, name) => {
@@ -149,6 +158,7 @@ const openBackup = async (p) => {
     });
     await p.click('#storageCard button:has-text("Bắt đầu chuyển sang SQLite")');
     await p.waitForSelector('#storageCard button:has-text("Kích hoạt SQLite")', { timeout: 60000 });
+    await shot(p, '2-doi-chieu-dat-cho-kich-hoat', '#storageCard');
     const txt = await p.textContent('#storageCard');
     check(/✔ ① Sao lưu ZIP/.test(txt) && /đọc lại khớp 1 hồ sơ/.test(txt), 'bước ① sao lưu ZIP đọc lại khớp');
     check(/✔ ② Chụp dữ liệu nhất quán/.test(txt), 'bước ② chụp nhất quán');
@@ -194,6 +204,8 @@ const openBackup = async (p) => {
     check(JSON.stringify(after.bytes) === JSON.stringify([0, 1, 2, 255, 0, 128]), 'tệp gốc đợt Excel nguyên byte');
     check(after.cat === 1, 'Danh mục còn đủ hợp đồng');
     await openBackup(p);
+    await shot(p, '3-sau-chuyen-sqlite', '#storageCard');
+    await shot(p, '3b-thanh-ben-sqlite', '#sidebar');
     const t2 = await p.textContent('#storageCard');
     check(/SQLite \(HAKDocs\)/.test(t2) && t2.includes(path.join(dir, 'hak.db')), 'thẻ nêu đường dẫn tệp SQLite');
     const bkText = await p.textContent('#backupBody');
@@ -244,6 +256,7 @@ const openBackup = async (p) => {
     await new Promise((ok) => srv.close(ok));
     await p.reload();
     await p.waitForSelector('#storageBlocked', { timeout: 15000 });
+    await shot(p, '4-bi-chan-mat-ket-noi');
     check(/không kết nối được/.test(await p.textContent('#storageBlocked')), 'mất kết nối: hiện màn BỊ CHẶN nêu nguyên nhân');
     const box = await p.evaluate(() => {
       const r = document.querySelector('#storageBlocked').getBoundingClientRect();

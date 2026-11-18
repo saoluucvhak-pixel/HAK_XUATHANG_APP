@@ -113,6 +113,12 @@
 
   async function init() {
     const expected = hint.get() === 'sqlite';
+    // Chỉ thăm dò HAKDocs khi CÓ MÃ BẢO VỆ (HAKDocs đã chạy và ghi native/hakdocs-token.js — bản cài Windows) hoặc lần trước đã dùng SQLite (để chặn đúng).
+    // Bản HTML / portable: tệp mã còn trống → không gọi mạng, không có lỗi "ERR_CONNECTION_REFUSED" trong console mỗi lần mở.
+    if (!token() && !expected) {
+      S.available = false;
+      return S;
+    }
     let st = null;
     try {
       st = await call('/db/status', undefined, { noSession: true, timeout: 4000 });
