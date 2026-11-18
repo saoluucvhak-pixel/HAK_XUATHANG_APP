@@ -39,10 +39,10 @@ Các quy tắc dưới đây đã được **suy ra từ mã nguồn / tài li�
 
 ## Đợt rà soát vòng 1 (v2.22.2) — ĐÃ XÁC NHẬN 18/11/2026 (theo đề xuất)
 
-26. **Đếm số xe theo biển số chuẩn hóa — ĐÃ XÁC NHẬN (18/11/2026): CÓ.** Chuẩn hóa biển số khi đếm số xe (hoa/thường, khoảng trắng, dấu gạch/chấm); mọi màn hình khớp Tìm kiếm chung / Tổng quan. *Trạng thái triển khai: xem NHAT_KY_PHIEN_BAN.md (v2.22.2).*
+26. **Đếm số xe theo biển số chuẩn hóa — ĐÃ XÁC NHẬN (18/11/2026): CÓ.** Chuẩn hóa biển số khi đếm số xe (hoa/thường, khoảng trắng, dấu gạch/chấm); mọi màn hình khớp Tìm kiếm chung / Tổng quan. *Đã triển khai ở v2.22.2.*
 27. **Số có dấu phẩy + đúng 3 chữ số ("1,200") — ĐÃ XÁC NHẬN (18/11/2026): GIỮ NGUYÊN.** Ở chứng thư / tờ khai "1,200" = 1,2 (dấu phẩy là thập phân kiểu Việt); ở ô Excel / số kg-tiền = 1200. Chỉ thêm cảnh báo khi giá trị mơ hồ.
 28. **Số âm trong ngoặc ở tờ khai / hợp đồng — ĐÃ XÁC NHẬN (18/11/2026): CHƯA đọc ngoặc là số âm.** Tờ khai (và hợp đồng) không đổi "(1.200)" thành −1200; chỉ cảnh báo khi gặp ô dạng ngoặc ở tờ khai. (Ô Excel / ô nhập số kg-tiền vẫn đọc "(1.200)" = −1200 theo mục 14.)
-29. **Phiếu khối lượng ≤ 0 — ĐÃ XÁC NHẬN (18/11/2026): KHÔNG cộng vào tổng.** Phiếu KL ≤ 0 (kể cả âm) không cộng vào tổng; liệt kê riêng ở "Cần xử lý" (số phiếu + kg bị loại); mọi màn hình và bản xuất cùng quy tắc. *Trạng thái triển khai: xem NHAT_KY_PHIEN_BAN.md (v2.22.2).*
+29. **Phiếu khối lượng ≤ 0 — ĐÃ XÁC NHẬN (18/11/2026): KHÔNG cộng vào tổng.** Phiếu KL ≤ 0 (kể cả âm) không cộng vào tổng; liệt kê riêng ở "Cần xử lý" (số phiếu + kg bị loại); mọi màn hình và bản xuất cùng quy tắc. *Đã triển khai ở v2.22.2.*
 30. **Danh mục xét phiếu cân khi tính "Đã hoàn thành" — ĐÃ XÁC NHẬN (18/11/2026): CÓ; ĐÃ triển khai.** Danh mục, tab Tờ khai, Báo cáo tổng hợp, Chi tiết xuất hàng theo HĐ, Báo cáo thực hiện HĐ, Hồ sơ hợp đồng, Excel / PDF và Google Sheet dùng MỘT nguồn "chi tiết đã có phiếu cân" tính từ Lưu trữ (`HAK.TripDetails`). Đóng mục 1b.
 31. **Làm tròn kg ở SQLite — CHỜ XÁC NHẬN.** Cột chỉ mục `kg_milli` làm tròn 1/1000 kg; nội dung hồ sơ vẫn giữ nguyên số gốc. Danh sách hồ sơ trên SQLite hiển thị kg đã làm tròn gram, IndexedDB hiển thị số gốc; chênh < 0,0005 kg mỗi hồ sơ, không ảnh hưởng số tấn hiển thị.
 
