@@ -15,6 +15,7 @@
     "e2e:reports": "node tools/e2e-reports.cjs",
     "e2e:carrier": "node tools/e2e-carrier.cjs",
     "e2e:customs": "node tools/e2e-customs.cjs",
+    "e2e:bkls-scope": "node tools/e2e-bkls-scope.cjs",
     "snapshot:customs": "node tools/customs-snapshot.cjs",
     "audit:data": "node tools/data-audit.cjs",
     "accept": "node tools/accept.cjs",
