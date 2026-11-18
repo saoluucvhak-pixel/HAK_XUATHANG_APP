@@ -11,8 +11,35 @@
     String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
   /* ---------- Toast ---------- */
+  const VI = /[àáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]/i;
+  const GENERIC =
+    'Đã xảy ra lỗi ngoài dự kiến. Thử lại; nếu vẫn lỗi, ghi lại thao tác vừa làm và báo người hỗ trợ (chi tiết kỹ thuật ở Console, phím F12).';
+  /**
+   * Thông báo lỗi dành cho người dùng: thông báo tiếng Việt do app viết giữ nguyên; thông báo THÔ của trình duyệt / JavaScript (tiếng Anh, "Cannot read properties…", khung stack,
+   * đường dẫn tệp, mã ERR_…, "[object Object]") KHÔNG hiện ra — thay bằng câu chung, bản gốc ghi ở Console.
+   */
+  function friendly(msg) {
+    const s = String(msg == null ? '' : msg);
+    const leaks =
+      /\bat [\w$.<>[\] ]+ \(|\bat (file|https?):\/|file:\/\/|[\w-]+\.(js|cjs|mjs):\d+|\bERR_[A-Z_]+|\[object |\bundefined\b|\bNaN\b/.test(
+        s
+      );
+    const rawEnglish = !VI.test(s) && /[A-Za-z]{2,}\s+[A-Za-z]{2,}/.test(s) && /^[\x20-\x7E\s]*$/.test(s) && s.length > 12;
+    return leaks || rawEnglish ? GENERIC : s;
+  }
   function toast(msg, type, ms) {
     type = type || 'info';
+    if (type === 'error' || type === 'warning') {
+      const shown = friendly(msg);
+      if (shown !== String(msg == null ? '' : msg)) {
+        try {
+          console.error('[thông báo lỗi gốc]', msg);
+        } catch (e) {
+          /* không có console */
+        }
+        msg = shown;
+      }
+    }
     const cls = { success: 'text-bg-success', error: 'text-bg-danger', warning: 'text-bg-warning', info: 'text-bg-primary' }[type];
     const el = document.createElement('div');
     el.className = 'toast align-items-center border-0 ' + cls;
@@ -159,5 +186,5 @@
       }
     });
   }
-  HAK.UI = { $, $$, esc, toast, Loading, setTheme, toggleTheme, confirmClick, debounce, todayISO, loadScript, needLib };
+  HAK.UI = { $, $$, esc, toast, friendly, Loading, setTheme, toggleTheme, confirmClick, debounce, todayISO, loadScript, needLib };
 })(window);
