@@ -1,3 +1,5 @@
+> **Báo cáo lịch sử của đợt v2.22.0.** Các câu “chưa phát hành”, “chưa chạy Windows” và số kiểm thử bên dưới mô tả thời điểm lập báo cáo, không phải kết luận của bản mới. Kết quả kiểm chứng Windows và bản vá mới xem [Nghiệm thu v2.22.1](NGHIEM_THU_V2.22.1.md). Các giới hạn nghiệp vụ và hạng mục chưa làm ở §7 vẫn cần được xem xét riêng.
+
 # Nghiệm thu: bản Windows lưu dữ liệu bằng SQLite (v2.22.0, chưa phát hành)
 
 ## 0. Kết luận

@@ -228,13 +228,35 @@
   /* v2.17.0 (theo hak-migration-manager: sao lưu TRƯỚC khi ghi đè): trước khi khôi phục, chụp cài đặt + danh mục + tài khoản đang có vào 'hak.prerestore.v1' để HOÀN TÁC.
    * Chỉ phần cài đặt / danh mục (localStorage); hồ sơ Lưu trữ nhập vào là thêm / cập nhật theo phiên bản nên không bị xóa. Bản chụp không nằm trong sao lưu toàn bộ. */
   const PRE_KEY = 'hak.prerestore.v1';
-  function snapshotBeforeRestore() {
+  // SQLite là nguồn chính: chỉ cập nhật cache sau khi máy chủ xác nhận ghi.
+  // Store.set() thông thường là API đồng bộ, không thể xác nhận một thao tác khôi phục.
+  async function writeRestoreKey(key, value) {
+    if (HAK.Storage && HAK.Storage.mode !== 'idb') {
+      HAK.Storage.assertOpen();
+      const expected = JSON.stringify(HAK.Store.get(key, undefined));
+      await HAK.DB.kvCas(
+        key,
+        (cur) => (JSON.stringify(cur) !== expected ? 'Dữ liệu đã thay đổi. Tải lại trước khi khôi phục.' : null),
+        value
+      );
+      HAK.Store.set(key, value, { dbCommitted: true });
+    } else if (HAK.Store.set(key, value) === false) throw new Error('Không ghi được "' + key + '".');
+  }
+  async function removeRestoreKey(key) {
+    if (HAK.Storage && HAK.Storage.mode !== 'idb') {
+      HAK.Storage.assertOpen();
+      await HAK.DB.kvDel(key);
+      HAK.Store.remove(key, { dbCommitted: true });
+    } else HAK.Store.remove(key);
+  }
+  async function snapshotBeforeRestore() {
     try {
       const keys = {};
       HAK.Store.keys().forEach((k) => {
         if (k.indexOf('hak.') === 0 && k !== LAST_KEY && k !== AUTO_KEY && k !== PRE_KEY) keys[k] = HAK.Store.get(k, null);
       });
-      return HAK.Store.set(PRE_KEY, { at: Date.now(), keys }) !== false; // Store.set trả false khi không lưu được ở cả localStorage lẫn IndexedDB
+      await writeRestoreKey(PRE_KEY, { at: Date.now(), keys });
+      return true;
     } catch (e) {
       return false;
     }
@@ -244,24 +266,24 @@
     return p && p.keys ? { at: p.at, n: Object.keys(p.keys).length } : null;
   };
   /** Hoàn tác lần khôi phục gần nhất: trả cài đặt / danh mục về bản chụp; khóa mới do khôi phục tạo ra (không có trong bản chụp) bị gỡ. */
-  function undoRestore() {
+  async function undoRestore() {
     const p = HAK.Store.get(PRE_KEY, null);
     if (!p || !p.keys) throw new Error('Chưa có bản chụp trước khi khôi phục.');
     let set = 0,
       removed = 0;
-    HAK.Store.keys().forEach((k) => {
+    for (const k of HAK.Store.keys()) {
       if (k.indexOf('hak.') === 0 && k !== LAST_KEY && k !== AUTO_KEY && k !== PRE_KEY && !(k in p.keys)) {
-        HAK.Store.remove(k);
+        await removeRestoreKey(k);
         removed++;
       }
-    });
-    Object.keys(p.keys).forEach((k) => {
+    }
+    for (const k of Object.keys(p.keys)) {
       if (p.keys[k] !== null) {
-        HAK.Store.set(k, p.keys[k]);
+        await writeRestoreKey(k, p.keys[k]);
         set++;
       }
-    });
-    HAK.Store.remove(PRE_KEY);
+    }
+    await removeRestoreKey(PRE_KEY);
     return { set, removed };
   }
   const CAT = 'hak.catalog.v1';
@@ -400,7 +422,7 @@
       const r = await HAK.Archive.importItems(j.items);
       return { legacy: true, keys: 0, added: r.added, updated: r.updated, skipped: r.skipped, mode };
     }
-    const snapshot = snapshotBeforeRestore();
+    const snapshot = await snapshotBeforeRestore();
     if (!snapshot)
       throw new Error(
         'Không chụp được bản hiện tại trước khi khôi phục (bộ nhớ trình duyệt đầy?). Chưa thay đổi gì — hãy Sao lưu toàn bộ ra file rồi dọn bớt dữ liệu trước.'
@@ -438,11 +460,11 @@
         id: 'keys',
         label: 'cài đặt & danh mục',
         undoable: true,
-        run: () => {
-          Object.keys(j.keys).forEach((k) => {
-            if (k === PRE_KEY) return;
-            if (keepAuth && AUTH_KEYS.indexOf(k) >= 0) return; // giữ tài khoản / mật khẩu / khóa khôi phục / loại máy hiện tại
-            if (!(k.indexOf('hak.') === 0 && k !== LAST_KEY && k !== AUTO_KEY && j.keys[k] !== null)) return;
+        run: async () => {
+          for (const k of Object.keys(j.keys)) {
+            if (k === PRE_KEY) continue;
+            if (keepAuth && AUTH_KEYS.indexOf(k) >= 0) continue; // giữ tài khoản / mật khẩu / khóa khôi phục / loại máy hiện tại
+            if (!(k.indexOf('hak.') === 0 && k !== LAST_KEY && k !== AUTO_KEY && j.keys[k] !== null)) continue;
             if (k === CAT && merge && HAK.ContractModel) {
               // CÙNG quy tắc phiên bản với Gói cấu hình: bản cũ không ghi đè bản mới
               const merged = HAK.ContractModel.mergeCatalog(HAK.Store.get(CAT, null), j.keys[k]),
@@ -451,14 +473,14 @@
               out.conflicts = (rp.conflicts || []).length;
               out.dupPayments = ((rp.customs || {}).duplicatePayments || []).length;
               out.maybePayments = ((rp.customs || {}).maybe || []).length;
-              if (HAK.Store.set(CAT, merged) === false) throw new Error('Không ghi được danh mục.');
+              await writeRestoreKey(CAT, merged);
               out.keys++;
-              return;
+              continue;
             }
-            if (merge && k !== CAT && HAK.Store.get(k, null) !== null) return; // nhập bổ sung: không đè cài đặt đang có
-            if (HAK.Store.set(k, j.keys[k]) === false) throw new Error('Không ghi được "' + k + '".');
+            if (merge && k !== CAT && HAK.Store.get(k, null) !== null) continue; // nhập bổ sung: không đè cài đặt đang có
+            await writeRestoreKey(k, j.keys[k]);
             out.keys++;
-          });
+          }
           return { n: out.keys };
         },
       },
@@ -1458,9 +1480,9 @@
       bu.addEventListener('click', () =>
         HAK.UI.confirmClick(
           bu,
-          () => {
+          async () => {
             try {
-              const r = undoRestore();
+              const r = await undoRestore();
               toast(
                 'Đã hoàn tác khôi phục: trả ' +
                   r.set +

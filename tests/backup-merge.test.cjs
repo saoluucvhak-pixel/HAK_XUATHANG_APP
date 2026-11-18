@@ -100,7 +100,7 @@ test('Khôi phục (replace) thay danh mục bằng bản sao như thiết kế,
     mode: 'replace',
   });
   assert.equal(local().contractQty, 500);
-  HAK.Backup.undoRestore();
+  await HAK.Backup.undoRestore();
   assert.equal(local().contractQty, 700);
   assert.equal(local().revision, 4);
 });
@@ -160,7 +160,7 @@ test('một bước ghi thất bại: lỗi nêu rõ kho đã nhập, kho chưa 
   assert.match(err.message, /Chưa chạy: nhật ký chứng từ/);
   assert.match(err.message, /KHÔNG hoàn tác tự động.*hồ sơ Lưu trữ/);
   assert.equal(local().contractQty, 900, 'phần đã nhập vẫn còn');
-  HAK.Backup.undoRestore();
+  await HAK.Backup.undoRestore();
   assert.equal(local().contractQty, 700);
   assert.ok(store);
 });

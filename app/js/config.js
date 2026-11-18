@@ -62,7 +62,7 @@
       }
       return true;
     },
-    remove(key) {
+    remove(key, opts) {
       delete mem[key];
       memOnly.delete(key);
       try {
@@ -70,7 +70,7 @@
       } catch (e) {
         /* noop */
       }
-      if (HAK.DB && HAK.DB.usable())
+      if (HAK.DB && HAK.DB.usable() && !(opts && opts.dbCommitted))
         HAK.DB.kvDel(key).catch(() => {
           /* bỏ qua */
         });

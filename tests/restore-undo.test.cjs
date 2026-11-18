@@ -46,13 +46,13 @@ test('khôi phục chụp bản hiện tại; hoàn tác trả lại đúng, g�
   assert.deepEqual(HAK.Store.get('hak.config.v1'), { a: 2 });
   assert.ok(HAK.Store.get('hak.moi.v1'));
   assert.ok(HAK.Backup.preRestoreInfo());
-  const u = HAK.Backup.undoRestore();
+  const u = await HAK.Backup.undoRestore();
   assert.deepEqual(HAK.Store.get('hak.config.v1'), { a: 1 });
   assert.deepEqual(HAK.Store.get('hak.catalog.v1'), { v: 3, contracts: ['máy này'] });
   assert.equal(HAK.Store.get('hak.moi.v1', null), null, 'khóa mới bị gỡ');
   assert.equal(HAK.Backup.preRestoreInfo(), null);
   assert.ok(u.removed >= 1);
-  assert.throws(() => HAK.Backup.undoRestore(), /Chưa có bản chụp/);
+  await assert.rejects(HAK.Backup.undoRestore(), /Chưa có bản chụp/);
 });
 test('không chụp được bản hiện tại → từ chối khôi phục, dữ liệu máy không đổi', async () => {
   boot(true);
@@ -73,4 +73,71 @@ test('bản chụp không lọt vào sao lưu toàn bộ và không bị ghi đ�
   const c = await HAK.Backup.collect();
   assert.equal('hak.prerestore.v1' in c.keys, false);
   assert.deepEqual(HAK.Store.get('hak.prerestore.v1').keys['hak.config.v1'], { a: 1 }, 'chụp là bản của máy, không phải của file');
+});
+
+function sqlite() {
+  const { store } = boot(false);
+  const durable = new Map();
+  HAK.Storage = { mode: 'sqlite', assertOpen() {} };
+  let failing = null;
+  HAK.DB.kvCas = async (key, check, value) => {
+    if (key === failing) throw Error('SQLite write failed');
+    const error = check(durable.get(key));
+    if (error) throw Error(error);
+    durable.set(key, structuredClone(value));
+  };
+  HAK.DB.kvDel = async (key) => {
+    if (key === failing) throw Error('SQLite delete failed');
+    durable.delete(key);
+  };
+  const seed = (key, value) => {
+    HAK.Store.set(key, value);
+    durable.set(key, structuredClone(value));
+  };
+  return { store, durable, seed, fail: (key) => (failing = key) };
+}
+
+test('SQLite: lỗi ghi bản hoàn tác phải chặn khôi phục trước mọi thay đổi', async () => {
+  const s = sqlite();
+  s.seed('hak.config.v1', { a: 1 });
+  s.fail('hak.prerestore.v1');
+  await assert.rejects(HAK.Backup.restoreFile(fileOf(backupOf({ 'hak.config.v1': { a: 9 } })), { mode: 'replace' }), /Không chụp được/);
+  assert.deepEqual(HAK.Store.get('hak.config.v1'), { a: 1 });
+  assert.deepEqual(s.durable.get('hak.config.v1'), { a: 1 });
+});
+
+test('SQLite: lỗi ghi cài đặt không báo thành công, không đổi cache, giữ bản hoàn tác', async () => {
+  const s = sqlite();
+  s.seed('hak.config.v1', { a: 1 });
+  s.fail('hak.config.v1');
+  await assert.rejects(HAK.Backup.restoreFile(fileOf(backupOf({ 'hak.config.v1': { a: 9 } })), { mode: 'replace' }), (e) => {
+    assert.equal(e.report[0].status, 'failed');
+    assert.ok(e.report.slice(1).every((x) => x.status === 'pending'));
+    return /SQLite write failed/.test(e.message);
+  });
+  assert.deepEqual(HAK.Store.get('hak.config.v1'), { a: 1 });
+  assert.ok(s.durable.get('hak.prerestore.v1'));
+});
+
+test('SQLite: bản khác thay cài đặt trước khôi phục thì không bị ghi đè', async () => {
+  const s = sqlite();
+  s.seed('hak.config.v1', { a: 1 });
+  s.durable.set('hak.config.v1', { a: 2 });
+  await assert.rejects(HAK.Backup.restoreFile(fileOf(backupOf({ 'hak.config.v1': { a: 9 } })), { mode: 'replace' }), /đã thay đổi/);
+  assert.deepEqual(s.durable.get('hak.config.v1'), { a: 2 });
+});
+
+test('SQLite: hoàn tác phải chờ ghi; lỗi vẫn giữ bản chụp để thử lại', async () => {
+  const s = sqlite();
+  s.seed('hak.config.v1', { a: 1 });
+  await HAK.Backup.restoreFile(fileOf(backupOf({ 'hak.config.v1': { a: 9 }, 'hak.moi.v1': { x: 1 } })), { mode: 'replace' });
+  assert.deepEqual(s.durable.get('hak.config.v1'), { a: 9 });
+  s.fail('hak.config.v1');
+  await assert.rejects(HAK.Backup.undoRestore(), /SQLite write failed/);
+  assert.ok(s.durable.get('hak.prerestore.v1'));
+  s.fail(null);
+  await HAK.Backup.undoRestore();
+  assert.deepEqual(s.durable.get('hak.config.v1'), { a: 1 });
+  assert.equal(s.durable.has('hak.moi.v1'), false);
+  assert.equal(s.durable.has('hak.prerestore.v1'), false);
 });

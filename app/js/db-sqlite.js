@@ -376,6 +376,41 @@
     }
   }
 
+  /** Chốt đóng năm trên nguồn SQLite, kiểm tra sổ năm và mọi đợt trước khi xóa trong cùng giao dịch. */
+  async function finalizeYear(expected, bundle, proof) {
+    S().assertOpen();
+    const key = 'hak.yearbook.v1';
+    const saved = await getRow('kv', key);
+    const state = saved && saved.rec.val;
+    if (!state || state.revision !== expected)
+      throw Object.assign(Error('Dữ liệu đã thay đổi khi đang đóng năm. File đã lưu, chưa dọn kho đang làm việc.'), { conflict: true });
+    const ops = [{ op: 'guard', table: 'kv', key, ifRev: saved.rev }];
+    for (const item of bundle.batches) {
+      const meta = await getRow('batches', item.meta.id);
+      const bytes = await get('batchdata', item.meta.id);
+      if (!meta || J(meta.rec) !== J(item.meta) || !bytes || toB64(bytes) !== item.b64)
+        throw Object.assign(Error('File cân đã thay đổi; chưa dọn.'), { conflict: true });
+      ops.push({ op: 'guard', table: 'batches', key: item.meta.id, ifRev: meta.rev });
+      ops.push({ op: 'del', table: 'batch_files', key: item.meta.id });
+      ops.push({ op: 'del', table: 'batches', key: item.meta.id, ifRev: meta.rev });
+    }
+    const ids = new Set(bundle.records.map((r) => r.id));
+    state.records = state.records.filter((r) => !ids.has(r.id));
+    state.closed = (state.closed || []).filter((c) => c.sha256 !== proof.sha256);
+    state.closed.push({
+      ...proof,
+      year: bundle.year,
+      closedAt: Date.now(),
+      count: bundle.records.length,
+      archiveCount: bundle.archive.length,
+      batchCount: bundle.batches.length,
+      pending: false,
+    });
+    state.revision++;
+    ops.push(...(await kvWriteOps({ key, val: state, ls: false, ts: Date.now() }, saved.rev)));
+    await S().call('/db/tx', { ops });
+  }
+
   /* ---------------- Lưu trữ hồ sơ cân (thay IndexedDB "hak-archive") ---------------- */
   const dmyTs = (v) => {
     const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(String(v || ''));
@@ -480,6 +515,7 @@
     kvDel,
     kvClear,
     kvCas,
+    finalizeYear,
     kvGet: async (k) => {
       const g = await getRow('kv', k);
       return g ? g.rec.val : undefined; // GIÁ TRỊ (cùng nghĩa với HAK.DB.kvGet ở IndexedDB)
