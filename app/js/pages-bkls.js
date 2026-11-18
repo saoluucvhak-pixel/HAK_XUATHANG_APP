@@ -11,6 +11,7 @@
       ctx;
     // Hàm dùng chung: gọi qua ctx tại thời điểm dùng (giữ nguyên ngữ nghĩa khi pages.js/test gán lại hàm)
     const collect = (...a) => ctx.collect(...a),
+      confirmScope = (...a) => ctx.confirmScope(...a),
       archive = (...a) => ctx.archive(...a),
       printInBatches = (...a) => ctx.printInBatches(...a),
       fieldDef = (...a) => ctx.fieldDef(...a),
@@ -68,6 +69,7 @@
       }
       // v2.12.4: LUÔN hỏi phạm vi / định dạng (mặc định "BKLS tổng · Word"), kể cả khi tạo lại từ Lưu trữ — trước đây Lưu trữ dùng 4 ô đã lưu
       // (mặc định đều tick) nên luôn tạo cả bản từng xe Word + PDF rất lâu dù chỉ cần bản tổng.
+      if (!src && !confirmScope(type, 'Lập Bảng kê lâm sản (BKLS) "' + DOCS[type].title + '"')) return; // cùng hộp xác nhận phạm vi như Word / PDF / Excel
       const chosen = await HAK.BklsTemplates.choose(p);
       if (!chosen) return;
       p.bklsTemplate = chosen.template;

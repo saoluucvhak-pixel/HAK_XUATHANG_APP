@@ -97,6 +97,9 @@
       conflicts,
       rows,
       stats: X.computeStats(rows),
+      // phiếu KL ≤ 0 đã loại khỏi tổng ở từng đợt (quy tắc 29) — gom lại để lưu cùng hồ sơ và liệt kê ở "Ngoại lệ cần đối soát"
+      excluded: ok.flatMap((b) => (b.ds.excluded || []).map((x) => Object.assign({ file: b.fileName }, x))),
+      excludedKg: ok.reduce((a, b) => a + (b.ds.excludedKg || 0), 0),
       warnings,
       errors: [],
       meta: {},

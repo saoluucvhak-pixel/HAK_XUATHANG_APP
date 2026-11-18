@@ -82,10 +82,15 @@
           m.kg += kg;
         }
         // khử trùng giữa các loại (cùng một lượt cân có thể được nạp ở nhiều loại biên bản)
+        const nk = (v) =>
+          String(v == null ? '' : v)
+            .trim()
+            .toUpperCase()
+            .replace(/\s+/g, ''); // cùng chuẩn hóa với HAK.Weigh.identity (hoa/thường, khoảng trắng)
         const k =
-          (r.ticket || '') +
+          nk(r.ticket) +
           '|' +
-          r.plate +
+          key(r.plate) +
           '|' +
           (r.ts1 !== null && r.ts1 !== undefined ? r.ts1 : r.time1) +
           (r.ticket ? '' : '|' + r.net);

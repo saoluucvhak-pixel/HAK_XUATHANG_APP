@@ -19,6 +19,14 @@
       .trim()
       .toUpperCase()
       .replace(/\s+/g, '');
+  /** Khóa biển số (xem HAK.Excel.util.plateKey): "43c-111.11" ≡ "43C 11111". */
+  const plateKey = (s) =>
+    String(s == null ? '' : s)
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[đĐ]/g, 'D')
+      .toUpperCase()
+      .replace(/[^0-9A-Z]/g, '');
   const kgKey = (n) => Math.round((Number(n) || 0) * 1000); // so khớp khối lượng lẻ tới gram
 
   /** Khóa nhận diện của 1 dòng phiếu cân (null = không nhận diện được). */
@@ -26,7 +34,7 @@
     const r = row || {},
       c = norm(cid),
       date = norm(r.dateStr),
-      plate = norm(r.plate),
+      plate = plateKey(r.plate),
       tk = norm(r.ticket);
     if (tk) return 'T|' + c + '|' + tk + '|' + date + '|' + plate;
     if (plate && norm(r.time1)) return 'S|' + c + '|' + date + '|' + norm(r.time1) + '|' + plate;
@@ -188,6 +196,6 @@
     o.delKg = o.kg - o.retKg;
     return o;
   }
-  HAK.Weigh = { identity, ticketsOf, clusters, resolve, overall, norm };
+  HAK.Weigh = { identity, ticketsOf, clusters, resolve, overall, norm, plateKey };
   if (typeof module === 'object' && module.exports) module.exports = HAK.Weigh;
 })(typeof window !== 'undefined' ? window : globalThis);

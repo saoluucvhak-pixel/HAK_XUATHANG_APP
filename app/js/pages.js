@@ -1713,8 +1713,9 @@
   }
 
   /** Xác nhận trước khi xuất: công ty · tàu · số phiếu · bỏ · trả về · thực giao (cùng tập phiếu với màn hình). Test đặt HAK.Pages._confirmScope. */
-  function confirmScope(type) {
-    const txt = 'Lập chứng từ "' + DOCS[type].title + '" cho:\n' + scopeSummary(type) + '\n\nĐúng phạm vi cần lập? (Hủy để chỉnh lại)';
+  function confirmScope(type, what) {
+    const txt =
+      (what || 'Lập chứng từ "' + DOCS[type].title + '"') + ' cho:\n' + scopeSummary(type) + '\n\nĐúng phạm vi cần lập? (Hủy để chỉnh lại)';
     if (HAK.Pages && HAK.Pages._confirmScope) return HAK.Pages._confirmScope(txt, type);
     return typeof root.confirm === 'function' ? root.confirm(txt) : true;
   }
@@ -1845,6 +1846,7 @@
     fid,
     SAVED,
     collect: (...a) => collect(...a),
+    confirmScope: (...a) => confirmScope(...a),
     archive: (...a) => archive(...a),
     printInBatches: (...a) => printInBatches(...a),
     fieldDef: (...a) => fieldDef(...a),

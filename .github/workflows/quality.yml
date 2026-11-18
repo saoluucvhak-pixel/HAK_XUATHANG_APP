@@ -43,6 +43,9 @@ jobs:
       - run: npm run e2e:carrier   # chi tiết đơn vị vận chuyển khớp bảng tổng khi lọc theo ngày cân
       - run: npm run e2e:reports   # 5 mẫu báo cáo + bảng chéo kho × hình thức: màn hình, tra cứu, Excel, bản in, phạm vi công ty
       - run: npm run e2e:customs   # nhập tờ khai Excel, OCR giấy nộp tiền (giả lập OCR), nhập lại, khai bổ sung, hoàn thuế, hủy, phạm vi công ty
+      - run: npm run e2e:bkls-scope   # Lập BKLS phải hỏi xác nhận phạm vi như Word / PDF / Excel
+      - run: npm run e2e:contract-status   # trạng thái "Đã hoàn thành" của hợp đồng: Danh mục, báo cáo, bộ lọc, Hồ sơ hợp đồng cùng một nguồn (có phiếu cân)
+      - run: npm run e2e:nonpositive   # phiếu KL ≤ 0 không cộng vào tổng, liệt kê ở Ngoại lệ cần đối soát
       - run: npm run accept:release   # Word và PDF BẮT BUỘC: thiếu / không đọc lại được file → lỗi (chưa xác minh)
 
   accept-windows:

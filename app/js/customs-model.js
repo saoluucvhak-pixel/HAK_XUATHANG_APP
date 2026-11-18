@@ -360,7 +360,16 @@
     if (missing.length === 1 && need.length === 1 && looseCleared > 0) return [];
     return missing;
   }
+  /**
+   * NGUỒN CHUNG "chi tiết hợp đồng đã có phiếu cân" (HAK.TripDetails, đọc từ Lưu trữ): trả Set mã chi tiết, hoặc null khi chưa tính xong
+   * (khi đó trạng thái hiển thị như cũ rồi tự cập nhật). Mọi màn hình gọi contractStatus không truyền opt.tripDetails đều dùng nguồn này.
+   */
+  let tripProvider = null;
+  const setTripDetailsProvider = (fn) => {
+    tripProvider = typeof fn === 'function' ? fn : null;
+  };
   function contractStatus(customs, contractId, contract, opt) {
+    if (!opt || opt.tripDetails === undefined) opt = Object.assign({}, opt, { tripDetails: tripProvider ? tripProvider() : null });
     const list = act(customs).filter((d) => d.contractId === contractId);
     const cleared = list.filter((d) => d.status === 'cleared').length;
     // Đóng thủ công (hợp đồng Xuất bán / Trao đổi không có tờ khai, hoặc đã giao đủ): contract.closedAt = ngày đóng.
@@ -554,6 +563,7 @@
     setStatus,
     statusDate,
     contractStatus,
+    setTripDetailsProvider,
     validate,
     upsert,
     merge,

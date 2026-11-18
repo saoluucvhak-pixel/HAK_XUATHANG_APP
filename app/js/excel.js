@@ -72,6 +72,14 @@
       .replace(/\s+/g, ' ')
       .trim();
   }
+  /** Khóa biển số để đếm / gộp xe: không phân biệt hoa/thường, khoảng trắng, dấu gạch, dấu chấm, dấu tiếng Việt ("43c-111.11" ≡ "43C 11111"). Cùng quy tắc HAK.Weigh.plateKey / Tìm kiếm chung (có test đối chiếu). */
+  const plateKey = (s) =>
+    String(s == null ? '' : s)
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[đĐ]/g, 'D')
+      .toUpperCase()
+      .replace(/[^0-9A-Z]/g, '');
   const isBlank = (v) => v === null || v === undefined || (typeof v === 'string' && v.trim() === '');
 
   /** Đọc số từ ô Excel: hỗ trợ "13.770", "13,770", "1,979", "36,042,650", "12.5", "12,5". */
@@ -441,8 +449,9 @@
 
     // ---- chuẩn hoá từng dòng ----
     const rows = [];
-    const issues = { swap: [], mismatch: [], noDate: [], dupTicket: [], nonPos: [], plate: [] };
+    const issues = { swap: [], mismatch: [], noDate: [], dupTicket: [], nonPos: [], plate: [], noWeight: [] };
     const seenTicket = new Map();
+    const excluded = []; // phiếu KL ≤ 0 (kể cả âm): KHÔNG cộng vào tổng, KHÔNG đưa vào biên bản — liệt kê riêng để đối soát (quy tắc 29)
     const cancelled = []; // phiếu "BO" (bỏ cân — xe cân lại phiếu khác) → loại khỏi biên bản
     let skipped = 0;
     for (let r = hr + 1; r < G.length; r++) {
@@ -463,6 +472,8 @@
       }
       if (net === null && (tare === null || gross === null)) {
         skipped++;
+        // dòng có số phiếu / biển số nhưng không đọc được khối lượng: KHÔNG được nuốt âm thầm → báo kèm số dòng Excel
+        if (plate || !isBlank(g('ticket'))) issues.noWeight.push(r + 1 + rowOff);
         continue;
       }
       let rowUnit = unitFactor;
@@ -532,6 +543,11 @@
         cancelled.push({ idx: r + 1 + rowOff, ticket: normTicket(g('ticket')), net });
         continue;
       }
+      if (net <= 0) {
+        excluded.push({ idx: row.idx, ticket: row.ticket, plate, net, dateStr: row.dateStr });
+        issues.nonPos.push(row.idx);
+        continue;
+      }
       if (tare !== null && gross !== null) {
         if (tare > gross) {
           issues.swap.push(row.idx);
@@ -547,10 +563,6 @@
           issues.mismatch.push(row.idx);
           row.warn.push('KL hàng ≠ |lần 2 − lần 1|');
         }
-      }
-      if (net <= 0) {
-        issues.nonPos.push(row.idx);
-        row.warn.push('KL hàng ≤ 0');
       }
       row.tare = tare;
       row.gross = gross;
@@ -570,16 +582,31 @@
       rows.push(row);
     }
     ds.rows = rows;
-    ds.skipped = skipped;
+    ds.skipped = skipped - issues.noWeight.length; // dòng tiêu đề / chữ ký / trống thật sự
+    ds.noWeightRows = issues.noWeight;
     ds.cancelled = cancelled;
     ds.cancelledKg = cancelled.reduce((a, c) => a + c.net, 0);
+    ds.excluded = excluded;
+    ds.excludedKg = excluded.reduce((a, c) => a + c.net, 0);
     if (!rows.length) {
-      ds.errors.push('Không có dòng dữ liệu hợp lệ sau dòng tiêu đề.');
+      ds.errors.push(
+        'Không có dòng dữ liệu hợp lệ sau dòng tiêu đề.' +
+          (issues.noWeight.length ? ' (' + issues.noWeight.length + ' dòng có biển số/số phiếu nhưng không đọc được khối lượng.)' : '') +
+          (excluded.length ? ' (' + excluded.length + ' phiếu có KL ≤ 0 đã loại khỏi tổng.)' : '')
+      );
       return ds;
     }
 
     // ---- Cảnh báo dữ liệu ----
     const lim = (a) => a.slice(0, 8).join(', ') + (a.length > 8 ? ' … (+' + (a.length - 8) + ')' : '');
+    if (issues.noWeight.length)
+      ds.warnings.push(
+        '⚠ ' +
+          issues.noWeight.length +
+          ' dòng có số phiếu/biển số nhưng không đọc được khối lượng nên CHƯA được nạp (dòng Excel: ' +
+          lim(issues.noWeight) +
+          ').'
+      );
     if (issues.noDate.length)
       ds.warnings.push('⚠ ' + issues.noDate.length + ' dòng thiếu/sai ngày cân (dòng Excel: ' + lim(issues.noDate) + ').');
     if (cancelled.length)
@@ -609,8 +636,18 @@
       ds.warnings.push(
         '⚠ ' + issues.mismatch.length + ' dòng có KL hàng ≠ |cân lần 2 − cân lần 1| (dòng Excel: ' + lim(issues.mismatch) + ').'
       );
-    if (issues.nonPos.length)
-      ds.warnings.push('⚠ ' + issues.nonPos.length + ' dòng có KL hàng ≤ 0 (dòng Excel: ' + lim(issues.nonPos) + ').');
+    if (excluded.length)
+      ds.warnings.push(
+        '⚠ ' +
+          excluded.length +
+          ' phiếu có KL hàng ≤ 0 (' +
+          excluded.reduce((a, c) => a + c.net, 0).toLocaleString('en-US') +
+          ' kg) đã LOẠI khỏi tổng và biên bản — số phiếu: ' +
+          lim(excluded.map((x) => x.ticket || 'dòng ' + x.idx)) +
+          ' (dòng Excel: ' +
+          lim(issues.nonPos) +
+          '). Đối chiếu với file gốc; danh sách nằm ở Báo cáo › Ngoại lệ cần đối soát.'
+      );
     if (issues.plate.length)
       ds.warnings.push('⚠ ' + issues.plate.length + ' dòng có biển số bất thường (dòng Excel: ' + lim(issues.plate) + ').');
     if (issues.dupTicket.length)
@@ -622,8 +659,8 @@
     // ---- Đối chiếu với dòng "Tổng số" trong tiêu đề báo cáo ----
     const mt = ds.meta;
     // (đối chiếu tính cả phiếu BO vì tiêu đề báo cáo của phần mềm cân vẫn đếm chúng)
-    const allTrips = ds.stats.trips + cancelled.length,
-      allKg = ds.stats.kg + ds.cancelledKg;
+    const allTrips = ds.stats.trips + cancelled.length + excluded.length,
+      allKg = ds.stats.kg + ds.cancelledKg + ds.excludedKg;
     if (mt.declaredTrips !== null && mt.declaredTrips !== allTrips)
       ds.warnings.push('⚠ Số xe đọc được (' + allTrips + ') khác "Tổng số" ghi ở tiêu đề báo cáo (' + mt.declaredTrips + ').');
     if (mt.declaredKg !== null && Math.abs(mt.declaredKg - allKg) > 1)
@@ -672,10 +709,11 @@
         if (r.ts1 < minTs) minTs = r.ts1;
         if (r.ts1 > maxTs) maxTs = r.ts1;
       }
-      let p = plates.get(r.plate);
+      const pk = plateKey(r.plate);
+      let p = plates.get(pk);
       if (!p) {
         p = { plate: r.plate, trips: 0, kg: 0, minTs: Infinity, maxTs: -Infinity };
-        plates.set(r.plate, p);
+        plates.set(pk, p);
       }
       p.trips++;
       p.kg += r.net;
@@ -720,6 +758,6 @@
     readBuffer,
     parseSheet,
     computeStats,
-    util: { norm, parseNum, parseDT, partsToTs, tsToParts, fmtDate, fmtDateTime, normTicket, colName, isBlank },
+    util: { norm, parseNum, parseDT, partsToTs, tsToParts, fmtDate, fmtDateTime, normTicket, plateKey, colName, isBlank },
   };
 })(typeof window !== 'undefined' ? window : globalThis);

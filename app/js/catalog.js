@@ -543,6 +543,11 @@
     root.addEventListener('hak:scope', (e) => {
       if (e.detail && e.detail.key === 'catalog') renderRows();
     });
+    // Trạng thái "Đã hoàn thành" của hợp đồng phụ thuộc phiếu cân trong Lưu trữ (HAK.TripDetails): tính xong / đổi thì vẽ lại bảng đang mở
+    root.addEventListener('hak:tripdetails', () => {
+      const r = $('#catalogRoot');
+      if (r && r.offsetParent !== null) renderRows();
+    });
     $('#catSave').addEventListener('click', onSave);
     $('#catForm').addEventListener('input', onFormInput);
     $('#catForm').addEventListener('change', onFormInput);

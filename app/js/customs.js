@@ -562,7 +562,7 @@
     '<div id="csSmart"></div><div class="mb-2"><label class="form-check mb-0 d-inline-block"><input class="form-check-input" type="checkbox" id="csDeleted"> Xem tờ khai đã xóa</label></div>' +
     '<div id="csCards" class="row g-2 mb-2"></div><div class="tbl-wrap"><table class="table table-hover align-middle mb-0"><thead><tr><th>Số tờ khai</th><th>Ngày mở</th><th class="num">Lần</th><th>Loại hình</th><th>Hợp đồng</th><th>Tàu</th><th>Trạng thái</th><th class="num">Thuế XK phải nộp</th><th class="num">Đã nộp</th><th class="num">Còn phải nộp</th><th></th></tr></thead><tbody id="csBody"></tbody></table></div>' +
     '<div class="text-center muted py-4 d-none" id="csEmpty"></div><div id="csDetail" class="mt-3"></div>' +
-    '<div class="form-text mt-2">Tờ khai là bảng cha; <b>khai bổ sung</b> và <b>giấy nộp tiền</b> là bảng con của tờ khai. Trạng thái: Đã mở tờ khai → Chờ thông quan → Đã thông quan. Khi <b>mọi tờ khai</b> của một hợp đồng đã thông quan, hợp đồng tự chuyển từ <b>Đang thực hiện</b> sang <b>Đã hoàn thành</b>. Số liệu nằm trong <b>Sao lưu toàn bộ</b>.</div>';
+    '<div class="form-text mt-2">Tờ khai là bảng cha; <b>khai bổ sung</b> và <b>giấy nộp tiền</b> là bảng con của tờ khai. Trạng thái: Đã mở tờ khai → Chờ thông quan → Đã thông quan. Khi <b>mọi tờ khai</b> của một hợp đồng đã thông quan, hợp đồng tự chuyển từ <b>Đang thực hiện</b> sang <b>Đã hoàn thành</b>. Chi tiết đã có <b>chứng thư</b> hoặc <b>phiếu cân</b> (trong Lưu trữ) cũng cần có tờ khai thông quan. Số liệu nằm trong <b>Sao lưu toàn bộ</b>.</div>';
   const csView = () =>
     smartView(
       'cs',
@@ -1063,6 +1063,12 @@
     root.addEventListener('hak:catalog', () => {
       drawReport();
       drawContractReport();
+    });
+    root.addEventListener('hak:tripdetails', () => {
+      drawReport();
+      drawContractReport();
+      const r = $('#customsRoot');
+      if (r && r.offsetParent !== null) render();
     });
   }
 

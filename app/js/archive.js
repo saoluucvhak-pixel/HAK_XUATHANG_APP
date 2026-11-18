@@ -105,10 +105,19 @@
       }
     });
   }
+  /** Báo cho các màn phụ thuộc Lưu trữ (vd. trạng thái hợp đồng cần biết chi tiết nào đã có phiếu cân) rằng kho vừa đổi. */
+  const changed = () => {
+    try {
+      root.dispatchEvent(new Event('hak:archive'));
+    } catch (e) {
+      /* môi trường không có sự kiện */
+    }
+  };
   const putBoth = async (meta, data) => {
     const q = await sq();
-    if (q) return q.put(meta, data);
-    return putBothIdb(meta, data);
+    const r = q ? await q.put(meta, data) : await putBothIdb(meta, data);
+    changed();
+    return r;
   };
   const putBothIdb = (meta, data) =>
     writeTx(
@@ -123,8 +132,9 @@
     );
   const delOne = async (id) => {
     const q = await sq();
-    if (q) return q.del(id);
-    return delOneIdb(id);
+    const r = q ? await q.del(id) : await delOneIdb(id);
+    changed();
+    return r;
   };
   const delOneIdb = (id) =>
     writeTx(
@@ -139,8 +149,9 @@
     );
   const clearAll = async () => {
     const q = await sq();
-    if (q) return q.clear();
-    return clearAllIdb();
+    const r = q ? await q.clear() : await clearAllIdb();
+    changed();
+    return r;
   };
   const clearAllIdb = () =>
     writeTx(
@@ -265,6 +276,13 @@
       if (modes.indexOf(mode) < 0) modes.push(mode);
       const title = res.excel ? stripExt(res.excel.fileName) : stripExt((res.files[res.files.length - 1] || {}).name);
       const st = stats(type, params, rows);
+      // Quy tắc 29: phiếu KL ≤ 0 đã loại khỏi tổng được lưu cùng hồ sơ (tối đa 50 dòng) để Báo cáo liệt kê ở "Ngoại lệ cần đối soát"
+      const ex = (ds && ds.excluded) || [];
+      if (ex.length) {
+        st.nonPosTrips = ex.length;
+        st.nonPosKg = ex.reduce((a, x) => a + (Number(x.net) || 0), 0);
+        st.nonPos = ex.slice(0, 50).map((x) => ({ t: x.ticket || '', p: x.plate || '', d: x.dateStr || '', kg: Number(x.net) || 0 }));
+      }
       const isBkls = mode === 'bkls',
         keepOld = old && isBkls; // BKLS ghép vào hồ sơ biên bản có sẵn: giữ tên + tóm tắt của biên bản
       const meta = Object.assign(st, {
@@ -285,6 +303,12 @@
         size: old ? old.size : 0,
       });
       if (!meta.contract && old && old.contract) meta.contract = old.contract;
+      if (!ex.length && ds && ds.excluded === undefined && old && old.nonPos) {
+        // lập lại từ Lưu trữ (dữ liệu hồ sơ không mang danh sách phiếu đã loại) → giữ danh sách của lần lưu trước
+        meta.nonPosTrips = old.nonPosTrips;
+        meta.nonPosKg = old.nonPosKg;
+        meta.nonPos = old.nonPos;
+      }
       // v2.17.0: chứng từ lập với số liệu chứng thư KHÁC Danh mục → ghi rõ giá trị Danh mục / giá trị dùng / lý do ngay ở tóm tắt hồ sơ.
       if (params.certSnap && params.certSnap.overrides && params.certSnap.overrides.length && HAK.Cert)
         meta.summary = Object.assign({}, meta.summary, { 'Số liệu chứng thư khác Danh mục': HAK.Cert.describe(params.certSnap) });
@@ -420,6 +444,7 @@
     if (q) {
       await q.closeVerified(items);
       updateBadge();
+      changed();
       return;
     }
     const db = await openDb();
@@ -456,6 +481,7 @@
       }
       tx.oncomplete = () => {
         updateBadge();
+        changed();
         ok();
       };
       tx.onabort = tx.onerror = () => no(error || tx.error || Error('Chưa dọn được kho cũ.'));

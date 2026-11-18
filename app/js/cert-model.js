@@ -29,8 +29,13 @@
     if (typeof v === 'number') return isFinite(v) ? v : null;
     let s = String(v).trim().replace(/\s/g, '');
     if (!s) return null;
-    if (s.indexOf(',') >= 0) s = s.replace(/\./g, '').replace(',', '.');
-    else if (/^-?\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '');
+    if (s.indexOf(',') >= 0 && s.indexOf('.') >= 0) {
+      // đủ cả hai dấu: dấu nằm CUỐI là dấu thập phân ("1.234,56" và "1,234.56" cùng = 1234,56)
+      s = s.lastIndexOf(',') > s.lastIndexOf('.') ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '');
+    } else if (/^-?\d{1,3}(,\d{3}){2,}$/.test(s))
+      s = s.replace(/,/g, ''); // "1,234,567" = nhiều nhóm nghìn
+    else if (s.indexOf(',') >= 0) s = s.replace(/\./g, '').replace(',', '.');
+    else if (/^-?[1-9]\d{0,2}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '');
     const n = Number(s);
     return isFinite(n) ? n : null;
   }
