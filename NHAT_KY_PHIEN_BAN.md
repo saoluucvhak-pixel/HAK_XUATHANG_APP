@@ -7,6 +7,8 @@
 - Công cụ: `npm run e2e:archive-ops` (lưu / lưu lặp / xóa kèm lỗi giữa chừng, IndexedDB và SQLite), `npm run e2e:gsync-parity` (Google Sheet GIẢ LẬP chạy đúng Code.gs; chưa kiểm Sheet thật), `npm run e2e:import-warn`; chạy trong CI.
 - **Thông báo lỗi:** thông báo lỗi THÔ của trình duyệt / JavaScript (tiếng Anh, "Cannot read properties…", khung stack, đường dẫn tệp, mã ERR_…) không còn hiện cho người dùng; thay bằng câu chung tiếng Việt, bản gốc ghi ở Console (F12). Thông báo tiếng Việt của app giữ nguyên.
 - **Giao diện:** `ui-audit` kiểm thêm phần tử chỉ bấm được bằng chuột mà không vào được bằng Tab; test quét mã cho nút Hủy / Đóng và nút mặc định của form (không phá hủy).
+- **Hợp đồng đọc từ PDF (OCR):** số lượng viết dạng ngoặc "(1.200)" (quy tắc 28) không còn bị bỏ trống lặng lẽ / bỏ ngoặc không báo: bộ đọc trả cảnh báo và màn đề xuất hiện cảnh báo "app KHÔNG đọc ngoặc là số âm — kiểm tra lại trên hợp đồng gốc"; giá trị không đổi.
+- Công cụ: `npm run e2e:bkls-readback` (BKLS tạo thật rồi đọc lại Word tổng và từng xe: số BKLS, biển số, khối lượng, BDMT); chạy trong CI.
 
 ## v2.22.4 — Rà soát vòng 2: bộ lọc, lưu trữ, khôi phục, giao diện bàn phím
 - **Hộp thoại:** đóng bằng Esc hoặc nút Đóng nay TRẢ tiêu điểm về đúng nút đã mở hộp thoại (trước đây rơi về đầu trang, người dùng bàn phím mất vị trí); hộp thoại chồng nhau chỉ trả khi hộp cuối đóng. Tìm kiếm chung (Ctrl+K) cũng trả tiêu điểm khi đóng; khi đang có hộp thoại mở thì không mở chồng (trước đây tiêu điểm bị giật khỏi ô tìm, gõ nhầm ô).

@@ -18,7 +18,8 @@
     const pages = typeof input === 'string' ? [{ page: 1, text: input }] : input;
     const lines = pages.flatMap((p) => p.text.split(/\r?\n/).map((text) => ({ text: text.trim(), page: p.page }))).filter((x) => x.text);
     const parties = {},
-      lots = [];
+      lots = [],
+      warnings = [];
     let product = '';
     const company = (line) =>
       /^(?:c[o06]ng\s*ty|cty)\b/.test(fold(line)) || /\b(?:company limited|corporation pte\.? ltd\.?|co\.,?\s*ltd\.?)\b/i.test(line);
@@ -173,6 +174,16 @@
         /^\d+[).]\s*/.test(f) ||
         /(?:s[o6]\s*lu[qou]+ng|quantity)\s*[:：]?\s*$/.test(prev);
       if (!quantityContext) continue;
+      // Quy tắc 28: số lượng viết dạng ngoặc "(1.200)" — KHÔNG đọc ngoặc là số âm; chỉ cảnh báo để đối chiếu hợp đồng gốc.
+      const paren = /\(\s*([0-9][0-9Oo., ]*?)\s*(?:\)\s*B[D0O]M[TI1l]|B[D0O]M[TI1l]\s*\))/i.exec(l.text);
+      if (paren)
+        warnings.push(
+          'Số lượng dạng ngoặc "(' +
+            paren[1].trim() +
+            ')" (trang ' +
+            l.page +
+            '): app KHÔNG đọc ngoặc là số âm — kiểm tra lại số lượng trên hợp đồng gốc.'
+        );
       const re = /([0-9][0-9Oo., ]*)\s*B[D0O]M[TI1l]\b/gi;
       let m;
       while ((m = re.exec(l.text))) {
@@ -195,7 +206,7 @@
       lines.map((x) => fold(x.text)).join('\n')
     );
     if (vessel) lots.forEach((lot) => (lot.ship = vessel[1].toUpperCase()));
-    return { type: agency ? 'uythac' : 'xuatkhau', parties, product, lots };
+    return { type: agency ? 'uythac' : 'xuatkhau', parties, product, lots, warnings };
   }
   function matchParty(party, customers) {
     if (!party) return null;

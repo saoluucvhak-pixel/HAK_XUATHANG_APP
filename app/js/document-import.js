@@ -447,6 +447,7 @@
         value: result.lots.reduce((n, l) => n + l.qty, 0),
         evidence: result.lots.map((l) => 'Trang ' + l.page + ': ' + l.evidence).join('; '),
       });
+    (result.warnings || []).forEach((w) => review.append(el('p', w, 'text-warning mb-1'))); // quy tắc 28: số lượng dạng ngoặc
     const selected = [];
     function offer(label, value, evidence, apply, pre) {
       const row = el('label', null, 'd-block p-2 border-bottom'),
