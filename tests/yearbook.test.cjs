@@ -73,6 +73,10 @@ function harness() {
     },
   };
   let exported;
+  let snapNow = { params: { ship: 'QA' }, rows: [{ net: 100 }] };
+  const opened = [],
+    readOnlyCalls = [],
+    auditLog = [];
   const window = {
     location: {},
     localStorage: { getItem: () => null, setItem() {} },
@@ -80,7 +84,18 @@ function harness() {
       Store: { get: () => ({ v: 3, contracts: [], customers: [], products: [] }) },
       Catalog: { contract: () => null },
       Config: { data: { companies: [], warehouses: [] }, custom: {} },
-      Pages: { snapshot: () => ({ params: { ship: 'QA' }, rows: [{ net: 100 }] }), DOCS: { xuatkhau: { title: 'QA' } }, openSnapshot() {} },
+      Pages: {
+        snapshot: () => structuredClone(snapNow),
+        DOCS: { xuatkhau: { title: 'QA' } },
+        openSnapshot(r) {
+          opened.push(structuredClone(r));
+        },
+        readOnly(type, on) {
+          readOnlyCalls.push([type, on]);
+        },
+      },
+      Audit: { log: (e) => auditLog.push(e) },
+      Auth: { who: () => 'Nguyễn Văn A' },
       UI: { toast() {} },
       Word: {
         Files: {
@@ -124,6 +139,10 @@ function harness() {
   return {
     Y: window.HAK.Yearbook,
     H: window.HAK,
+    opened,
+    readOnlyCalls,
+    auditLog,
+    snap: (v) => (snapNow = v),
     fail: () => (fail = true),
     get state() {
       return state;
@@ -207,4 +226,81 @@ test('legacy transfer copies once and leaves original archive untouched', async 
   assert.equal(await h.Y.copyLegacy(), 0);
   assert.equal((await h.Y.read()).records.length, 1);
   assert.equal(JSON.stringify(old), before);
+});
+
+const same = { params: { ship: 'QA' }, rows: [{ net: 100 }] },
+  edited = { params: { ship: 'QA' }, rows: [{ net: 100 }, { net: 250 }] };
+test('sửa hồ sơ ĐÃ XUẤT cần lý do; bản cũ giữ lại kèm trạng thái, lý do, người sửa; nhật ký ghi lý do', async () => {
+  const h = harness(),
+    Y = h.Y;
+  Y.setYear(2026);
+  const a = await Y.save('xuatkhau', true); // lập và xuất
+  assert.equal(a.status, 'exported');
+  h.snap(edited);
+  await assert.rejects(Y.save('xuatkhau', false), (e) => e.code === 'reason-required');
+  assert.equal((await Y.read()).records[0].revision, 1, 'chưa ghi gì khi thiếu lý do');
+  const b = await Y.save('xuatkhau', false, { reason: '  Thêm xe bị sót  ' });
+  assert.equal(b.revision, 2);
+  assert.equal(b.versions.length, 1);
+  assert.deepEqual([b.versions[0].revision, b.versions[0].status, b.versions[0].rows.length], [1, 'exported', 1]);
+  assert.deepEqual(
+    [
+      b.versions[0].supersededBy.reason,
+      b.versions[0].supersededBy.by,
+      b.versions[0].supersededBy.revision,
+      b.versions[0].supersededBy.changed,
+    ],
+    ['Thêm xe bị sót', 'Nguyễn Văn A', 2, true]
+  );
+  const log = h.auditLog.find((e) => e.action === 'sửa hồ sơ đã xuất');
+  assert.ok(log && log.reason === 'Thêm xe bị sót' && log.before === '1' && log.after === '2' && log.entity === 'yearbook');
+  assert.ok(h.auditLog.some((e) => e.action === 'tạo hồ sơ'));
+});
+test('hồ sơ đã xuất lưu lại KHÔNG đổi nội dung: không cần lý do; hồ sơ chưa xuất sửa tự do', async () => {
+  const h = harness(),
+    Y = h.Y;
+  Y.setYear(2026);
+  await Y.save('xuatkhau', true);
+  const again = await Y.save('xuatkhau', true);
+  assert.equal(again.revision, 2);
+  assert.equal(again.versions[0].supersededBy.changed, false);
+  const h2 = harness();
+  h2.Y.setYear(2026);
+  await h2.Y.save('xuatkhau', false);
+  h2.snap(edited);
+  assert.equal((await h2.Y.save('xuatkhau', false)).revision, 2, 'bản nháp sửa không cần lý do');
+});
+test('saveAsk: hỏi lý do khi cần; hủy / để trống thì không lưu gì', async () => {
+  const h = harness(),
+    Y = h.Y;
+  Y.setYear(2026);
+  await Y.save('xuatkhau', true);
+  h.snap(edited);
+  Y.askReason = async () => '   ';
+  await assert.rejects(Y.saveAsk('xuatkhau', false), (e) => e.code === 'reason-cancelled');
+  assert.equal((await Y.read()).records[0].revision, 1);
+  Y.askReason = async (msg) => {
+    assert.match(msg, /đã xuất/);
+    return 'Khách đổi số xe';
+  };
+  const r = await Y.saveAsk('xuatkhau', false);
+  assert.equal(r.versions[0].supersededBy.reason, 'Khách đổi số xe');
+});
+test('openVersion: mở đúng bản cũ ở chế độ chỉ xem (không ghi kho); bản không có thì báo lỗi', async () => {
+  const h = harness(),
+    Y = h.Y;
+  Y.setYear(2026);
+  const a = await Y.save('xuatkhau', true);
+  h.snap(edited);
+  await Y.save('xuatkhau', false, { reason: 'bổ sung' });
+  assert.equal(await Y.openVersion(a.id, 1), true);
+  const view = h.opened[h.opened.length - 1];
+  assert.deepEqual([view.revision, view.rows.length, view.status], [1, 1, 'exported'], 'đúng bản 1 đã xuất, 1 phiếu');
+  assert.deepEqual(h.readOnlyCalls[h.readOnlyCalls.length - 1], ['xuatkhau', true]);
+  assert.equal(Y.active('xuatkhau').readonly, true);
+  await assert.rejects(Y.save('xuatkhau', false, { reason: 'x' }), /phiên bản cũ \(chỉ xem\)/, 'bản cũ không ghi đè kho');
+  assert.equal((await Y.read()).records[0].revision, 2);
+  await Y.openVersion(a.id, 2);
+  assert.equal(h.opened[h.opened.length - 1].rows.length, 2, 'bản hiện hành cũng mở được');
+  await assert.rejects(Y.openVersion(a.id, 9), /Không có bản 9/);
 });

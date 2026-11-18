@@ -117,9 +117,18 @@
     catalog.customers = (catalog.customers || []).filter((c) => parties.has(c.id));
     return { config: copy(H.Config.data), custom: copy(H.Config.custom), catalog, attachments };
   }
-  async function save(type, exported) {
+  /**
+   * Lưu hồ sơ năm. opts.reason: lý do sửa — BẮT BUỘC khi sửa nội dung của hồ sơ ĐÃ XUẤT (có phiếu / thông số khác bản đã xuất); thiếu → lỗi code 'reason-required'.
+   * Mỗi lần sửa giữ lại bản cũ trong versions (kèm trạng thái, lý do, người sửa, thời điểm) để mở / in lại đúng bản đã lưu (openVersion).
+   */
+  async function save(type, exported, opts) {
     if (needsReload) throw Error('Năm đã đóng. Tải lại ứng dụng trước khi làm việc.');
-    if (active[type] && active[type].readonly) throw Error('Năm đã đóng đang chỉ xem. Khôi phục năm nếu cần sửa.');
+    if (active[type] && active[type].readonly)
+      throw Error(
+        active[type].versionView
+          ? 'Đang xem một phiên bản cũ (chỉ xem). Mở bản hiện hành trong Sổ hồ sơ năm để sửa.'
+          : 'Năm đã đóng đang chỉ xem. Khôi phục năm nếu cần sửa.'
+      );
     if (busy) throw Error('Đang lưu hồ sơ.');
     busy = true;
     try {
@@ -132,8 +141,16 @@
       if (current && current.storeRevision !== state.revision) throw Error('Kho hồ sơ đã thay đổi. Mở lại hồ sơ trước khi lưu.');
       const old = current ? state.records.find((x) => x.id === current.id) : null;
       if (current && (!old || old.revision !== current.revision)) throw Error('Phiên bản hồ sơ đã thay đổi.');
+      const changed =
+        !!old && (JSON.stringify(old.rows) !== JSON.stringify(view.rows) || JSON.stringify(old.params) !== JSON.stringify(view.params));
+      const reason = String((opts && opts.reason) || '').trim();
+      if (old && old.status === 'exported' && changed && !reason)
+        throw Object.assign(Error('Hồ sơ này đã xuất chứng từ. Ghi lý do trước khi sửa để lưu thành phiên bản mới.'), {
+          code: 'reason-required',
+        });
       const ctx = current && current.context ? current.context : await context(view.params);
       const now = Date.now();
+      const who = (H.Auth && H.Auth.who && H.Auth.who()) || '';
       const record = {
         id: old ? old.id : 'y-' + now.toString(36) + '-' + Math.random().toString(36).slice(2, 9),
         type,
@@ -147,7 +164,17 @@
         context: ctx,
         status: exported ? 'exported' : 'draft',
         versions: old
-          ? [...(old.versions || []), { revision: old.revision, updatedAt: old.updatedAt, params: old.params, rows: old.rows }]
+          ? [
+              ...(old.versions || []),
+              {
+                revision: old.revision,
+                updatedAt: old.updatedAt,
+                status: old.status || 'draft',
+                params: old.params,
+                rows: old.rows,
+                supersededBy: { revision: old.revision + 1, at: now, by: who, reason: reason || '', changed },
+              },
+            ]
           : [],
       };
       validate(record);
@@ -158,6 +185,17 @@
         return s;
       });
       active[type] = { ...record, storeRevision: next.revision };
+      if (H.Audit)
+        H.Audit.log({
+          action: !old ? 'tạo hồ sơ' : old.status === 'exported' && changed ? 'sửa hồ sơ đã xuất' : exported ? 'xuất hồ sơ' : 'sửa hồ sơ',
+          entity: 'yearbook',
+          id: record.id,
+          field: 'revision',
+          before: old ? String(old.revision) : null,
+          after: String(record.revision),
+          reason: reason || null,
+          company: (view.params && (view.params.giaoId || view.params.cid)) || null,
+        });
       H.UI.toast('Đã lưu hồ sơ năm ' + workingYear + '.', 'success');
       return record;
     } finally {
@@ -185,6 +223,48 @@
         if (H.Pages.unloadSnapshot) H.Pages.unloadSnapshot(t);
         delete active[t];
       }
+  }
+  /** Lưu; nếu là hồ sơ đã xuất bị sửa thì hỏi lý do (bắt buộc) rồi lưu thành phiên bản mới. Hủy / để trống → không lưu. */
+  async function saveAsk(type, exported) {
+    try {
+      return await save(type, exported);
+    } catch (e) {
+      if (!(e && e.code === 'reason-required')) throw e;
+      const asked = H.Yearbook.askReason ? await H.Yearbook.askReason(e.message) : null;
+      const reason = String(asked || '').trim();
+      if (!reason) throw Object.assign(Error('Chưa lưu: cần ghi lý do khi sửa hồ sơ đã xuất.'), { code: 'reason-cancelled' });
+      return save(type, exported, { reason });
+    }
+  }
+  /** Mở lại đúng một phiên bản cũ của hồ sơ ở chế độ CHỈ XEM (xuất / in lại đúng bản đã lưu; không ghi vào kho). rev = số bản; bản hiện hành cũng mở được. */
+  async function openVersion(id, rev) {
+    const state = await read(),
+      r = state.records.find((x) => x.id === id);
+    if (!r || !visible(r)) throw Error('Hồ sơ không còn hoạt động.');
+    const v = rev === r.revision ? r : (r.versions || []).find((x) => x.revision === rev);
+    if (!v) throw Error('Không có bản ' + rev + ' của hồ sơ này.');
+    if (H.Pages.guardLeave && !(await H.Pages.guardLeave(r.type))) return false;
+    const view = {
+      ...copy(r),
+      params: copy(v.params),
+      rows: copy(v.rows),
+      revision: v.revision,
+      updatedAt: v.updatedAt,
+      status: v.status || r.status,
+    };
+    setYear(r.year);
+    active[r.type] = { ...view, storeRevision: state.revision, readonly: true, versionView: true };
+    H.Pages.openSnapshot(view);
+    H.Pages.readOnly(r.type, true);
+    const note = root.document && root.document.getElementById('year-note-' + r.type);
+    if (note)
+      note.textContent =
+        'Đang xem bản ' +
+        v.revision +
+        (v === r ? ' (hiện hành)' : ' — phiên bản cũ') +
+        ' · Chỉ xem, có thể xuất / in lại đúng bản này; không ghi vào kho.';
+    root.location.hash = '/' + r.type;
+    return true;
   }
   async function open(id) {
     const state = await read(),
@@ -347,7 +427,14 @@
                   (isOffline ? 'Xem hồ sơ' : 'Mở / Sửa') +
                   '</button> <button class="btn btn-sm btn-outline-primary" data-files="' +
                   esc(r.id) +
-                  '">PDF kèm theo</button> '
+                  '">PDF kèm theo</button> ' +
+                  ((r.versions || []).length
+                    ? '<button class="btn btn-sm btn-outline-secondary" data-versions="' +
+                      esc(r.id) +
+                      '">Phiên bản (' +
+                      ((r.versions || []).length + 1) +
+                      ')</button> '
+                    : '')
                 : '') +
               (!isOffline
                 ? '<button class="btn btn-sm btn-outline-secondary" data-toggle="' +
@@ -500,7 +587,50 @@
       }
       const id = e.target.dataset.open,
         t = e.target.dataset.toggle,
-        f = e.target.dataset.files;
+        f = e.target.dataset.files,
+        vr = e.target.dataset.versions;
+      if (vr)
+        run(async () => {
+          const all = offlineView && offlineView.year === workingYear ? offlineView.records : (await read()).records;
+          const r = all.find((x) => x.id === vr && visible(x));
+          status.replaceChildren();
+          if (!r) return void (status.textContent = 'Hồ sơ không còn hoạt động.');
+          const label = (v) => (v.status === 'exported' ? 'Đã xuất' : v.status === 'legacy' ? 'Bản sao cũ' : 'Đã lưu');
+          const list = [
+            ...(r.versions || []).map((v) => ({ ...v, current: false })),
+            { revision: r.revision, updatedAt: r.updatedAt, status: r.status, rows: r.rows, current: true },
+          ].reverse();
+          const ul = document.createElement('ul');
+          ul.className = 'list-unstyled small mb-0';
+          list.forEach((v) => {
+            const li = document.createElement('li');
+            li.className = 'mb-1';
+            const by = v.supersededBy;
+            li.append(
+              'Bản ' +
+                v.revision +
+                (v.current ? ' (hiện hành)' : '') +
+                ' · ' +
+                new Date(v.updatedAt).toLocaleString('vi-VN') +
+                ' · ' +
+                label(v) +
+                ' · ' +
+                (v.rows || []).length +
+                ' phiếu'
+            );
+            if (by && by.reason) li.append(' · bị thay ở bản ' + by.revision + (by.by ? ' bởi ' + by.by : '') + ' — lý do: ' + by.reason);
+            const b = document.createElement('button');
+            b.className = 'btn btn-sm btn-outline-primary ms-2';
+            b.textContent = 'Xem / in lại bản này';
+            b.onclick = () =>
+              run(async () => {
+                if (await openVersion(r.id, v.revision)) modal.hide();
+              });
+            li.append(b);
+            ul.append(li);
+          });
+          status.append(ul);
+        });
       if (f)
         run(async () => {
           const all = offlineView && offlineView.year === workingYear ? offlineView.records : (await read()).records;
@@ -578,6 +708,9 @@
     importState,
     validateBundle: (records) => merge(empty(), records),
     save,
+    saveAsk,
+    askReason: async (msg) => (root.prompt ? root.prompt(msg + '\n\nLý do sửa (bắt buộc):') : null),
+    openVersion,
     open,
     show,
     backup,

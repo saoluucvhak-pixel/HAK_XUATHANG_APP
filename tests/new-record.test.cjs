@@ -38,6 +38,9 @@ function boot() {
           if (log.saveFails) throw new Error('Kho hồ sơ đã thay đổi');
           log.saves++;
         },
+        async saveAsk() {
+          return this.save(); // trang gọi saveAsk (hỏi lý do khi sửa hồ sơ đã xuất); bản giả lập dùng chung hành vi với save
+        },
         active: () => null,
       },
     },
