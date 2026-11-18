@@ -1,5 +1,8 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.22.4 — Rà soát vòng 2: bộ lọc, lưu trữ, khôi phục, giao diện bàn phím
+- (đang cập nhật theo từng mục đã triển khai)
+
 ## v2.22.3 — Rà soát số liệu: một nguồn trạng thái hợp đồng, bộ đọc số, khử trùng phiếu, báo dòng bị bỏ, xác nhận phạm vi BKLS
 - **Trạng thái hợp đồng một nguồn:** "Đã hoàn thành" chỉ khi mọi tờ khai đã thông quan VÀ mọi chi tiết đã có chứng thư **hoặc phiếu cân** đều có tờ khai thông quan. Danh mục, tab Tờ khai, Báo cáo tổng hợp, Chi tiết xuất hàng theo HĐ, Báo cáo thực hiện HĐ, Hồ sơ hợp đồng, Excel / PDF và Google Sheet nay cùng lấy "chi tiết đã có phiếu cân" từ Lưu trữ (tính nền, tự cập nhật khi Lưu trữ / Danh mục / công ty đổi; lần đầu chưa tính xong thì hiện như cũ rồi tự cập nhật). Trước đây Danh mục và vài báo cáo bỏ sót phiếu cân nên báo "Đã hoàn thành" trong khi Báo cáo thực hiện HĐ báo "Đang thực hiện".
 - **Bộ đọc số:** số Chứng thư đọc đúng "1,234.56" (trước đây thành 1,23456) và "1,234,567" (trước đây trống); "0.500" = 0,5 ở Chứng thư và Tờ khai. Tờ khai chưa đọc ngoặc là số âm; gặp ô dạng "(…)" thì cảnh báo. Các kết quả đã có test không đổi.
