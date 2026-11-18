@@ -20,7 +20,8 @@
     running = null,
     pending = false,
     started = false,
-    lastMs = 0;
+    lastMs = 0,
+    failed = false;
   const signature = (s) => (s ? Array.from(s).sort().join('|') : null);
 
   /** Tính tập mã chi tiết hợp đồng đã có phiếu cân (≥ 1 phiếu trong phạm vi công ty đang xem). */
@@ -50,6 +51,7 @@
         const next = signature(s),
           changed = next !== sig;
         ids = s;
+        failed = false;
         sig = next;
         if (changed) {
           try {
@@ -62,6 +64,14 @@
       })
       .catch((e) => {
         console.warn('Không tính được chi tiết hợp đồng đã có phiếu cân', e);
+        if (ids === null) {
+          failed = true; // chưa có kết quả nào: các màn báo "chưa đối chiếu được phiếu cân" thay vì chờ mãi
+          try {
+            root.dispatchEvent(new CustomEvent('hak:tripdetails', { detail: { error: true } }));
+          } catch (e2) {
+            /* môi trường không có sự kiện */
+          }
+        }
         return ids;
       })
       .finally(() => {
@@ -84,7 +94,8 @@
   }
   /** Gắn nguồn cho mô hình trạng thái hợp đồng và theo dõi thay đổi. Gọi một lần sau khi app khởi động. */
   function start() {
-    if (HAK.CustomsModel && HAK.CustomsModel.setTripDetailsProvider) HAK.CustomsModel.setTripDetailsProvider(() => ids);
+    if (HAK.CustomsModel && HAK.CustomsModel.setTripDetailsProvider)
+      HAK.CustomsModel.setTripDetailsProvider(() => (ids === null && failed ? 'error' : ids));
     if (!started) {
       started = true;
       ['hak:archive', 'hak:catalog', 'hak:scope'].forEach((ev) => root.addEventListener(ev, schedule));

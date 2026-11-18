@@ -18,9 +18,9 @@ test('nguồn chung báo chi tiết B đã có phiếu cân → chưa hoàn thà
   const both = decls.concat(CM.newDecl({ no: '222222222222', contractId: 'c1', detailId: 'dB', status: 'cleared' }));
   assert.equal(CM.contractStatus(both, 'c1', contract).code, 'done');
 });
-test('nguồn trả null (chưa tính xong) → như cũ; opt.tripDetails truyền tường minh thắng nguồn chung', () => {
+test('opt.tripDetails truyền tường minh thắng nguồn chung (kể cả khi nguồn đang tính)', () => {
   CM.setTripDetailsProvider(() => null);
-  assert.equal(CM.contractStatus(decls, 'c1', contract).code, 'done');
+  assert.equal(CM.contractStatus(decls, 'c1', contract, { tripDetails: new Set() }).code, 'done');
   CM.setTripDetailsProvider(() => new Set(['dB']));
   assert.equal(CM.contractStatus(decls, 'c1', contract, { tripDetails: new Set() }).code, 'done');
 });
@@ -29,4 +29,26 @@ test('hợp đồng đóng thủ công vẫn "Đã đóng hợp đồng" bất k
   const s = CM.contractStatus(decls, 'c1', Object.assign({}, contract, { closedAt: '2026-07-01' }));
   assert.equal(s.code, 'done');
   assert.equal(s.label, 'Đã đóng hợp đồng');
+});
+test('M6.4: nguồn đang tính (null) → hợp đồng CÓ THỂ đổi kết quả hiện "Đang kiểm tra…", không hiện "Đã hoàn thành" rồi mới đổi', () => {
+  CM.setTripDetailsProvider(() => null);
+  const s = CM.contractStatus(decls, 'c1', contract);
+  assert.equal(s.code, 'running');
+  assert.equal(s.pending, true);
+  assert.equal(s.label, 'Đang kiểm tra…');
+  assert.match(s.basis, /phiếu cân/);
+});
+test('M6.4: đang tính nhưng mọi chi tiết đã có tờ khai thông quan (phiếu cân không thể làm đổi kết quả) → vẫn "Đã hoàn thành", không chờ', () => {
+  CM.setTripDetailsProvider(() => null);
+  const both = decls.concat(CM.newDecl({ no: '222222222222', contractId: 'c1', detailId: 'dB', status: 'cleared' }));
+  const s = CM.contractStatus(both, 'c1', contract);
+  assert.equal(s.code, 'done');
+  assert.equal(s.pending, undefined);
+});
+test('M6.4: không tính được phiếu cân ("error") → hiển thị theo chứng thư nhưng đánh dấu CHƯA đối chiếu, không chờ mãi', () => {
+  CM.setTripDetailsProvider(() => 'error');
+  const s = CM.contractStatus(decls, 'c1', contract);
+  assert.equal(s.code, 'done');
+  assert.equal(s.unverified, true);
+  assert.match(s.basis, /CHƯA đối chiếu được phiếu cân/);
 });
