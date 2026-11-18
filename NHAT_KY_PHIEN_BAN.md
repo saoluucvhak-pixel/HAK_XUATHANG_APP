@@ -6,6 +6,7 @@
 - Bổ sung kiểm thử trên SQLite cho đóng năm, sai dữ liệu và xung đột giữa hai cửa sổ.
 - Bộ cài chỉ được công bố sau khi workflow HAK quality của đúng commit thành công.
 - Nâng PDF.js của công cụ nghiệm thu lên 4.8.69, tắt thực thi biểu thức khi đọc PDF; cập nhật lockfile, npm audit không còn cảnh báo.
+- Khôi phục và hoàn tác trên SQLite chờ máy chủ xác nhận từng khóa, kiểm tra xung đột trước khi ghi, chỉ đổi bộ đệm sau khi ghi thành công. Không ghi được bản hoàn tác thì dừng trước khi nhập; lỗi giữa chừng giữ bản chụp để thử lại.
 
 ## v2.21.4 — Bộ cài chỉ dừng HAKDocs của đúng thư mục cài; công cụ đối soát dữ liệu
 - **Bộ cài:** trước đây khi cài / nâng cấp / gỡ, bộ cài dừng MỌI tiến trình `HAKDocs.exe` theo tên (`taskkill /IM`), có thể làm dừng HAKDocs của một bản cài khác trên cùng máy. Nay `installer/stop-hakdocs.ps1` chỉ dừng tiến trình HAKDocs nằm trong `<thư mục cài>\native\`; bản cài khác không bị ảnh hưởng. CI Windows kiểm bằng 3 bản giả lập (dừng a, còn nguyên b và a2).
