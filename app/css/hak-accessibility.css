@@ -20,3 +20,7 @@
 [data-bs-theme="dark"] .btn-close { filter:var(--bs-btn-close-filter, invert(1) grayscale(100%) brightness(200%)); }
 @media (max-width:576px) { .hak-download-notice { right:16px; bottom:16px; } .topbar #pageTitle { flex-basis:90px; } }
 @media print { .hak-download-notice { display:none!important; } }
+
+/* Công tắc (form-switch): vùng bấm tối thiểu 24 px chiều cao (WCAG 2.5.8) — mặc định của Bootstrap chỉ 16 px; dùng rem để không phụ thuộc cỡ chữ của khung chứa. */
+.form-switch { padding-left: 3.25rem; }
+.form-switch .form-check-input { width: 2.75rem; height: 1.5rem; margin-left: -3.25rem; cursor: pointer; }
