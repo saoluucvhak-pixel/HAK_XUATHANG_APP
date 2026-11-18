@@ -72,6 +72,17 @@ const file = path.join(tmp, 'can.xlsx');
     check(shown, 'mở được bằng nút');
     if (!shown) return;
     check(await p.evaluate((m) => document.querySelector(m).contains(document.activeElement), modalSel), 'tiêu điểm vào trong hộp thoại');
+    check(
+      await p.evaluate(() => {
+        const a = document.activeElement;
+        return !(
+          a &&
+          a.tagName === 'BUTTON' &&
+          (/btn-(outline-)?danger/.test(a.className) || /(Xóa|Gỡ|Quay lui|Ghi đè)/i.test(a.textContent))
+        );
+      }),
+      'tiêu điểm đầu tiên KHÔNG ở nút phá hủy (Enter ngay sau khi mở không xóa gì)'
+    );
     let leaked = 0;
     for (let i = 0; i < 25; i++) {
       await p.keyboard.press('Tab');
