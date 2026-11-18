@@ -96,7 +96,10 @@
       sel.addEventListener("change", function () {
         if (!sel.value) return; var nm0 = sel.value.slice(2), r = SF.applyPreset(cfg, sel.value.charAt(0) === "l" ? ps.legacyGet(nm0) : ps.get(cfg.screenId, nm0));
         if (!r.ok) { note.textContent = "⚠ Không đọc được bộ lọc đã lưu này"; return; }
-        setS(r.state); note.textContent = r.dropped.length ? "⚠ Màn hình này không áp được: " + r.dropped.join(", ") + " — các điều kiện còn lại đã được nạp (bấm Áp dụng để dùng)." : "Đã nạp “" + nm0 + "” — bấm Áp dụng để dùng.";
+        setS(r.state);
+        var msg = r.dropped.length ? "⚠ Màn hình này không áp được: " + r.dropped.join(", ") + " — các điều kiện còn lại đã được nạp (bấm Áp dụng để dùng)." : "Đã nạp “" + nm0 + "” — bấm Áp dụng để dùng.";
+        if (r.stale && r.stale.length) msg += " ⚠ Điều kiện hết hiệu lực (mục đã xóa hoặc đổi tên): " + r.stale.map(function (x) { return x.label + " (" + x.count + "/" + x.total + " mục)"; }).join("; ") + " — vẫn được giữ nên kết quả có thể rỗng; mở bộ lọc để bỏ chọn và chọn lại mục hiện có.";
+        note.textContent = msg;
         rerender();
       });
       var save = btn("💾 Lưu bộ lọc hiện tại", "ghost", function () {

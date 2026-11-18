@@ -131,3 +131,16 @@ test('report supports several types while retaining deduplication and export mod
 test('unknown archived smart conditions fail closed instead of exporting extra rows', () => {
   assert.throws(() => F.trips(rows, { sel: { future: ['yes'] } }), /không được hỗ trợ/);
 });
+test('M2.1: bộ lọc đã lưu tham chiếu mục không còn tồn tại → báo "hết hiệu lực" (stale), không im lặng; giá trị còn lại giữ nguyên', () => {
+  const cfg = {
+    screenId: 's',
+    fields: [{ key: 'contract', label: 'Hợp đồng', type: 'multi', options: () => [{ value: 'hd-1', label: 'HD-1' }], match: () => true }],
+  };
+  const r = F.core.applyPreset(cfg, { state: { sel: { contract: ['hd-1', 'hd-da-xoa'] } } });
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.stale, [{ key: 'contract', label: 'Hợp đồng', count: 1, total: 2 }]);
+  assert.deepEqual(r.state.sel.contract, ['hd-1', 'hd-da-xoa'], 'giữ điều kiện (không tự rộng ra thành "tất cả")');
+  assert.deepEqual(r.dropped, [], 'không rò mã nội bộ vào thông báo');
+  const ok = F.core.applyPreset(cfg, { state: { sel: { contract: ['hd-1'] } } });
+  assert.deepEqual(ok.stale, []);
+});

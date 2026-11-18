@@ -203,15 +203,15 @@
     if (!preset) return { state: empty(), dropped: [], ok: false };
     var raw = preset.state || (preset.legacy && cfg.fromLegacy ? cfg.fromLegacy(preset.legacy) : null);
     if (!raw) return { state: empty(), dropped: [], ok: false };
-    var keys = fieldKeys(cfg), dropped = [], s = normalize(raw);
+    var keys = fieldKeys(cfg), dropped = [], stale = [], s = normalize(raw);
     ["sel", "one", "flag"].forEach(function (g) { Object.keys(s[g]).forEach(function (k) { if (!keys[k]) { dropped.push(k); delete s[g][k]; } }); });
-    (cfg.fields || []).forEach(function (f) { // giá trị chọn không còn trong danh sách → vẫn giữ (có thể dữ liệu đã đổi) nhưng báo
+    (cfg.fields || []).forEach(function (f) { // giá trị chọn không còn trong danh sách (mục đã xóa / đổi tên) → vẫn giữ để kết quả không âm thầm rộng ra, nhưng BÁO "điều kiện hết hiệu lực" (stale)
       if (f.type === "multi" && s.sel[f.key] && typeof f.options === "function") {
         var have = {}; f.options().forEach(function (o) { have[typeof o === "string" ? o : String(o.value)] = 1; });
-        var miss = s.sel[f.key].filter(function (v) { return v !== NONE && !have[v]; }); if (miss.length) dropped.push(f.key + "=" + miss.join("|"));
+        var miss = s.sel[f.key].filter(function (v) { return v !== NONE && !have[v]; }); if (miss.length) stale.push({ key: f.key, label: f.label || f.key, count: miss.length, total: s.sel[f.key].length });
       }
     });
-    return { state: s, dropped: dropped, ok: true };
+    return { state: s, dropped: dropped, stale: stale, ok: true };
   }
 
   var api = {
