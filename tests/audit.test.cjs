@@ -1,4 +1,5 @@
 /* HAK.Audit: nhật ký thao tác ở chế độ trình duyệt (khóa hak.auditlog.v1) và ở SQLite (audit_log chỉ-thêm); cờ suppress; trần số dòng; gộp khi liệt kê. */
+if (require('./helpers/needs-sqlite.cjs')()) return;
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');

@@ -1,4 +1,5 @@
 /* Lưu trữ hồ sơ (archive.js THẬT) trên SQLite: meta + dữ liệu cùng giao dịch, cột kiểu đúng, lưu lặp không nhân đôi, gắn hợp đồng, xóa kéo theo dữ liệu, mất kết nối thì báo lỗi. */
+if (require('./helpers/needs-sqlite.cjs')()) return;
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');

@@ -1,4 +1,5 @@
 /* Bộ kiểm hợp đồng HAKDB (tools/hakdb/contract.cjs) chạy trên máy chủ tham chiếu Node. CI Windows chạy đúng bộ này trên HAKDocs.exe thật. */
+if (require('./helpers/needs-sqlite.cjs')()) return;
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');

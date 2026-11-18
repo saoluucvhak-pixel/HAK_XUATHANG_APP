@@ -1,4 +1,5 @@
 /* Di trú IndexedDB → SQLite: nhập có đối chiếu, chạy lặp, dừng giữa chừng, dữ liệu hỏng, phát hiện sai lệch đến mã nguồn, kích hoạt có điều kiện, quay lui. */
+if (require('./helpers/needs-sqlite.cjs')()) return;
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');

@@ -1,4 +1,5 @@
 /* HAK.DB ở chế độ SQLite: chạy db.js + storage.js + db-sqlite.js THẬT trên máy chủ HAKDB tham chiếu (cùng hợp đồng với HAKDocs). */
+if (require('./helpers/needs-sqlite.cjs')()) return;
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
