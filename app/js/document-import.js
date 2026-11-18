@@ -431,10 +431,50 @@
       }
     }
   }
+  /**
+   * Quy tắc 28: app KHÔNG đọc số trong ngoặc "(1.200)" là số âm. Ở hợp đồng / PO, ô khối lượng hoặc đơn giá dạng ngoặc nên bộ đọc để TRỐNG;
+   * hàm này tìm các số dạng ngoặc nằm sát nhãn / đơn vị khối lượng hoặc giá để báo cho người dùng (hàm thuần, trả về danh sách chuỗi gốc).
+   */
+  function parenNumberNotes(text) {
+    const fold = (t) =>
+      String(t || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[đĐ]/g, 'd')
+        .toLowerCase();
+    const num = '\\(\\s*\\d[\\d.,\\s]*\\)';
+    const marker = '(?:quantity|so luong|khoi luong|price|don gia|gia ban|amount|thanh tien|tong gia tri)';
+    const unit = '(?:bdmt|mt|tan|usd|us\\$|vnd|\\$|kg)\\b';
+    const near = new RegExp(marker + '[^\\n(]{0,30}' + num + '|' + num + '\\s*' + unit, 'g');
+    const out = [];
+    String(text || '')
+      .split(/\r?\n/)
+      .forEach((line) => {
+        const f = fold(line); // fold giữ nguyên độ dài ký tự (NFD đã bỏ dấu) nên vị trí khớp với dòng gốc
+        near.lastIndex = 0;
+        let m;
+        while ((m = near.exec(f))) {
+          const hit = /\(\s*\d[\d.,\s]*\)/.exec(m[0]);
+          if (hit && out.length < 5 && out.indexOf(hit[0].replace(/\s+/g, '')) < 0) out.push(hit[0].replace(/\s+/g, ''));
+        }
+      });
+    return out;
+  }
   function renderContractSuggestions(pages, rec) {
     const result = HAK.ContractParser.extract(pages),
       review = el('div', null, 'border rounded p-2 mt-2');
     review.append(el('strong', 'Đề xuất từ hợp đồng — chọn và đối chiếu trước khi điền'));
+    const parens = parenNumberNotes(pages.map((p) => (p.rowsText || p.text || '') + '\n' + (p.text || '')).join('\n'));
+    if (parens.length)
+      review.append(
+        el(
+          'p',
+          'Có số dạng ngoặc ' +
+            parens.join(', ') +
+            ' ở ô khối lượng / đơn giá: app KHÔNG đọc ngoặc là số âm (quy tắc 28) nên để trống ô đó — đối chiếu PDF gốc rồi nhập tay.',
+          'text-warning'
+        )
+      );
     const numberProposal = contractNumberFromPages(pages);
     const common = parse(pages.map((p) => (p.rowsText || p.text) + '\n' + p.text).join('\n'), 'contract').filter(
       (s) => !['qty', 'ship', 'no'].includes(s.key)
@@ -833,6 +873,7 @@
     mount,
     commit,
     parse,
+    parenNumberNotes,
     number,
     contractNumber,
     contractNumberFromPages,
@@ -840,5 +881,13 @@
     certificateParties,
   };
   if (typeof module === 'object' && module.exports)
-    module.exports = { parse, number, contractNumber, contractNumberFromPages, readerVersion: READER_VERSION, certificateParties };
+    module.exports = {
+      parse,
+      parenNumberNotes,
+      number,
+      contractNumber,
+      contractNumberFromPages,
+      readerVersion: READER_VERSION,
+      certificateParties,
+    };
 })(typeof window !== 'undefined' ? window : globalThis);
