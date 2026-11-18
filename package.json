@@ -21,6 +21,7 @@
     "e2e:export-parity": "node tools/e2e-export-parity.cjs",
     "e2e:dialogs": "node tools/e2e-dialogs.cjs",
     "e2e:persist-keys": "node tools/e2e-persist-keys.cjs",
+    "e2e:bkls-readback": "node tools/e2e-bkls-readback.cjs",
     "e2e:roundtrip": "node tools/e2e-roundtrip.cjs",
     "e2e:archive-ops": "node tools/e2e-archive-ops.cjs",
     "e2e:gsync-parity": "node tools/e2e-gsync-parity.cjs",

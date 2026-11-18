@@ -3,6 +3,7 @@
 ## v2.22.5 — Rà soát vòng 3: bền dữ liệu cấu hình trên SQLite, đóng năm, nhập tờ khai, thông báo lỗi
 - **Cài đặt bền trên SQLite (bản Windows):** bộ lọc đã lưu, Năm làm việc và giao diện (phong cách HAK) trước đây ghi thẳng bộ nhớ trình duyệt nên bị XÓA mỗi lần mở lại app khi dùng SQLite; nay ghi qua kho chung (có trong SQLite và trong sao lưu / khôi phục). Giá trị cũ đang có được giữ khi nâng cấp. Có test tĩnh cấm ghi thẳng khóa `hak.*`.
 - **Hợp đồng / PO đọc bằng OCR:** số dạng ngoặc "(1.200)" ở ô khối lượng hoặc đơn giá không bị đọc thành số (quy tắc 28) và nay có cảnh báo trong màn đề xuất, thay vì để trống không nói gì.
+- Công cụ: `npm run e2e:bkls-readback` đọc lại riêng BKLS (Word tổng, Word từng xe, PDF) với bộ lọc giờ và phiếu KL = 0 — chạy trong CI.
 - **Đóng năm:** đóng lại cùng năm sau khi lần trước bị ngắt (bấm "Đóng năm" thay vì "Tiếp tục đóng năm") không còn để biên nhận "đang dở" của lần trước tồn tại mãi (năm vẫn hiện "đang dở" dù đã đóng xong); biên nhận cũ được giữ làm bằng chứng và ghi bị lần nào thay thế. Kiểm cả IndexedDB và SQLite.
 - **Nhập tờ khai từ Excel / khai bổ sung từ Excel:** cảnh báo của bộ đọc (ô thuế dạng ngoặc "(1.200)" theo quy tắc 28, thiếu số tiền thuế / ngày đăng ký) nay HIỆN ra như ở đường OCR; trước đây bị bỏ qua và chỉ báo "Đã nhập 1 tờ khai".
 - **Kiểm tra mục lục ↔ nội dung hồ sơ Lưu trữ:** `HAK.Archive.verifyIndex()` (số phiếu, tổng kg, phiếu KL ≤ 0 đã loại); `HAK.Archive.remove` xuất ra để kiểm thử.
