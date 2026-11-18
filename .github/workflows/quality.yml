@@ -46,6 +46,7 @@ jobs:
       - run: npm run e2e:bkls-scope   # Lập BKLS phải hỏi xác nhận phạm vi như Word / PDF / Excel
       - run: npm run e2e:contract-status   # trạng thái "Đã hoàn thành" của hợp đồng: Danh mục, báo cáo, bộ lọc, Hồ sơ hợp đồng cùng một nguồn (có phiếu cân)
       - run: npm run e2e:nonpositive   # phiếu KL ≤ 0 không cộng vào tổng, liệt kê ở Ngoại lệ cần đối soát
+      - run: npm run e2e:export-parity   # màn hình = Excel = Word = PDF cùng tập phiếu (ca sát biên ngày/giờ, biển số chuẩn hóa, phiếu KL ≤ 0)
       - run: npm run accept:release   # Word và PDF BẮT BUỘC: thiếu / không đọc lại được file → lỗi (chưa xác minh)
 
   accept-windows:

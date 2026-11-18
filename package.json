@@ -18,6 +18,7 @@
     "e2e:bkls-scope": "node tools/e2e-bkls-scope.cjs",
     "e2e:contract-status": "node tools/e2e-contract-status.cjs",
     "e2e:nonpositive": "node tools/e2e-nonpositive.cjs",
+    "e2e:export-parity": "node tools/e2e-export-parity.cjs",
     "snapshot:customs": "node tools/customs-snapshot.cjs",
     "audit:data": "node tools/data-audit.cjs",
     "accept": "node tools/accept.cjs",
