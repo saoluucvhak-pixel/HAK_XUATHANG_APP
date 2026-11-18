@@ -424,3 +424,21 @@ test('hai lần đóng dở cùng năm: gọi chữ ký cũ (năm + file lần 2
   assert.equal(s.closed.find((c) => c.sha256 === sha1).pending, true);
   await assert.rejects(h.C.resumeClose(2025, new Blob(['khác'])), /không khớp/);
 });
+test('đóng lại cùng năm sau khi bị ngắt (không dùng "Tiếp tục"): không còn năm "đang dở", hồ sơ đã dọn, biên nhận cũ ghi bị thay thế', async () => {
+  const opt = { fail: true },
+    h = harness(opt);
+  await assert.rejects(h.C.closeYear(2025, () => true));
+  assert.equal(JSON.stringify((await h.C.pendingYears()).map((x) => x.year)), '[2025]');
+  opt.fail = false; // sự cố đã hết
+  h.db.clearFail();
+  await new Promise((ok) => setTimeout(ok, 5));
+  const done = await h.C.closeYear(2025, () => true);
+  assert.ok(done.path);
+  assert.equal((await h.C.pendingYears()).length, 0);
+  const s = await h.Y.read();
+  assert.equal(JSON.stringify(s.records.map((r) => r.id)), '["keep"]');
+  const receipts = s.closed.filter((c) => c.year === 2025);
+  assert.equal(receipts.length, 2);
+  assert.ok(receipts.every((c) => !c.pending));
+  assert.equal(receipts.filter((c) => c.supersededBy).length, 1);
+});
