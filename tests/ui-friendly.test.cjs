@@ -16,9 +16,8 @@ test('thông báo thô của trình duyệt / JavaScript bị thay bằng câu c
     'TypeError: x is not a function',
     'net::ERR_CONNECTION_REFUSED',
     '[object Object]',
-    'Lỗi tại trích xuất at parse (file:///C:/app/js/archive.js:120:15)',
-    'Đã lưu tại archive.js:300:12',
-    'Giá trị undefined không hợp lệ',
+    'Giá trị undefined không hợp lệ', // lỗi nằm GIỮA câu: không cắt được mà vẫn có nghĩa → câu chung
+    'Lỗi at parse (file:///C:/app/js/archive.js:120:15)', // sau khi cắt đuôi không còn tiếng Việt có nghĩa
   ])
     assert.equal(friendly(raw), GENERIC, raw);
   assert.match(GENERIC, /^Đã xảy ra lỗi ngoài dự kiến/);
@@ -36,4 +35,19 @@ test('thông báo tiếng Việt của app giữ nguyên (kể cả có từ k�
   ])
     assert.equal(friendly(ok), ok, ok);
   assert.equal(friendly(null), '');
+});
+test('A4: câu tiếng Việt có đuôi kỹ thuật → giữ phần tiếng Việt, chỉ cắt đuôi (không thay cả câu bằng câu chung)', () => {
+  const cases = {
+    'Không đọc được tệp sao lưu (ERR_FILE_NOT_FOUND)': 'Không đọc được tệp sao lưu',
+    'Không kết nối được máy chủ: net::ERR_CONNECTION_REFUSED': 'Không kết nối được máy chủ',
+    'Lỗi tại trích xuất at parse (file:///C:/app/js/archive.js:120:15)': 'Lỗi tại trích xuất',
+    'Không lưu được hồ sơ at save (https://x/app.js:10:5)\n    at async run (https://x/app.js:20:1)': 'Không lưu được hồ sơ',
+    'Đã lưu tại archive.js:300:12': 'Đã lưu',
+    'Khôi phục dừng: [ERR_ABORTED] vì tệp bị ngắt': 'Khôi phục dừng vì tệp bị ngắt',
+  };
+  for (const [raw, want] of Object.entries(cases)) assert.equal(friendly(raw), want, raw);
+});
+test('A4: thông báo sạch không bị cắt; đuôi tiếng Anh không có mã kỹ thuật vẫn giữ (không đổi)', () => {
+  const ok = 'Không kết nối được Google (máy đang offline). Chi tiết: Failed to fetch';
+  assert.equal(friendly(ok), ok);
 });

@@ -8,7 +8,7 @@
 - **Nhập tờ khai từ Excel / khai bổ sung từ Excel:** cảnh báo của bộ đọc (ô thuế dạng ngoặc "(1.200)" theo quy tắc 28, thiếu số tiền thuế / ngày đăng ký) nay HIỆN ra như ở đường OCR; trước đây bị bỏ qua và chỉ báo "Đã nhập 1 tờ khai".
 - **Kiểm tra mục lục ↔ nội dung hồ sơ Lưu trữ:** `HAK.Archive.verifyIndex()` (số phiếu, tổng kg, phiếu KL ≤ 0 đã loại); `HAK.Archive.remove` xuất ra để kiểm thử.
 - Công cụ: `npm run e2e:archive-ops` (lưu / lưu lặp / xóa kèm lỗi giữa chừng, IndexedDB và SQLite), `npm run e2e:gsync-parity` (Google Sheet GIẢ LẬP chạy đúng Code.gs; chưa kiểm Sheet thật), `npm run e2e:import-warn`; chạy trong CI.
-- **Thông báo lỗi:** lỗi thô của trình duyệt / JS ("Cannot read properties…", khung stack, đường dẫn tệp, ERR_…) không còn hiện nguyên cho người dùng; thông báo tiếng Việt của app giữ nguyên, bản gốc ghi ở Console.
+- **Thông báo lỗi:** lỗi thô của trình duyệt / JS ("Cannot read properties…", khung stack, đường dẫn tệp, ERR_…) không còn hiện nguyên cho người dùng; thông báo tiếng Việt của app giữ nguyên; câu tiếng Việt có đuôi kỹ thuật (ERR_…, khung stack, tên tệp) chỉ bị cắt phần đuôi, giữ phần tiếng Việt. Bản gốc ghi ở Console.
 - Công cụ: `ui-audit` kiểm phần tử chỉ bấm được bằng chuột mà không vào được bằng Tab (bàn phím).
 
 ## v2.22.4 — Rà soát vòng 2: bộ lọc, lưu trữ, khôi phục, giao diện bàn phím

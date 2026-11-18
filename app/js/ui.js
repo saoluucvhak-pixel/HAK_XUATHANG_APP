@@ -18,14 +18,27 @@
    * Thông báo lỗi dành cho người dùng: thông báo tiếng Việt do app viết giữ nguyên; thông báo THÔ của trình duyệt / JavaScript (tiếng Anh, "Cannot read properties…", khung stack,
    * đường dẫn tệp, mã ERR_…, "[object Object]") KHÔNG hiện ra — thay bằng câu chung, bản gốc ghi ở Console.
    */
+  const LEAK =
+    /\bat [\w$.<>[\] ]+ \(|\bat (file|https?):\/|file:\/\/|[\w-]+\.(js|cjs|mjs):\d+|\bERR_[A-Z_]+|\[object |\bundefined\b|\bNaN\b/;
+  /** Cắt ĐUÔI kỹ thuật (khung stack, đường dẫn tệp, mã ERR_…) khỏi câu tiếng Việt, giữ nguyên phần tiếng Việt phía trước. */
+  function cutTail(s) {
+    return String(s)
+      .replace(/\s+at [\w$.<>[\] ]+ \([^)]*\)[\s\S]*$/, '') // " at hàm (đường/dẫn.js:1:2)" và mọi khung phía sau
+      .replace(/\s*[:;,]?\s*[([][^)\]]*\bERR_[A-Z_]+[^)\]]*[)\]]/g, '') // "(ERR_CONNECTION_REFUSED)"
+      .replace(/\s*[:;,-]?\s*(?:net::)?\bERR_[A-Z_]+/g, '') // ": net::ERR_…"
+      .replace(/\s*(?:tại|ở|in|at)?\s*(?:file:\/\/\S+|\S+\.(?:js|cjs|mjs):\d+(?::\d+)?)/g, '') // "tại archive.js:300:12"
+      .replace(/[\s:;,(\-–]+$/, '')
+      .trim();
+  }
   function friendly(msg) {
     const s = String(msg == null ? '' : msg);
-    const leaks =
-      /\bat [\w$.<>[\] ]+ \(|\bat (file|https?):\/|file:\/\/|[\w-]+\.(js|cjs|mjs):\d+|\bERR_[A-Z_]+|\[object |\bundefined\b|\bNaN\b/.test(
-        s
-      );
     const rawEnglish = !VI.test(s) && /[A-Za-z]{2,}\s+[A-Za-z]{2,}/.test(s) && /^[\x20-\x7E\s]*$/.test(s) && s.length > 12;
-    return leaks || rawEnglish ? GENERIC : s;
+    if (!LEAK.test(s) && !rawEnglish) return s;
+    if (VI.test(s) && !rawEnglish) {
+      const t = cutTail(s);
+      if (t.length >= 6 && VI.test(t) && !LEAK.test(t)) return t; // còn lại câu tiếng Việt sạch → giữ, chỉ bỏ đuôi kỹ thuật
+    }
+    return GENERIC;
   }
   function toast(msg, type, ms) {
     type = type || 'info';
