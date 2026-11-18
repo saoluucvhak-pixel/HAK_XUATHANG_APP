@@ -117,4 +117,18 @@ Mức lớn (1.500 hồ sơ × 100 phiếu = 150.000 phiếu): lưu 1 hồ sơ 1
 
 ## 12. Tiến độ và mức kiểm chứng
 
-(Cập nhật theo từng nhóm; xem `docs/NGHIEM_THU_SQLITE.md` khi có.)
+Ký hiệu: **ĐK** = đã kiểm chứng bằng test / e2e chạy được trên Linux (Node, Chromium); **CXM** = chưa xác minh (cần Windows / Edge / HAKDocs.exe thật); **CL** = chưa làm.
+
+| Nhóm | Nội dung | Mức |
+|---|---|---|
+| Schema v1 | 21 bảng, khóa ngoại, `ord`, `quarantine`, `audit_log` chỉ-thêm, `record_versions` (bảng có, chưa có chỗ ghi) | ĐK (engine) |
+| Engine + máy chủ tham chiếu (Node) | CRUD theo schema, khóa lạc quan, giao dịch, phạm vi công ty, backup, activate / deactivate / reset | ĐK: 18 test engine + 6 test máy chủ + bộ hợp đồng HTTP |
+| Backend trong app | `HAK.DB` / `Archive` / Danh mục / Sổ năm / đợt Excel / nhật ký / tệp đính kèm / mẫu trên SQLite; chặn khi mất nguồn; nhãn nơi lưu | ĐK: 18 + 6 test; e2e-flow, carrier, reports, customs, accept:release chạy trên SQLite với Chromium thật |
+| Phần chiếu quan hệ Danh mục | bảng cha–con từ tài liệu, mồ côi → quarantine, nhật ký | ĐK: 6 + 5 test; e2e-customs điền đủ bảng |
+| Di trú / đối chiếu / kích hoạt / quay lui | ĐK: 10 test + `tools/e2e-migrate.cjs` qua giao diện (Chromium thật) |
+| HAKDocs C# (`HakDb.cs`, `/db/*`) | cài đặt cùng hợp đồng | **CXM**: chỉ kiểm cú pháp (tree-sitter); chưa biên dịch / chạy; CI Windows (`accept-windows`) đã được thêm bước biên dịch + bộ hợp đồng + e2e trên Edge nhưng **chưa chạy** (chưa đẩy nhánh) |
+| Bộ cài | thư mục dữ liệu ngoài thư mục cài, lời nhắn khi gỡ | ĐK: biên dịch bằng makensis (Linux) + test cấu hình; **CXM**: cài mới / nâng cấp / gỡ thật |
+| Chỉ mục phiếu `archive_tickets` | bảng có | **CL** (xem Q-1) |
+| Trạng thái hồ sơ (Nháp / Đã lưu / Đã xuất / Đã đóng), `record_versions`, mẫu Word có phiên bản, cấp số chứng từ | | **CL** (cấp số: cần Q-2) |
+| Tiền kiểm trước khi lưu / xuất, truy vết tổng → phiếu | | **CL** (phần truy vết hiện có của báo cáo giữ nguyên) |
+| Bố cục / thiết kế giao diện toàn diện | | **CL** — chỉ có nhãn nơi lưu, thẻ "Nơi lưu dữ liệu", màn chặn |
