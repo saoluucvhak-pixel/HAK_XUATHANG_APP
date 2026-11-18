@@ -182,6 +182,36 @@ async function run(base, token, log) {
   await t('thân quá lớn / JSON hỏng', async () => {
     eq((await call('POST', '/db/tx', '{khong phai json', admin)).status, 400);
   });
+  await t(
+    'chuyển nguồn: reset khi chưa kích hoạt; activate sai số → 400 kèm diff và KHÔNG kích hoạt; đúng số → kích hoạt; quay lui giữ dữ liệu',
+    async () => {
+      eq((await call('POST', '/db/reset', {}, hak)).status, 403, 'tài khoản giới hạn không được đổi nguồn');
+      eq((await call('GET', '/db/status')).body.active, null);
+      await tx(
+        [
+          { op: 'put', table: 'kv', row: { key: 'k1', val: '1', updated_at: 1 } },
+          { op: 'put', table: 'issued', row: { id: 'ia', no: '1', doc: '{}' } },
+        ],
+        admin
+      );
+      const counts = (await call('GET', '/db/status')).body.counts;
+      const bad = await call('POST', '/db/activate', { expected: { kv: counts.kv + 1 } }, admin);
+      eq([bad.status, bad.body.error.code], [400, 'bad-request']);
+      eq(bad.body.error.diff[0].table, 'kv');
+      eq((await call('GET', '/db/status')).body.active, null, 'sai số thì không kích hoạt');
+      eq((await call('POST', '/db/activate', { expected: {} }, admin)).status, 400, 'thiếu expected');
+      eq((await call('POST', '/db/activate', { expected: { kv: counts.kv, issued: counts.issued } }, admin)).status, 200);
+      eq((await call('GET', '/db/status')).body.active, 'sqlite');
+      eq((await call('POST', '/db/activate', { expected: { kv: counts.kv } }, admin)).status, 400, 'không kích hoạt hai lần');
+      eq((await call('POST', '/db/reset', {}, admin)).status, 400, 'đang là nguồn chính thì không làm sạch');
+      eq((await call('POST', '/db/deactivate', {}, admin)).status, 200);
+      eq((await call('GET', '/db/status')).body.active, null);
+      eq((await q({ table: 'kv', where: { key: 'k1' } }, admin)).body.rows.length, 1, 'quay lui không xóa dữ liệu');
+      eq((await call('POST', '/db/reset', {}, admin)).status, 200);
+      const after = (await call('GET', '/db/status')).body.counts;
+      eq([after.kv, after.issued, after.contracts], [0, 0, 0], 'reset xóa dữ liệu nghiệp vụ');
+    }
+  );
   await t('sao lưu: chỉ phiên toàn quyền, tên được lọc, tệp trong backups, không ghi đè; check đạt', async () => {
     eq((await call('POST', '/db/backup', { name: 'x' }, hak)).status, 403);
     const name = 'contract-' + Date.now();

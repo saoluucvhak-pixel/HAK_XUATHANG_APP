@@ -125,6 +125,7 @@ class HAKDocs {
      else if(path=="/db/tx")resp=new Dictionary<string,object>{{"results",db.Tx(Get(data,"ops",null),ses.Scope)}};
      else if(path=="/db/query")resp=db.Query(data,ses.Scope);
      else if(path=="/db/check")resp=db.Check();
+     else if(path=="/db/activate"||path=="/db/deactivate"||path=="/db/reset"){if(ses.Scope!=null)throw new HakDbException("scope","Chỉ tài khoản toàn quyền được đổi nguồn dữ liệu");resp=path=="/db/activate"?db.Activate(Get(data,"expected",null) as Dictionary<string,object>):path=="/db/deactivate"?db.Deactivate():db.Reset();}
      else if(path=="/db/backup"){if(ses.Scope!=null)throw new HakDbException("scope","Chỉ tài khoản toàn quyền mới sao lưu toàn bộ cơ sở dữ liệu");resp=db.Backup(Path.Combine(DataDir,"backups",SafeBackupName((string)Get(data,"name",""))));}
      else{code=404;resp=DbErr("bad-request","Không có điểm cuối "+path,null);}
     }

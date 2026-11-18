@@ -149,6 +149,23 @@ class HakDb : IDisposable {
  void ChkCol(Tbl t,string c,string table){if(!Ident.IsMatch(c)||!t.Cols.Contains(c))throw new HakDbException("bad-request","Cột không có trong "+table+": "+c);}
  public string Meta(string key){lock(gate){var r=Rows("SELECT value FROM meta WHERE key=?",new List<object>{key});return r.Count>0?(string)r[0]["value"]:null;}}
  public void SetMeta(string key,string value){lock(gate){Run("INSERT INTO meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",new List<object>{key,value});}}
+ /* Kích hoạt SQLite làm nguồn chính: chỉ khi toàn vẹn đạt, chưa kích hoạt và số bản ghi từng bảng khớp expected. */
+ public Dictionary<string,object> Activate(Dictionary<string,object> expected){
+  if(Meta("active_backend")=="sqlite")throw new HakDbException("bad-request","Cơ sở dữ liệu đã được kích hoạt");
+  var chk=Check();if(!(bool)chk["ok"])throw new HakDbException("bad-request","Kiểm tra toàn vẹn chưa đạt, không kích hoạt");
+  if(expected==null||expected.Count==0)throw new HakDbException("bad-request","Thiếu số bản ghi cần đối chiếu (expected)");
+  var counts=Counts();var diff=new List<object>();
+  foreach(var kv in expected){object a;bool has=counts.TryGetValue(kv.Key,out a);if(!has||Convert.ToInt64(a)!=Convert.ToInt64(kv.Value))diff.Add(new Dictionary<string,object>{{"table",kv.Key},{"expected",Convert.ToInt64(kv.Value)},{"actual",has?a:null}});}
+  if(diff.Count>0)throw new HakDbException("bad-request","Số bản ghi không khớp nguồn, không kích hoạt").With("diff",diff);
+  SetMeta("active_backend","sqlite");SetMeta("activated_at",DateTime.UtcNow.ToString("o"));
+  return new Dictionary<string,object>{{"active",true},{"counts",counts}};
+ }
+ public Dictionary<string,object> Deactivate(){lock(gate){Run("DELETE FROM meta WHERE key='active_backend'",new List<object>());}SetMeta("deactivated_at",DateTime.UtcNow.ToString("o"));return new Dictionary<string,object>{{"active",false}};}
+ public Dictionary<string,object> Reset(){
+  if(Meta("active_backend")=="sqlite")throw new HakDbException("bad-request","Đang là nguồn chính, không được làm sạch. Hãy quay lui (deactivate) trước.");
+  lock(gate){Exec("BEGIN IMMEDIATE");try{Exec("PRAGMA defer_foreign_keys=ON");foreach(var n in tables.Keys.ToList()){if(n=="meta"||n=="audit_log"||n=="sqlite_sequence")continue;Exec("DELETE FROM "+n);}Exec("COMMIT");}catch{try{Exec("ROLLBACK");}catch{}throw;}}
+  return new Dictionary<string,object>{{"reset",true}};
+ }
  public int SchemaVersion(){return Int32.Parse(Meta("schema_version"));}
  static Dictionary<string,object> D(object o){return o as Dictionary<string,object>;}
  static object[] A(object o){var arr=o as object[];if(arr!=null)return arr;var l=o as System.Collections.ArrayList;if(l!=null)return l.ToArray();return null;}

@@ -121,6 +121,59 @@ class HakDb {
   setMeta(key, value) {
     this.db.prepare('INSERT INTO meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(key, String(value));
   }
+  /** Kích hoạt SQLite làm nguồn chính: CHỈ khi toàn vẹn đạt, chưa kích hoạt và số bản ghi từng bảng khớp `expected` (do bên di trú đối chiếu từ nguồn). */
+  activate(expected) {
+    if (this.meta('active_backend') === 'sqlite') throw new HakDbError('bad-request', 'Cơ sở dữ liệu đã được kích hoạt');
+    const chk = this.check();
+    if (!chk.ok)
+      throw new HakDbError(
+        'bad-request',
+        'Kiểm tra toàn vẹn chưa đạt, không kích hoạt: ' +
+          JSON.stringify({ integrity: chk.integrity, foreignKeys: chk.foreignKeys.slice(0, 5) })
+      );
+    const counts = this.counts(),
+      diff = [];
+    for (const [t, n] of Object.entries(expected || {}))
+      if (counts[t] !== n) diff.push({ table: t, expected: n, actual: counts[t] === undefined ? null : counts[t] });
+    if (!expected || !Object.keys(expected).length) throw new HakDbError('bad-request', 'Thiếu số bản ghi cần đối chiếu (expected)');
+    if (diff.length)
+      throw Object.assign(
+        new HakDbError(
+          'bad-request',
+          'Số bản ghi không khớp nguồn, không kích hoạt (' + diff.map((d) => d.table + ' ' + d.actual + '/' + d.expected).join(', ') + ')'
+        ),
+        { diff }
+      );
+    this.setMeta('active_backend', 'sqlite');
+    this.setMeta('activated_at', new Date().toISOString());
+    return { active: true, counts };
+  }
+  /** Quay lui: tắt cờ nguồn chính. KHÔNG xóa dữ liệu trong SQLite (giữ để xuất / đối chiếu). */
+  deactivate() {
+    this.db.prepare("DELETE FROM meta WHERE key='active_backend'").run();
+    this.setMeta('deactivated_at', new Date().toISOString());
+    return { active: false };
+  }
+  /** Làm sạch vùng nhập (chỉ khi CHƯA kích hoạt): xóa mọi dữ liệu nghiệp vụ để di trú lại từ đầu. Giữ meta và nhật ký chỉ-thêm. */
+  reset() {
+    if (this.meta('active_backend') === 'sqlite')
+      throw new HakDbError('bad-request', 'Đang là nguồn chính, không được làm sạch. Hãy quay lui (deactivate) trước.');
+    const keep = new Set(['meta', 'audit_log', 'sqlite_sequence']);
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      this.db.exec('PRAGMA defer_foreign_keys=ON');
+      for (const t of this.tables.keys()) if (!keep.has(t)) this.db.exec('DELETE FROM ' + t);
+      this.db.exec('COMMIT');
+    } catch (err) {
+      try {
+        this.db.exec('ROLLBACK');
+      } catch (e2) {
+        /* đã hủy */
+      }
+      throw this._wrap(err);
+    }
+    return { reset: true };
+  }
   schemaVersion() {
     return Number(this.db.prepare("SELECT value FROM meta WHERE key='schema_version'").get().value);
   }

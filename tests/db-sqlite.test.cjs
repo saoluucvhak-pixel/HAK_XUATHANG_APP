@@ -392,3 +392,71 @@ test('Danh mục: kvCas xung đột thì cả tài liệu lẫn bảng quan hệ
   assert.equal(projected(b.srv).contracts[0].no, '000123/HĐ', 'phần chiếu không bị ghi dở');
   await b.close();
 });
+
+const auditRows = (srv) => srv.hakdb.query({ table: 'audit_log', order: [['seq', 'asc']] }).rows;
+test('nhật ký thao tác: tạo / sửa trường quan trọng (trước, sau) / ngừng dùng / khôi phục / thay liên kết / xóa — cùng giao dịch, kèm người thực hiện', async () => {
+  const b = await boot(true);
+  HAK.Auth = { who: () => 'Nguyễn Văn A' };
+  const doc = catalogDoc();
+  await DB.kvCas('hak.catalog.v1', () => null, doc);
+  const created = auditRows(b.srv);
+  assert.ok(created.length >= 6 && created.every((r) => r.action === 'tạo' && r.actor === 'Nguyễn Văn A'), 'tạo: mỗi bản ghi một dòng');
+  const n0 = created.length;
+  const d2 = JSON.parse(JSON.stringify(doc));
+  d2.contracts[0].details[0].qty = 1200; // sửa số lượng
+  d2.contracts[0].details[1].deletedAt = '2026-03-01'; // ngừng dùng
+  d2.customs[0].detailId = 'ct-b'; // thay liên kết
+  d2.customs[0].payments[0].amount = 900;
+  await DB.kvCas('hak.catalog.v1', () => null, d2);
+  const rows = auditRows(b.srv).slice(n0);
+  const pick = (entity, field) => rows.find((r) => r.entity === entity && r.field === field);
+  assert.deepEqual(
+    [pick('contract_details', 'qty').action, pick('contract_details', 'qty').before, pick('contract_details', 'qty').after],
+    ['sửa', '1000', '1200']
+  );
+  assert.equal(pick('contract_details', 'deletedAt').action, 'ngừng dùng');
+  assert.deepEqual(
+    [pick('customs_decls', 'detailId').action, pick('customs_decls', 'detailId').before, pick('customs_decls', 'detailId').after],
+    ['thay liên kết', '"ct-a"', '"ct-b"']
+  );
+  assert.equal(pick('customs_payments', 'amount').after, '900');
+  const d3 = JSON.parse(JSON.stringify(d2));
+  delete d3.contracts[0].details[1].deletedAt; // khôi phục
+  d3.customs = []; // xóa hẳn tờ khai
+  await DB.kvCas('hak.catalog.v1', () => null, d3);
+  const r3 = auditRows(b.srv).slice(n0 + rows.length);
+  assert.ok(r3.some((r) => r.action === 'khôi phục' && r.entity === 'contract_details'));
+  assert.ok(
+    r3.some(
+      (r) => r.action === 'xóa' && r.entity === 'customs_decls' && r.entity_id === 'tk1' && JSON.parse(r.before).no === '308629701000'
+    ),
+    'xóa hẳn: giữ nguyên bản ghi trước khi xóa'
+  );
+  const before = auditRows(b.srv).length;
+  await DB.kvCas('hak.catalog.v1', () => null, d3); // lưu lại y hệt: không sinh dòng nhật ký
+  assert.equal(auditRows(b.srv).length, before);
+  assert.throws(() => b.srv.hakdb.db.prepare('DELETE FROM audit_log').run(), /chỉ được thêm/);
+  delete HAK.Auth;
+  await b.close();
+});
+test('nhật ký: giao dịch lỗi / xung đột thì không để lại dòng nhật ký nào', async () => {
+  const b = await boot(true);
+  const doc = catalogDoc();
+  await DB.kvCas('hak.catalog.v1', () => null, doc);
+  const n = auditRows(b.srv).length;
+  const d2 = JSON.parse(JSON.stringify(doc));
+  d2.contracts[0].no = 'KHAC';
+  const e = await rejects(
+    DB.kvCas(
+      'hak.catalog.v1',
+      () => {
+        b.srv.hakdb.tx([{ op: 'put', table: 'kv', row: { key: 'hak.catalog.v1', val: '{"v":3}', updated_at: 9 } }]);
+        return null;
+      },
+      d2
+    )
+  );
+  assert.equal(e.conflict, true);
+  assert.equal(auditRows(b.srv).length, n, 'không ghi nhật ký cho thao tác bị từ chối');
+  await b.close();
+});

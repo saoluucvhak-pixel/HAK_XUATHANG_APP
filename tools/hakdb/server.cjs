@@ -139,6 +139,15 @@ function createServer(opt) {
       if (url === '/db/tx') return reply(res, 200, { results: db.tx(body.ops, ctx) }, cors);
       if (url === '/db/query') return reply(res, 200, db.query(body, ctx), cors);
       if (url === '/db/check') return reply(res, 200, db.check(), cors);
+      if (url === '/db/activate' || url === '/db/deactivate' || url === '/db/reset') {
+        if (s.scope !== null) throw new HakDbError('scope', 'Chỉ tài khoản toàn quyền được đổi nguồn dữ liệu');
+        return reply(
+          res,
+          200,
+          url === '/db/activate' ? db.activate(body.expected) : url === '/db/deactivate' ? db.deactivate() : db.reset(),
+          cors
+        );
+      }
       if (url === '/db/backup') {
         if (s.scope !== null) throw new HakDbError('scope', 'Chỉ tài khoản toàn quyền mới sao lưu toàn bộ cơ sở dữ liệu');
         const name = String(body.name || 'hak-' + new Date().toISOString().replace(/[:.]/g, '-'))
@@ -154,7 +163,7 @@ function createServer(opt) {
       const c = e && e.code ? e.code : 'io';
       code = c === 'too-large' ? 413 : c === 'no-session' ? 401 : STATUS[c] || 500;
       const err = { code: c, message: e.message };
-      ['table', 'key', 'expected', 'actual', 'opIndex'].forEach((k) => e[k] !== undefined && (err[k] = e[k]));
+      ['table', 'key', 'expected', 'actual', 'opIndex', 'diff'].forEach((k) => e[k] !== undefined && (err[k] = e[k]));
       reply(res, code, { error: err }, cors);
     } finally {
       log(req.method + ' ' + req.url.split('?')[0] + ' ' + code + ' ' + (Date.now() - t0) + 'ms'); // không ghi header / thân yêu cầu

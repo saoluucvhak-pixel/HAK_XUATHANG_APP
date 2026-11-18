@@ -84,7 +84,6 @@ jobs:
           if (-not (Test-Path app/native/HAKDocs.exe)) { throw 'HAKDocs.exe was not built' }
           # Thư mục dữ liệu thử CÓ DẤU TIẾNG VIỆT và khoảng trắng (đường dẫn UTF-8 phải mở được).
           $env:HAK_DATA_DIR = Join-Path $env:RUNNER_TEMP 'dữ liệu HAK ƯT'
-          $env:HAK_DB_ACTIVATE = '1'
           $p = Start-Process -FilePath app/native/HAKDocs.exe -ArgumentList '--serve' -PassThru -WindowStyle Hidden
           $up = $false
           for ($i = 0; $i -lt 40 -and -not $up; $i++) { try { Invoke-RestMethod http://127.0.0.1:31879/status -TimeoutSec 2 | Out-Null; $up = $true } catch { Start-Sleep -Milliseconds 500 } }

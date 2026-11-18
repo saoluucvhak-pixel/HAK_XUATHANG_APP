@@ -151,24 +151,92 @@
   const CATALOG_KEY = 'hak.catalog.v1';
   const cmp = (a, b) =>
     Object.keys(a).every((k) => k === 'rev' || (a[k] === undefined ? null : a[k]) === (b[k] === undefined ? null : b[k]));
+  /* Nhật ký thao tác: từng trường quan trọng đổi (trước / sau) → audit_log, cùng giao dịch với lần lưu. Người thực hiện lấy từ HAK.Auth.who(). */
+  const AUDIT_FIELDS = {
+    contracts: ['no', 'type', 'contractQty', 'exporterId', 'principalId', 'buyerId', 'closedAt', 'reopenedAt', 'deletedAt'],
+    contract_details: ['ship', 'qty', 'bdmt', 'certNo', 'contractId', 'deletedAt'],
+    contract_addenda: ['no', 'date', 'qty', 'deletedAt'],
+    customs_decls: ['no', 'status', 'taxVnd', 'contractId', 'detailId', 'deletedAt'],
+    customs_supplements: ['no', 'taxVnd', 'deletedAt'],
+    customs_payments: ['receiptNo', 'kind', 'amount', 'deletedAt'],
+    customers: ['name', 'companyId', 'deletedAt'],
+  };
+  const LINKS = new Set(['contractId', 'detailId']);
+  const jv = (v) => (v === undefined ? null : J(v));
+  const auditOff = () => !!(HAK.Audit && HAK.Audit.suppress); // di trú / khôi phục hàng loạt: không phải thao tác của người dùng
+  function auditOps(table, row, oldRow) {
+    const fields = AUDIT_FIELDS[table];
+    if (!fields || auditOff()) return [];
+    const now = Date.now(),
+      who = (HAK.Auth && HAK.Auth.who && HAK.Auth.who()) || '',
+      nw = JSON.parse(row.doc),
+      od = oldRow ? JSON.parse(oldRow.doc) : null;
+    const mk = (action, field, before, after) => ({
+      op: 'append',
+      table: 'audit_log',
+      row: {
+        at: now,
+        actor: who || null,
+        company_id: row.company_id || null,
+        action,
+        entity: table,
+        entity_id: row.id,
+        field: field || null,
+        before,
+        after,
+        reason: (HAK.Audit && HAK.Audit.reason) || null,
+      },
+    });
+    if (!od) return [mk('tạo', null, null, null)];
+    const out = [];
+    fields.forEach((f) => {
+      if (jv(od[f]) === jv(nw[f])) return;
+      const action = f === 'deletedAt' ? (nw[f] ? 'ngừng dùng' : 'khôi phục') : LINKS.has(f) ? 'thay liên kết' : 'sửa';
+      out.push(mk(action, f, jv(od[f]), jv(nw[f])));
+    });
+    return out;
+  }
   /** Các thao tác đưa bảng quan hệ về ĐÚNG như Danh mục `doc` (chỉ ghi dòng đổi; xóa dòng không còn; mồ côi / mất độ chính xác → quarantine). Cùng giao dịch với bản ghi kv. */
   async function catalogOps(doc) {
     const CR = HAK.CatalogRows;
     if (!CR || !doc || typeof doc !== 'object' || !Array.isArray(doc.contracts)) return [];
     const built = CR.build(doc);
     const ops = [],
-      dels = [];
+      dels = [],
+      audit = [];
     for (const t of CR.TABLES) {
       const old = new Map((await S().call('/db/query', { table: t })).rows.map((r) => [r.id, r]));
       const seen = new Set();
       for (const row of built.tables[t]) {
         seen.add(row.id);
         const o = old.get(row.id);
-        if (!o || !cmp(row, o)) ops.push({ op: 'put', table: t, row });
+        if (!o || !cmp(row, o)) {
+          ops.push({ op: 'put', table: t, row });
+          audit.push(...auditOps(t, row, o));
+        }
       }
-      for (const id of old.keys()) if (!seen.has(id)) dels.push({ op: 'del', table: t, key: id });
+      for (const [id, o] of old.entries())
+        if (!seen.has(id)) {
+          dels.push({ op: 'del', table: t, key: id });
+          if (AUDIT_FIELDS[t] && !auditOff())
+            audit.push({
+              op: 'append',
+              table: 'audit_log',
+              row: {
+                at: Date.now(),
+                actor: (HAK.Auth && HAK.Auth.who && HAK.Auth.who()) || null,
+                action: 'xóa',
+                entity: t,
+                entity_id: id,
+                before: o.doc,
+                after: null,
+                reason: (HAK.Audit && HAK.Audit.reason) || null,
+              },
+            });
+        }
     }
     ops.push(...dels.reverse()); // xóa con trước cha
+    ops.push(...audit);
     ops.push({ op: 'del', table: 'quarantine', where: { source: 'catalog' } });
     built.orphans.forEach((o) =>
       ops.push({
@@ -419,6 +487,7 @@
     MAP,
     toB64,
     fromB64,
+    sha256,
   };
   if (typeof module === 'object' && module.exports) module.exports = HAK.DBSqlite;
 })(typeof window !== 'undefined' ? window : globalThis);

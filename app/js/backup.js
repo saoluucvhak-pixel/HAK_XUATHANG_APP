@@ -1399,6 +1399,7 @@
       '</div>' +
       (await autoHtml());
     bindAuto();
+    if (HAK.MigrateUI) HAK.MigrateUI.mount(box); // khu "Nơi lưu dữ liệu" (SQLite / trình duyệt)
     const b1 = $('#bkSave'),
       b2 = $('#bkRestore'),
       b3 = $('#bkPersist'),
