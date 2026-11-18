@@ -1,12 +1,12 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
-## v2.22.2 — Rà soát số liệu vòng 1: bộ đọc số, khử trùng phiếu, báo dòng bị bỏ, xác nhận phạm vi BKLS
-- **Bộ đọc số thống nhất:** số Chứng thư đọc đúng "1,234.56" (trước đây thành 1,23456) và "1,234,567" (trước đây trống), "0.500" = 0,5; Tờ khai đọc "(1.200)" = −1.200 (trước đây mất dấu âm) và "0.500" = 0,5. Các kết quả đã có test không đổi.
+## v2.22.2 — Rà soát số liệu: một nguồn trạng thái hợp đồng, bộ đọc số, khử trùng phiếu, báo dòng bị bỏ, xác nhận phạm vi BKLS
+- **Trạng thái hợp đồng một nguồn:** "Đã hoàn thành" chỉ khi mọi tờ khai đã thông quan VÀ mọi chi tiết đã có chứng thư **hoặc phiếu cân** đều có tờ khai thông quan. Danh mục, tab Tờ khai, Báo cáo tổng hợp, Chi tiết xuất hàng theo HĐ, Báo cáo thực hiện HĐ, Hồ sơ hợp đồng, Excel / PDF và Google Sheet nay cùng lấy "chi tiết đã có phiếu cân" từ Lưu trữ (tính nền, tự cập nhật khi Lưu trữ / Danh mục / công ty đổi; lần đầu chưa tính xong thì hiện như cũ rồi tự cập nhật). Trước đây Danh mục và vài báo cáo bỏ sót phiếu cân nên báo "Đã hoàn thành" trong khi Báo cáo thực hiện HĐ báo "Đang thực hiện".
+- **Bộ đọc số:** số Chứng thư đọc đúng "1,234.56" (trước đây thành 1,23456) và "1,234,567" (trước đây trống); "0.500" = 0,5 ở Chứng thư và Tờ khai. Tờ khai chưa đọc ngoặc là số âm; gặp ô dạng "(…)" thì cảnh báo. Các kết quả đã có test không đổi.
 - **Tổng quan:** khử trùng phiếu giữa các hình thức không còn phân biệt hoa/thường và khoảng trắng của biển số / số phiếu (cùng cách với Báo cáo).
 - **Nhập Excel:** dòng có số phiếu / biển số nhưng không đọc được khối lượng (ô là chữ) nay được **báo kèm số dòng Excel**, không còn bị tính lẫn vào "dòng tiêu đề / chữ ký".
 - **Lập BKLS:** hiện hộp xác nhận phạm vi (công ty · tàu · số phiếu · thực giao) trước khi chọn mẫu, giống Word / PDF / Excel. Dựng lại từ Lưu trữ không hỏi.
-- **Danh mục:** ghi chú rõ trạng thái "Đã hoàn thành" ở Danh mục chỉ xét chứng thư; chi tiết mới có phiếu cân xem ở Báo cáo thực hiện hợp đồng.
-- Công cụ: `ui-audit` thêm khổ 768×1024; `npm run e2e:bkls-scope`; test chéo bộ đọc số và khóa nhận diện phiếu.
+- Công cụ: `ui-audit` thêm khổ 768×1024; `npm run e2e:bkls-scope`, `npm run e2e:contract-status`; test chéo bộ đọc số và khóa nhận diện phiếu.
 
 ## v2.22.1 — Đóng năm đúng nguồn SQLite và kiểm tra trước khi phát hành
 - Đóng năm và tiếp tục đóng năm dùng giao dịch SQLite khi SQLite đang là nguồn chính. Sổ hồ sơ năm, thông số đợt và file Excel gốc được kiểm tra phiên bản trước khi dọn cùng một giao dịch.
