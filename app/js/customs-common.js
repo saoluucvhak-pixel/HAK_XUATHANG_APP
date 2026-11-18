@@ -53,6 +53,9 @@
       (s.code === 'done' ? 'text-bg-success' : 'text-bg-primary') +
       '" title="' +
       (s.total ? s.cleared + '/' + s.total + ' tờ khai đã thông quan' : 'Chưa có tờ khai hải quan') +
+      (s.code === 'done' && !s.manual
+        ? ' · Danh mục chỉ xét chứng thư; chi tiết mới có phiếu cân (chưa chứng thư) xem ở Báo cáo thực hiện hợp đồng'
+        : '') +
       '">' +
       s.label +
       '</span>'

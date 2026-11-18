@@ -441,7 +441,7 @@
 
     // ---- chuẩn hoá từng dòng ----
     const rows = [];
-    const issues = { swap: [], mismatch: [], noDate: [], dupTicket: [], nonPos: [], plate: [] };
+    const issues = { swap: [], mismatch: [], noDate: [], dupTicket: [], nonPos: [], plate: [], noWeight: [] };
     const seenTicket = new Map();
     const cancelled = []; // phiếu "BO" (bỏ cân — xe cân lại phiếu khác) → loại khỏi biên bản
     let skipped = 0;
@@ -463,6 +463,8 @@
       }
       if (net === null && (tare === null || gross === null)) {
         skipped++;
+        // dòng có số phiếu / biển số nhưng không đọc được khối lượng: KHÔNG được nuốt âm thầm → báo kèm số dòng Excel
+        if (plate || !isBlank(g('ticket'))) issues.noWeight.push(r + 1 + rowOff);
         continue;
       }
       let rowUnit = unitFactor;
@@ -570,16 +572,28 @@
       rows.push(row);
     }
     ds.rows = rows;
-    ds.skipped = skipped;
+    ds.skipped = skipped - issues.noWeight.length; // dòng tiêu đề / chữ ký / trống thật sự
+    ds.noWeightRows = issues.noWeight;
     ds.cancelled = cancelled;
     ds.cancelledKg = cancelled.reduce((a, c) => a + c.net, 0);
     if (!rows.length) {
-      ds.errors.push('Không có dòng dữ liệu hợp lệ sau dòng tiêu đề.');
+      ds.errors.push(
+        'Không có dòng dữ liệu hợp lệ sau dòng tiêu đề.' +
+          (issues.noWeight.length ? ' (' + issues.noWeight.length + ' dòng có biển số/số phiếu nhưng không đọc được khối lượng.)' : '')
+      );
       return ds;
     }
 
     // ---- Cảnh báo dữ liệu ----
     const lim = (a) => a.slice(0, 8).join(', ') + (a.length > 8 ? ' … (+' + (a.length - 8) + ')' : '');
+    if (issues.noWeight.length)
+      ds.warnings.push(
+        '⚠ ' +
+          issues.noWeight.length +
+          ' dòng có số phiếu/biển số nhưng không đọc được khối lượng nên CHƯA được nạp (dòng Excel: ' +
+          lim(issues.noWeight) +
+          ').'
+      );
     if (issues.noDate.length)
       ds.warnings.push('⚠ ' + issues.noDate.length + ' dòng thiếu/sai ngày cân (dòng Excel: ' + lim(issues.noDate) + ').');
     if (cancelled.length)
