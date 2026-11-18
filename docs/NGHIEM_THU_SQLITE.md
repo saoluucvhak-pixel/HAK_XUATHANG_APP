@@ -122,12 +122,19 @@ Xem `docs/HUONG_DAN_SQLITE.md` (chuyển, sao lưu, quay lui, chuyển máy, khi
 
 ## 7. Chưa làm / lỗi và giới hạn còn mở
 
+**Đã làm thêm sau bản báo cáo đầu (đã kiểm chứng ở Linux):**
+* **Phiên bản hồ sơ + lý do + nhật ký:** sửa hồ sơ đã xuất bắt buộc có lý do; bản cũ giữ kèm trạng thái / lý do / người sửa; nút "Phiên bản (n)" và "Xem / in lại bản này" (chỉ xem, không ghi kho); `HAK.Audit` ghi nhật ký ở chế độ trình duyệt (khóa `hak.auditlog.v1`) và SQLite (`audit_log`). Test: `yearbook` (+4), `audit` (2), `tools/e2e-versions.cjs` (13 kiểm tra trên trình duyệt thật). Mã mutation (bỏ kiểm tra lý do) làm test đỏ.
+* **Giao diện:** công tắc đủ vùng bấm 24 px (trước 29×15); `ui-audit` kiểm thêm vùng bấm, dấu focus bàn phím, tiêu đề bảng cố định — chạy lại 3 lần ổn định, 141 màn hình, 0 vi phạm; chứng minh kiểm tra bắt đúng lỗi bằng cách tạm bỏ quy tắc CSS. Phát hiện phụ: thăm dò "vùng bấm nhỏ" cũ chỉ thu thập số liệu mà không bao giờ báo vi phạm — đã thay bằng kiểm tra thật.
+* **Tiền kiểm trước khi lưu / xuất:** app **đã có sẵn** `scopeSummary` (công ty, tàu, số phiếu, phiếu bỏ, xe trả về, thực giao) và khối tóm tắt (thời gian, số xe, tổng kg, xe trả về, thực giao, phiếu đã bỏ, dòng cảnh báo); xung đột chọn phiếu được hỏi trước khi lưu (`confirmPickConflicts`). Không thêm hộp xác nhận mới để tránh làm chậm thao tác; việc báo "thành công" chỉ sau khi giao dịch / tạo file hoàn tất đã có từ v2.19.0.
+* Trạng thái hồ sơ: mô hình hiện có (Đã lưu / Đã xuất / Bản sao cũ / Đã lưu trữ ở Sổ hồ sơ năm; Đã đóng ở Đóng năm) được giữ nguyên, **không** thêm trạng thái "Nháp" riêng vì "Đã lưu" hiện chính là bản nháp lưu (chưa xuất).
+
 **Chưa làm (so với yêu cầu):**
-* Bố cục và thiết kế giao diện toàn diện (§5 của yêu cầu): chuẩn hóa khoảng cách / cỡ chữ / màu trạng thái, điều hướng theo công việc, màn lập hồ sơ nhóm lại, phân biệt Lọc xem trước / Phạm vi lập chứng từ / Kỳ báo cáo, bảng cố định tiêu đề, bàn phím / focus / tương phản, kiểm 1366×768 · 1920×1080 · màn hẹp. Chỉ có phần giao diện nơi lưu dữ liệu; `ui-audit` hiện có (141 màn hình) vẫn đạt.
-* Trạng thái hồ sơ Nháp / Đã lưu / Đã xuất / Đã đóng, `record_versions` (bảng có, chưa có chỗ ghi), mở / in lại đúng bản đã xuất, quản lý phiên bản mẫu Word / BKLS, tiền kiểm "trước khi lưu / xuất" (công ty, tàu, phạm vi, số phiếu, qua cân, trả về, phiếu bỏ, thực giao, ngoại lệ), truy vết số tổng → phiếu → Excel → hồ sơ → bộ lọc → phiên bản dữ liệu (phần truy vết **có sẵn** của báo cáo vẫn dùng).
+* Thiết kế lại bố cục giao diện toàn diện (điều hướng theo công việc, nhóm lại màn lập hồ sơ, tách rõ Lọc xem trước / Phạm vi lập chứng từ / Kỳ báo cáo, sắp xếp / phân trang bảng): app đã có sidebar theo thứ tự công việc ①②… và các kiểm tra `ui-audit`; **không** đổi bố cục lớn vì không có tiêu chí xác nhận và rủi ro làm lệch các e2e. Việc đã làm ở giao diện: nơi lưu dữ liệu, màn chặn, công tắc, phiên bản.
+* Quản lý phiên bản **mẫu Word / BKLS** (ngày áp dụng, trường bắt buộc, hồ sơ cũ tra mẫu đã dùng): cần định nghĩa (Q-5). Hồ sơ năm đã lưu `context` (cấu hình tại thời điểm lưu) nhưng mẫu Word thì chưa gắn phiên bản.
 * Kiểm tra số chứng từ theo công ty / loại / kỳ cấp số — **cần quy tắc** (Q-2).
-* Chỉ mục phiếu `archive_tickets` (Q-1) và tách Sổ hồ sơ năm theo bản ghi (Sổ năm vẫn là một khóa kv).
-* Sao lưu SQLite trong gói ZIP: ZIP vẫn là bản JSON như cũ; bản `VACUUM INTO` là chức năng riêng của HAKDocs (`/db/backup`), **chưa có nút trên giao diện** và chưa đóng gói chung với tệp / checksum vào ZIP.
+* Chỉ mục phiếu `archive_tickets` (Q-1; bảng có nhưng chưa dựng — một chỉ mục không dùng thì không có giá trị) và tách Sổ hồ sơ năm theo bản ghi (Sổ năm vẫn là một khóa kv).
+* Sao lưu SQLite trong gói ZIP: ZIP vẫn là bản JSON như cũ; bản `VACUUM INTO` là chức năng riêng của HAKDocs (`/db/backup`), **chưa có nút trên giao diện**.
+* Truy vết "số tổng → phiếu → Excel → hồ sơ → bộ lọc → phiên bản dữ liệu": phần có sẵn (tra từ dòng tổng về hồ sơ / phiếu cân; cùng tập phiếu cho màn hình và bản xuất) được giữ; thêm phiên bản hồ sơ (ở trên). Chưa có màn "phiên bản dữ liệu" riêng.
 * Nhập ZIP vào SQLite có kiểm thử riêng cho "bản cũ không ghi đè mới / không cộng đôi khoản nộp" — hiện dựa trên mã hợp nhất cũ đã có test ở IDB.
 
 **Giới hạn đã biết:**

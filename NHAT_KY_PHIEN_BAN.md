@@ -13,6 +13,8 @@
 - **Nhật ký thao tác** (chỉ thêm, không sửa / xóa): tạo / sửa trường quan trọng (trước → sau) / ngừng dùng / khôi phục / thay liên kết / xóa, kèm người thực hiện; sự kiện chuyển nguồn / quay lui.
 - **Khóa lạc quan theo phiên bản bản ghi** cho mọi ghi nhiều kho (đợt Excel, Danh mục, Sổ hồ sơ năm); cửa sổ khác ghi chen vào giữa thì giao dịch bị từ chối, không ghi dở.
 - **API cục bộ** `/db/*` của HAKDocs: chỉ `127.0.0.1`, Origin `null`, mã bảo vệ, phiên mang phạm vi công ty (lọc khi đọc, chặn ghi / xóa ngoài phạm vi), giới hạn 36 MB, log không chứa bí mật; không có SQL từ trang web.
+- **Hồ sơ đã xuất khi sửa phải có lý do:** Sổ hồ sơ năm hỏi lý do (bắt buộc) trước khi lưu thay đổi nội dung của hồ sơ **đã xuất**; bản cũ được giữ lại kèm trạng thái, lý do, người sửa, thời điểm. Nút **Phiên bản (n)** trong Sổ hồ sơ năm liệt kê các bản và **Xem / in lại bản này** mở đúng bản cũ ở chế độ chỉ xem (không ghi vào kho). Mọi thao tác này vào nhật ký (`HAK.Audit`, ở cả chế độ trình duyệt lẫn SQLite).
+- **Giao diện:** công tắc (phạm vi dữ liệu…) đủ vùng bấm 24 px; `ui-audit` kiểm thêm vùng bấm ≥ 24 px, dấu focus khi dùng bàn phím và tiêu đề bảng cố định (kiểm tra đã được chứng minh bắt lỗi).
 - Công cụ: `npm run audit:data`, `tools/e2e-sqlite.cjs` (chạy e2e hiện có trên SQLite), `tools/e2e-migrate.cjs`, `tools/bench-sqlite-backend.cjs`, `tools/hakdb/contract.cjs`. Tài liệu: `docs/SQLITE_KIEN_TRUC.md`, `docs/HUONG_DAN_SQLITE.md`, `docs/NGHIEM_THU_SQLITE.md`.
 - **Chưa xác minh trên Windows thật** (xem báo cáo nghiệm thu): HAKDocs.exe (C# + winsqlite3) chưa được biên dịch / chạy ngoài CI; cài mới / nâng cấp / lối tắt / đường dẫn có dấu / Edge với SQLite.
 
