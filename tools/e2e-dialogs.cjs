@@ -127,6 +127,34 @@ const file = path.join(tmp, 'can.xlsx');
   });
   check(r.aStill && r.insideA, 'đóng hộp B, hộp A vẫn mở và giữ tiêu điểm');
   check(r.back === 'btnPick-' + T, 'đóng nốt hộp A: tiêu điểm về nút ban đầu (' + r.back + ')');
+  console.log(
+    '5) Tìm kiếm chung (Ctrl+K): gõ được, Esc đóng, tiêu điểm về chỗ cũ; khi đang có hộp thoại không mở chồng (tránh giật tiêu điểm)'
+  );
+  await p.focus('#btnPick-' + T);
+  await p.keyboard.press('Control+k');
+  await p.waitForTimeout(500);
+  check(await p.evaluate(() => document.activeElement && document.activeElement.id === 'gsInput'), 'Ctrl+K: tiêu điểm ở ô tìm');
+  await p.keyboard.type('43C');
+  check((await p.inputValue('#gsInput')) === '43C', 'gõ được vào ô tìm');
+  await p.keyboard.press('Escape');
+  await p.waitForTimeout(400);
+  check(await p.evaluate(() => document.querySelector('.gs-overlay').hidden), 'Esc đóng tìm kiếm');
+  check(
+    await p.evaluate((t) => document.activeElement && document.activeElement.id === 'btnPick-' + t, T),
+    'tiêu điểm trả về nút đang đứng trước đó'
+  );
+  await p.click('#btnPick-' + T);
+  await p.waitForTimeout(700);
+  await p.keyboard.press('Control+k');
+  await p.waitForTimeout(500);
+  const overlayHidden = await p.evaluate(() => document.querySelector('.gs-overlay').hidden);
+  await p.keyboard.type('xe');
+  const inModal = await p.evaluate(() => document.getElementById('pickModal').contains(document.activeElement));
+  check(overlayHidden && inModal, 'Ctrl+K khi hộp thoại đang mở: không mở tìm kiếm chồng lên; tiêu điểm và chữ gõ vẫn ở trong hộp thoại');
+  await p.keyboard.press('Escape');
+  await p.waitForTimeout(400);
+  await p.keyboard.press('Escape');
+  await p.waitForTimeout(700);
   check(errs.length === 0, 'không có lỗi script' + (errs.length ? ': ' + errs.slice(0, 2).join(' | ') : ''));
   await browser.close();
   if (failures.length) {

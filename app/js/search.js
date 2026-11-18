@@ -242,6 +242,7 @@
 
   /* ===================== Giao diện ===================== */
   let ov = null,
+    prevFocus = null,
     inp = null,
     box = null,
     idxCache = null,
@@ -294,6 +295,8 @@
           if (!ov.hidden) render();
         })
         .catch(() => {});
+    const a = document.activeElement;
+    if (ov.hidden) prevFocus = a && a !== document.body && !ov.contains(a) ? a : null; // nhớ vị trí để trả tiêu điểm khi đóng
     ov.hidden = false;
     document.body.classList.add('gs-open');
     inp.value = q == null ? inp.value : q;
@@ -308,6 +311,15 @@
     if (ov) {
       ov.hidden = true;
       document.body.classList.remove('gs-open');
+      const a = prevFocus;
+      prevFocus = null;
+      if (a && document.contains(a) && !a.disabled && a.getClientRects().length) {
+        try {
+          a.focus({ preventScroll: true });
+        } catch (e) {
+          /* phần tử không nhận tiêu điểm */
+        }
+      }
     }
   }
 
@@ -463,6 +475,8 @@
   function init() {
     document.addEventListener('keydown', (e) => {
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && String(e.key).toLowerCase() === 'k') {
+        // Đang có hộp thoại: bẫy tiêu điểm của hộp thoại sẽ giật tiêu điểm khỏi ô tìm (gõ nhầm ô) → không mở tìm kiếm chồng lên
+        if (document.querySelector('.modal.show') && (!ov || ov.hidden)) return;
         e.preventDefault();
         ov && !ov.hidden ? close() : open();
       }
