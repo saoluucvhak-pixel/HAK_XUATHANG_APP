@@ -39,18 +39,15 @@ const skip = (msg) => {
   skipped.push(msg);
 };
 let pdfjs = null;
+let pdfjsReady = Promise.resolve();
 if (process.env.HAK_ACCEPT_NO_PDF !== '1') {
-  // pdfjs-dist in cảnh báo về `canvas` (chỉ cần khi vẽ trang, không cần để đọc chữ) → tắt trong lúc nạp
-  const { log, warn } = console;
-  console.log = console.warn = () => {};
-  try {
-    pdfjs = require('pdfjs-dist/legacy/build/pdf.js');
-  } catch (e) {
-    pdfjs = null;
-  } finally {
-    console.log = log;
-    console.warn = warn;
-  }
+  pdfjsReady = import('pdfjs-dist/legacy/build/pdf.mjs')
+    .then((module) => {
+      pdfjs = module;
+    })
+    .catch(() => {
+      pdfjs = null;
+    });
 } // HAK_ACCEPT_NO_PDF=1: giả lập thiếu công cụ đọc PDF (để thử chế độ --release phải báo lỗi)
 /** Chữ trong DOCX: đọc word/document.xml bằng JSZip (không cần unzip). */
 const docxText = async (file) => {
@@ -62,7 +59,12 @@ const docxText = async (file) => {
 /** Đọc lại PDF bằng pdfjs: chữ từng trang, khổ trang và phần chữ có tràn ra ngoài lề trang không. */
 const readPdf = async (file) => {
   if (!pdfjs) throw new Error('thiếu pdfjs-dist (chạy npm ci)');
-  const doc = await pdfjs.getDocument({ data: new Uint8Array(fs.readFileSync(file)), useSystemFonts: true, verbosity: 0 }).promise;
+  const doc = await pdfjs.getDocument({
+    data: new Uint8Array(fs.readFileSync(file)),
+    useSystemFonts: true,
+    isEvalSupported: false,
+    verbosity: 0,
+  }).promise;
   const pages = [];
   for (let i = 1; i <= doc.numPages; i++) {
     const pg = await doc.getPage(i),
@@ -128,6 +130,7 @@ async function login(p) {
 }
 
 (async () => {
+  await pdfjsReady;
   const exe = process.env.HAK_CHROMIUM || undefined,
     channel = process.env.HAK_BROWSER_CHANNEL || undefined;
   const browser = await chromium.launch(exe ? { executablePath: exe, args: ['--no-sandbox'] } : channel ? { channel } : {});

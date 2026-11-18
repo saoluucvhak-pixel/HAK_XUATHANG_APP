@@ -12,6 +12,7 @@ Nền mã nguồn là main `f60f9f8` (v2.22.0). Bản vá sửa bước chốt �
 - 515/515 kiểm thử tự động đạt. Có ca đóng năm, sai file cân, phiên bản sổ cũ và cửa sổ khác thay đợt giữa lúc đọc và ghi.
 - Biên dịch HAKDocs C# từ nguồn trên Windows. Hợp đồng HTTP với winsqlite3 đạt 16/16 ca.
 - Bản vá Đóng năm chạy trên HAKDocs thật: giữ hồ sơ năm khác, xóa đúng đợt và file gốc, tăng phiên bản sổ.
+- PDF.js cho công cụ nghiệm thu nâng từ 3.11.174 lên 4.8.69; npm audit sau cập nhật đạt 0 lỗ hổng.
 - `accept:release` trên Edge và HAKDocs SQLite thật đạt 27/27, 0 bỏ qua. Đọc lại DOCX/XLSX/PDF; kiểm tra hai tàu, xe trả về, thuế, toàn vẹn cha–con và PDF 140 dòng nhiều trang.
 
 ## Phát hành
