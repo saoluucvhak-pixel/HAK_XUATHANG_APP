@@ -80,12 +80,25 @@ Module._load = function (request) {
           r.fulfill({ contentType: 'application/javascript', body: "window.HAK_DOCS_TOKEN='" + TOKEN + "';" })
         );
         // Chẩn đoán khi lỗi: lỗi console, yêu cầu /db/ bị từ chối hoặc chậm > 3 giây (để biết lỗi nằm ở máy chủ hay ở trang).
+        // HAKDocs thật mở hộp Lưu của Windows cho /save-download (không ai bấm trên CI → treo). Bộ thử trả lỗi để app tự rơi về tải qua trình duyệt
+        // (đường dự phòng có sẵn của word.js). Hộp Lưu thật chỉ kiểm bằng tay (docs/NGHIEM_THU_SQLITE.md).
+        await c.route('**/save-download', (r) =>
+          r.fulfill({
+            status: 503,
+            contentType: 'application/json',
+            headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*' },
+            body: JSON.stringify({ error: 'bộ thử tự động không mở hộp Lưu của Windows' }),
+          })
+        );
         c.on('page', (pg) => {
           pg.on('console', (m) => {
-            if (m.type() === 'error' || m.type() === 'warning') console.log('[e2e-sqlite] console.' + m.type() + ': ' + m.text().slice(0, 300));
+            if (m.type() === 'error' || m.type() === 'warning')
+              console.log('[e2e-sqlite] console.' + m.type() + ': ' + m.text().slice(0, 300));
           });
           pg.on('pageerror', (e) => console.log('[e2e-sqlite] pageerror: ' + String(e.message).slice(0, 300)));
-          pg.on('requestfailed', (r) => console.log('[e2e-sqlite] request lỗi: ' + r.method() + ' ' + r.url().slice(0, 120) + ' ' + (r.failure() || {}).errorText));
+          pg.on('requestfailed', (r) =>
+            console.log('[e2e-sqlite] request lỗi: ' + r.method() + ' ' + r.url().slice(0, 120) + ' ' + (r.failure() || {}).errorText)
+          );
           pg.on('response', async (r) => {
             if (!/\/db\//.test(r.url())) return;
             if (r.status() >= 400) {
