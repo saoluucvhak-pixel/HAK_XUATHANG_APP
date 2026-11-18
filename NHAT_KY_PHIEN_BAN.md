@@ -6,6 +6,7 @@
 - Test mới: `data-audit`, `report-reconcile` (mô hình màn hình ↔ Excel), cấu hình bộ cài. Không đổi công thức, giao diện hay cách lưu dữ liệu.
 
 ## v2.22.0 — Bản Windows lưu dữ liệu bằng SQLite (chưa phát hành)
+- **Kiểm chứng trên Windows thật (CI):** `HAKDocs.exe` biên dịch bằng `csc`, bộ hợp đồng CSDL, và nghiệm thu Edge trên SQLite (27 ca) đạt. HAKDocs nhận kết nối ngay (trước đó chờ 200 ms mỗi lần); app thử lại yêu cầu đọc khi lỗi mạng tạm thời.
 - **Nơi lưu:** bản Windows (có HAKDocs) có thể chuyển nguồn dữ liệu chính sang **SQLite** do HAKDocs giữ tại `%LOCALAPPDATA%\HAK_XUATHANG\data\hak.db` — nằm NGOÀI thư mục cài, không phụ thuộc trình duyệt / profile; nâng cấp và gỡ chương trình **không xóa** dữ liệu (trình gỡ nhắc đường dẫn). Bản HTML / portable (không HAKDocs) **giữ IndexedDB**. Thanh bên luôn hiện "Dữ liệu: SQLite / Trình duyệt / BỊ CHẶN".
 - **Chuyển dữ liệu có đối chiếu** (Cài đặt › Chung › "Nơi lưu dữ liệu"): ① sao lưu ZIP và đọc lại để xác minh → ② chụp nhất quán → ③ nhập vào SQLite (chưa kích hoạt, chạy lặp được) → ④ đối chiếu từng bản ghi, tệp (SHA-256), tổng kg / MT / thuế / số dòng, khóa ngoại → ⑤ kích hoạt. Sai lệch báo theo mã bản ghi nguồn; dữ liệu nguồn hỏng dừng trước khi ghi. **Quay lui** về IndexedDB bất cứ lúc nào (IndexedDB cũ không bị xóa; dữ liệu phát sinh sau khi chuyển chỉ có ở SQLite — xuất bằng "Sao lưu toàn bộ" rồi "Nhập bổ sung").
 - **Mất kết nối / DB bị thay sau khi đã dùng SQLite → app BỊ CHẶN** (màn hình báo lỗi), không lặng lẽ quay về IndexedDB cũ để tránh sửa nhầm nguồn.

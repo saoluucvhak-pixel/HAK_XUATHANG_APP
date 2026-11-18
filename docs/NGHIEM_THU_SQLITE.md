@@ -39,10 +39,10 @@ Loại dữ liệu: **M** = dữ liệu mẫu tự sinh (không dùng dữ liệ
 | Cùng 5 kịch bản trên | **SQL** | M | **Đạt** (accept 27/27); toàn vẹn SQLite (`integrity_check` + `foreign_key_check`) đạt sau mỗi lần |
 | Di trú qua giao diện (`tools/e2e-migrate.cjs`, 35 kiểm tra) | IDB → SQL | M | **Đạt** |
 | Bộ hợp đồng HTTP `tools/hakdb/contract.cjs` | SQL (tham chiếu) | M | **Đạt** |
-| Bộ hợp đồng HTTP trên **`HAKDocs.exe`** | HAKDocs thật | — | **Chưa xác minh** |
-| Biên dịch `HakDb.cs` / `HAKDocs.cs` | — | — | **Chưa xác minh** (không có `csc`); chỉ kiểm **cú pháp** bằng tree-sitter: 0 lỗi |
+| Bộ hợp đồng HTTP trên **`HAKDocs.exe`** | HAKDocs thật (Windows Server 2025, thư mục dữ liệu có dấu tiếng Việt) | M | **Đạt** — bước CI thành công; lần đọc log đầy đủ trước đó: 16/16 ca ([run 215](https://github.com/saoluucvhak-pixel/HAK_XUATHANG_APP/actions/runs/44221834487)); run 218 đạt lại sau khi đổi vòng nhận kết nối |
+| Biên dịch `HakDb.cs` / `HAKDocs.cs` | `csc` trên CI Windows | — | **Đạt** ([run 218](https://github.com/saoluucvhak-pixel/HAK_XUATHANG_APP/actions/runs/44226779915)); trước đó chỉ kiểm cú pháp bằng tree-sitter |
 | Bộ cài NSIS (biên dịch bằng `makensis` Linux, test cấu hình giữ dữ liệu) | — | — | **Đạt** (biên dịch + test); cài / nâng cấp / gỡ thật: **Chưa xác minh** |
-| Edge Windows với SQLite | HAKDocs thật | — | **Chưa xác minh** |
+| Edge Windows với SQLite | HAKDocs.exe thật + Edge 156 | M | **Đạt**: `e2e:customs` và `accept:release` (27/27 ca, mã thoát 0; 125 yêu cầu `/db/`, tổng 3,4 giây) — [run 218](https://github.com/saoluucvhak-pixel/HAK_XUATHANG_APP/actions/runs/44226779915, commit `985c14c`). Hộp **Lưu của Windows** (`/save-download`) KHÔNG được kiểm tự động (bộ thử trả lỗi để app tải qua trình duyệt): kiểm tay, mục S5 |
 | Dữ liệu thật của người dùng | — | thật | **Chưa xác minh** (chưa có bản sao lưu) |
 
 Phủ theo yêu cầu (kiểm thử đơn vị / tích hợp, đều ở Linux, dữ liệu mẫu):
@@ -153,3 +153,11 @@ node tools/e2e-migrate.cjs                            # di trú qua giao diện 
 node tools/hakdb/contract.cjs http://127.0.0.1:31879 <token>   # bộ hợp đồng trên HAKDocs.exe thật (Windows)
 node tools/bench-sqlite-backend.cjs all kq.json       # đo hiệu năng
 ```
+
+
+## Phụ lục: lỗi tìm được khi chạy trên HAKDocs.exe thật (CI Windows, runs 215 → 218)
+| Triệu chứng | Nguyên nhân | Xử lý |
+|---|---|---|
+| Xuất Word hết giờ chờ tải | Với HAKDocs đang chạy, `word.js` gọi `/save-download` → hộp Lưu native chờ người bấm (CI không có) | Bộ thử chặn `/save-download` (app tự rơi về tải qua trình duyệt); hộp Lưu thật chỉ kiểm tay |
+| `net::ERR_NO_BUFFER_SPACE` ở `/db/query`; màn duyệt giấy nộp tiền biến mất | Vòng nhận kết nối của HAKDocs chờ 200 ms mỗi lần không có kết nối đang chờ (mỗi yêu cầu bị trễ, hàng đợi dồn) | `HAKDocs.cs`: nhận ngay bằng `Poll`, hàng đợi 512; app thử lại tối đa 3 lần cho yêu cầu ĐỌC (`/db/query`, `/db/check`); yêu cầu ghi không thử lại |
+Nguyên nhân thứ hai được suy ra từ triệu chứng và xác nhận gián tiếp (cùng kịch bản đạt sau khi sửa); chưa đo riêng từng thay đổi.

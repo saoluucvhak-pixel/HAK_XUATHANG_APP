@@ -126,7 +126,7 @@ Ký hiệu: **ĐK** = đã kiểm chứng bằng test / e2e chạy được trê
 | Backend trong app | `HAK.DB` / `Archive` / Danh mục / Sổ năm / đợt Excel / nhật ký / tệp đính kèm / mẫu trên SQLite; chặn khi mất nguồn; nhãn nơi lưu | ĐK: 18 + 6 test; e2e-flow, carrier, reports, customs, accept:release chạy trên SQLite với Chromium thật |
 | Phần chiếu quan hệ Danh mục | bảng cha–con từ tài liệu, mồ côi → quarantine, nhật ký | ĐK: 6 + 5 test; e2e-customs điền đủ bảng |
 | Di trú / đối chiếu / kích hoạt / quay lui | ĐK: 10 test + `tools/e2e-migrate.cjs` qua giao diện (Chromium thật) |
-| HAKDocs C# (`HakDb.cs`, `/db/*`) | cài đặt cùng hợp đồng | **CXM**: chỉ kiểm cú pháp (tree-sitter); chưa biên dịch / chạy; CI Windows (`accept-windows`) đã được thêm bước biên dịch + bộ hợp đồng + e2e trên Edge nhưng **chưa chạy** (chưa đẩy nhánh) |
+| HAKDocs C# (`HakDb.cs`, `/db/*`) | cài đặt cùng hợp đồng | **ĐK trên Windows thật**: biên dịch `csc`, bộ hợp đồng, Edge + e2e:customs + accept:release trên SQLite ([run 218](https://github.com/saoluucvhak-pixel/HAK_XUATHANG_APP/actions/runs/44226779915). Chưa kiểm: hộp Lưu native, cài / nâng cấp / gỡ thật |
 | Bộ cài | thư mục dữ liệu ngoài thư mục cài, lời nhắn khi gỡ | ĐK: biên dịch bằng makensis (Linux) + test cấu hình; **CXM**: cài mới / nâng cấp / gỡ thật |
 | Chỉ mục phiếu `archive_tickets` | bảng có | **CL** (xem Q-1) |
 | Trạng thái hồ sơ (Nháp / Đã lưu / Đã xuất / Đã đóng), `record_versions`, mẫu Word có phiên bản, cấp số chứng từ | | **CL** (cấp số: cần Q-2) |
