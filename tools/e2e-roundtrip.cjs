@@ -4,6 +4,7 @@
  * và trên SQLite (máy chủ tham chiếu):  node tools/e2e-sqlite.cjs tools/e2e-roundtrip.cjs. Dữ liệu 100% giả lập. */
 const { chromium } = require('playwright');
 const path = require('node:path');
+const fs = require('node:fs');
 const APP = 'file://' + path.resolve(__dirname, '../app/index.html');
 const failures = [];
 const check = (c, m) => {
@@ -41,71 +42,76 @@ async function login(p) {
   p.on('pageerror', (e) => errs.push(e.message));
   p.on('dialog', (d) => d.accept());
   await login(p);
+  // Khôi phục CHÉO backend: HAK_RT_EXPORT=<tệp> (dựng dữ liệu, ghi sao lưu + ảnh chụp rồi thoát) · HAK_RT_IMPORT=<tệp> (máy trống, khôi phục từ tệp đó). Xem e2e-roundtrip-cross.cjs.
+  const EXPORT = process.env.HAK_RT_EXPORT,
+    IMPORT = process.env.HAK_RT_IMPORT;
 
-  console.log('0) Dựng dữ liệu: hợp đồng + tờ khai + 2 hồ sơ Lưu trữ (một hồ sơ có phiếu KL ≤ 0 đã loại)');
-  await p.evaluate(async () => {
-    const M = HAK.ContractModel,
-      CM = HAK.CustomsModel,
-      d = HAK.Catalog.core.get();
-    d.customers = (d.customers || []).concat([
-      { id: 'k-hak', companyId: 'hak', name: 'HAK' },
-      { id: 'k-iwc', companyId: 'hak', name: 'IWC' },
-    ]);
-    const c = M.parent({
-      type: 'xuatkhau',
-      no: 'HD-RT',
-      date: '2026-05-20',
-      contractQty: 2000,
-      priceUsd: 150,
-      currency: 'USD',
-      details: [],
-      exporterId: 'k-hak',
-      buyerId: 'k-iwc',
+  if (!IMPORT) {
+    console.log('0) Dựng dữ liệu: hợp đồng + tờ khai + 2 hồ sơ Lưu trữ (một hồ sơ có phiếu KL ≤ 0 đã loại)');
+    await p.evaluate(async () => {
+      const M = HAK.ContractModel,
+        CM = HAK.CustomsModel,
+        d = HAK.Catalog.core.get();
+      d.customers = (d.customers || []).concat([
+        { id: 'k-hak', companyId: 'hak', name: 'HAK' },
+        { id: 'k-iwc', companyId: 'hak', name: 'IWC' },
+      ]);
+      const c = M.parent({
+        type: 'xuatkhau',
+        no: 'HD-RT',
+        date: '2026-05-20',
+        contractQty: 2000,
+        priceUsd: 150,
+        currency: 'USD',
+        details: [],
+        exporterId: 'k-hak',
+        buyerId: 'k-iwc',
+      });
+      const A = M.child(c.id, { ship: 'TÀU RTA', certNo: 'CT-RTA', bdmt: 1000, mt: 2000, exchangeRate: 26000 });
+      const B = M.child(c.id, { ship: 'TÀU RTB', bdmt: 0, mt: 0, exchangeRate: 26000 });
+      c.details.push(A, B);
+      d.contracts.push(c);
+      d.customs = d.customs || [];
+      d.customs.push(CM.newDecl({ no: '308629708001', contractId: c.id, detailId: A.id, status: 'cleared', openDate: '2026-06-01' }));
+      await HAK.Catalog.persist();
+      const mk = (h, n, kg) =>
+        Array.from({ length: n }, (_, i) => ({
+          idx: i + 2,
+          uid: 'u' + h + i,
+          ticket: 'RT' + h + '-' + i,
+          plate: '43C-' + (1000 + i),
+          driver: '',
+          carrier: '',
+          wh: '',
+          weightType: '',
+          weigher: '',
+          note: '',
+          warn: [],
+          ts1: Date.UTC(2026, 5, 5 + h, 8, i),
+          ts2: null,
+          dateStr: String(5 + h).padStart(2, '0') + '/06/2026',
+          time1: '08:' + String(i).padStart(2, '0'),
+          time2: '',
+          tare: 10000,
+          gross: 10000 + kg,
+          net: kg,
+        }));
+      await HAK.Archive.save(
+        'xuatkhau',
+        { giaoId: 'hak', nhanId: 'k-iwc', ship: 'TÀU RTB', contractId: B.id, returned: [], filter: {} },
+        { files: [{ name: 'RT_B.docx' }], summary: {} },
+        { rows: mk(0, 10, 20000), excluded: [{ ticket: 'RT-BAD', plate: '43C-999', dateStr: '05/06/2026', net: -300 }] },
+        'word'
+      );
+      await HAK.Archive.save(
+        'uythac',
+        { giaoId: 'hak', nhanId: 'k-iwc', ship: 'TÀU RTX', returned: [], filter: {} },
+        { files: [{ name: 'RT_X.docx' }], summary: {} },
+        { rows: mk(1, 6, 21000) },
+        'word'
+      );
     });
-    const A = M.child(c.id, { ship: 'TÀU RTA', certNo: 'CT-RTA', bdmt: 1000, mt: 2000, exchangeRate: 26000 });
-    const B = M.child(c.id, { ship: 'TÀU RTB', bdmt: 0, mt: 0, exchangeRate: 26000 });
-    c.details.push(A, B);
-    d.contracts.push(c);
-    d.customs = d.customs || [];
-    d.customs.push(CM.newDecl({ no: '308629708001', contractId: c.id, detailId: A.id, status: 'cleared', openDate: '2026-06-01' }));
-    await HAK.Catalog.persist();
-    const mk = (h, n, kg) =>
-      Array.from({ length: n }, (_, i) => ({
-        idx: i + 2,
-        uid: 'u' + h + i,
-        ticket: 'RT' + h + '-' + i,
-        plate: '43C-' + (1000 + i),
-        driver: '',
-        carrier: '',
-        wh: '',
-        weightType: '',
-        weigher: '',
-        note: '',
-        warn: [],
-        ts1: Date.UTC(2026, 5, 5 + h, 8, i),
-        ts2: null,
-        dateStr: String(5 + h).padStart(2, '0') + '/06/2026',
-        time1: '08:' + String(i).padStart(2, '0'),
-        time2: '',
-        tare: 10000,
-        gross: 10000 + kg,
-        net: kg,
-      }));
-    await HAK.Archive.save(
-      'xuatkhau',
-      { giaoId: 'hak', nhanId: 'k-iwc', ship: 'TÀU RTB', contractId: B.id, returned: [], filter: {} },
-      { files: [{ name: 'RT_B.docx' }], summary: {} },
-      { rows: mk(0, 10, 20000), excluded: [{ ticket: 'RT-BAD', plate: '43C-999', dateStr: '05/06/2026', net: -300 }] },
-      'word'
-    );
-    await HAK.Archive.save(
-      'uythac',
-      { giaoId: 'hak', nhanId: 'k-iwc', ship: 'TÀU RTX', returned: [], filter: {} },
-      { files: [{ name: 'RT_X.docx' }], summary: {} },
-      { rows: mk(1, 6, 21000) },
-      'word'
-    );
-  });
+  }
   const snap = () =>
     p.evaluate(async () => {
       const list = (await HAK.Archive.list())
@@ -134,22 +140,31 @@ async function login(p) {
         trips: ids,
       };
     });
-  const S1 = await snap();
+  const S1 = IMPORT ? JSON.parse(fs.readFileSync(IMPORT + '.snap.json', 'utf8')) : await snap();
   check(S1.list.length === 2 && S1.list.some((x) => x.nonPosTrips === 1), 'có 2 hồ sơ Lưu trữ, một hồ sơ ghi 1 phiếu KL ≤ 0 đã loại');
   check(S1.contracts.join() === 'HD-RT:2' && S1.decls.length === 1, 'danh mục: 1 hợp đồng 2 chi tiết, 1 tờ khai');
   if (S1.trips) check(S1.trips.length === 1, 'nguồn TripDetails: 1 chi tiết đã có phiếu cân');
 
   console.log('1) Sao lưu toàn bộ → xóa hồ sơ + danh mục → khôi phục (thay thế)');
-  const text = await p.evaluate(async () => {
-    const b = await HAK.Backup.buildFull();
-    return b.parts.join('');
-  });
+  const text = IMPORT
+    ? fs.readFileSync(IMPORT, 'utf8')
+    : await p.evaluate(async () => {
+        const b = await HAK.Backup.buildFull();
+        return b.parts.join('');
+      });
+  if (EXPORT) {
+    fs.writeFileSync(EXPORT, text);
+    fs.writeFileSync(EXPORT + '.snap.json', JSON.stringify(S1));
+    console.log('  (đã ghi sao lưu + ảnh chụp: ' + EXPORT + ')');
+    await browser.close();
+    process.exit(failures.length ? 1 : 0);
+  }
   check(text.length > 1000 && /"archive":\[/.test(text), 'file sao lưu có phần hồ sơ (' + text.length + ' ký tự)');
   await p.evaluate(async () => {
     await HAK.Archive.closeVerified(await HAK.Archive.collectItems());
     const d = HAK.Catalog.core.get();
-    d.contracts.length = 0;
-    d.customs.length = 0;
+    if (d.contracts) d.contracts.length = 0; // máy trống (khôi phục chéo backend) chưa có hợp đồng
+    if (d.customs) d.customs.length = 0;
     await HAK.Catalog.persist();
   });
   const wiped = await snap();
