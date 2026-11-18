@@ -55,6 +55,18 @@ Var NewInstalled
 
 !insertmacro MUI_LANGUAGE "English"
 
+Function .onInit
+  SetErrorLevel 1
+FunctionEnd
+
+Function .onUserAbort
+  SetErrorLevel 1
+FunctionEnd
+
+Function un.onInit
+  SetErrorLevel 1
+FunctionEnd
+
 ;--------------------------------
 ; Cai dat
 

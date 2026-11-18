@@ -17,7 +17,7 @@ Kế thừa mã ứng dụng và các bản vá SQLite v2.22.1. Đợt nghiệm 
 
 1. Cài mới: kiểm phiên bản, native SQLite, lối tắt, đăng ký và loại tệp phát triển/khôi phục.
 2. Cài đè: bản mới đầy đủ, tệp người dùng tự thêm còn trong bản cũ được giữ lại.
-3. Đích là một tệp có sẵn: cài đặt thất bại với mã khác 0; tệp đó và đăng ký chương trình trước đó không đổi.
+3. Đích là một thư mục có tệp người dùng và không phải bản HAK: cài đặt thất bại với mã khác 0; tệp đó và đăng ký chương trình trước đó không đổi.
 4. Gỡ: không còn index/native và đăng ký; dữ liệu mẫu ngoài thư mục app không đổi SHA-256.
 5. Cài lại: đầy đủ chương trình, lối tắt và dữ liệu mẫu vẫn giữ nguyên.
 

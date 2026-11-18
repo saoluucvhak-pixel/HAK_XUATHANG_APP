@@ -55,11 +55,13 @@ try {
   if($previous.Count -ne 1){throw 'Expected exactly one preserved previous installation'}
   if((Get-Content (Join-Path $previous[0].FullName 'user-note.txt') -Raw) -ne 'preserve user-added files'){throw 'Previous user file was lost'}
   'PASS upgrade swaps complete application and preserves previous user files'
-  $occupied=Join-Path $root 'occupied-file'
-  [IO.File]::WriteAllText($occupied,'keep this file')
+  $occupied=Join-Path $root 'not a HAK installation'
+  New-Item -ItemType Directory -Path $occupied | Out-Null
+  $foreignFile=Join-Path $occupied 'user-file.txt'
+  [IO.File]::WriteAllText($foreignFile,'keep this file')
   $failed=Start-Process -FilePath $setup -ArgumentList "/S /D=$occupied" -WorkingDirectory $root -WindowStyle Hidden -Wait -PassThru
   if($failed.ExitCode -eq 0){throw 'Failed install reported success'}
-  if((Get-Content -LiteralPath $occupied -Raw) -ne 'keep this file'){throw 'Failed install changed destination file'}
+  if((Get-Content -LiteralPath $foreignFile -Raw) -ne 'keep this file'){throw 'Failed install changed destination file'}
   Verify-Install
   'PASS failed install returns nonzero, retains destination and registered application'
   $un=Start-Process -FilePath (Join-Path $install 'Uninstall.exe') -ArgumentList "/S _?=$install" -WorkingDirectory $root -WindowStyle Hidden -Wait -PassThru
