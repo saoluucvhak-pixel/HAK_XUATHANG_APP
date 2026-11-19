@@ -49,4 +49,10 @@ Các quy tắc dưới đây đã được **suy ra từ mã nguồn / tài li�
 ## Đợt rà soát vòng 2 (v2.22.4) — CHỜ XÁC NHẬN (chưa đổi hành vi)
 32. **Bộ lọc đã lưu có tách theo tài khoản / công ty / năm không? — CHỜ.** Hiện tại (đọc mã `app/libs/hak-smart-filter/core.js`, khóa `hak.sf.presets`): bộ lọc đã lưu chỉ tách theo **màn hình**, dùng chung cho mọi tài khoản, công ty và năm trên cùng một trình duyệt. Hệ quả: tài khoản bị giới hạn một công ty vẫn thấy TÊN và điều kiện (tên tàu, mã hợp đồng, kho…) của bộ lọc do tài khoản khác / công ty khác lưu; đổi công ty / năm thì điều kiện cũ chỉ "không còn khớp" (đã có cảnh báo hết hiệu lực, không rò dữ liệu phiếu). Đề xuất: tách khóa theo tài khoản (và công ty đang làm việc), giữ bộ lọc cũ làm "bộ lọc chung" chỉ đọc cho tới khi người dùng lưu lại. **Chưa làm vì đổi hành vi người dùng đang quen; chưa kiểm bằng kịch bản hai tài khoản trên trình duyệt (mới kết luận từ mã).**
 
+## Sao lưu & khôi phục — bố cục mới (v2.23.0) — ĐÃ XÁC NHẬN 19/11/2026
+
+33. **Hồ sơ thuộc tháng nào — ĐÃ XÁC NHẬN (19/11/2026): theo NGÀY CÂN.** Hồ sơ kéo dài qua 2 tháng thuộc tháng của ngày cân ĐẦU TIÊN (như cách tính Năm ở Báo cáo).
+34. **Nội dung bản sao lưu THEO THÁNG — ĐÃ XÁC NHẬN (19/11/2026):** hồ sơ Lưu trữ + đợt Excel + chứng từ của tháng **cùng hợp đồng / tờ khai / khách hàng mà các hồ sơ đó gắn tới**. Khôi phục tháng **chỉ nhập bổ sung** (không xóa / ghi đè tháng khác, không thay thế).
+35. **Tự sao lưu SQLite — ĐÃ XÁC NHẬN (19/11/2026):** mỗi ngày, giữ 30 bản (đổi được: ngày/tuần, số bản giữ); chạy ở lần mở app đầu tiên trong ngày + nút "Sao lưu SQLite ngay".
+
 **Chờ xác nhận: mục 32.** (Mục 1–16 xác nhận 17/11/2026; 17–24 giữ nguyên; 26–31 xác nhận 18/11/2026).

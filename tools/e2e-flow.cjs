@@ -245,7 +245,12 @@ async function login(p) {
 
   console.log('5) Lưu trữ và Báo cáo');
   const arch = await p.evaluate(async () => {
-    const l = await HAK.Archive.list();
+    // App lưu hồ sơ Lưu trữ bất đồng bộ SAU khi tải file xong: chờ tối đa 10 giây cho hồ sơ xuất hiện (máy chậm / SQLite); không xuất hiện thì vẫn lỗi.
+    let l = await HAK.Archive.list();
+    for (let i = 0; i < 50 && !l.length; i++) {
+      await new Promise((ok) => setTimeout(ok, 200));
+      l = await HAK.Archive.list();
+    }
     const d = await HAK.Archive.load(l[0].id);
     return {
       n: l.length,

@@ -182,8 +182,8 @@ const probe = () => {
   return out;
 };
 
-const TPL = ['period', 'breakdown', 'contracts', 'tax', 'exceptions'].map((id) => '#/report::' + id),
-  TPL_THEME = ['#/report::breakdown', '#/report::tax'];
+const TPL = ['period', 'breakdown', 'contracts', 'tax', 'exceptions'].map((id) => '#/report::' + id).concat(['#/settings::backup']),
+  TPL_THEME = ['#/report::breakdown', '#/report::tax', '#/settings::backup'];
 const ROUTES = [
   '#/home',
   '#/catalog',
@@ -210,7 +210,11 @@ const ROUTES = [
       location.hash = x;
     }, hash);
     await page.waitForTimeout(350);
-    if (tpl) {
+    if (tpl && hash === '#/settings') {
+      // 'settings::backup' = mở tab "Sao lưu & khôi phục" của Cài đặt
+      await page.evaluate((t) => document.querySelector('[data-bs-target="#tab-' + t + '"]').click(), tpl);
+      await page.waitForTimeout(1200);
+    } else if (tpl) {
       await page.selectOption('#repTpl', tpl);
       await page.waitForTimeout(1200);
     }

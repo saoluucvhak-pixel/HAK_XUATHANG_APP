@@ -94,16 +94,18 @@ Cả 7 trang có nút **📊 Xuất Excel** (cạnh nút Tải PDF) → tải fi
 - **Chứng từ đã lập** (bảng cuối trang Chứng từ xuất hàng): mỗi lần tạo PXKKVCNB / BKLS được ghi lại. Từ đó app:
   - cảnh báo khi dải số PXK chồng lên lần lập trước (cùng công ty), hoặc đợt này đã lập PXK rồi, hoặc số BKLS đã dùng cho đợt khác — nút đổi thành "⚠ Trùng số — bấm lại để vẫn tạo";
   - gợi ý số PXK bắt đầu tiếp theo và số BKLS kế tiếp (011/2026/BKLS sau 010/2026/BKLS).
-- Sao lưu toàn bộ (Cài đặt → Chung) đã gồm các đợt Excel và nhật ký chứng từ.
+- Sao lưu toàn bộ (Cài đặt → 💾 Sao lưu & khôi phục) đã gồm các đợt Excel và nhật ký chứng từ.
 
-## Bộ nhớ & sao lưu toàn bộ (⚙️ Cài đặt → Chung)
+## Sao lưu & khôi phục (⚙️ Cài đặt → 💾 Sao lưu & khôi phục, từ v2.23.0)
+- Tab có 6 khối: ① Tình trạng dữ liệu · ② Sao lưu ngay (Toàn bộ .zip · **Theo tháng .json** `HAK_Thang_MM-YYYY_xuat<ngày>.json` · SQLite .db, chỉ bản Windows) · ③ Khôi phục (MỘT nút, tự nhận file toàn bộ / tháng / năm; bản tháng chỉ **Nhập bổ sung**) · ④ Tự sao lưu định kỳ (JSON + SQLite: trạng thái, lần chạy cuối, lỗi cuối, Chạy ngay) · ⑤ Thư mục · ⑥ Sổ hồ sơ theo năm.
+- Tự sao lưu SQLite: mặc định mỗi ngày, giữ 30 bản; chỉ xóa tệp `HAK_SQLite_*.db` do app tạo; kiểm integrity_check bản vừa ghi.
 - Mọi cài đặt (công ty, kho, danh sách xe, mẫu Word, form) được **lưu 2 nơi**: localStorage và bản sao IndexedDB. Nếu localStorage bị xóa hoặc đầy, lần mở sau app tự khôi phục từ bản sao.
 - Không lưu được ở cả hai nơi thì app báo lỗi đỏ (trước đây im lặng).
 - **Sao lưu toàn bộ (.zip)** (từ v2.7.5; bản cũ là .json): cài đặt + danh sách xe + mẫu Word + đợt Excel + nhật ký chứng từ + Lưu trữ trong 1 file nén (bên trong là HAK_SaoLuuToanBo.json). Nút **⬆ Nhập / Khôi phục từ bản sao** nhận .zip, file .json cũ và file sao lưu riêng Lưu trữ. App kiểm tra bản sao TRƯỚC, hiện phạm vi (số mục, số hợp đồng khác nội dung, hợp đồng máy này mới hơn) rồi hỏi cách nhập:
   - **Nhập bổ sung** (khuyên dùng, mặc định): gộp theo phiên bản — máy 700 BDMT phiên bản 4 + bản sao 500 BDMT phiên bản 2 → giữ 700 / phiên bản 4; hợp đồng đã mở lại vẫn mở; cài đặt đang có không bị đè; nhập lặp lại cho cùng kết quả.
   - **Khôi phục (ghi đè)**: về đúng thời điểm sao lưu — cài đặt và danh mục hợp đồng bị thay bằng bản sao (kể cả khi máy này mới hơn). Hồ sơ Lưu trữ / đợt Excel / nhật ký vẫn gộp theo phiên bản, dữ liệu chỉ có trên máy này không bị xóa. Nút **↶ Hoàn tác khôi phục** trả lại phần cài đặt & danh mục.
   - **Nếu dừng giữa chừng** (lỗi bộ nhớ…): thông báo nêu kho đã nhập, kho chưa chạy, phần hoàn tác được (cài đặt & danh mục) và phần đã nằm trong IndexedDB (hồ sơ, đợt Excel, nhật ký — nhập lại cùng bản sao là an toàn). Sau khi xong trang tự tải lại.
-- **🔁 Tự sao lưu vào thư mục** (v2.7.5, Chrome/Edge, Quản trị cài): Cài đặt → Chung → Bộ nhớ & sao lưu → 📁 Chọn thư mục tự sao lưu (nên là thư mục Google Drive / OneDrive hoặc ổ D) → cho phép ghi → ▶ Sao lưu vào thư mục ngay. Mỗi ngày lần đầu mở app (sau ~20 giây) app ghi `HAK_TuDong_<yyyymmdd>_<hhmm>.zip`, đọc lại kiểm tra dung lượng, giữ 5/10/20/30 bản mới nhất (mặc định 10) — chỉ xóa file `HAK_TuDong_*.zip`, không đụng file khác. Trình duyệt hỏi lại quyền sau khi mở lại → Tổng quan có dòng 🔁 **Cho phép & sao lưu**. Cài đặt tự sao lưu gắn với máy (không đi theo file sao lưu / khôi phục).
+- **🔁 Tự sao lưu vào thư mục** (v2.7.5, Chrome/Edge, Quản trị cài): Cài đặt → 💾 Sao lưu & khôi phục → 📁 Chọn thư mục tự sao lưu (nên là thư mục Google Drive / OneDrive hoặc ổ D) → cho phép ghi → ▶ Sao lưu vào thư mục ngay. Mỗi ngày lần đầu mở app (sau ~20 giây) app ghi `HAK_TuDong_<yyyymmdd>_<hhmm>.zip`, đọc lại kiểm tra dung lượng, giữ 5/10/20/30 bản mới nhất (mặc định 10) — chỉ xóa file `HAK_TuDong_*.zip`, không đụng file khác. Trình duyệt hỏi lại quyền sau khi mở lại → Tổng quan có dòng 🔁 **Cho phép & sao lưu**. Cài đặt tự sao lưu gắn với máy (không đi theo file sao lưu / khôi phục).
 - **🩺 Sức khỏe dữ liệu** (Tổng quan): bộ nhớ trình duyệt, cài đặt (localStorage / 5 MB), số hồ sơ Lưu trữ (vàng khi > 1.500), sao lưu toàn bộ gần nhất (vàng > 7 ngày, đỏ > 14 ngày / chưa có), tự sao lưu (xanh khi đang bật và có quyền ghi, đỏ khi lỗi).
 - Lưu trữ **không tự xóa hồ sơ** (từ v2.7.4; bản cũ tự xóa khi quá 500). Nhiều hồ sơ thì dùng **📦 Xuất & dọn hồ sơ cũ** ở trang Lưu trữ. Nên sao lưu định kỳ, nhất là trước khi đổi máy / trình duyệt.
 

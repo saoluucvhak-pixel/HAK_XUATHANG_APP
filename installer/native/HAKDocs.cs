@@ -105,6 +105,32 @@ class HAKDocs {
  static HakDb GetDb(){lock(dbLock){if(dbInstance!=null)return dbInstance;string schema;using(var rs=Assembly.GetExecutingAssembly().GetManifestResourceStream("hak.schema.v1.sql"))using(var rd=new StreamReader(rs,Encoding.UTF8))schema=rd.ReadToEnd();dbInstance=HakDb.Open(Path.Combine(DataDir,"hak.db"),schema);/* CHỈ để CI / thử nghiệm: kích hoạt SQLite khi có HAK_DB_ACTIVATE=1 VÀ thư mục dữ liệu thử HAK_DATA_DIR; bản dùng thật không bao giờ tự kích hoạt (phải qua di trú có đối chiếu). */if(Environment.GetEnvironmentVariable("HAK_DB_ACTIVATE")=="1"&&!String.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("HAK_DATA_DIR"))&&dbInstance.Meta("active_backend")==null)dbInstance.SetMeta("active_backend","sqlite");return dbInstance;}}
  static Dictionary<string,object> DbErr(string code,string message,Dictionary<string,object> extra){var e=new Dictionary<string,object>{{"code",code},{"message",message}};if(extra!=null)foreach(var kv in extra)e[kv.Key]=kv.Value;return new Dictionary<string,object>{{"error",e}};}
  static string SafeBackupName(string raw){var n=System.Text.RegularExpressions.Regex.Replace(String.IsNullOrEmpty(raw)?"hak-"+DateTime.UtcNow.ToString("yyyyMMdd-HHmmss"):raw,"[^A-Za-z0-9._-]","_");n=System.Text.RegularExpressions.Regex.Replace(n,@"\.{2,}","_").TrimStart('.');if(n.Length>80)n=n.Substring(0,80);if(n.Length==0)n="backup";return n.EndsWith(".db")?n:n+".db";}
+ /* Sao lưu vào THƯ MỤC NGƯỜI DÙNG CHỌN — cùng hợp đồng với tools/hakdb/server.cjs (backupToDir): dir tuyệt đối, không có "..", tên HAK_SQLite_<yyyymmdd-HHMMSS>.db, kiểm integrity_check bản vừa ghi, xoay vòng chỉ xóa tệp đúng mẫu đó. (C# 5: không dùng cú pháp mới.) */
+ static readonly System.Text.RegularExpressions.Regex AutoBackupName=new System.Text.RegularExpressions.Regex(@"^HAK_SQLite_\d{8}-\d{6}\.db$");
+ static string SchemaSqlText(){using(var rs=Assembly.GetExecutingAssembly().GetManifestResourceStream("hak.schema.v1.sql"))using(var rd=new StreamReader(rs,Encoding.UTF8))return rd.ReadToEnd();}
+ static string FsReason(Exception e){if(e is UnauthorizedAccessException)return "không đủ quyền ghi";if(e is DirectoryNotFoundException||e is DriveNotFoundException)return "ổ đĩa hoặc thư mục cha không tồn tại";if(e is PathTooLongException)return "đường dẫn quá dài";if(e is IOException){int hr=e.HResult&0xFFFF;if(hr==112||hr==39)return "ổ đĩa đầy";if(hr==80||hr==183||hr==267)return "đường dẫn này là một tệp, không phải thư mục";}return "lỗi hệ thống tệp";}
+ static Dictionary<string,object> BackupToDir(HakDb db,Dictionary<string,object> data,string dir){
+  bool badDrive=dir.Length>=2&&dir[1]==':'&&(dir.Length<3||(dir[2]!='\\'&&dir[2]!='/'));
+  bool hasDots=false;foreach(var part in dir.Split(new char[]{'\\','/'},StringSplitOptions.RemoveEmptyEntries))if(part=="..")hasDots=true;
+  if(dir.IndexOf('\0')>=0||!Path.IsPathRooted(dir)||badDrive||hasDots)throw new HakDbException("bad-request","Thư mục sao lưu không hợp lệ: cần đường dẫn đầy đủ (ví dụ D:\\SaoLuu\\HAK), không chứa \"..\".");
+  string root=Path.GetFullPath(dir).TrimEnd(new char[]{'\\','/'});if(root.Length==2&&root[1]==':')root+="\\";
+  string given=(string)Get(data,"name","");
+  string name=(given!=null&&AutoBackupName.IsMatch(given))?given:"HAK_SQLite_"+DateTime.Now.ToString("yyyyMMdd-HHmmss")+".db";
+  string dest=Path.Combine(root,name);
+  try{Directory.CreateDirectory(root);string probe=Path.Combine(root,".hak-ghi-"+Guid.NewGuid().ToString("N"));File.WriteAllText(probe,"x");File.Delete(probe);}
+  catch(Exception e){throw new HakDbException("io","Không ghi được vào thư mục sao lưu \""+root+"\" ("+FsReason(e)+"). Chọn thư mục khác.");}
+  Dictionary<string,object> r;
+  try{r=db.Backup(dest);}
+  catch(HakDbException e){if(e.Code=="bad-request")throw;throw new HakDbException("io",(e.Message.IndexOf("disk",StringComparison.OrdinalIgnoreCase)>=0||e.Message.IndexOf("full",StringComparison.OrdinalIgnoreCase)>=0)?"Ổ đĩa đầy, không ghi được bản sao lưu. Giải phóng dung lượng hoặc chọn ổ khác.":"Không ghi được bản sao lưu ("+FsReason(e)+").");}
+  string integrity="ok";
+  try{using(var chk=HakDb.Open(dest,SchemaSqlText())){var c=chk.Check();if(!(bool)c["ok"])integrity="không đạt";}}catch(Exception e){integrity="không mở được: "+e.Message;}
+  if(integrity!="ok"){try{File.Delete(dest);}catch{}throw new HakDbException("io","Bản sao lưu vừa ghi không đạt kiểm tra toàn vẹn ("+integrity+"), đã xóa bản đó. Dữ liệu gốc không bị ảnh hưởng.");}
+  var removed=new List<string>();int keep=0;try{keep=Convert.ToInt32(Get(data,"keep",0));}catch{keep=0;}
+  if(keep>=1){var mine=new List<string>();foreach(var f in Directory.GetFiles(root)){var n=Path.GetFileName(f);if(AutoBackupName.IsMatch(n))mine.Add(n);}
+   mine.Sort(StringComparer.Ordinal);mine.Reverse();
+   for(int i=keep;i<mine.Count;i++){try{File.Delete(Path.Combine(root,mine[i]));removed.Add(mine[i]);}catch{}}}
+  var res=new Dictionary<string,object>();foreach(var kv in r)res[kv.Key]=kv.Value;res["integrity"]=integrity;res["removed"]=removed;res["dir"]=root;res["keep"]=keep;return res;
+ }
  static async Task HandleDb(Stream stream,string method,string path,Dictionary<string,string> headers,bool cors){
   int code=200;object resp=null;
   try{
@@ -126,7 +152,7 @@ class HAKDocs {
      else if(path=="/db/query")resp=db.Query(data,ses.Scope);
      else if(path=="/db/check")resp=db.Check();
      else if(path=="/db/activate"||path=="/db/deactivate"||path=="/db/reset"){if(ses.Scope!=null)throw new HakDbException("scope","Chỉ tài khoản toàn quyền được đổi nguồn dữ liệu");resp=path=="/db/activate"?db.Activate(Get(data,"expected",null) as Dictionary<string,object>):path=="/db/deactivate"?db.Deactivate():db.Reset();}
-     else if(path=="/db/backup"){if(ses.Scope!=null)throw new HakDbException("scope","Chỉ tài khoản toàn quyền mới sao lưu toàn bộ cơ sở dữ liệu");resp=db.Backup(Path.Combine(DataDir,"backups",SafeBackupName((string)Get(data,"name",""))));}
+     else if(path=="/db/backup"){if(ses.Scope!=null)throw new HakDbException("scope","Chỉ tài khoản toàn quyền mới sao lưu toàn bộ cơ sở dữ liệu");var bdir=Get(data,"dir",null) as string;resp=String.IsNullOrEmpty(bdir)?db.Backup(Path.Combine(DataDir,"backups",SafeBackupName((string)Get(data,"name","")))):BackupToDir(db,data,bdir);}
      else{code=404;resp=DbErr("bad-request","Không có điểm cuối "+path,null);}
     }
    }

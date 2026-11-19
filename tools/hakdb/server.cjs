@@ -14,6 +14,84 @@ const MAX_BODY = 36 * 1024 * 1024;
 const SESSION_TTL = 8 * 3600 * 1000;
 const STATUS = { 'bad-request': 400, scope: 403, conflict: 409, fk: 409, unique: 409, io: 500 };
 
+const AUTO_NAME = /^HAK_SQLite_\d{8}-\d{6}\.db$/;
+const pad2 = (n) => String(n).padStart(2, '0');
+const localStamp = (d) =>
+  d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate()) + '-' + pad2(d.getHours()) + pad2(d.getMinutes()) + pad2(d.getSeconds());
+/**
+ * Sao lưu vào THƯ MỤC NGƯỜI DÙNG CHỌN (Thư mục sao lưu SQLite): dir phải là đường dẫn tuyệt đối, không có "..", không ghi ra ngoài dir.
+ * Tên tệp luôn là HAK_SQLite_<yyyymmdd-HHMMSS>.db (body.name chỉ được dùng nếu ĐÚNG mẫu đó). Ghi xong mở lại tệp chạy integrity_check (không đạt → xóa bản vừa ghi, báo lỗi).
+ * body.keep (số nguyên ≥ 1): xoay vòng — chỉ XÓA tệp khớp mẫu HAK_SQLite_<yyyymmdd-HHMMSS>.db trong dir, giữ keep bản mới nhất; tệp khác không bao giờ bị đụng.
+ */
+/** Lý do tiếng Việt cho lỗi hệ thống tệp (không đưa mã / thông báo tiếng Anh của hệ điều hành cho người dùng). */
+function fsReason(e) {
+  const c = e && e.code;
+  if (c === 'EACCES' || c === 'EPERM' || c === 'EROFS') return 'không đủ quyền ghi';
+  if (c === 'ENOSPC') return 'ổ đĩa đầy';
+  if (c === 'ENOENT') return 'ổ đĩa hoặc thư mục cha không tồn tại';
+  if (c === 'EEXIST' || c === 'ENOTDIR') return 'đường dẫn này là một tệp, không phải thư mục';
+  if (c === 'ENAMETOOLONG') return 'đường dẫn quá dài';
+  return 'lỗi hệ thống tệp';
+}
+function backupToDir(db, body, clean) {
+  const dir = String(body.dir);
+  if (dir.indexOf('\0') >= 0 || !path.isAbsolute(dir) || dir.split(/[\\/]+/).includes('..'))
+    throw new HakDbError('bad-request', 'Thư mục sao lưu không hợp lệ: cần đường dẫn đầy đủ (ví dụ D:\\SaoLuu\\HAK), không chứa "..".');
+  const root = path.resolve(dir);
+  const name = body.name && AUTO_NAME.test(String(body.name)) ? String(body.name) : 'HAK_SQLite_' + localStamp(new Date()) + '.db';
+  const dest = path.join(root, clean(name));
+  if (path.dirname(dest) !== root) throw new HakDbError('bad-request', 'Tên tệp sao lưu không hợp lệ.');
+  try {
+    fs.mkdirSync(root, { recursive: true });
+    fs.accessSync(root, fs.constants.W_OK);
+  } catch (e) {
+    throw new HakDbError('io', 'Không ghi được vào thư mục sao lưu "' + root + '" (' + fsReason(e) + '). Chọn thư mục khác.');
+  }
+  let r;
+  try {
+    r = db.backup(dest);
+  } catch (e) {
+    if (e instanceof HakDbError && e.code === 'bad-request') throw e;
+    const full = e && /ENOSPC|disk|full/i.test(String(e.message));
+    throw new HakDbError(
+      'io',
+      full
+        ? 'Ổ đĩa đầy, không ghi được bản sao lưu. Giải phóng dung lượng hoặc chọn ổ khác.'
+        : 'Không ghi được bản sao lưu (' + fsReason(e) + ').'
+    );
+  }
+  const integrity = HakDb.integrityOfFile(dest);
+  if (integrity !== 'ok') {
+    try {
+      fs.rmSync(dest, { force: true });
+    } catch (e) {
+      /* bỏ qua */
+    }
+    throw new HakDbError(
+      'io',
+      'Bản sao lưu vừa ghi không đạt kiểm tra toàn vẹn (' + integrity + '), đã xóa bản đó. Dữ liệu gốc không bị ảnh hưởng.'
+    );
+  }
+  const removed = [];
+  const keep = Number.isInteger(body.keep) && body.keep >= 1 ? body.keep : 0;
+  if (keep) {
+    const mine = fs
+      .readdirSync(root)
+      .filter((f) => AUTO_NAME.test(f))
+      .sort()
+      .reverse();
+    for (const f of mine.slice(keep)) {
+      try {
+        fs.rmSync(path.join(root, f), { force: true });
+        removed.push(f);
+      } catch (e) {
+        /* không xóa được thì thôi — không làm hỏng việc sao lưu */
+      }
+    }
+  }
+  return Object.assign({}, r, { integrity, removed, dir: root, keep });
+}
+
 function createServer(opt) {
   const dataDir = path.resolve(opt.dataDir);
   const token = opt.token || crypto.randomBytes(16).toString('hex');
@@ -150,12 +228,18 @@ function createServer(opt) {
       }
       if (url === '/db/backup') {
         if (s.scope !== null) throw new HakDbError('scope', 'Chỉ tài khoản toàn quyền mới sao lưu toàn bộ cơ sở dữ liệu');
-        const name = String(body.name || 'hak-' + new Date().toISOString().replace(/[:.]/g, '-'))
-          .replace(/[^A-Za-z0-9._-]/g, '_')
-          .replace(/\.{2,}/g, '_')
-          .replace(/^\.+/, '')
-          .slice(0, 80);
-        return reply(res, 200, db.backup(path.join(dataDir, 'backups', name.endsWith('.db') ? name : name + '.db')), cors);
+        const clean = (raw) =>
+          String(raw)
+            .replace(/[^A-Za-z0-9._-]/g, '_')
+            .replace(/\.{2,}/g, '_')
+            .replace(/^\.+/, '')
+            .slice(0, 80);
+        if (body.dir === undefined || body.dir === null || body.dir === '') {
+          // như trước: tệp trong <data-dir>/backups với tên đã lọc
+          const name = clean(body.name || 'hak-' + new Date().toISOString().replace(/[:.]/g, '-'));
+          return reply(res, 200, db.backup(path.join(dataDir, 'backups', name.endsWith('.db') ? name : name + '.db')), cors);
+        }
+        return reply(res, 200, backupToDir(db, body, clean), cors);
       }
       code = 404;
       return reply(res, 404, { error: { code: 'bad-request', message: 'Không có điểm cuối ' + url } }, cors);

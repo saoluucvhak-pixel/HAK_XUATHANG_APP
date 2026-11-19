@@ -430,6 +430,26 @@ class HakDb {
     }
     return { path: dest, sha256: sha256File(dest), size: fs.statSync(dest).size, schema: this.schemaVersion() };
   }
+  /** Mở TỆP sao lưu (chỉ đọc) và chạy integrity_check: trả 'ok' hoặc chuỗi lỗi đầu tiên. Dùng để xác nhận bản vừa ghi đọc lại được. */
+  static integrityOfFile(file) {
+    let d = null;
+    try {
+      d = new DatabaseSync(file, { readOnly: true });
+      const ic = d
+        .prepare('PRAGMA integrity_check')
+        .all()
+        .map((r) => Object.values(r)[0]);
+      return ic.length === 1 && ic[0] === 'ok' ? 'ok' : String(ic[0] || 'không rõ');
+    } catch (e) {
+      return 'không mở được: ' + e.message;
+    } finally {
+      try {
+        if (d) d.close();
+      } catch (e) {
+        /* bỏ qua */
+      }
+    }
+  }
   /** Kiểm tra toàn vẹn: integrity_check + foreign_key_check. */
   check() {
     const ic = this.db

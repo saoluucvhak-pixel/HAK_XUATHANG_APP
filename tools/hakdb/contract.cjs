@@ -2,6 +2,9 @@
  *   node tools/hakdb/contract.cjs http://127.0.0.1:31879 <token 32 hex>
  * Chỉ dùng HTTP + JSON nên không phụ thuộc cách cài đặt. Thoát mã 1 nếu có ca lỗi. Dữ liệu thử nằm trong các bảng của cơ sở dữ liệu ĐÍCH — chỉ chạy trên cơ sở dữ liệu thử. */
 const http = require('node:http');
+const fs = require('node:fs');
+const os = require('node:os');
+const nodePath = require('node:path');
 const { URL } = require('node:url');
 
 async function run(base, token, log) {
@@ -222,6 +225,63 @@ async function run(base, token, log) {
     eq(r.body.sha256.length, 64);
     eq((await call('POST', '/db/backup', { name: '../../' + name }, admin)).status, 400, 'không ghi đè');
     eq((await call('POST', '/db/check', {}, admin)).body.ok, true);
+  });
+  await t(
+    'sao lưu vào thư mục người dùng chọn: tên HAK_SQLite_*.db, đạt integrity_check, không ghi ra ngoài; đường dẫn xấu bị từ chối',
+    async () => {
+      const sameDir = (a, b) => {
+        const rp = (x) => fs.realpathSync.native(x).toLowerCase();
+        return rp(a) === rp(b);
+      };
+      const root = fs.mkdtempSync(nodePath.join(os.tmpdir(), 'hakdb-bk-'));
+      const dir = nodePath.join(root, 'SaoLuu SQLite');
+      eq((await call('POST', '/db/backup', { dir, auto: true }, hak)).status, 403, 'phiên giới hạn công ty không được sao lưu');
+      const r = await call('POST', '/db/backup', { dir, name: 'HAK_SQLite_20261119-010203.db' }, admin);
+      eq(r.status, 200);
+      eq(r.body.integrity, 'ok');
+      eq(nodePath.basename(r.body.path), 'HAK_SQLite_20261119-010203.db');
+      if (!sameDir(nodePath.dirname(r.body.path), dir)) throw new Error('ghi ra ngoài thư mục đã chọn: ' + r.body.path);
+      // tên không đúng mẫu bị bỏ, dùng tên tự đặt; không bao giờ thoát khỏi thư mục
+      const r2 = await call('POST', '/db/backup', { dir, name: '../../thoat' }, admin);
+      eq(r2.status, 200);
+      if (!/^HAK_SQLite_\d{8}-\d{6}\.db$/.test(nodePath.basename(r2.body.path)) || !sameDir(nodePath.dirname(r2.body.path), dir))
+        throw new Error('tên / vị trí không an toàn: ' + r2.body.path);
+      for (const bad of ['SaoLuu', '..\\..\\x', dir + nodePath.sep + '..' + nodePath.sep + 'x']) {
+        const b = await call('POST', '/db/backup', { dir: bad }, admin);
+        eq(b.status, 400, 'đường dẫn "' + bad + '" phải bị từ chối');
+        if (!/không hợp lệ/.test(b.body.error.message)) throw new Error('thông báo không rõ: ' + b.body.error.message);
+      }
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  );
+  await t('xoay vòng: giữ N bản mới nhất, CHỈ xóa HAK_SQLite_*.db; tệp khác trong thư mục không bị đụng', async () => {
+    const dir = fs.mkdtempSync(nodePath.join(os.tmpdir(), 'hakdb-rot-'));
+    for (const f of ['quan-trong.db', 'HAK_SQLite_ghi-chu.txt', 'HAK_SQLite_20261101-000000.db.bak', 'HAK_SQLite_x.db'])
+      fs.writeFileSync(nodePath.join(dir, f), 'giữ');
+    const stamps = ['20261101-000001', '20261102-000001', '20261103-000001', '20261104-000001'];
+    let last = null;
+    for (const st of stamps) last = await call('POST', '/db/backup', { dir, name: 'HAK_SQLite_' + st + '.db', keep: 2 }, admin);
+    eq(last.status, 200);
+    const left = fs.readdirSync(dir).sort();
+    eq(
+      left.filter((f) => /^HAK_SQLite_\d{8}-\d{6}\.db$/.test(f)),
+      ['HAK_SQLite_20261103-000001.db', 'HAK_SQLite_20261104-000001.db'],
+      'chỉ còn 2 bản mới nhất'
+    );
+    for (const f of ['quan-trong.db', 'HAK_SQLite_ghi-chu.txt', 'HAK_SQLite_20261101-000000.db.bak', 'HAK_SQLite_x.db'])
+      if (!left.includes(f)) throw new Error('đã xóa nhầm tệp ' + f);
+    eq(last.body.removed, ['HAK_SQLite_20261102-000001.db'], 'bản bị xoay vòng ở lần cuối');
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+  await t('thư mục không ghi được (đường dẫn là một TỆP) → lỗi tiếng Việt rõ, không để lại tệp nửa vời', async () => {
+    const dir = fs.mkdtempSync(nodePath.join(os.tmpdir(), 'hakdb-ro-'));
+    const file = nodePath.join(dir, 'la-mot-tep');
+    fs.writeFileSync(file, 'x');
+    const r = await call('POST', '/db/backup', { dir: file }, admin);
+    if (r.status < 400 || !/Không ghi được/.test((r.body.error || {}).message || ''))
+      throw new Error('mong đợi lỗi tiếng Việt, nhận ' + r.status + ' ' + JSON.stringify(r.body));
+    eq(fs.readdirSync(dir), ['la-mot-tep']);
+    fs.rmSync(dir, { recursive: true, force: true });
   });
   return out;
 }

@@ -128,6 +128,26 @@ const state = (p) =>
       'khóa cũ còn sau lần mở ' + n + ' (' + JSON.stringify(s) + ')'
     );
   }
+  if (first.backend === 'sqlite') {
+    console.log('4) SQLite: khóa lạ của nguồn khác KHÔNG bị đẩy vào file .db; khóa danh sách trắng được chuyển một lần');
+    await p.evaluate(() => {
+      HAK.Store.remove('hak.workingYear');
+      // giả lập dữ liệu còn sót của một nguồn khác trong localStorage (không có trong kv của file .db hiện tại)
+      localStorage.setItem('hak.ngoai.v1', JSON.stringify({ nguon: 'B' }));
+      localStorage.setItem('hak.workingYear', '2022');
+    });
+    await p.waitForTimeout(1500); // localStorage ghi ở tiến trình này cần thời gian lan sang trang mới sau khi tải lại
+    for (const n of [1, 2]) {
+      await reload(p);
+      const kv = await p.evaluate(async () => ((await HAK.Storage.call('/db/query', { table: 'kv' })).rows || []).map((r) => r.key));
+      const ls = await p.evaluate(() => [localStorage.getItem('hak.ngoai.v1'), localStorage.getItem('hak.workingYear')]);
+      check(!kv.includes('hak.ngoai.v1') && ls[0] === null, 'lần mở ' + n + ': khóa lạ không vào kv và bị xóa khỏi bản đệm');
+      check(
+        kv.includes('hak.workingYear') && (await state(p)).year === 2022,
+        'lần mở ' + n + ': khóa danh sách trắng đã chuyển vào kv (năm 2022)'
+      );
+    }
+  }
   check(errs.length === 0, 'không có lỗi script' + (errs.length ? ': ' + errs.slice(0, 2).join(' | ') : ''));
   await browser.close();
   if (failures.length) {
