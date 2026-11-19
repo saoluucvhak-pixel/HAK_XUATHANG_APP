@@ -1,4 +1,4 @@
-/* E2E di trú IndexedDB → SQLite trên trình duyệt thật, qua GIAO DIỆN: tạo dữ liệu ở chế độ IndexedDB → Cài đặt › Chung › "Nơi lưu dữ liệu" → chuyển → kích hoạt →
+/* E2E di trú IndexedDB → SQLite trên trình duyệt thật, qua GIAO DIỆN: tạo dữ liệu ở chế độ IndexedDB → Cài đặt › Sao lưu & khôi phục › "Nơi lưu dữ liệu" → chuyển → kích hoạt →
  * mở lại: nhãn "Dữ liệu: SQLite", dữ liệu còn đủ, ghi mới chỉ vào SQLite → quay lui → mất kết nối thì BỊ CHẶN. Máy chủ SQLite tham chiếu ở cổng 31879. Chạy: node tools/e2e-migrate.cjs */
 const { chromium } = require('playwright');
 const fs = require('node:fs'),
@@ -64,7 +64,7 @@ const openBackup = async (p) => {
   await p.evaluate(() => (location.hash = '#/settings'));
   await p.waitForTimeout(600);
   await p.evaluate(() => {
-    const b = document.querySelector('[data-bs-target="#tab-general"]');
+    const b = document.querySelector('[data-bs-target="#tab-backup"]');
     if (b) b.click();
   });
   await p.waitForSelector('#storageCard', { timeout: 15000 });

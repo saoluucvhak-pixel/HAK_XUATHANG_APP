@@ -2,7 +2,7 @@
  * backup.js — HAK.Backup: an toàn dữ liệu.
  *   boot()    : chạy trước khi dựng giao diện — khôi phục các khóa còn thiếu / lỗi thời của localStorage từ bản sao IndexedDB (HAK.DB "kv").
  *   sao lưu / khôi phục TOÀN BỘ ra 1 file .json: cài đặt, danh sách xe, mẫu Word, form, các đợt Excel đã nhập, nhật ký chứng từ + toàn bộ hồ sơ Lưu trữ.
- *   thẻ "Bộ nhớ & sao lưu" ở Cài đặt → Chung; báo lỗi khi không lưu được; lưu nốt form khi đóng trang.
+ *   tab "Sao lưu & khôi phục" ở Cài đặt; báo lỗi khi không lưu được; lưu nốt form khi đóng trang.
  *   v2.7.5: sao lưu toàn bộ dạng .zip (nén, khôi phục nhận cả .zip lẫn .json cũ) · 🔁 tự sao lưu mỗi ngày vào 1 thư mục, giữ N bản mới nhất
  *           (File System Access API, Chrome/Edge) · health(): "Sức khỏe dữ liệu" cho Tổng quan.
  */
@@ -1078,7 +1078,7 @@
     if (location.hash === '#/home' || !location.hash) {
       if (HAK.Dashboard && HAK.Dashboard.render) HAK.Dashboard.render();
     }
-    const g = document.getElementById('tab-general');
+    const g = document.getElementById('tab-backup');
     if (g && g.classList.contains('active')) render();
   }
   async function autoTick() {
@@ -1101,7 +1101,7 @@
       );
     else if (r.err === 'fail' && !auto.warned) {
       auto.warned = true;
-      toast('⚠ Tự sao lưu lỗi: ' + r.msg + ' — vào Cài đặt → Chung → Tự sao lưu để kiểm tra.', 'error');
+      toast('⚠ Tự sao lưu lỗi: ' + r.msg + ' — vào Cài đặt → Sao lưu & khôi phục → Tự sao lưu để kiểm tra.', 'error');
     } else if (r.err === 'perm' && before !== auto.perm) notify();
   }
   /** Trạng thái tự sao lưu (đồng bộ, theo lần kiểm tra quyền gần nhất) — cho cảnh báo ở Tổng quan. */
@@ -1119,7 +1119,7 @@
         'success'
       );
     else if (r.err === 'perm') toast('Trình duyệt chưa cho phép ghi vào thư mục — bấm lại và chọn "Cho phép" (Allow).', 'warning');
-    else if (r.err === 'nodir') toast('Chưa chọn thư mục tự sao lưu (Cài đặt → Chung).', 'warning');
+    else if (r.err === 'nodir') toast('Chưa chọn thư mục tự sao lưu (Cài đặt → Sao lưu & khôi phục → Thư mục).', 'warning');
     else if (r.err === 'fail') toast('Không sao lưu được: ' + r.msg, 'error');
     if (btn) btn.disabled = false;
     return r;
@@ -1155,7 +1155,7 @@
       ' bản mới nhất</span></div>' +
       '<ul class="sum-list mb-2">' +
       '<li><span>Thư mục</span><b>' +
-      (h ? '📁 ' + esc(h.name) : okT(false, 'Chưa chọn')) +
+      (h ? '📁 ' + esc(h.name) : okT(false, 'Chưa chọn — chọn ở khối ⑤ Thư mục sao lưu')) +
       '</b></li>' +
       '<li><span>Trạng thái</span><b>' +
       (c.on ? okT(true, 'Đang bật') : okT(false, 'Đang tắt')) +
@@ -1167,9 +1167,6 @@
       lastTxt +
       '</b></li></ul>' +
       '<div class="d-flex flex-wrap align-items-center gap-2">' +
-      '<button class="btn btn-outline-secondary" id="abPick" type="button">📁 ' +
-      (h ? 'Đổi thư mục…' : 'Chọn thư mục tự sao lưu…') +
-      '</button>' +
       '<div class="form-check form-switch mb-0"><input class="form-check-input" type="checkbox" role="switch" id="abOn"' +
       (c.on ? ' checked' : '') +
       (h ? '' : ' disabled') +
@@ -1180,7 +1177,6 @@
       '<button class="btn btn-primary" id="abRun" type="button"' +
       (h ? '' : ' disabled') +
       '>▶ Sao lưu vào thư mục ngay</button>' +
-      (h ? '<button class="btn btn-outline-secondary btn-sm" id="abForget" type="button">✕ Bỏ thư mục</button>' : '') +
       '</div>' +
       (files.length
         ? '<div class="table-responsive mt-2"><table class="table table-sm mb-0"><thead><tr><th>Bản trong thư mục (' +
@@ -1206,39 +1202,43 @@
   }
   function bindAuto() {
     const pick = $('#abPick');
-    if (!pick) return;
-    pick.addEventListener('click', async () => {
-      try {
-        await autoPick();
-        const c = autoCfg();
-        if (!c.on) autoSet({ on: true });
-        await render();
-        toast('Đã chọn thư mục tự sao lưu và bật tự sao lưu mỗi ngày. Bấm ▶ để tạo bản đầu tiên.', 'success');
-      } catch (e) {
-        if (!(e && e.name === 'AbortError')) {
-          console.error(e);
-          toast('Không chọn được thư mục: ' + (e.message || e), 'error');
+    if (pick)
+      pick.addEventListener('click', async () => {
+        try {
+          const h = await autoPick(); // quyền GHI — cũng dùng làm thư mục "mở sẵn" của hộp thoại Lưu file (MỘT thư mục cho cả hai)
+          await setSavedDir(h);
+          const c = autoCfg();
+          if (!c.on) autoSet({ on: true });
+          await render();
+          toast('Đã chọn thư mục sao lưu JSON và bật tự sao lưu mỗi ngày. Bấm ▶ để tạo bản đầu tiên.', 'success');
+        } catch (e) {
+          if (!(e && e.name === 'AbortError')) {
+            console.error(e);
+            toast('Không chọn được thư mục: ' + (e.message || e), 'error');
+          }
         }
-      }
-    });
-    $('#abOn').addEventListener('change', (e) => {
-      autoSet({ on: e.target.checked });
-      render();
-    });
-    $('#abKeep').addEventListener('change', (e) => {
-      autoSet({ keep: +e.target.value });
-      render();
-    });
-    $('#abRun').addEventListener('click', async (e) => {
-      const b = e.currentTarget;
-      HAK.UI.Loading.show('Đang sao lưu vào thư mục…');
-      try {
-        await autoAllowAndRun(b);
-      } finally {
-        HAK.UI.Loading.hide();
-      }
-      render();
-    });
+      });
+    const on = $('#abOn');
+    if (on) {
+      on.addEventListener('change', (e) => {
+        autoSet({ on: e.target.checked });
+        render();
+      });
+      $('#abKeep').addEventListener('change', (e) => {
+        autoSet({ keep: +e.target.value });
+        render();
+      });
+      $('#abRun').addEventListener('click', async (e) => {
+        const b = e.currentTarget;
+        HAK.UI.Loading.show('Đang sao lưu vào thư mục…');
+        try {
+          await autoAllowAndRun(b);
+        } finally {
+          HAK.UI.Loading.hide();
+        }
+        render();
+      });
+    }
     const fg = $('#abForget');
     if (fg)
       fg.addEventListener('click', (e) =>
@@ -1246,9 +1246,10 @@
           e.currentTarget,
           async () => {
             await autoForget();
+            await setSavedDir(null);
             autoSet({ on: false });
             render();
-            toast('Đã bỏ thư mục tự sao lưu (các file đã ghi vẫn còn trong thư mục).', 'info');
+            toast('Đã bỏ thư mục sao lưu JSON (các file đã ghi vẫn còn trong thư mục).', 'info');
           },
           'Bấm lần nữa'
         )
@@ -1364,7 +1365,7 @@
                     ? 'Chờ cho phép'
                     : 'Đang bật',
         lvl: a.on && a.dir && a.last && a.last.ok === false ? 2 : a.on && a.dir && a.perm === 'granted' ? 0 : 1,
-        hint: a.dir ? '📁 ' + a.dir + ' · giữ ' + a.keep + ' bản' : 'Cài đặt → Chung → Tự sao lưu',
+        hint: a.dir ? '📁 ' + a.dir + ' · giữ ' + a.keep + ' bản' : 'Cài đặt → Sao lưu & khôi phục',
       },
     ];
     return {
@@ -1449,6 +1450,141 @@
       inst.show();
     });
   }
+  /** Hộp xác nhận khôi phục bản THEO THÁNG: chỉ "Nhập bổ sung" (quy tắc 34), có xem trước nội dung. Trả 'merge' | null. */
+  function chooseMonth(info) {
+    if (HAK.Backup && HAK.Backup._choose) return Promise.resolve(HAK.Backup._choose(info));
+    return new Promise((ok) => {
+      let m = document.getElementById('restoreModal');
+      if (m) m.remove();
+      m = document.createElement('div');
+      m.className = 'modal fade';
+      m.id = 'restoreModal';
+      m.tabIndex = -1;
+      const sc = info.plan.scope || {},
+        cn = sc.counts || {};
+      const ym = String(sc.month || ''),
+        label = ym ? ym.slice(5, 7) + '/' + ym.slice(0, 4) : '?';
+      m.innerHTML =
+        '<div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Khôi phục bản sao lưu THEO THÁNG ' +
+        esc(label) +
+        '</h5></div><div class="modal-body">' +
+        '<p class="small mb-2">Bản này chứa hồ sơ, đợt Excel và chứng từ của <b>tháng ' +
+        esc(label) +
+        '</b> (tính theo <b>ngày cân đầu tiên</b> của hồ sơ) cùng <b>' +
+        (cn.contracts || 0) +
+        '</b> hợp đồng, <b>' +
+        (cn.customs || 0) +
+        '</b> tờ khai, <b>' +
+        (cn.customers || 0) +
+        '</b> khách hàng mà các hồ sơ đó gắn tới.</p>' +
+        planHtml(info.plan) +
+        '<div class="border rounded p-2"><b>Chỉ NHẬP BỔ SUNG</b><div class="small">Thêm phần còn thiếu, cập nhật phần cũ hơn; <b>không xóa hay ghi đè các tháng khác</b>, không thay cài đặt. Nhập lại cùng file không tạo bản trùng.</div></div>' +
+        '</div><div class="modal-footer"><button class="btn btn-primary" data-choice="merge" type="button">Nhập bổ sung</button><button class="btn btn-secondary" data-choice="cancel" type="button">Hủy</button></div></div></div>';
+      document.body.appendChild(m);
+      const inst = bootstrap.Modal.getOrCreateInstance(m, { backdrop: 'static', keyboard: false });
+      m.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-choice]');
+        if (!b) return;
+        inst._isTransitioning ? m.addEventListener('shown.bs.modal', () => inst.hide(), { once: true }) : inst.hide();
+        ok(b.dataset.choice === 'cancel' ? null : b.dataset.choice);
+      });
+      inst.show();
+    });
+  }
+  const MONTH_NAMES = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
+  const blockHead = (n, t, sub) =>
+    '<div class="bk-block mt-4 mb-2"><h3 class="h6 mb-0">' +
+    n +
+    ' ' +
+    t +
+    '</h3>' +
+    (sub ? '<div class="muted small">' + sub + '</div>' : '') +
+    '</div>';
+  /** ⑤ Thư mục sao lưu JSON: MỘT thư mục cho cả hộp thoại "Lưu file" (mở sẵn) và tự sao lưu JSON; + thư mục SQLite (HAKDocs ghi). */
+  async function foldersHtml() {
+    const dirOk = dirPickerSupported(),
+      h = dirOk ? (await autoDir()) || (await getSavedDir()) : null,
+      sc = sqlCfg(),
+      okT = (v, t) => '<span class="' + (v ? 'text-success' : 'text-warning') + '">' + t + '</span>';
+    return (
+      '<ul class="sum-list mb-2">' +
+      '<li><span>Thư mục sao lưu JSON</span><b>' +
+      (dirOk ? (h ? '📁 ' + esc(h.name) : okT(false, 'Chưa chọn')) : okT(false, 'Trình duyệt này không hỗ trợ chọn thư mục')) +
+      '</b></li></ul>' +
+      (dirOk
+        ? '<div class="d-flex flex-wrap gap-2 mb-1"><button class="btn btn-outline-secondary" id="abPick" type="button">📁 ' +
+          (h ? 'Đổi thư mục…' : 'Chọn thư mục sao lưu JSON…') +
+          '</button>' +
+          (h ? '<button class="btn btn-outline-secondary btn-sm" id="abForget" type="button">✕ Bỏ thư mục</button>' : '') +
+          '</div>'
+        : '') +
+      '<div class="form-text mb-3">Một thư mục dùng cho cả hộp thoại "Lưu file" (mở sẵn tại đây) và <b>tự sao lưu JSON</b>. Nên chọn thư mục đồng bộ Google Drive / OneDrive hoặc ổ khác ổ C.</div>' +
+      '<div class="mb-1 fw-semibold small">Thư mục sao lưu SQLite</div>' +
+      (sqlAvailable()
+        ? '<div class="input-group mb-1"><input class="form-control" id="sqDir" type="text" placeholder="' +
+          esc(
+            HAK.BackupSchedule.defaultDir(((HAK.Storage && HAK.Storage.status) || {}).dataDir) || 'Đường dẫn đầy đủ, ví dụ D:\\SaoLuu\\HAK'
+          ) +
+          '" value="' +
+          esc(sc.dir) +
+          '" aria-label="Thư mục sao lưu SQLite"><button class="btn btn-outline-secondary" id="sqDirSave" type="button">Lưu</button><button class="btn btn-outline-secondary" id="sqDirDefault" type="button" title="Dùng thư mục mặc định (backups trong thư mục dữ liệu)">Mặc định</button></div>' +
+          '<div class="form-text">HAKDocs ghi tệp <span class="mono">HAK_SQLite_&lt;ngày&gt;-&lt;giờ&gt;.db</span> vào thư mục này (nhập đường dẫn đầy đủ trên máy này; để trống = thư mục mặc định ở trên). App chỉ xóa các tệp đúng mẫu đó khi xoay vòng.</div>'
+        : '<div class="small muted">Chỉ có ở bản Windows đang lưu dữ liệu bằng SQLite.</div>')
+    );
+  }
+  /** ④ Dòng tự sao lưu SQLite (cùng mẫu với dòng JSON). */
+  function sqlAutoHtml() {
+    const okT = (v, t) => '<span class="' + (v ? 'text-success' : 'text-warning') + '">' + t + '</span>';
+    if (!sqlAvailable())
+      return '<hr><div class="fw-semibold mb-1">🗄 Tự sao lưu SQLite</div><div class="small muted">Chỉ có ở bản Windows đang lưu dữ liệu bằng SQLite.</div>';
+    const c = sqlCfg(),
+      L = c.last;
+    const lastOk = L && (L.ok ? L.at : L.okAt);
+    const lastTxt = !lastOk
+      ? okT(false, 'Chưa có')
+      : okT(true, '✓ ' + esc(fmtDT(lastOk))) + (L && L.ok && L.name ? ' — <span class="mono">' + esc(L.name) + '</span>' : '');
+    const errTxt =
+      L && L.ok === false
+        ? '<span class="text-danger">✗ ' + esc(fmtDT(L.at)) + ': ' + esc(L.error || '') + '</span>'
+        : okT(true, 'Không có');
+    return (
+      '<hr><div class="fw-semibold mb-1">🗄 Tự sao lưu SQLite <span class="muted small fw-normal">— ' +
+      (c.freq === 'week' ? 'mỗi tuần' : 'mỗi ngày') +
+      ' 1 bản .db, giữ ' +
+      c.keep +
+      ' bản mới nhất</span></div>' +
+      '<ul class="sum-list mb-2">' +
+      '<li><span>Thư mục</span><b>' +
+      esc(sqlDir(c) || '—') +
+      '</b></li>' +
+      '<li><span>Trạng thái</span><b>' +
+      (c.on ? okT(true, 'Đang bật') : okT(false, 'Đang tắt')) +
+      '</b></li>' +
+      '<li><span>Lần sao lưu thành công gần nhất</span><b>' +
+      lastTxt +
+      '</b></li>' +
+      '<li><span>Lỗi gần nhất</span><b>' +
+      errTxt +
+      '</b></li></ul>' +
+      '<div class="d-flex flex-wrap align-items-center gap-2">' +
+      '<div class="form-check form-switch mb-0"><input class="form-check-input" type="checkbox" role="switch" id="sqOn"' +
+      (c.on ? ' checked' : '') +
+      '><label class="form-check-label" for="sqOn">Tự sao lưu</label></div>' +
+      '<label class="small d-flex align-items-center gap-1 mb-0">Chạy <select class="form-select form-select-sm w-auto" id="sqFreq"><option value="day"' +
+      (c.freq === 'day' ? ' selected' : '') +
+      '>mỗi ngày</option><option value="week"' +
+      (c.freq === 'week' ? ' selected' : '') +
+      '>mỗi tuần</option></select></label>' +
+      '<label class="small d-flex align-items-center gap-1 mb-0">Giữ <input class="form-control form-control-sm" style="width:5rem" type="number" min="1" max="365" id="sqKeep" value="' +
+      c.keep +
+      '" aria-label="Số bản giữ"> bản</label>' +
+      '<button class="btn btn-primary" id="sqRun" type="button">▶ Chạy ngay</button>' +
+      '</div>' +
+      '<div class="form-text mt-2">Chạy ở lần mở app đầu tiên trong ' +
+      (c.freq === 'week' ? 'tuần (cách ≥ 7 ngày)' : 'ngày') +
+      '. Bản được kiểm tra toàn vẹn ngay sau khi ghi; lỗi quyền / đĩa đầy được báo ở đây.</div>'
+    );
+  }
   async function render() {
     const box = $('#backupBody');
     if (!box) return;
@@ -1468,19 +1604,22 @@
     }
     const nIss = HAK.Issued ? HAK.Issued.list.length : 0;
     const last = HAK.Store.get(LAST_KEY, 0);
-    const dirOk = dirPickerSupported();
-    const dir = dirOk ? await getSavedDir() : null;
     const ok = (v, t) => '<span class="' + (v ? 'text-success' : 'text-warning') + '">' + t + '</span>';
     const pct = st.quota ? Math.max(0.01, (st.usage / st.quota) * 100) : 0;
+    let mo = { list: [], undated: 0 };
+    try {
+      mo = await listMonths();
+    } catch (e) {
+      /* bỏ qua: chưa có dữ liệu */
+    }
+    const sc = sqlCfg(),
+      sqlLast = sc.last && (sc.last.ok ? sc.last.at : sc.last.okAt);
+    const now = new Date(),
+      defYm = mo.list[0] ? mo.list[0].month : now.getFullYear() + '-' + MONTH_NAMES[now.getMonth()];
+    const years = Array.from(new Set(mo.list.map((x) => +x.month.slice(0, 4)).concat([now.getFullYear()]))).sort((a, b) => b - a);
     box.innerHTML =
-      '<ul class="sum-list mb-3">' +
-      '<li><span>Nơi lưu dữ liệu</span><b>' +
-      (st.backend === 'sqlite'
-        ? ok(true, 'SQLite (HAKDocs) — ' + esc(st.file || ''))
-        : st.backend === 'idb'
-          ? ok(true, 'IndexedDB (bền, gắn với trình duyệt đang mở)')
-          : ok(false, 'RAM tạm — mất khi đóng trang')) +
-      '</b></li>' +
+      blockHead('①', 'Tình trạng dữ liệu', 'Nơi lưu · dung lượng · số liệu · lần sao lưu gần nhất — MỘT chỗ') +
+      '<ul class="sum-list mb-2">' +
       '<li><span>Trình duyệt cam kết giữ dữ liệu</span><b>' +
       (st.persisted === null ? '—' : ok(st.persisted, st.persisted ? 'Có' : 'Chưa (có thể bị xóa khi thiếu dung lượng)')) +
       '</b></li>' +
@@ -1500,44 +1639,123 @@
       '<li><span>Chứng từ đã lập (nhật ký)</span><b>' +
       nIss +
       '</b></li>' +
-      '<li><span>Sao lưu toàn bộ gần nhất</span><b>' +
+      '<li><span>Sao lưu JSON gần nhất</span><b>' +
       (last ? fmtDT(last) : ok(false, 'Chưa sao lưu lần nào')) +
       '</b></li>' +
-      (dirOk ? '<li><span>Thư mục sao lưu mặc định</span><b>' + (dir ? '📁 ' + esc(dir.name) : ok(false, 'Chưa chọn')) + '</b></li>' : '') +
+      (sqlAvailable()
+        ? '<li><span>Sao lưu SQLite gần nhất</span><b>' + (sqlLast ? fmtDT(sqlLast) : ok(false, 'Chưa có')) + '</b></li>'
+        : '') +
       '</ul>' +
+      '<div id="bkStorage"></div>' +
+      blockHead('②', 'Sao lưu ngay') +
+      '<div class="d-flex flex-wrap align-items-end gap-2">' +
+      '<button class="btn btn-primary" id="bkSave" type="button">⬇ Toàn bộ (.zip)</button>' +
+      '<div class="d-flex flex-wrap align-items-end gap-1 border rounded p-2"><label class="small mb-0">Tháng <select class="form-select form-select-sm" id="bkMonthM" aria-label="Tháng">' +
+      MONTH_NAMES.map((m) => '<option value="' + m + '"' + (defYm.slice(5, 7) === m ? ' selected' : '') + '>' + m + '</option>').join('') +
+      '</select></label><label class="small mb-0">Năm <select class="form-select form-select-sm" id="bkMonthY" aria-label="Năm">' +
+      years.map((y) => '<option value="' + y + '"' + (+defYm.slice(0, 4) === y ? ' selected' : '') + '>' + y + '</option>').join('') +
+      '</select></label><button class="btn btn-outline-primary" id="bkSaveMonth" type="button">⬇ Theo tháng (.json)</button><span class="small muted ms-1" id="bkMonthInfo"></span></div>' +
+      (sqlAvailable() ? '<button class="btn btn-outline-primary" id="bkSqlNow" type="button">🗄 SQLite ngay (.db)</button>' : '') +
+      '</div>' +
+      '<div class="form-text mt-2">Bản <b>theo tháng</b> = hồ sơ, đợt Excel, chứng từ của tháng (tính theo <b>ngày cân đầu tiên</b>) cùng hợp đồng / tờ khai / khách hàng mà chúng gắn tới' +
+      (mo.undated ? ' · ⚠ ' + mo.undated + ' hồ sơ không có ngày cân nên không thuộc tháng nào (chỉ có trong bản toàn bộ)' : '') +
+      '. Nên sao lưu toàn bộ định kỳ và trước khi đổi máy / trình duyệt.</div>' +
+      blockHead('③', 'Khôi phục', 'MỘT nút — app tự nhận loại file (toàn bộ · theo tháng · theo năm)') +
       '<div class="d-flex flex-wrap gap-2">' +
-      '<button class="btn btn-primary" id="bkSave" type="button">⬇ Sao lưu toàn bộ (.zip)</button>' +
       (preRestoreInfo()
         ? '<button class="btn btn-outline-warning admin-only" id="bkUndo" type="button" title="Trả cài đặt / danh mục về trạng thái trước lần khôi phục gần nhất (' +
           esc(fmtDT(preRestoreInfo().at)) +
           ')">↶ Hoàn tác khôi phục</button>'
         : '') +
-      '<label class="btn btn-outline-primary mb-0 admin-only">⬆ Nhập / Khôi phục từ bản sao<input type="file" id="bkRestore" accept=".zip,.json,application/zip,application/json" hidden></label>' +
-      (dirOk
-        ? '<button class="btn btn-outline-secondary" id="bkPickDir" type="button">📁 ' +
-          (dir ? 'Đổi thư mục…' : 'Chọn thư mục mặc định…') +
-          '</button>'
-        : '') +
-      (dirOk && dir ? '<button class="btn btn-outline-secondary" id="bkClearDir" type="button">✕ Bỏ chọn thư mục</button>' : '') +
+      '<label class="btn btn-outline-primary mb-0 admin-only">⬆ Chọn file để khôi phục<input type="file" id="bkRestore" accept=".zip,.json,application/zip,application/json" hidden></label>' +
       (st.persisted === false
         ? '<button class="btn btn-outline-secondary" id="bkPersist" type="button">Yêu cầu trình duyệt giữ dữ liệu</button>'
         : '') +
       '</div>' +
-      '<div class="form-check mt-2 admin-only"><input class="form-check-input" type="checkbox" id="bkKeepAuth" checked><label class="form-check-label small" for="bkKeepAuth"><b>Giữ tài khoản đang dùng trên máy này</b> khi khôi phục (không lấy tài khoản / mật khẩu trong file sao lưu). ' +
-      'Bỏ tick khi chuyển sang máy mới và muốn mọi người đăng nhập bằng mật khẩu cũ.</label></div>' +
-      '<div class="form-text mt-2">Nên sao lưu định kỳ và trước khi đổi máy / trình duyệt hoặc xóa dữ liệu duyệt web. File sao lưu là <b>.zip</b> (nén, từ v2.7.5); Nhập từ bản sao nhận cả .zip và file .json của bản cũ; chọn <b>Nhập bổ sung</b> (gộp theo phiên bản, giữ dữ liệu mới hơn) hoặc <b>Khôi phục (ghi đè)</b> danh mục &amp; cài đặt về thời điểm sao lưu.' +
-      (dirOk
-        ? ' Đã chọn thư mục mặc định thì hộp thoại "Lưu file" khi bấm Sao lưu sẽ tự mở sẵn tại thư mục đó (trình duyệt chỉ cho biết tên thư mục, không cho biết đường dẫn đầy đủ). Chỉ hỗ trợ trên Chrome/Edge.'
-        : '') +
-      '</div>' +
-      (await autoHtml());
+      '<div class="form-check mt-2 admin-only"><input class="form-check-input" type="checkbox" id="bkKeepAuth" checked><label class="form-check-label small" for="bkKeepAuth"><b>Giữ tài khoản đang dùng trên máy này</b> khi khôi phục bản toàn bộ. Bỏ tick khi chuyển sang máy mới và muốn mọi người đăng nhập bằng mật khẩu cũ.</label></div>' +
+      '<div class="form-text mt-1">Bản <b>toàn bộ</b>: chọn <b>Nhập bổ sung</b> (giữ dữ liệu mới hơn trên máy) hoặc <b>Thay thế</b> (về đúng thời điểm sao lưu, có Hoàn tác). Bản <b>theo tháng</b>: chỉ Nhập bổ sung, không đụng tháng khác. Bản <b>theo năm</b>: nhập vào Sổ hồ sơ năm. Xem trước nội dung trước khi ghi.</div>' +
+      blockHead('④', 'Tự sao lưu định kỳ') +
+      (await autoHtml()) +
+      sqlAutoHtml() +
+      blockHead('⑤', 'Thư mục sao lưu') +
+      (await foldersHtml()) +
+      blockHead('⑥', 'Theo năm') +
+      '<div class="small mb-1">Sao lưu / khôi phục / đóng năm theo từng năm làm ở <b>Sổ hồ sơ năm</b> (không làm lại ở đây).</div>' +
+      '<button class="btn btn-outline-secondary" id="bkYear" type="button">📚 Mở Sổ hồ sơ năm</button>';
     bindAuto();
-    if (HAK.MigrateUI) HAK.MigrateUI.mount(box); // khu "Nơi lưu dữ liệu" (SQLite / trình duyệt)
+    if (HAK.MigrateUI) HAK.MigrateUI.mount($('#bkStorage')); // "Nơi lưu dữ liệu" — chỉ một chỗ (khối ①)
+    bindSqlFolders();
     const b1 = $('#bkSave'),
       b2 = $('#bkRestore'),
-      b3 = $('#bkPersist'),
-      b4 = $('#bkPickDir'),
-      b5 = $('#bkClearDir');
+      b3 = $('#bkPersist');
+    const monthYm = () => $('#bkMonthY').value + '-' + $('#bkMonthM').value;
+    const monthInfo = () => {
+      const row = mo.list.find((x) => x.month === monthYm());
+      $('#bkMonthInfo').textContent = row ? row.archive + ' hồ sơ · ' + row.issued + ' chứng từ' : 'chưa có hồ sơ';
+    };
+    $('#bkMonthM').addEventListener('change', monthInfo);
+    $('#bkMonthY').addEventListener('change', monthInfo);
+    monthInfo();
+    $('#bkSaveMonth').addEventListener('click', async (e) => {
+      const b = e.currentTarget,
+        ym = monthYm(),
+        row = mo.list.find((x) => x.month === ym);
+      if (!row) {
+        toast('Tháng ' + ym.slice(5, 7) + '/' + ym.slice(0, 4) + ' chưa có hồ sơ hay chứng từ nào để sao lưu.', 'warning');
+        return;
+      }
+      b.disabled = true;
+      try {
+        const r = await saveMonth(ym);
+        toast(
+          'Đã sao lưu tháng ' +
+            ym.slice(5, 7) +
+            '/' +
+            ym.slice(0, 4) +
+            ': ' +
+            r.name +
+            ' (' +
+            r.archive +
+            ' hồ sơ, ' +
+            r.batches +
+            ' đợt Excel, ' +
+            r.issued +
+            ' chứng từ).',
+          'success'
+        );
+      } catch (err) {
+        if (!(err && err.name === 'AbortError')) {
+          console.error(err);
+          toast('Không sao lưu được: ' + (err.message || err), 'error');
+        }
+      }
+      b.disabled = false;
+    });
+    const bs = $('#bkSqlNow');
+    if (bs)
+      bs.addEventListener('click', async () => {
+        bs.disabled = true;
+        HAK.UI.Loading.show('Đang sao lưu SQLite…');
+        try {
+          const r = await sqlRunNow();
+          toast(
+            'Đã sao lưu SQLite: ' +
+              String(r.path).split(/[\\/]/).pop() +
+              ' (' +
+              fmtBytes(r.size) +
+              ', đạt kiểm tra toàn vẹn' +
+              (r.removed && r.removed.length ? ', xóa ' + r.removed.length + ' bản cũ' : '') +
+              ').',
+            'success'
+          );
+        } catch (err) {
+          toast('Không sao lưu SQLite được: ' + (err.message || err), 'error');
+        }
+        HAK.UI.Loading.hide();
+        render();
+      });
+    const by = $('#bkYear');
+    if (by) by.addEventListener('click', () => HAK.Yearbook && HAK.Yearbook.show && HAK.Yearbook.show());
     b1.addEventListener('click', async () => {
       b1.disabled = true;
       try {
@@ -1568,24 +1786,6 @@
         b1.disabled = false;
       }
     });
-    if (b4)
-      b4.addEventListener('click', async () => {
-        try {
-          await pickDefaultDir();
-          render();
-        } catch (e) {
-          if (!(e && e.name === 'AbortError')) {
-            console.error(e);
-            toast('Không chọn được thư mục: ' + (e.message || e), 'error');
-          }
-        }
-      });
-    if (b5)
-      b5.addEventListener('click', async () => {
-        await setSavedDir(null);
-        toast('Đã bỏ chọn thư mục mặc định.', 'info');
-        render();
-      });
     const bu = $('#bkUndo');
     if (bu)
       bu.addEventListener('click', () =>
@@ -1617,9 +1817,27 @@
       HAK.UI.Loading.show('Đang kiểm tra bản sao…');
       let info = null;
       try {
+        const j0 = await readJson(f),
+          kind = kindOf(j0);
+        if (!kind) throw new Error('Không nhận ra file này là bản sao lưu của app (toàn bộ, theo tháng hay theo năm).');
+        if (kind === 'year') {
+          // bản sao lưu THEO NĂM (Sổ hồ sơ năm): nhập vào Sổ hồ sơ năm bằng đúng bộ khôi phục năm
+          HAK.UI.Loading.hide();
+          if (!HAK.Yearbook || !HAK.Yearbook.restore) throw new Error('Chưa nạp Sổ hồ sơ năm.');
+          if (
+            !root.confirm('Đây là bản sao lưu THEO NĂM ' + j0.year + ' (' + (j0.records || []).length + ' hồ sơ). Nhập vào Sổ hồ sơ năm?')
+          ) {
+            toast('Đã hủy — chưa thay đổi gì.', 'info');
+            return;
+          }
+          HAK.UI.Loading.show('Đang nhập bản sao lưu năm…');
+          await HAK.Yearbook.restore(f);
+          toast('Đã nhập bản sao lưu năm ' + j0.year + ' vào Sổ hồ sơ năm.', 'success');
+          return;
+        }
         info = await inspect(f); // kiểm tra TRƯỚC khi ghi: file hỏng thì chưa đổi gì
         HAK.UI.Loading.hide();
-        const mode = info.legacy ? 'merge' : await chooseMode(info);
+        const mode = info.legacy ? 'merge' : kind === 'month' ? await chooseMonth(info) : await chooseMode(info);
         if (!mode) {
           toast('Đã hủy — chưa thay đổi gì.', 'info');
           return;
@@ -1632,7 +1850,9 @@
             ' xong' +
             (r.legacy
               ? ' (file riêng Lưu trữ)'
-              : ': ' + r.keys + ' mục cài đặt' + (r.keepAuth ? ' (giữ tài khoản đang dùng)' : ' (lấy cả tài khoản trong file)')) +
+              : kind === 'month'
+                ? ' (bản theo tháng)'
+                : ': ' + r.keys + ' mục cài đặt' + (r.keepAuth ? ' (giữ tài khoản đang dùng)' : ' (lấy cả tài khoản trong file)')) +
             ', hồ sơ thêm ' +
             r.added +
             ', cập nhật ' +
@@ -1670,6 +1890,58 @@
         );
         render();
       });
+  }
+  /** Gắn nút cho thư mục SQLite + dòng tự sao lưu SQLite (khối ④, ⑤). */
+  function bindSqlFolders() {
+    const save = $('#sqDirSave');
+    if (save) {
+      const saveDir = (v) => {
+        const t = String(v || '').trim();
+        if (t && !/^([A-Za-z]:[\\/]|\\\\|\/)/.test(t)) {
+          toast('Thư mục không hợp lệ: nhập đường dẫn đầy đủ (ví dụ D:\\SaoLuu\\HAK).', 'error');
+          return;
+        }
+        sqlSet(Object.assign(sqlCfg(), { dir: t }));
+        toast(t ? 'Đã lưu thư mục sao lưu SQLite.' : 'Đã dùng thư mục mặc định.', 'success');
+        render();
+      };
+      save.addEventListener('click', () => saveDir($('#sqDir').value));
+      $('#sqDirDefault').addEventListener('click', () => saveDir(''));
+    }
+    const on = $('#sqOn');
+    if (on) {
+      on.addEventListener('change', (e) => {
+        sqlSet(Object.assign(sqlCfg(), { on: e.target.checked }));
+        render();
+      });
+      $('#sqFreq').addEventListener('change', (e) => {
+        sqlSet(Object.assign(sqlCfg(), { freq: e.target.value }));
+        render();
+      });
+      $('#sqKeep').addEventListener('change', (e) => {
+        sqlSet(Object.assign(sqlCfg(), { keep: +e.target.value }));
+        render();
+      });
+      $('#sqRun').addEventListener('click', async (e) => {
+        const b = e.currentTarget;
+        b.disabled = true;
+        HAK.UI.Loading.show('Đang sao lưu SQLite…');
+        try {
+          const r = await sqlRunNow();
+          toast(
+            'Đã sao lưu SQLite: ' +
+              String(r.path).split(/[\\/]/).pop() +
+              (r.removed && r.removed.length ? ' (xóa ' + r.removed.length + ' bản cũ)' : '') +
+              '.',
+            'success'
+          );
+        } catch (err) {
+          toast('Không sao lưu SQLite được: ' + (err.message || err), 'error');
+        }
+        HAK.UI.Loading.hide();
+        render();
+      });
+    }
   }
 
   /* ---------------- v2.16.2 — Dải nhắc sao lưu ở mọi trang: có dữ liệu mà > 7 ngày (hoặc chưa lần nào) chưa sao lưu toàn bộ ---------------- */
@@ -1735,7 +2007,7 @@
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') flush();
     });
-    const tab = document.querySelector('[data-bs-target="#tab-general"]');
+    const tab = document.querySelector('[data-bs-target="#tab-backup"]');
     if (tab) tab.addEventListener('shown.bs.tab', render);
     render();
     renderPack();

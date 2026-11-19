@@ -229,6 +229,10 @@ async function run(base, token, log) {
   await t(
     'sao lưu vào thư mục người dùng chọn: tên HAK_SQLite_*.db, đạt integrity_check, không ghi ra ngoài; đường dẫn xấu bị từ chối',
     async () => {
+      const sameDir = (a, b) => {
+        const rp = (x) => fs.realpathSync.native(x).toLowerCase();
+        return rp(a) === rp(b);
+      };
       const root = fs.mkdtempSync(nodePath.join(os.tmpdir(), 'hakdb-bk-'));
       const dir = nodePath.join(root, 'SaoLuu SQLite');
       eq((await call('POST', '/db/backup', { dir, auto: true }, hak)).status, 403, 'phiên giới hạn công ty không được sao lưu');
@@ -236,11 +240,11 @@ async function run(base, token, log) {
       eq(r.status, 200);
       eq(r.body.integrity, 'ok');
       eq(nodePath.basename(r.body.path), 'HAK_SQLite_20261119-010203.db');
-      if (nodePath.dirname(r.body.path) !== nodePath.resolve(dir)) throw new Error('ghi ra ngoài thư mục đã chọn: ' + r.body.path);
+      if (!sameDir(nodePath.dirname(r.body.path), dir)) throw new Error('ghi ra ngoài thư mục đã chọn: ' + r.body.path);
       // tên không đúng mẫu bị bỏ, dùng tên tự đặt; không bao giờ thoát khỏi thư mục
       const r2 = await call('POST', '/db/backup', { dir, name: '../../thoat' }, admin);
       eq(r2.status, 200);
-      if (!/^HAK_SQLite_\d{8}-\d{6}\.db$/.test(nodePath.basename(r2.body.path)) || nodePath.dirname(r2.body.path) !== nodePath.resolve(dir))
+      if (!/^HAK_SQLite_\d{8}-\d{6}\.db$/.test(nodePath.basename(r2.body.path)) || !sameDir(nodePath.dirname(r2.body.path), dir))
         throw new Error('tên / vị trí không an toàn: ' + r2.body.path);
       for (const bad of ['SaoLuu', '..\\..\\x', dir + nodePath.sep + '..' + nodePath.sep + 'x']) {
         const b = await call('POST', '/db/backup', { dir: bad }, admin);
