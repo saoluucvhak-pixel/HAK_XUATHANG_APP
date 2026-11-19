@@ -13,6 +13,7 @@
     LAST_KEY = 'hak.backup.last',
     DIR_KEY = 'backupDir',
     AUTO_KEY = 'hak.autobk',
+    SQL_KEY = 'hak.sqlbk.v1', // cấu hình tự sao lưu SQLite — gắn với thư mục / máy này → không mang đi theo sao lưu
     AUTO_DIR = 'autoDir';
   const $ = (s) => document.querySelector(s);
   const toast = (m, t) => HAK.UI && HAK.UI.toast(m, t);
@@ -136,7 +137,7 @@
   async function collect() {
     const keys = {};
     HAK.Store.keys().forEach((k) => {
-      if (k !== LAST_KEY && k !== AUTO_KEY && k !== PRE_KEY) keys[k] = HAK.Store.get(k, null);
+      if (k !== LAST_KEY && k !== AUTO_KEY && k !== SQL_KEY && k !== PRE_KEY) keys[k] = HAK.Store.get(k, null);
     }); // v2.7.5: cài đặt tự sao lưu gắn với thư mục của máy này → không mang đi
     const items = HAK.Archive ? await HAK.Archive.collectItems() : [];
     const batches = HAK.Batches ? await HAK.Batches.exportAll() : [];
@@ -237,6 +238,53 @@
     HAK.Store.set(LAST_KEY, Date.now());
     return { name, size: (zip || {}).size, keys: f.keys, archive: f.archive, batches: f.batches, issued: f.issued };
   }
+  /* ---------------- Tự sao lưu SQLite (quy tắc 35) ---------------- */
+  const sqlAvailable = () => !!(HAK.Storage && HAK.Storage.mode === 'sqlite');
+  const sqlCfg = () => HAK.BackupSchedule.normalize(HAK.Store.get(SQL_KEY, null));
+  const sqlSet = (c) => HAK.Store.set(SQL_KEY, c);
+  const sqlDir = (cfg) => (cfg || sqlCfg()).dir || HAK.BackupSchedule.defaultDir(((HAK.Storage && HAK.Storage.status) || {}).dataDir);
+  /** Sao lưu SQLite NGAY (nút "Sao lưu SQLite ngay" và tự động): máy chủ ghi bản nhất quán vào thư mục, kiểm integrity_check, xoay vòng (chỉ xóa HAK_SQLite_*.db). */
+  async function sqlRunNow(opts) {
+    if (!sqlAvailable()) throw new Error('Chỉ dùng được ở bản Windows đang lưu dữ liệu bằng SQLite.');
+    const cfg = sqlCfg(),
+      dir = sqlDir(cfg);
+    if (!dir) throw new Error('Chưa xác định được thư mục sao lưu SQLite. Chọn thư mục ở mục "Thư mục sao lưu SQLite".');
+    const body = { dir, keep: cfg.keep };
+    if (opts && opts.name) body.name = opts.name;
+    try {
+      const r = await HAK.Storage.call('/db/backup', body);
+      sqlSet(
+        HAK.BackupSchedule.record(
+          cfg,
+          {
+            ok: true,
+            name: String(r.path || '')
+              .split(/[\\/]/)
+              .pop(),
+            removed: (r.removed || []).length,
+            dir: r.dir,
+          },
+          Date.now()
+        )
+      );
+      return r;
+    } catch (e) {
+      const msg =
+        e && e.code === 'scope' ? 'Chỉ tài khoản toàn quyền (không giới hạn công ty) mới sao lưu SQLite.' : (e && e.message) || String(e);
+      sqlSet(HAK.BackupSchedule.record(cfg, { ok: false, error: msg }, Date.now()));
+      throw Object.assign(new Error(msg), { code: e && e.code });
+    }
+  }
+  /** Chạy một lần khi mở app nếu ĐẾN HẠN (lần mở đầu tiên trong ngày / tuần). Lỗi không làm hỏng việc mở app: chỉ báo (trừ thiếu quyền — không báo mỗi lần mở). */
+  async function sqlTick() {
+    if (!sqlAvailable() || !HAK.BackupSchedule.due(sqlCfg(), Date.now())) return null;
+    try {
+      return await sqlRunNow();
+    } catch (e) {
+      if (e.code !== 'scope' && HAK.UI) HAK.UI.toast('Tự sao lưu SQLite chưa chạy được: ' + e.message, 'warning');
+      return null;
+    }
+  }
   /** Tên file sao lưu tháng: HAK_Thang_MM-YYYY_xuat<ngày>.json (CEO 19/11/2026). */
   const monthFileName = (ym) => 'HAK_Thang_' + ym.slice(5, 7) + '-' + ym.slice(0, 4) + '_xuat' + stamp() + '.json';
   async function saveMonth(ym) {
@@ -298,7 +346,7 @@
     try {
       const keys = {};
       HAK.Store.keys().forEach((k) => {
-        if (k.indexOf('hak.') === 0 && k !== LAST_KEY && k !== AUTO_KEY && k !== PRE_KEY) keys[k] = HAK.Store.get(k, null);
+        if (k.indexOf('hak.') === 0 && k !== LAST_KEY && k !== AUTO_KEY && k !== SQL_KEY && k !== PRE_KEY) keys[k] = HAK.Store.get(k, null);
       });
       await writeRestoreKey(PRE_KEY, { at: Date.now(), keys });
       return true;
@@ -317,7 +365,7 @@
     let set = 0,
       removed = 0;
     for (const k of HAK.Store.keys()) {
-      if (k.indexOf('hak.') === 0 && k !== LAST_KEY && k !== AUTO_KEY && k !== PRE_KEY && !(k in p.keys)) {
+      if (k.indexOf('hak.') === 0 && k !== LAST_KEY && k !== AUTO_KEY && k !== SQL_KEY && k !== PRE_KEY && !(k in p.keys)) {
         await removeRestoreKey(k);
         removed++;
       }
@@ -367,7 +415,8 @@
     const plan = {
       kind: kindOf(j),
       scope: j.scope || null,
-      keys: Object.keys(j.keys).filter((k) => k.indexOf('hak.') === 0 && k !== PRE_KEY && k !== LAST_KEY && k !== AUTO_KEY).length,
+      keys: Object.keys(j.keys).filter((k) => k.indexOf('hak.') === 0 && k !== PRE_KEY && k !== LAST_KEY && k !== AUTO_KEY && k !== SQL_KEY)
+        .length,
       archive: j.archive.length,
       batches: (j.batches || []).length,
       issued: (j.issued || []).length,
@@ -526,7 +575,7 @@
           for (const k of Object.keys(j.keys)) {
             if (k === PRE_KEY) continue;
             if (keepAuth && AUTH_KEYS.indexOf(k) >= 0) continue; // giữ tài khoản / mật khẩu / khóa khôi phục / loại máy hiện tại
-            if (!(k.indexOf('hak.') === 0 && k !== LAST_KEY && k !== AUTO_KEY && j.keys[k] !== null)) continue;
+            if (!(k.indexOf('hak.') === 0 && k !== LAST_KEY && k !== AUTO_KEY && k !== SQL_KEY && j.keys[k] !== null)) continue;
             if (k === CAT && merge && HAK.ContractModel) {
               // CÙNG quy tắc phiên bản với Gói cấu hình: bản cũ không ghi đè bản mới
               const merged = HAK.ContractModel.mergeCatalog(HAK.Store.get(CAT, null), j.keys[k]),
@@ -1705,6 +1754,7 @@
       .catch(() => {
         /* bỏ qua */
       });
+    setTimeout(() => sqlTick().catch(() => {}), 4000); // tự sao lưu SQLite (đến hạn mới chạy)
     setTimeout(() => {
       autoTick();
       setInterval(autoTick, 30 * 60e3);
@@ -1742,6 +1792,12 @@
     bkBanner,
     readJson,
     buildFull,
+    sqlAvailable,
+    sqlCfg,
+    sqlSet,
+    sqlDir,
+    sqlRunNow,
+    sqlTick,
     buildMonth,
     listMonths,
     saveMonth,
