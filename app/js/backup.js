@@ -151,11 +151,17 @@
       bklsTemplates: await HAK.DB.getAll('bklsTemplates'),
     };
   }
-  /** Dựng nội dung sao lưu toàn bộ (mảng chuỗi JSON — không nối thành 1 chuỗi lớn) + số đếm. */
-  async function buildFull() {
-    const { yearbook, keys, items, batches, issued, attachments, bklsTemplates } = await collect();
+  /** Dựng nội dung sao lưu từ kết quả collect() (toàn bộ) hoặc BackupMonth.select() (theo tháng — có thêm "scope"). MỘT bộ dựng file cho cả hai. */
+  function serialize(coll) {
+    const { yearbook, keys, items, batches, issued, attachments, bklsTemplates, scope } = coll;
     const parts = [
-      '{"app":"' + APP + '","v":1,"exportedAt":"' + new Date().toISOString() + '","keys":',
+      '{"app":"' +
+        APP +
+        '","v":1,"exportedAt":"' +
+        new Date().toISOString() +
+        '"' +
+        (scope ? ',"scope":' + JSON.stringify(scope) : '') +
+        ',"keys":',
       JSON.stringify(keys),
       ',"archive":[',
     ];
@@ -177,7 +183,38 @@
       JSON.stringify(yearbook),
       '}'
     );
-    return { parts, keys: Object.keys(keys).length, archive: items.length, batches: batches.length, issued: issued.length };
+    return {
+      parts,
+      keys: Object.keys(keys).length,
+      archive: items.length,
+      batches: batches.length,
+      issued: issued.length,
+      scope: scope || null,
+    };
+  }
+  /** Dựng nội dung sao lưu toàn bộ (mảng chuỗi JSON — không nối thành 1 chuỗi lớn) + số đếm. */
+  async function buildFull() {
+    return serialize(await collect());
+  }
+  /** Sao lưu THEO THÁNG (quy tắc 33–35): cùng collect() + serialize() với sao lưu toàn bộ, chỉ lọc thêm theo tháng ("2026-02"). */
+  async function buildMonth(ym) {
+    if (!HAK.BackupMonth) throw new Error('Chưa nạp bộ sao lưu theo tháng.');
+    const sel = await HAK.BackupMonth.select(await collect(), ym, { decode: HAK.Archive && HAK.Archive.decode });
+    return serialize(sel);
+  }
+  /** Các tháng có dữ liệu để chọn khi sao lưu theo tháng (chỉ đọc mục lục hồ sơ + nhật ký chứng từ, không giải nén hồ sơ). */
+  async function listMonths() {
+    const metas = HAK.Archive ? await HAK.Archive.list() : [];
+    const issued = HAK.Issued ? await HAK.DB.getAll('issued') : [];
+    return HAK.BackupMonth.months({ items: metas.map((meta) => ({ meta })), issued });
+  }
+  /** Loại file sao lưu: 'full' (toàn bộ) · 'month' (theo tháng) · 'year' (Sổ hồ sơ năm) · 'archive' (Lưu trữ bản cũ) · '' (không nhận ra). */
+  function kindOf(j) {
+    if (!j || typeof j !== 'object') return '';
+    if (j.app === 'hak-bienban-archive' && Array.isArray(j.items)) return 'archive';
+    if (j.app === 'hak-yearbook') return 'year';
+    if (j.app === APP) return j.scope && j.scope.kind === 'month' ? 'month' : 'full';
+    return '';
   }
   /** v2.7.5: nén thành .zip (1 file HAK_SaoLuuToanBo.json bên trong — Windows mở được). Không có JSZip → null (lưu .json như cũ). */
   const ZIP_INNER = 'HAK_SaoLuuToanBo.json';
@@ -199,6 +236,14 @@
     await saveBackupBlob(zip || new Blob(f.parts, { type: 'application/json' }), name);
     HAK.Store.set(LAST_KEY, Date.now());
     return { name, size: (zip || {}).size, keys: f.keys, archive: f.archive, batches: f.batches, issued: f.issued };
+  }
+  /** Tên file sao lưu tháng: HAK_Thang_MM-YYYY_xuat<ngày>.json (CEO 19/11/2026). */
+  const monthFileName = (ym) => 'HAK_Thang_' + ym.slice(5, 7) + '-' + ym.slice(0, 4) + '_xuat' + stamp() + '.json';
+  async function saveMonth(ym) {
+    const f = await buildMonth(ym);
+    const name = monthFileName(ym);
+    await saveBackupBlob(new Blob(f.parts, { type: 'application/json' }), name);
+    return { name, month: ym, archive: f.archive, batches: f.batches, issued: f.issued, scope: f.scope };
   }
   /** v2.7.5: đọc file sao lưu .zip (của app) hoặc .json → object (null nếu không đọc được JSON). Dùng chung cho Lưu trữ. */
   async function readJson(file) {
@@ -320,6 +365,8 @@
     if (j && j.app === 'hak-bienban-archive' && Array.isArray(j.items)) return { j, legacy: true, plan: { archive: j.items.length } };
     validateBackup(j);
     const plan = {
+      kind: kindOf(j),
+      scope: j.scope || null,
       keys: Object.keys(j.keys).filter((k) => k.indexOf('hak.') === 0 && k !== PRE_KEY && k !== LAST_KEY && k !== AUTO_KEY).length,
       archive: j.archive.length,
       batches: (j.batches || []).length,
@@ -420,10 +467,18 @@
    * opts.parsed: kết quả inspect() để khỏi đọc lại file. Trả { …, report } hoặc ném lỗi có .report.
    */
   async function restoreFile(file, opts) {
-    const keepAuth = !!(opts && opts.keepAuth),
-      mode = opts && opts.mode === 'replace' ? 'replace' : 'merge';
+    const keepAuth = !!(opts && opts.keepAuth);
+    let mode = opts && opts.mode === 'replace' ? 'replace' : 'merge';
     const ins = (opts && opts.parsed) || (await inspect(file)),
       j = ins.j; // v2.7.5: .zip hoặc .json
+    if (kindOf(j) === 'month') {
+      // quy tắc 34: bản tháng CHỈ nhập bổ sung — không thay thế (sẽ xóa / ghi đè dữ liệu tháng khác)
+      if (opts && opts.mode === 'replace')
+        throw new Error(
+          'Bản sao lưu theo tháng chỉ dùng được ở chế độ "Nhập bổ sung" (không thay thế). Dữ liệu các tháng khác được giữ nguyên.'
+        );
+      mode = 'merge';
+    }
     if (ins.legacy) {
       // file sao lưu riêng Lưu trữ (bản cũ)
       const r = await HAK.Archive.importItems(j.items);
@@ -1687,6 +1742,12 @@
     bkBanner,
     readJson,
     buildFull,
+    buildMonth,
+    listMonths,
+    saveMonth,
+    monthFileName,
+    kindOf,
+    serialize,
     zipParts,
     health,
     autoStatus,

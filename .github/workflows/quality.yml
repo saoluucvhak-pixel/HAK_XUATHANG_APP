@@ -53,6 +53,8 @@ jobs:
       - run: npm run e2e:persist-keys   # bộ lọc đã lưu · Năm làm việc · giao diện bền khi mở lại app, giữ khóa cũ khi nâng cấp, có trong sao lưu → khôi phục
       - run: node tools/e2e-sqlite.cjs tools/e2e-persist-keys.cjs   # như trên trên SQLite (hydrate không được xóa khóa hak.*)
       - run: npm run e2e:roundtrip-cross   # sao lưu ở backend này → khôi phục ở backend kia (IDB↔SQLite, 4 hướng)
+      - run: npm run e2e:month-backup   # sao lưu THEO THÁNG: máy trống / máy đã có tháng khác, lặp không nhân đôi, hồ sơ qua 2 tháng, hợp đồng dùng chung, thay thế bị từ chối
+      - run: node tools/e2e-sqlite.cjs tools/e2e-month-backup.cjs   # như trên trên SQLite
       - run: node tools/e2e-sqlite.cjs tools/e2e-roundtrip.cjs   # như trên trên SQLite (máy chủ tham chiếu)
       - run: npm run e2e:archive-ops   # lưu / lưu lặp / xóa hồ sơ Lưu trữ kèm lỗi giữa chừng; mục lục ↔ nội dung khớp (IndexedDB)
       - run: node tools/e2e-sqlite.cjs tools/e2e-archive-ops.cjs   # như trên trên SQLite, kể cả mất phản hồi sau khi đã ghi

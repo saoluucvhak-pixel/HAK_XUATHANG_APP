@@ -2,6 +2,7 @@
 
 ## v2.23.0 — Sao lưu & khôi phục: bố cục mới, sao lưu theo tháng, tự sao lưu SQLite
 - **Bản đệm cài đặt trên SQLite:** khi mở app, `hydrate()` xóa khóa `hak.*` cũ trong bộ nhớ trình duyệt nhưng trước đây duyệt theo chỉ số vừa duyệt vừa xóa nên có thể BỎ SÓT khóa; khóa sót của nguồn dữ liệu trước (khi dùng file .db khác) bị đẩy ngược vào file mới. Nay chụp danh sách khóa trước khi xóa, và chỉ giữ + chuyển một lần danh sách trắng `hak.sf.presets`, `hak.workingYear`, `hak.design.theme` (+ bản sao kho bộ lọc).
+- **Sao lưu THEO THÁNG (lõi):** `HAK.Backup.buildMonth("2026-10")` dùng chung `collect()` và bộ dựng file với sao lưu toàn bộ, chỉ lọc thêm: hồ sơ Lưu trữ có ngày cân đầu tiên trong tháng (hồ sơ qua 2 tháng thuộc tháng đầu), chứng từ đã lập, đợt Excel các hồ sơ dùng, cùng hợp đồng / chi tiết / tờ khai / khách hàng và tệp đính kèm mà hồ sơ gắn tới. File `HAK_Thang_MM-YYYY_xuat<ngày>.json`. Khôi phục bản tháng CHỈ nhập bổ sung (chế độ Thay thế bị từ chối); tháng khác và hợp đồng dùng chung không bị đụng / nhân đôi. `HAK.Backup.kindOf()` tự nhận loại file (toàn bộ · tháng · năm · Lưu trữ cũ). File sao lưu toàn bộ cũ vẫn khôi phục được.
 - Công cụ: `e2e-flow` trên SQLite chờ hồ sơ Lưu trữ xuất hiện (app lưu bất đồng bộ) nên không đỏ ngẫu nhiên ở máy chậm.
 
 ## v2.22.5 — Rà soát vòng 3: bền dữ liệu cấu hình trên SQLite, đóng năm, nhập tờ khai, thông báo lỗi
