@@ -1,7 +1,8 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
 ## v2.23.0 — Sao lưu & khôi phục: bố cục mới, sao lưu theo tháng, tự sao lưu SQLite
-- (đang cập nhật theo từng mục đã triển khai)
+- **Bản đệm cài đặt trên SQLite:** khi mở app, `hydrate()` xóa khóa `hak.*` cũ trong bộ nhớ trình duyệt nhưng trước đây duyệt theo chỉ số vừa duyệt vừa xóa nên có thể BỎ SÓT khóa; khóa sót của nguồn dữ liệu trước (khi dùng file .db khác) bị đẩy ngược vào file mới. Nay chụp danh sách khóa trước khi xóa, và chỉ giữ + chuyển một lần danh sách trắng `hak.sf.presets`, `hak.workingYear`, `hak.design.theme` (+ bản sao kho bộ lọc).
+- Công cụ: `e2e-flow` trên SQLite chờ hồ sơ Lưu trữ xuất hiện (app lưu bất đồng bộ) nên không đỏ ngẫu nhiên ở máy chậm.
 
 ## v2.22.5 — Rà soát vòng 3: bền dữ liệu cấu hình trên SQLite, đóng năm, nhập tờ khai, thông báo lỗi
 - **Cài đặt bền trên SQLite (bản Windows):** bộ lọc đã lưu, Năm làm việc và giao diện (phong cách HAK) trước đây ghi thẳng bộ nhớ trình duyệt nên bị XÓA mỗi lần mở lại app khi dùng SQLite; nay ghi qua kho chung (có trong SQLite và trong sao lưu / khôi phục). Giá trị cũ đang có được giữ khi nâng cấp. Có test tĩnh cấm ghi thẳng khóa `hak.*`.

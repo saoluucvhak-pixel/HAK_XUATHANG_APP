@@ -107,12 +107,10 @@
 
   // Khóa mà BẢN CŨ ghi thẳng localStorage (không qua HAK.Store) nên chưa có trong kv: khi nâng cấp phải GIỮ giá trị cũ rồi đẩy vào kv,
   // nếu không hydrate() xóa mất (bộ lọc đã lưu, Năm làm việc, giao diện). Khóa đã có trong kv thì kv thắng (SQLite là nguồn chính).
+  // DANH SÁCH TRẮNG (CEO, 19/11/2026): chỉ các khóa này được giữ + chuyển một lần. Mọi khóa hak.* khác vẫn bị xóa — nếu không, khi dùng file .db KHÁC
+  // (khôi phục SQLite bản cũ, đổi máy / thư mục dữ liệu), dữ liệu của nguồn trước (danh mục, tài khoản, cài đặt…) bị đẩy ngược vào file mới = trộn hai nguồn.
   const LEGACY_DIRECT = (k) =>
-    k === 'hak.sf.presets' ||
-    k === 'hak.rf.presets' ||
-    k === 'hak.workingYear' ||
-    k === 'hak.design.theme' ||
-    k.indexOf('hak.sf.presets.bak.') === 0;
+    k === 'hak.sf.presets' || k === 'hak.workingYear' || k === 'hak.design.theme' || k.indexOf('hak.sf.presets.bak.') === 0;
   /** Nạp lại localStorage TỪ SQLite (SQLite là nguồn chính): xóa khóa hak.* cũ trong localStorage rồi ghi theo kv. Khóa cũ chưa có trong kv (LEGACY_DIRECT) được giữ lại ở S.orphans để init đẩy vào kv. */
   async function hydrate() {
     const rows = (await call('/db/query', { table: 'kv' })).rows;
@@ -121,12 +119,16 @@
     S.orphans = [];
     try {
       ls = root.localStorage;
-      for (let i = ls.length - 1; i >= 0; i--) {
+      // Chụp danh sách khóa TRƯỚC khi xóa: duyệt theo chỉ số vừa duyệt vừa removeItem làm trình duyệt đổi thứ tự khóa → BỎ SÓT khóa
+      // (khóa của nguồn cũ còn sót rồi bị Backup.boot đẩy vào kv = trộn hai nguồn).
+      const keys = [];
+      for (let i = 0; i < ls.length; i++) {
         const k = ls.key(i);
-        if (k && k.indexOf('hak.') === 0) {
-          if (!have.has(k) && LEGACY_DIRECT(k)) S.orphans.push([k, ls.getItem(k)]);
-          ls.removeItem(k);
-        }
+        if (k && k.indexOf('hak.') === 0) keys.push(k);
+      }
+      for (const k of keys) {
+        if (!have.has(k) && LEGACY_DIRECT(k)) S.orphans.push([k, ls.getItem(k)]);
+        ls.removeItem(k);
       }
       for (const r of rows) if (r.key.indexOf('hak.') === 0) ls.setItem(r.key, r.val);
       for (const [k, v] of S.orphans) ls.setItem(k, v); // giữ nguyên trong localStorage (cache) trong lúc chờ đẩy vào kv
