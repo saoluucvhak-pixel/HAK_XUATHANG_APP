@@ -58,6 +58,8 @@ jobs:
       - run: npm run e2e:sqlite-backup   # tự sao lưu SQLite: tới hạn / chưa tới hạn, xoay vòng giữ N, chỉ xóa HAK_SQLite_*.db, thư mục không ghi được
       - run: npm run e2e:backup-ui   # tab Sao lưu & khôi phục: 6 khối, tải xuống, khôi phục một nút tự nhận loại file
       - run: npm run e2e:backup-ui-sqlite
+      - run: npm run e2e:sf-focus   # Bộ lọc nâng cao: vẽ lại giữ tiêu điểm đúng ô; tiêu đề không lộ mã nội bộ (đồng bộ repo gốc HAK_SMART_FILTER)
+      - run: node tools/e2e-sqlite.cjs tools/e2e-sf-focus.cjs
       - run: node tools/e2e-sqlite.cjs tools/e2e-roundtrip.cjs   # như trên trên SQLite (máy chủ tham chiếu)
       - run: npm run e2e:archive-ops   # lưu / lưu lặp / xóa hồ sơ Lưu trữ kèm lỗi giữa chừng; mục lục ↔ nội dung khớp (IndexedDB)
       - run: node tools/e2e-sqlite.cjs tools/e2e-archive-ops.cjs   # như trên trên SQLite, kể cả mất phản hồi sau khi đã ghi

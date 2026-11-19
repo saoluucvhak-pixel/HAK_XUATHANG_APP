@@ -1,5 +1,10 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.24.0 — Đồng bộ thư viện dùng chung HAK (Smart Filter)
+- **Bộ lọc nâng cao — bàn phím:** khi ngăn vẽ lại (nạp / lưu / xóa bộ lọc đã lưu), tiêu điểm ở lại ĐÚNG ô đang dùng và giữ vị trí cuộn, thay vì nhảy về ô "Từ khóa" đầu ngăn (đồng bộ sửa của repo gốc `HAK_SMART_FILTER`).
+- **Không lộ mã nội bộ:** tiêu đề nhỏ của ngăn Bộ lọc nâng cao hiện tên màn hình (vd "Lưu trữ") thay cho "HAK SMART FILTER · archive".
+- Ghi `docs/DONG_BO_THU_VIEN.md`: đối chiếu app ↔ các repo tham chiếu HAK (phần đã đồng bộ, phần app có mà repo gốc chưa có). Có `e2e:sf-focus` (IndexedDB + SQLite), đỏ trên v2.23.0 → xanh.
+
 ## v2.23.0 — Sao lưu & khôi phục: bố cục mới, sao lưu theo tháng, tự sao lưu SQLite
 - **Bản đệm cài đặt trên SQLite:** khi mở app, `hydrate()` xóa khóa `hak.*` cũ trong bộ nhớ trình duyệt nhưng trước đây duyệt theo chỉ số vừa duyệt vừa xóa nên có thể BỎ SÓT khóa; khóa sót của nguồn dữ liệu trước (khi dùng file .db khác) bị đẩy ngược vào file mới. Nay chụp danh sách khóa trước khi xóa, và chỉ giữ + chuyển một lần danh sách trắng `hak.sf.presets`, `hak.workingYear`, `hak.design.theme` (+ bản sao kho bộ lọc).
 - **Sao lưu THEO THÁNG (lõi):** `HAK.Backup.buildMonth("2026-10")` dùng chung `collect()` và bộ dựng file với sao lưu toàn bộ, chỉ lọc thêm: hồ sơ Lưu trữ có ngày cân đầu tiên trong tháng (hồ sơ qua 2 tháng thuộc tháng đầu), chứng từ đã lập, đợt Excel các hồ sơ dùng, cùng hợp đồng / chi tiết / tờ khai / khách hàng và tệp đính kèm mà hồ sơ gắn tới. File `HAK_Thang_MM-YYYY_xuat<ngày>.json`. Khôi phục bản tháng CHỈ nhập bổ sung (chế độ Thay thế bị từ chối); tháng khác và hợp đồng dùng chung không bị đụng / nhân đôi. `HAK.Backup.kindOf()` tự nhận loại file (toàn bộ · tháng · năm · Lưu trữ cũ). File sao lưu toàn bộ cũ vẫn khôi phục được.

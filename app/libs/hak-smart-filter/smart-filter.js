@@ -142,17 +142,21 @@
       if (opener && opener.setAttribute) opener.setAttribute("aria-expanded", "true");
       var body = h("div", { class: "sfd-body" });
       var fill = function () {
-        var hadFocus = body.contains(document.activeElement);
+        // Giữ tiêu điểm ĐÚNG ô đang dùng (theo thứ tự ô) và vị trí cuộn khi vẽ lại — đồng bộ repo gốc HAK_SMART_FILTER (bàn phím không bị nhảy về ô đầu).
+        var controls = "input, select, button", previous = document.activeElement;
+        var index = body.contains(previous) ? Array.prototype.indexOf.call(body.querySelectorAll(controls), previous) : -1, scrollTop = body.scrollTop;
         body.innerHTML = "";
         (cfg.advancedFields || []).forEach(function (k) { var n = drawerField(cfg, k, getS, setS, fill); if (n) body.appendChild(n); });
         body.appendChild(presetManager(cfg, getS, setS, fill));
-        if (hadFocus) { var target = body.querySelector("input, select, button"); if (target) target.focus(); }
+        var target = index >= 0 ? body.querySelectorAll(controls)[index] || body.querySelector(controls) : null;
+        if (target) target.focus({ preventScroll: true });
+        body.scrollTop = scrollTop;
       };
       var close = function () { closeDrawer(true); };
       var apply = btn("Áp dụng", "pri", function () { var p = SF.dateProblem(draft); if (p) { A.toast("⚠ " + p); return; } cfg.state.set(draft); closeDrawer(true); onApplied(); }, "Áp dụng các điều kiện đang chọn"),
         cancel = btn("Hủy", "", close, "Đóng, không đổi gì"),
         reset = btn("Đặt lại", "ghost", function () { draft = SF.empty(); fill(); }, "Bỏ hết điều kiện trong ngăn này (bấm Áp dụng để dùng)");
-      el.appendChild(h("div", { class: "sfd-head hak-sfd-head" }, [h("div", {}, [h("small", { text: "HAK SMART FILTER · " + cfg.screenId }), h("b", { text: "Bộ lọc nâng cao" }), h("span", { text: "Thiết lập điều kiện rồi nhấn Áp dụng để lọc dữ liệu." })]), btn("✕", "ghost", close, "Đóng")]));
+      el.appendChild(h("div", { class: "sfd-head hak-sfd-head" }, [h("div", {}, [h("small", { text: (document.querySelector("#pageTitle") || {}).textContent || "Điều kiện lọc" }), h("b", { text: "Bộ lọc nâng cao" }), h("span", { text: "Thiết lập điều kiện rồi nhấn Áp dụng để lọc dữ liệu." })]), btn("✕", "ghost", close, "Đóng")]));
       el.appendChild(body); el.appendChild(h("div", { class: "sfd-foot" }, [reset, h("span", { class: "sp" }), cancel, apply]));
       fill();
       mask.addEventListener("mousedown", close);
