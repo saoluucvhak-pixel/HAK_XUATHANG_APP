@@ -49,7 +49,16 @@ jobs:
       - run: npm run e2e:export-parity   # màn hình = Excel = Word = PDF cùng tập phiếu (ca sát biên ngày/giờ, biển số chuẩn hóa, phiếu KL ≤ 0)
       - run: npm run e2e:dialogs   # hộp thoại: Tab không rơi ra nền, Esc đóng, tiêu điểm trả về nút đã mở, hộp chồng nhau
       - run: npm run e2e:roundtrip   # sao lưu → xóa → khôi phục vòng tròn (IndexedDB): số liệu trước = sau; khôi phục lặp không nhân đôi; file hỏng bị từ chối
+      - run: npm run e2e:bkls-readback   # đọc lại riêng BKLS (Word tổng + từng xe, PDF): đúng tập phiếu / khối lượng, phiếu KL ≤ 0 không có
+      - run: npm run e2e:persist-keys   # bộ lọc đã lưu · Năm làm việc · giao diện bền khi mở lại app, giữ khóa cũ khi nâng cấp, có trong sao lưu → khôi phục
+      - run: node tools/e2e-sqlite.cjs tools/e2e-persist-keys.cjs   # như trên trên SQLite (hydrate không được xóa khóa hak.*)
+      - run: npm run e2e:roundtrip-cross   # sao lưu ở backend này → khôi phục ở backend kia (IDB↔SQLite, 4 hướng)
       - run: node tools/e2e-sqlite.cjs tools/e2e-roundtrip.cjs   # như trên trên SQLite (máy chủ tham chiếu)
+      - run: npm run e2e:archive-ops   # lưu / lưu lặp / xóa hồ sơ Lưu trữ kèm lỗi giữa chừng; mục lục ↔ nội dung khớp (IndexedDB)
+      - run: node tools/e2e-sqlite.cjs tools/e2e-archive-ops.cjs   # như trên trên SQLite, kể cả mất phản hồi sau khi đã ghi
+      - run: npm run e2e:gsync-parity   # Google Sheet GIẢ LẬP (chạy đúng Code.gs): KL ≤ 0 loại, đồng bộ lại / mất phản hồi không nhân đôi, trạng thái hợp đồng một nguồn
+      - run: npm run e2e:import-warn   # nhập tờ khai / khai bổ sung từ Excel: ô dạng ngoặc "(1.200)" được cảnh báo (quy tắc 28), nhập lại không trùng
+      - run: node tools/e2e-sqlite.cjs tools/e2e-import-warn.cjs
       - run: node tools/e2e-sqlite.cjs tools/e2e-contract-status.cjs   # trạng thái hợp đồng một nguồn trên SQLite
       - run: npm run accept:release   # Word và PDF BẮT BUỘC: thiếu / không đọc lại được file → lỗi (chưa xác minh)
 

@@ -136,6 +136,23 @@
       tx.onabort = tx.onerror = () => no(error || tx.error || Error('Chưa hoàn tất đóng năm. File đã lưu vẫn dùng để mở lại.'));
     });
   }
+  /**
+   * Đóng năm xong TRỌN VẸN (file mới chứa mọi hồ sơ năm đó còn ở kho): các biên nhận "đang dở" của lần đóng trước CÙNG NĂM (bị ngắt rồi người dùng bấm "Đóng năm" lại thay vì "Tiếp tục")
+   * không còn việc dọn nào nữa → gỡ cờ đang dở (giữ biên nhận + file làm bằng chứng, ghi supersededBy). Lỗi ở bước này không làm hỏng lần đóng đã xong.
+   */
+  async function supersedePending(year, sha256) {
+    try {
+      const state = await H.Yearbook.read();
+      if (!(state.closed || []).some((c) => c.pending && c.year === year && c.sha256 !== sha256)) return;
+      await H.Yearbook.commit(state.revision, (s) => {
+        for (const c of s.closed || [])
+          if (c.pending && c.year === year && c.sha256 !== sha256) Object.assign(c, { pending: false, supersededBy: sha256 });
+        return s;
+      });
+    } catch (e) {
+      /* biên nhận cũ còn hiện "đang dở": vô hại, Tiếp tục đóng năm sẽ xử lý */
+    }
+  }
   async function closeYear(year, ask = root.confirm) {
     if (H.Auth && (!H.Auth.isAdmin() || H.Auth.scopeIds('archive') !== null)) throw Error('Đóng năm cần Quản trị xem tất cả công ty.');
     const { state, bundle, skipped } = await build(year);
@@ -175,6 +192,7 @@
     if (bundle.archive.length) await H.Archive.closeVerified(bundle.archive);
     await finalize(prepared.revision, bundle, proof);
     H.Yearbook.release(year, bundle.batches);
+    await supersedePending(year, proof.sha256);
     return { path, skipped, records: bundle.records.length, batches: bundle.batches.length };
   }
   async function readFile(file, expected) {

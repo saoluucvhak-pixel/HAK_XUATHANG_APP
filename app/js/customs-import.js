@@ -92,6 +92,8 @@
       draw();
       core().render();
       const linked = added.filter((x) => x.rec.contractId).length;
+      // Cảnh báo của bộ đọc (vd ô thuế dạng ngoặc "(1.200)" — quy tắc 28, thiếu số tiền thuế / ngày đăng ký) phải hiện ở MỌI đường nhập, như đường OCR.
+      const notes = added.flatMap((x) => (x.p.warnings || []).map((w) => x.name + ': ' + w));
       toast(
         (added.length
           ? 'Đã nhập ' +
@@ -99,8 +101,10 @@
             ' tờ khai' +
             (linked ? ' (' + linked + ' tờ khai tự gắn hợp đồng / đợt theo tàu hoặc số TKHQ)' : '') +
             '. '
-          : '') + (skipped.length ? 'Bỏ qua: ' + skipped.join(' · ') : ''),
-        skipped.length && !added.length ? 'warning' : 'success'
+          : '') +
+          (skipped.length ? 'Bỏ qua: ' + skipped.join(' · ') + (notes.length ? ' ' : '') : '') +
+          (notes.length ? 'Cần đối chiếu với tờ khai gốc: ' + notes.join(' · ') : ''),
+        (skipped.length && !added.length) || notes.length ? 'warning' : 'success'
       );
     } finally {
       Loading.hide();
@@ -123,6 +127,7 @@
         qtyBdmt: p.qtyBdmt,
         reason: 'Khai bổ sung theo tờ khai ' + p.no,
       });
+      if (p.warnings && p.warnings.length) toast('Cần đối chiếu với tờ khai bổ sung gốc: ' + p.warnings.join(' · '), 'warning');
     } catch (e) {
       toast(e.message || String(e), 'error');
     } finally {

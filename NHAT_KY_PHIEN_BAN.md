@@ -1,5 +1,17 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.22.5 — Rà soát vòng 3: bền dữ liệu cấu hình trên SQLite, đóng năm, nhập tờ khai, thông báo lỗi
+- **Cài đặt bền trên SQLite (bản Windows):** bộ lọc đã lưu, Năm làm việc và giao diện (phong cách HAK) trước đây ghi thẳng bộ nhớ trình duyệt nên bị XÓA mỗi lần mở lại app khi dùng SQLite; nay ghi qua kho chung (có trong SQLite và trong sao lưu / khôi phục). Giá trị cũ đang có được giữ khi nâng cấp. Có test tĩnh cấm ghi thẳng khóa `hak.*`.
+- **Hợp đồng / PO đọc bằng OCR:** số dạng ngoặc "(1.200)" ở ô khối lượng hoặc đơn giá không bị đọc thành số (quy tắc 28) và nay có cảnh báo trong màn đề xuất, thay vì để trống không nói gì.
+- Công cụ: `npm run e2e:bkls-readback` đọc lại riêng BKLS (Word tổng, Word từng xe, PDF) với bộ lọc giờ và phiếu KL = 0 — chạy trong CI.
+- Công cụ: `npm run e2e:roundtrip-cross` — sao lưu ở backend này → khôi phục ở backend kia (IndexedDB ↔ SQLite, đủ 4 hướng): hồ sơ, số dòng phiếu, danh mục, nguồn phiếu cân trước = sau, khôi phục lặp không nhân đôi.
+- **Đóng năm:** đóng lại cùng năm sau khi lần trước bị ngắt (bấm "Đóng năm" thay vì "Tiếp tục đóng năm") không còn để biên nhận "đang dở" của lần trước tồn tại mãi (năm vẫn hiện "đang dở" dù đã đóng xong); biên nhận cũ được giữ làm bằng chứng và ghi bị lần nào thay thế. Kiểm cả IndexedDB và SQLite.
+- **Nhập tờ khai từ Excel / khai bổ sung từ Excel:** cảnh báo của bộ đọc (ô thuế dạng ngoặc "(1.200)" theo quy tắc 28, thiếu số tiền thuế / ngày đăng ký) nay HIỆN ra như ở đường OCR; trước đây bị bỏ qua và chỉ báo "Đã nhập 1 tờ khai".
+- **Kiểm tra mục lục ↔ nội dung hồ sơ Lưu trữ:** `HAK.Archive.verifyIndex()` (số phiếu, tổng kg, phiếu KL ≤ 0 đã loại); `HAK.Archive.remove` xuất ra để kiểm thử.
+- Công cụ: `npm run e2e:archive-ops` (lưu / lưu lặp / xóa kèm lỗi giữa chừng, IndexedDB và SQLite), `npm run e2e:gsync-parity` (Google Sheet GIẢ LẬP chạy đúng Code.gs; chưa kiểm Sheet thật), `npm run e2e:import-warn`; chạy trong CI.
+- **Thông báo lỗi:** lỗi thô của trình duyệt / JS ("Cannot read properties…", khung stack, đường dẫn tệp, ERR_…) không còn hiện nguyên cho người dùng; thông báo tiếng Việt của app giữ nguyên; câu tiếng Việt có đuôi kỹ thuật (ERR_…, khung stack, tên tệp) chỉ bị cắt phần đuôi, giữ phần tiếng Việt. Bản gốc ghi ở Console.
+- Công cụ: `ui-audit` kiểm phần tử chỉ bấm được bằng chuột mà không vào được bằng Tab (bàn phím).
+
 ## v2.22.4 — Rà soát vòng 2: bộ lọc, lưu trữ, khôi phục, giao diện bàn phím
 - **Hộp thoại:** đóng bằng Esc hoặc nút Đóng nay TRẢ tiêu điểm về đúng nút đã mở hộp thoại (trước đây rơi về đầu trang, người dùng bàn phím mất vị trí); hộp thoại chồng nhau chỉ trả khi hộp cuối đóng. Tìm kiếm chung (Ctrl+K) cũng trả tiêu điểm khi đóng; khi đang có hộp thoại mở thì không mở chồng (trước đây tiêu điểm bị giật khỏi ô tìm, gõ nhầm ô).
 - **Trạng thái hợp đồng khi đang đối chiếu phiếu cân:** lúc nguồn "chi tiết đã có phiếu cân" chưa tính xong, hợp đồng có thể đổi kết quả hiện "Đang kiểm tra…" (thay vì hiện "Đã hoàn thành" rồi đổi); không tính được thì ghi rõ "chưa đối chiếu được phiếu cân".

@@ -105,21 +105,56 @@
     return j;
   }
 
-  /** Nạp lại localStorage TỪ SQLite (SQLite là nguồn chính): xóa khóa hak.* cũ trong localStorage rồi ghi theo kv. Không đẩy ngược lên SQLite. */
+  // Khóa mà BẢN CŨ ghi thẳng localStorage (không qua HAK.Store) nên chưa có trong kv: khi nâng cấp phải GIỮ giá trị cũ rồi đẩy vào kv,
+  // nếu không hydrate() xóa mất (bộ lọc đã lưu, Năm làm việc, giao diện). Khóa đã có trong kv thì kv thắng (SQLite là nguồn chính).
+  const LEGACY_DIRECT = (k) =>
+    k === 'hak.sf.presets' ||
+    k === 'hak.rf.presets' ||
+    k === 'hak.workingYear' ||
+    k === 'hak.design.theme' ||
+    k.indexOf('hak.sf.presets.bak.') === 0;
+  /** Nạp lại localStorage TỪ SQLite (SQLite là nguồn chính): xóa khóa hak.* cũ trong localStorage rồi ghi theo kv. Khóa cũ chưa có trong kv (LEGACY_DIRECT) được giữ lại ở S.orphans để init đẩy vào kv. */
   async function hydrate() {
     const rows = (await call('/db/query', { table: 'kv' })).rows;
+    const have = new Set(rows.map((r) => r.key));
     let ls;
+    S.orphans = [];
     try {
       ls = root.localStorage;
       for (let i = ls.length - 1; i >= 0; i--) {
         const k = ls.key(i);
-        if (k && k.indexOf('hak.') === 0) ls.removeItem(k);
+        if (k && k.indexOf('hak.') === 0) {
+          if (!have.has(k) && LEGACY_DIRECT(k)) S.orphans.push([k, ls.getItem(k)]);
+          ls.removeItem(k);
+        }
       }
       for (const r of rows) if (r.key.indexOf('hak.') === 0) ls.setItem(r.key, r.val);
+      for (const [k, v] of S.orphans) ls.setItem(k, v); // giữ nguyên trong localStorage (cache) trong lúc chờ đẩy vào kv
     } catch (e) {
       /* localStorage bị chặn: Store dùng RAM, vẫn đọc được qua kv */
     }
     return rows.length;
+  }
+  /** Đẩy các khóa cũ (S.orphans) vào kv qua HAK.Store — sau khi chế độ SQLite đã bật (HAK.DB ghi vào SQLite). */
+  function adoptOrphans() {
+    const list = S.orphans || [];
+    S.orphans = [];
+    if (!list.length || !root.HAK || !root.HAK.Store) return 0;
+    let n = 0;
+    for (const [k, raw] of list) {
+      let val;
+      try {
+        val = JSON.parse(raw);
+      } catch (e) {
+        val = raw;
+      }
+      try {
+        if (root.HAK.Store.set(k, val) !== false) n++;
+      } catch (e) {
+        /* giữ trong localStorage, thử lại lần mở sau */
+      }
+    }
+    return n;
   }
 
   async function init() {
@@ -152,6 +187,7 @@
         await hydrate();
         S.mode = 'sqlite';
         hint.set('sqlite');
+        adoptOrphans();
       } catch (e) {
         S.mode = 'blocked';
         S.error = 'Không đọc được cơ sở dữ liệu SQLite: ' + e.message;
@@ -167,6 +203,7 @@
   S.call = call;
   S.openSession = openSession;
   S.hydrate = hydrate;
+  S.adoptOrphans = adoptOrphans;
   S.hint = hint;
   S.url = url;
   S.isSqlite = () => S.mode === 'sqlite';
