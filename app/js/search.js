@@ -384,7 +384,10 @@
         '<div class="gs-empty">Gõ ít nhất 2 ký tự.<br><span class="muted small">Ví dụ: <code>43C</code> · <code>Nguyễn Văn</code> · <code>PXK000123</code> · <code>010/2026/BKLS</code> · tên tàu</span></div>';
       return;
     }
-    const res = run(q, { idx: idxCache || (idxCache = index()), archive: archCache });
+    // v2.25.0 (quyết định 36): hồ sơ Lưu trữ chỉ của công ty đang làm — cùng phạm vi với màn Lưu trữ ("Xem tất cả công ty" để mở rộng)
+    const scope = HAK.Auth && HAK.Auth.scopeIds ? HAK.Auth.scopeIds('archive') : null;
+    const archive = scope ? archCache.filter((m) => scope.indexOf(HAK.Auth.companyOfMeta(m)) >= 0) : archCache;
+    const res = run(q, { idx: idxCache || (idxCache = index()), archive });
     if (!res.groups.length) {
       box.innerHTML = '<div class="gs-empty">Không tìm thấy "' + esc(q) + '" trong dữ liệu đang nạp, nhật ký chứng từ và hồ sơ lưu.</div>';
       return;

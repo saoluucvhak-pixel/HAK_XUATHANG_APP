@@ -60,6 +60,8 @@ jobs:
       - run: npm run e2e:backup-ui-sqlite
       - run: npm run e2e:sf-focus   # Bộ lọc nâng cao: vẽ lại giữ tiêu điểm đúng ô; tiêu đề không lộ mã nội bộ (đồng bộ repo gốc HAK_SMART_FILTER)
       - run: node tools/e2e-sqlite.cjs tools/e2e-sf-focus.cjs
+      - run: npm run e2e:company-scope   # tách theo công ty: ô hợp đồng, Chứng từ, Tìm kiếm không lộ công ty khác; bộ lọc đã lưu theo tài khoản + công ty
+      - run: node tools/e2e-sqlite.cjs tools/e2e-company-scope.cjs
       - run: node tools/e2e-sqlite.cjs tools/e2e-roundtrip.cjs   # như trên trên SQLite (máy chủ tham chiếu)
       - run: npm run e2e:archive-ops   # lưu / lưu lặp / xóa hồ sơ Lưu trữ kèm lỗi giữa chừng; mục lục ↔ nội dung khớp (IndexedDB)
       - run: node tools/e2e-sqlite.cjs tools/e2e-archive-ops.cjs   # như trên trên SQLite, kể cả mất phản hồi sau khi đã ghi
