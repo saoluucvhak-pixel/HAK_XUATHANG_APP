@@ -85,7 +85,12 @@ const state = (p) =>
   console.log('2) Sao lưu → xóa 3 khóa → khôi phục: còn nguyên');
   const text = await p.evaluate(async () => (await HAK.Backup.buildFull()).parts.join(''));
   check(/hak\.sf\.presets/.test(text) && /hak\.workingYear/.test(text) && /hak\.design\.theme/.test(text), 'file sao lưu có đủ 3 khóa');
-  await p.evaluate(() => ['hak.sf.presets', 'hak.workingYear', 'hak.design.theme'].forEach((k) => HAK.Store.remove(k)));
+  // v2.25.0: bộ lọc đã lưu nằm ở khóa riêng theo tài khoản + công ty (HAK.Filters.presetKey) — xóa cả khóa chung lẫn khóa riêng
+  const mineKey = () => HAK.Filters.presetKey('hak.sf.presets', HAK.Auth.current().id, HAK.Auth.company());
+  await p.evaluate((src) => {
+    const mk = new Function('return (' + src + ')()');
+    ['hak.sf.presets', mk(), 'hak.workingYear', 'hak.design.theme'].forEach((k) => HAK.Store.remove(k));
+  }, mineKey.toString());
   await p.waitForTimeout(500);
   await reload(p);
   s = await state(p);
@@ -108,7 +113,13 @@ const state = (p) =>
 
   console.log('3) Nâng cấp: khóa cũ ghi thẳng localStorage (bản trước) không bị mất khi mở app');
   await p.evaluate(() => {
-    ['hak.sf.presets', 'hak.workingYear', 'hak.design.theme'].forEach((k) => HAK.Store.remove(k));
+    // tài khoản đang thử là Quản trị: chưa có kho riêng → nhận bản sao kho dùng chung cũ (mục 32, v2.25.0)
+    [
+      'hak.sf.presets',
+      HAK.Filters.presetKey('hak.sf.presets', HAK.Auth.current().id, HAK.Auth.company()),
+      'hak.workingYear',
+      'hak.design.theme',
+    ].forEach((k) => HAK.Store.remove(k));
     // giả lập bản cũ: ghi thẳng localStorage, KHÔNG qua HAK.Store (nên chưa có trong kv)
     localStorage.setItem(
       'hak.sf.presets',
