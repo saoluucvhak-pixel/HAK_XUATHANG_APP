@@ -62,11 +62,13 @@
         '<option value="">' +
         esc(list.length ? '— Không dùng danh mục (nhập tay) —' : '— Chưa có hợp đồng ' + tl + ' trong Danh mục —') +
         '</option>';
-      // v2.6.2: hợp đồng liên quan công ty đang làm lên trước; hợp đồng công ty khác vẫn chọn được (nhóm riêng) — "mặc định, vẫn đổi được".
+      // v2.25.0 (quyết định 36 — tách hẳn theo công ty): chỉ hợp đồng liên quan công ty đang làm; hợp đồng công ty khác chỉ hiện (nhóm riêng)
+      // khi bật "Xem tất cả công ty" ở Danh mục. Hợp đồng ĐÃ gắn với hồ sơ đang mở (sel) luôn giữ để không mất liên kết cũ.
       const co = HAK.Auth && HAK.Auth.company ? HAK.Auth.company() : '';
       if (!co || !HAK.Catalog.relatedTo) return head + list.map(opt).join('');
+      const scope = HAK.Auth.scopeIds ? HAK.Auth.scopeIds('catalog') : [co];
       const mine = list.filter((c) => HAK.Catalog.relatedTo(c, [co])),
-        other = list.filter((c) => mine.indexOf(c) < 0);
+        other = list.filter((c) => mine.indexOf(c) < 0 && (c.id === sel || HAK.Catalog.relatedTo(c, scope)));
       const cn = (cfg().companies.find((x) => x.id === co) || {}).short || co;
       return (
         head +

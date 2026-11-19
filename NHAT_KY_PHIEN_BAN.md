@@ -1,5 +1,10 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.25.0 — Tách theo công ty; bộ lọc đã lưu theo tài khoản + công ty
+- **Tách hẳn theo công ty (quyết định 36):** khi đang làm một công ty, các chỗ trước đây còn lộ dữ liệu công ty khác nay chỉ hiện dữ liệu công ty đang làm: ô **"Chọn hợp đồng"** ở các trang lập hồ sơ (trước có nhóm "Hợp đồng công ty khác"), ô hợp đồng ở **Chứng từ** (điền số hợp đồng vào phiếu xuất kho), và **Tìm kiếm Ctrl+K** (hồ sơ Lưu trữ). Bật **Xem tất cả công ty** ở Danh mục / Lưu trữ thì thấy lại như trước; hợp đồng đã gắn với hồ sơ đang mở luôn được giữ.
+- **Bộ lọc đã lưu (mục 32):** mỗi tài khoản ở mỗi công ty có kho riêng — tài khoản khác / công ty khác không thấy tên và điều kiện bộ lọc của mình. Kho dùng chung của bản cũ không bị xóa; tài khoản Quản trị nhận bản sao của nó ở lần đầu, Nhân viên bắt đầu từ kho trống. Bền trên SQLite, có trong sao lưu.
+- Kiểm thử: `e2e:company-scope` (IndexedDB + SQLite; đỏ trên v2.24.0: 3 chỗ lộ → xanh), `preset-scope.test`.
+
 ## v2.24.0 — Đồng bộ thư viện dùng chung HAK (Smart Filter)
 - **Bộ lọc nâng cao — bàn phím:** khi ngăn vẽ lại (nạp / lưu / xóa bộ lọc đã lưu), tiêu điểm ở lại ĐÚNG ô đang dùng và giữ vị trí cuộn, thay vì nhảy về ô "Từ khóa" đầu ngăn (đồng bộ sửa của repo gốc `HAK_SMART_FILTER`).
 - **Không lộ mã nội bộ:** tiêu đề nhỏ của ngăn Bộ lọc nâng cao hiện tên màn hình (vd "Lưu trữ") thay cho "HAK SMART FILTER · archive".

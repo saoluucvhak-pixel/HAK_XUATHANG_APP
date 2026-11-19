@@ -267,8 +267,11 @@
     const K = HAK.Catalog,
       cur = sel.value,
       decls = HAK.Customs ? HAK.Customs.activeDecls() : [];
+    // v2.25.0 (quyết định 36): chỉ hợp đồng liên quan công ty đang làm (bật "Xem tất cả công ty" ở Danh mục để thấy công ty khác)
+    const scope = HAK.Auth && HAK.Auth.scopeIds ? HAK.Auth.scopeIds('catalog') : null;
     const list = K.parents()
       .filter((c) => ['xuatkhau', 'uythac', 'xuatban', 'traodoi'].indexOf(c.type) >= 0)
+      .filter((c) => c.id === cur || !K.relatedTo || K.relatedTo(c, scope))
       .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
     const cust = (id) => {
       const x = K.customer(id);
