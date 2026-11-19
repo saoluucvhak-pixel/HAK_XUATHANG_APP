@@ -1,5 +1,8 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.23.0 — Sao lưu & khôi phục: bố cục mới, sao lưu theo tháng, tự sao lưu SQLite
+- (đang cập nhật theo từng mục đã triển khai)
+
 ## v2.22.5 — Rà soát vòng 3: bền dữ liệu cấu hình trên SQLite, đóng năm, nhập tờ khai, thông báo lỗi
 - **Cài đặt bền trên SQLite (bản Windows):** bộ lọc đã lưu, Năm làm việc và giao diện (phong cách HAK) trước đây ghi thẳng bộ nhớ trình duyệt nên bị XÓA mỗi lần mở lại app khi dùng SQLite; nay ghi qua kho chung (có trong SQLite và trong sao lưu / khôi phục). Giá trị cũ đang có được giữ khi nâng cấp. Có test tĩnh cấm ghi thẳng khóa `hak.*`.
 - **Hợp đồng / PO đọc bằng OCR:** số dạng ngoặc "(1.200)" ở ô khối lượng hoặc đơn giá không bị đọc thành số (quy tắc 28) và nay có cảnh báo trong màn đề xuất, thay vì để trống không nói gì.
