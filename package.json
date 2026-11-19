@@ -24,6 +24,8 @@
     "e2e:bkls-readback": "node tools/e2e-bkls-readback.cjs",
     "e2e:roundtrip": "node tools/e2e-roundtrip.cjs",
     "e2e:month-backup": "node tools/e2e-month-backup.cjs",
+    "e2e:backup-ui": "node tools/e2e-backup-ui.cjs",
+    "e2e:backup-ui-sqlite": "node tools/e2e-sqlite.cjs tools/e2e-backup-ui.cjs",
     "e2e:sqlite-backup": "node tools/e2e-sqlite.cjs tools/e2e-sqlite-backup.cjs",
     "e2e:roundtrip-cross": "node tools/e2e-roundtrip-cross.cjs",
     "e2e:archive-ops": "node tools/e2e-archive-ops.cjs",

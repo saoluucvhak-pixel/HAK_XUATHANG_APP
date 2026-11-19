@@ -35,7 +35,7 @@
         '<li><b>Một ngày hai tàu:</b> lập tàu A (lọc giờ cân / số phiếu hoặc Chọn phiếu…) → Lưu hồ sơ → <b>Thêm mới</b> cho tàu B trên cùng đợt cân; cột "Đã gán" cho biết phiếu đã thuộc tàu khác. Mở lại A vẫn đúng lựa chọn của A.</li>' +
         '<li><b>Phiếu bỏ khác xe trả về:</b> phiếu bỏ bị loại khỏi hồ sơ; xe trả về vẫn thuộc đợt cân nhưng được đánh dấu trả về.</li>' +
         '<li><b>Thêm mới:</b> xóa sạch phiếu bỏ, xe trả về, phiếu chọn riêng, bộ lọc và liên kết hợp đồng của hồ sơ trước; nếu còn thay đổi chưa lưu sẽ hỏi Lưu / Bỏ thay đổi / Quay lại.</li>' +
-        '<li><b>Nhập từ bản sao:</b> Cài đặt → Chung → <b>⬆ Nhập / Khôi phục từ bản sao</b>. Chọn <b>Nhập bổ sung</b> (giữ dữ liệu mới hơn trên máy; nhập lặp không đổi gì) hoặc <b>Khôi phục (ghi đè)</b> danh mục &amp; cài đặt về thời điểm sao lưu (có nút <b>↶ Hoàn tác khôi phục</b>). Nếu dừng giữa chừng, thông báo nêu kho đã nhập, kho chưa chạy và phần hoàn tác được.</li>' +
+        '<li><b>Nhập từ bản sao:</b> Cài đặt → <b>💾 Sao lưu &amp; khôi phục</b> → khối ③ <b>Khôi phục</b> (một nút, tự nhận file toàn bộ / tháng / năm). Chọn <b>Nhập bổ sung</b> (giữ dữ liệu mới hơn trên máy; nhập lặp không đổi gì) hoặc <b>Khôi phục (ghi đè)</b> danh mục &amp; cài đặt về thời điểm sao lưu (có nút <b>↶ Hoàn tác khôi phục</b>). Nếu dừng giữa chừng, thông báo nêu kho đã nhập, kho chưa chạy và phần hoàn tác được.</li>' +
         '<li><b>Đổi sheet / dòng tiêu đề / ánh xạ cột:</b> app đọc thử trước. Có dòng trùng hoàn toàn (cùng số phiếu, biển số, giờ cân) hoặc kết quả không hợp lệ thì <b>không áp dụng</b> — giữ nguyên cấu hình đang dùng và nêu sheet, số phiếu, dòng Excel cần xử lý.</li>' +
         '<li><b>Báo cáo theo ngày cân:</b> hồ sơ không đọc được hoặc phiếu thiếu / sai ngày cân được tách thành <b>chưa phân bổ</b> (khung vàng + sheet "Chưa phân bổ" trong Excel); tháng / năm chỉ gồm phần đã xác minh, không tự dồn vào ngày bắt đầu hồ sơ.</li>' +
         '<li><b>Mẫu báo cáo (Báo cáo tổng hợp):</b> chọn 1 trong 5 mẫu — <i>Tổng hợp theo kỳ</i> (so với kỳ trước cùng độ dài), <i>Phân tích theo tàu / kho / ĐVVC</i> (Top N + Khác, tỷ lệ xe trả về có mẫu số), <i>Tiến độ và đối chiếu hợp đồng</i> (BDMT gốc / hiện hành / chứng thư, MT thực giao), <i>Hải quan và công nợ thuế</i> (công ty → hợp đồng → tờ khai, không bù trừ), <i>Ngoại lệ cần đối soát</i>. Từ dòng tổng bấm <b>Hồ sơ / Phiếu cân / Hồ sơ hợp đồng / Giấy nộp tiền</b> để tra về nguồn. Màn hình, Excel và PDF cùng một kết quả và cùng phạm vi công ty.</li>' +
@@ -115,7 +115,7 @@
       true,
       '<p>Khi máy chính có thay đổi (thêm hợp đồng, nhân viên, đổi Sheet, mẫu Word…):</p><ol>' +
         '<li>Máy chính: xuất gói mới (bước A4) cho đúng công ty của máy cần cập nhật.</li>' +
-        '<li>Máy cần cập nhật: đăng nhập Quản trị → Cài đặt → Chung → 💾 <b>Sao lưu toàn bộ</b> trước.</li>' +
+        '<li>Máy cần cập nhật: đăng nhập Quản trị → Cài đặt → 💾 Sao lưu &amp; khôi phục → <b>Sao lưu toàn bộ</b> trước.</li>' +
         '<li>📦 <b>Nhập gói cấu hình</b> → chọn file → xem tóm tắt → <b>Áp dụng &amp; tải lại</b>.</li></ol>' +
         '<ul><li><b>Thay</b> theo gói: công ty, kho, mã ĐVVC, mẫu Word, Google Sheet (máy trạm: Sheet công ty khác bị xóa khỏi máy).</li>' +
         '<li><b>Gộp</b>: hợp đồng (trùng thì cập nhật theo gói, ô trống trong gói không xóa số liệu chứng thư của máy; HĐ riêng của máy giữ nguyên); Nhân viên theo tên đăng nhập (trùng tên Quản trị của máy → bỏ qua, có báo).</li>' +
@@ -147,7 +147,7 @@
         '<h6>Gỡ app rồi cài lại có vào được không?</h6><p><b>Không.</b> Tài khoản và dữ liệu nằm trong bộ nhớ của trình duyệt (Chrome / Edge), không nằm trong thư mục cài — gỡ / cài lại (kể cả thư mục khác) vẫn gặp đúng tài khoản cũ. Việc này để cập nhật / cài lại không mất dữ liệu.</p>' +
         '<h6>Cách cuối cùng — mất cả mã khôi phục lẫn công cụ, nhưng còn file Sao lưu toàn bộ</h6><ol>' +
         '<li>Mở app bằng <b>trình duyệt khác</b> (đang dùng Chrome thì mở bằng Edge, hoặc ngược lại) → app trắng như máy mới → nhập <b>gói cấu hình</b> (nếu có) → tạo <b>Quản trị mới</b>.</li>' +
-        '<li>Cài đặt → Chung → 💾 → để tick <b>"Giữ tài khoản đang dùng trên máy này"</b> → <b>Khôi phục toàn bộ</b> → chọn file sao lưu.</li>' +
+        '<li>Cài đặt → 💾 Sao lưu &amp; khôi phục → ③ để tick <b>"Giữ tài khoản đang dùng trên máy này"</b> → <b>Khôi phục toàn bộ</b> → chọn file sao lưu.</li>' +
         '<li>Hồ sơ Lưu trữ, đợt Excel, danh mục, cài đặt được lấy về; tài khoản vẫn là Quản trị mới vừa tạo. Tạo lại tài khoản Nhân viên nếu cần (hoặc nhập gói cấu hình).</li>' +
         '<li>Từ nay mở app bằng trình duyệt mới này. Dữ liệu trong trình duyệt cũ vẫn còn nhưng không vào được.</li></ol>' +
         '<p class="small muted">Chỉ <b>bỏ tick</b> ô đó khi chuyển sang máy mới và muốn mọi người đăng nhập bằng mật khẩu cũ trong file sao lưu.</p></div>',
@@ -170,7 +170,7 @@
       'Tự sao lưu mỗi ngày + Sức khỏe dữ liệu (v2.7.5)',
       false,
       '<p>Dữ liệu app nằm trong trình duyệt của máy — hỏng / xóa trình duyệt là mất. Từ v2.7.5 app <b>tự sao lưu mỗi ngày</b> vào 1 thư mục anh chọn:</p><ol>' +
-        '<li>Quản trị: ⚙️ Cài đặt → 🛠️ Chung → thẻ <b>Bộ nhớ &amp; sao lưu</b> → <b>🔁 Tự sao lưu vào thư mục</b> → <b>📁 Chọn thư mục tự sao lưu…</b> → chọn thư mục (nên là thư mục <b>Google Drive / OneDrive</b> đồng bộ, hoặc ổ D) → bấm <b>Cho phép</b> (Allow) khi trình duyệt hỏi quyền sửa file.</li>' +
+        '<li>Quản trị: ⚙️ Cài đặt → <b>💾 Sao lưu &amp; khôi phục</b> → khối ④ <b>🔁 Tự sao lưu định kỳ</b> / ⑤ Thư mục → <b>📁 Chọn thư mục tự sao lưu…</b> → chọn thư mục (nên là thư mục <b>Google Drive / OneDrive</b> đồng bộ, hoặc ổ D) → bấm <b>Cho phép</b> (Allow) khi trình duyệt hỏi quyền sửa file.</li>' +
         '<li>Bấm <b>▶ Sao lưu vào thư mục ngay</b> để tạo bản đầu tiên. Chọn số bản giữ (mặc định 10).</li>' +
         '<li>Từ đó mỗi ngày, lần đầu mở app (sau khoảng 20 giây) app ghi <span class="mono">HAK_TuDong_&lt;ngày&gt;_&lt;giờ&gt;.zip</span>, đọc lại kiểm tra, rồi xóa bản <span class="mono">HAK_TuDong_*.zip</span> cũ hơn số bản giữ (không đụng file khác).</li></ol>' +
         '<ul><li>Chrome / Edge thường <b>hỏi lại quyền</b> sau mỗi lần mở trình duyệt: Tổng quan hiện dòng 🔁 → bấm <b>Cho phép &amp; sao lưu</b> (trình duyệt có lựa chọn "Cho phép mỗi lần truy cập" thì chọn để khỏi hỏi lại).</li>' +
