@@ -34,6 +34,7 @@
   async function inspect(raw) {
     const zip = await JSZip.loadAsync(raw);
     if (zip.file('word/vbaProject.bin')) throw Error('Chỉ nhận DOCX không có macro');
+    if (HAK.Util && HAK.Util.checkZipLimits) HAK.Util.checkZipLimits(zip, { maxFile: 8e6, maxTotal: 25e6 });
     const f = zip.file('word/document.xml');
     if (!f) throw Error('Không phải mẫu Word DOCX');
     const xml = await f.async('string');

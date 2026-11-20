@@ -569,9 +569,21 @@
             d = DOCS()[r.type],
             t = d ? d.title : r.type;
           if (c.why === 'overlap')
-            return 'dải ' + pad6(r.pxkFrom) + '–' + pad6(r.pxkTo) + ' đã lập ngày ' + fmtDT(r.at) + ' (' + t + ', đợt "' + r.batch + '")';
+            return (
+              'dải ' +
+              pad6(r.pxkFrom) +
+              '–' +
+              pad6(r.pxkTo) +
+              ' đã lập ngày ' +
+              fmtDT(r.at) +
+              ' (' +
+              esc(t) +
+              ', đợt "' +
+              esc(r.batch) +
+              '")'
+            );
           if (c.why === 'again') return 'đợt này đã lập PXK ngày ' + fmtDT(r.at) + ' với dải ' + pad6(r.pxkFrom) + '–' + pad6(r.pxkTo);
-          return 'số ' + r.soBkls + ' đã dùng ngày ' + fmtDT(r.at) + ' cho đợt "' + r.batch + '" (' + t + ')';
+          return 'số ' + esc(r.soBkls) + ' đã dùng ngày ' + fmtDT(r.at) + ' cho đợt "' + esc(r.batch) + '" (' + esc(t) + ')';
         })
         .join('; ') + (cs.length > 3 ? ' …' : '')
     );

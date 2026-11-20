@@ -565,11 +565,24 @@
       if (!f) return;
       try {
         const d = JSON.parse(await f.text());
-        if (!Array.isArray(d.companies) || !Array.isArray(d.warehouses)) throw new Error('File không đúng định dạng cấu hình.');
-        C().data.companies = d.companies;
-        C().data.warehouses = d.warehouses;
-        C().data.general = Object.assign(C().data.general, d.general || {});
-        if (Array.isArray(d.carrierCodes)) C().data.carrierCodes = d.carrierCodes;
+        const U = root.HAK && root.HAK.Util;
+        const valid = U && U.validateConfigData ? U.validateConfigData(d) : d;
+        if (!Array.isArray(valid.companies) || !Array.isArray(valid.warehouses)) throw new Error('File không đúng định dạng cấu hình.');
+        if (
+          typeof confirm === 'function' &&
+          !confirm(
+            'Nhập cấu hình sẽ thay thế danh sách công ty (' +
+              valid.companies.length +
+              ') và kho (' +
+              valid.warehouses.length +
+              ') hiện tại. Tiếp tục?'
+          )
+        )
+          return;
+        C().data.companies = valid.companies;
+        C().data.warehouses = valid.warehouses;
+        C().data.general = Object.assign(C().data.general, valid.general || {});
+        if (Array.isArray(valid.carrierCodes)) C().data.carrierCodes = valid.carrierCodes;
         C().save();
         HAK.Settings.render();
         HAK.Pages.refreshSelects();

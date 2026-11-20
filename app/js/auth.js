@@ -1152,12 +1152,12 @@
           (u.disabled ? '🔒 Khóa' : 'Đang dùng') +
           '</td>' +
           '<td class="text-end text-nowrap"><div class="btn-group btn-group-sm"><button class="btn btn-outline-primary" data-us="edit" data-id="' +
-          u.id +
+          esc(u.id) +
           '" type="button">Sửa</button>' +
           (u.id === cur.id
             ? ''
             : '<button class="btn btn-outline-secondary" data-us="lock" data-id="' +
-              u.id +
+              esc(u.id) +
               '" type="button">' +
               (u.disabled ? 'Mở khóa' : 'Khóa') +
               '</button>') +
@@ -1381,7 +1381,8 @@
         Object.assign(loc, v);
         r.updated++;
       } else {
-        const id = pu.id && !d.users.some((x) => x.id === pu.id) ? pu.id : 'u' + Date.now().toString(36) + rand(3);
+        const safeId = HAK.Util && HAK.Util.asId ? HAK.Util.asId(pu.id) : pu.id;
+        const id = safeId && !d.users.some((x) => x.id === safeId) ? safeId : 'u' + Date.now().toString(36) + rand(3);
         d.users.push(Object.assign({ id, createdAt: pu.createdAt || Date.now() }, v));
         r.added++;
       }

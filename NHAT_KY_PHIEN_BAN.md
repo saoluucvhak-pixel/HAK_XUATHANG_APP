@@ -1,5 +1,11 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.25.2 — Đợt 1b: Bảo mật & toàn vẹn khi nhập file (B1–B11, N-02)
+- **Lớp lược đồ + ép kiểu dùng chung (`HAK.Util`):** chuẩn hóa và kiểm tra kiểu dữ liệu khi nhập ở `Archive.importItems` (**B1**), `Issued.importAll` + `pad6` (**B2**), `Batches.importAll` (**B3**), `Auth.packIn` (**B4**), và nhập cấu hình `settings.js` (**N-02** — kiểm tra trước khi ghi, hỏi xác nhận). Escape đầu ra ở Lưu trữ, Báo cáo, Chứng từ, Tài khoản, Nhập liệu.
+- **Danh sách trắng khóa sao lưu (`backup.js`):** chỉ cho phép khôi phục các khóa `hak.*` hợp lệ (**B7**), kiểm tra lược đồ `hak.config.v1`, `hak.auth.v1`, `hak.gsync.v2` trước khi ghi để không làm hỏng khởi động (**B8**).
+- **An toàn XML & phòng chống ZIP bomb:** loại bỏ ký tự điều khiển XML 1.0 không hợp lệ khi sinh BKLS `.docx` (**B5**), kiểm tra `uncompressedSize` từ thư mục trung tâm ZIP trước khi giải nén ở sao lưu, mẫu BKLS và file Excel `.xlsx` (**B9–B11**).
+- **Kiểm thử:** thêm `tests/schema-security.test.cjs` và `e2e:import-hostile` (IndexedDB + SQLite).
+
 ## v2.25.1 — Đợt 1: Sửa 4 lỗi mức Cao (L-01, L-02, L-03, L-04)
 - **L-01 (Google Sheet):** khi đang bật bộ lọc kỳ/tìm kiếm làm ẩn bớt hồ sơ hoặc phiếu cân của lô, bấm đồng bộ Google Sheet sẽ cảnh báo rõ số dòng ngoài kỳ sẽ bị xóa và hỏi xác nhận trước khi gửi; sửa tooltip mâu thuẫn trên nút đồng bộ. Ghi mục chờ quyết **D-01** vào `docs/QUY_TAC_NGHIEP_VU_CAN_XAC_NHAN.md`.
 - **L-02 / U-01 (Sao lưu toàn vẹn):** bật kiểm tra `checkCRC32: true` khi mở file sao lưu `.zip`, bọc lỗi giải nén thành thông báo tiếng Việt; bổ sung `manifest` (số bản ghi + SHA-256 từng phần) khi tạo bản sao lưu và kiểm tra trước khi khôi phục; bản sao lưu cũ không có `manifest` vẫn khôi phục được (đánh dấu "chưa kiểm").

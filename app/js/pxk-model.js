@@ -35,7 +35,7 @@
   ];
   /** kg → tấn (2 số lẻ), làm tròn half-up TRÊN SỐ NGUYÊN: Math.round(kg/1000*100)/100 làm tròn xuống sai ở 286 / 60.000 mức kg tận cùng 5 (vd 145 kg → 0,14 thay vì 0,15). */
   const tan = (kg) => Math.round((Number(kg) || 0) / 10) / 100;
-  const pad6 = (n) => 'PXK' + String(n).padStart(6, '0');
+  const pad6 = (n) => 'PXK' + String(Math.max(0, Math.trunc(Number(n) || 0))).padStart(6, '0');
   /**
    * rows = phiếu cân của đợt ({ net (kg), dateStr, driver, carrier, plate }); v = giá trị biểu mẫu; ctx = { cua, hopDong }.
    * 1 phiếu cân = 1 dòng PXK; số PXK = start + thứ tự dòng (đúng thứ tự file). Số lượng = kg / 1000 làm tròn 2 chữ số (tấn).
