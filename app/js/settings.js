@@ -566,7 +566,7 @@
       try {
         const d = JSON.parse(await f.text());
         const U = root.HAK && root.HAK.Util;
-        const valid = U && U.validateConfigData ? U.validateConfigData(d) : d;
+        const valid = U && U.validateConfigData ? U.validateConfigData(d, true) : d;
         if (!Array.isArray(valid.companies) || !Array.isArray(valid.warehouses)) throw new Error('File không đúng định dạng cấu hình.');
         if (
           typeof confirm === 'function' &&

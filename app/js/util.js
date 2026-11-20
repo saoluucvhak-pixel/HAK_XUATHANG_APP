@@ -11,7 +11,7 @@
   /** 'yyyy-mm-dd…' → 'dd/mm/yyyy' ('' nếu không phải ngày ISO). */
   const vnDate = (iso) => (iso && /^\d{4}-\d\d-\d\d/.test(iso) ? iso.slice(8, 10) + '/' + iso.slice(5, 7) + '/' + iso.slice(0, 4) : '');
 
-  const SAFE_ID_RE = /^[A-Za-z0-9_.:-]{1,128}$/;
+  const SAFE_ID_RE = /^[A-Za-z0-9_.:|-]{1,128}$/;
   const isPlainObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
   const asNum = (v, def) => {
     const n = Number(v);
@@ -116,31 +116,37 @@
     return Object.assign({}, raw, { users });
   }
 
-  function validateConfigData(d) {
+  function validateConfigData(d, strict) {
     if (!isPlainObj(d)) throw new Error('File không đúng định dạng cấu hình.');
-    if (!Array.isArray(d.companies) || !Array.isArray(d.warehouses)) {
+    if (strict && (!Array.isArray(d.companies) || !Array.isArray(d.warehouses))) {
       throw new Error('File không đúng định dạng cấu hình (thiếu danh sách công ty/kho).');
     }
-    if (!d.companies.length) throw new Error('Cấu hình phải có ít nhất 1 công ty.');
-    const companies = d.companies.map((c, i) => {
-      if (!isPlainObj(c) || !asId(c.id) || typeof c.name !== 'string' || !c.name.trim()) {
-        throw new Error('Công ty thứ ' + (i + 1) + ' không hợp lệ (thiếu mã hoặc tên).');
-      }
-      return Object.assign({}, c, { id: asId(c.id), name: c.name.trim() });
-    });
-    const warehouses = d.warehouses.map((w, i) => {
-      if (!isPlainObj(w) || !asId(w.id) || typeof w.name !== 'string' || !w.name.trim()) {
-        throw new Error('Kho thứ ' + (i + 1) + ' không hợp lệ (thiếu mã hoặc tên).');
-      }
-      return Object.assign({}, w, { id: asId(w.id), name: w.name.trim() });
-    });
+    const out = Object.assign({}, d);
+    if (d.companies !== undefined) {
+      if (!Array.isArray(d.companies) || !d.companies.length) throw new Error('Cấu hình phải có ít nhất 1 công ty.');
+      out.companies = d.companies.map((c, i) => {
+        if (!isPlainObj(c) || !asId(c.id) || typeof c.name !== 'string' || !c.name.trim()) {
+          throw new Error('Công ty thứ ' + (i + 1) + ' không hợp lệ (thiếu mã hoặc tên).');
+        }
+        return Object.assign({}, c, { id: asId(c.id), name: c.name.trim() });
+      });
+    }
+    if (d.warehouses !== undefined) {
+      if (!Array.isArray(d.warehouses)) throw new Error('Danh sách kho không hợp lệ.');
+      out.warehouses = d.warehouses.map((w, i) => {
+        if (!isPlainObj(w) || !asId(w.id) || typeof w.name !== 'string' || !w.name.trim()) {
+          throw new Error('Kho thứ ' + (i + 1) + ' không hợp lệ (thiếu mã hoặc tên).');
+        }
+        return Object.assign({}, w, { id: asId(w.id), name: w.name.trim() });
+      });
+    }
     if (d.general !== undefined && !isPlainObj(d.general)) {
       throw new Error('Mục cấu hình chung không hợp lệ.');
     }
     if (d.carrierCodes !== undefined && (!Array.isArray(d.carrierCodes) || d.carrierCodes.some((x) => !isPlainObj(x)))) {
       throw new Error('Bảng mã đơn vị vận chuyển không hợp lệ.');
     }
-    return Object.assign({}, d, { companies, warehouses });
+    return out;
   }
 
   function validateGsyncConfig(v) {
