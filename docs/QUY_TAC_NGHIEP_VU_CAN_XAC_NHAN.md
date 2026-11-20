@@ -67,4 +67,3 @@ Các quy tắc dưới đây đã được **suy ra từ mã nguồn / tài li�
     - **(b) Chặn / hỏi xác nhận** khi bộ lọc không phủ hết hồ sơ của lô, nêu rõ số dòng ngoài kỳ sẽ bị xóa (đang áp dụng phần cảnh báo xác nhận ở L-01 mà không đổi số liệu). *Gợi ý của kiểm toán: an toàn nhất, không tự ý đổi số liệu.*
     - **(c) Giữ nguyên** như cũ (đẩy phần đang lọc và xóa phiếu ngoài kỳ mà không cảnh báo): dễ mất dữ liệu ngoài kỳ trên Sheet.
   - **Tác động:** Chọn (a) đòi hỏi tách dữ liệu gửi Sheet khỏi bộ lọc màn hình Báo cáo; chọn (b) giữ an toàn tối đa và chỉ cần chốt câu chữ/hành vi chặn cứng hay cho phép xác nhận.
-
