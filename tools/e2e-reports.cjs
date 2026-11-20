@@ -396,6 +396,7 @@ async function login(p) {
     }
   }
   await p.evaluate(() => {
+    HAK.Report.ticketCache.clear(); // bộ đệm phiếu dùng chung (L-22): xóa để buộc đọc lại kho
     HAK.Archive.load = async () => {
       throw new Error('mô phỏng: kho dữ liệu hỏng');
     };

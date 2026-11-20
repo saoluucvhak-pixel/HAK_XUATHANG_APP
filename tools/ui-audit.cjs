@@ -283,6 +283,8 @@ const ROUTES = [
         'bàn phím ' + r + ': ' + noRing.length + ' điều khiển nhận focus nhưng không có dấu focus (' + noRing.slice(0, 3).join(', ') + ')'
       );
   }
+  // Tắt chuyển tiếp CSS khi đổi giao diện: tránh đo tương phản giữa chừng hiệu ứng chuyển màu (kết quả chập chờn trên máy chạy chậm)
+  await page.addStyleTag({ content: '*, *::before, *::after { transition: none !important; animation: none !important; }' });
   for (const theme of ['luxe', 'classic', 'neutral', 'champagne'])
     for (const mode of ['light', 'dark']) {
       await page.evaluate(

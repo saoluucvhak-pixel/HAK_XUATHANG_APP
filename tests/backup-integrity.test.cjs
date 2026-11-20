@@ -5,6 +5,7 @@ const { test } = require('node:test'),
 function boot() {
   const store = new Map();
   global.window = global;
+  if (!global.crypto || !global.crypto.subtle) global.crypto = require('node:crypto').webcrypto; // Node 18 chưa có crypto toàn cục
   global.HAK = {};
   global.JSZip = require('../app/libs/jszip.min.js');
   HAK.Store = {
