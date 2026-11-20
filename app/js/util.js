@@ -191,7 +191,17 @@
     else if (k === 'hak.auth.v1') cleanAuthStore(v);
     else if (k === 'hak.gsync.v2') validateGsyncConfig(v);
     else if (k === 'hak.auth.lastco') {
-      if (v !== '' && v !== '*' && v !== null && !asId(v)) throw new Error('Công ty đang chọn không hợp lệ.');
+      if (v !== '' && v !== '*' && v !== null) {
+        if (isPlainObj(v)) {
+          for (const uk of Object.keys(v)) {
+            if (!asId(uk) || (v[uk] !== '' && v[uk] !== '*' && !asId(v[uk]))) {
+              throw new Error('Công ty đang chọn không hợp lệ.');
+            }
+          }
+        } else if (!asId(v)) {
+          throw new Error('Công ty đang chọn không hợp lệ.');
+        }
+      }
     } else if (k === 'hak.workingYear') {
       if (v !== null && v !== '' && (!Number.isInteger(Number(v)) || Number(v) < 2000 || Number(v) > 2100)) {
         throw new Error('Năm làm việc trong sao lưu không hợp lệ.');
