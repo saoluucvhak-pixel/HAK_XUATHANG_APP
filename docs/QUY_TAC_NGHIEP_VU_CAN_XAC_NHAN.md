@@ -67,3 +67,15 @@ Các quy tắc dưới đây đã được **suy ra từ mã nguồn / tài li�
     - **(b) Chặn / hỏi xác nhận** khi bộ lọc không phủ hết hồ sơ của lô, nêu rõ số dòng ngoài kỳ sẽ bị xóa (đang áp dụng phần cảnh báo xác nhận ở L-01 mà không đổi số liệu). *Gợi ý của kiểm toán: an toàn nhất, không tự ý đổi số liệu.*
     - **(c) Giữ nguyên** như cũ (đẩy phần đang lọc và xóa phiếu ngoài kỳ mà không cảnh báo): dễ mất dữ liệu ngoài kỳ trên Sheet.
   - **Tác động:** Chọn (a) đòi hỏi tách dữ liệu gửi Sheet khỏi bộ lọc màn hình Báo cáo; chọn (b) giữ an toàn tối đa và chỉ cần chốt câu chữ/hành vi chặn cứng hay cho phép xác nhận.
+- **D-05 (liên quan L-09 — Dòng chỉ có khối lượng, thiếu biển/số phiếu/ngày):**
+  - **Câu hỏi:** Khi nhập Excel cân gặp dòng chỉ có khối lượng (không biển số, không số phiếu, không ngày giờ, và không có nhãn "Tổng cộng"): nên loại bỏ, chỉ cảnh báo, hay chặn nạp có xác nhận? (Quy tắc 15 chỉ mới chốt dòng sai ngày là cảnh báo.)
+  - **Các phương án:** (a) Chặn nạp có xác nhận (giống quy tắc 12) — *gợi ý của kiểm toán*; (b) Chỉ cảnh báo mạnh (đang áp dụng ở L-09 mà không đổi số liệu); (c) Tự động loại bỏ.
+  - **Tác động:** Chọn (a) hoặc (c) sẽ thay đổi số phiếu được nạp từ các file cân không có nhãn "Tổng cộng".
+- **D-06 (liên quan L-11 — Chuỗi số có đơn vị hoặc nhóm dấu nghìn không đều):**
+  - **Câu hỏi:** Với chuỗi như `"5 tấn"`, `"1200kg"`, `"1.2.3"`, `"1.200.5"`: nên chấp nhận có cảnh báo hay từ chối không đọc? (Quy tắc 27 chỉ mới chốt `"1,200"`.)
+  - **Các phương án:** (a) Chấp nhận giá trị hiện tại và cảnh báo (đang áp dụng ở L-11) — *gợi ý của kiểm toán*; (b) Từ chối trả về trống (`null`) và báo lỗi dòng.
+  - **Tác động:** Chọn (b) có thể làm giảm số dòng đọc được từ các file cân gõ kèm đơn vị.
+- **D-09 (liên quan L-19 — Giờ cân `24:00:00`):**
+  - **Câu hỏi:** Khi file cân ghi `24:00:00` (hoặc serial làm tròn thành `24:00:00`): coi là `00:00` ngày hôm sau (đổi ngày cân), kẹp `23:59:59` giữ nguyên ngày, hay coi là sai giờ + cảnh báo (như giờ `25:00` ở quy tắc 15)?
+  - **Các phương án:** (a) Coi là "sai giờ" + cảnh báo theo quy tắc 15 — *gợi ý của kiểm toán*; (b) Chuyển sang `00:00` ngày sau đồng bộ cả `ts1` và `dateStr` kèm cảnh báo (đang áp dụng tạm ở L-19 để `ts1` và `dateStr` không mâu thuẫn); (c) Kẹp `23:59:59` giữ ngày cũ.
+  - **Tác động:** Chọn (a) sẽ đưa phiếu `24:00:00` vào nhóm "Thiếu/sai ngày cân"; chọn (c) giữ phiếu ở ngày cũ.

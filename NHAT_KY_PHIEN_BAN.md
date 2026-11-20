@@ -1,5 +1,14 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.25.3 — Đợt 2: Nhập liệu (L-09, L-10, L-11, L-19, N-04, N-05, N-13, N-14)
+- **L-10 (Dấu trừ Unicode):** chuẩn hóa `−`, `–`, `—`, `‒` (`U+2212`…) thành `-` trong `excel.js` (`parseNumWarn`) và `numfmt.js` (`parseDec`).
+- **L-11 (Cảnh báo số mơ hồ — D-06):** thêm `parseNumWarn` cảnh báo khi số có kèm chữ/đơn vị hoặc nhóm phân cách không đều 3 chữ số (giữ nguyên giá trị đọc theo quy tắc 27).
+- **L-09 (Dòng Tổng cộng — D-05):** bỏ qua dòng có nhãn `Tổng`/`Cộng` ở bất kỳ cột nào khi thiếu biển số, số phiếu, ngày; cảnh báo mạnh với dòng chỉ có khối lượng (nghi dòng tổng không nhãn).
+- **L-19 (Ngày giờ — D-09):** hỗ trợ `AM/PM`, hệ ngày Excel `1904` (`WBProps.date1904`), đồng bộ `dateStr` với `ts1` và cảnh báo rõ khi gặp `24:00:00`.
+- **N-04 & N-05 (Nhập Excel danh mục):** chỉ tạo khách hàng khi dòng hợp lệ; báo rõ số dòng Excel & lý do bỏ qua; tối ưu `importWorkbook` từ `O(N²)` (~6 giây / 1.500 dòng) xuống `O(N)` (< 100 ms).
+- **N-13 & N-14:** cảnh báo khối lượng bất thường (> 200 tấn/phiếu); thêm `maxlength` cho ô nhập liệu Danh mục.
+- Ghi các mục chờ quyết **D-05, D-06, D-09** vào `docs/QUY_TAC_NGHIEP_VU_CAN_XAC_NHAN.md`.
+
 ## v2.25.2 — Đợt 1b: Bảo mật & toàn vẹn khi nhập file (B1–B11, N-02)
 - **Lớp lược đồ + ép kiểu dùng chung (`HAK.Util`):** chuẩn hóa và kiểm tra kiểu dữ liệu khi nhập ở `Archive.importItems` (**B1**), `Issued.importAll` + `pad6` (**B2**), `Batches.importAll` (**B3**), `Auth.packIn` (**B4**), và nhập cấu hình `settings.js` (**N-02** — kiểm tra trước khi ghi, hỏi xác nhận). Escape đầu ra ở Lưu trữ, Báo cáo, Chứng từ, Tài khoản, Nhập liệu.
 - **Danh sách trắng khóa sao lưu (`backup.js`):** chỉ cho phép khôi phục các khóa `hak.*` hợp lệ (**B7**), kiểm tra lược đồ `hak.config.v1`, `hak.auth.v1`, `hak.gsync.v2` trước khi ghi để không làm hỏng khởi động (**B8**).

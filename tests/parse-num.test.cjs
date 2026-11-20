@@ -29,3 +29,24 @@ test('a number starting with 0 and three decimals is a decimal, not thousands', 
 test('blank and non-numeric input give null', () => {
   for (const v of ['', '  ', null, undefined, 'abc']) assert.equal(f(v), null);
 });
+test('L-10: dấu trừ Unicode (U+2212, en-dash, em-dash) đọc đúng thành số âm', () => {
+  assert.equal(f('−1200'), -1200);
+  assert.equal(f('–500'), -500);
+  assert.equal(f('—1.200,5'), -1200.5);
+});
+test('L-11: chuỗi rác/đơn vị giữ nguyên giá trị (QT 27) nhưng có cảnh báo', () => {
+  const pw = HAK.Excel.util.parseNumWarn;
+  assert.equal(typeof pw, 'function', 'phải có parseNumWarn');
+  for (const [raw, expected] of [
+    ['1.2.3', 123],
+    ['1.200.5', 12005],
+    ['5 tấn', 5],
+    ['1200kg', 1200],
+  ]) {
+    const r = pw(raw);
+    assert.equal(r.value, expected, raw);
+    assert.ok(r.warn, 'phải có cảnh báo cho: ' + raw);
+  }
+  assert.equal(pw('1.200').warn, null);
+  assert.equal(pw('1.250.000').warn, null);
+});

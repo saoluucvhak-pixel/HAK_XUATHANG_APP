@@ -385,7 +385,7 @@
     if (/xuat ban|ban/.test(k)) return 'xuatban';
     return 'xuatkhau';
   }
-  /** wb = workbook SheetJS. Trả về { sheet, rows, addedCustomers, addedContracts, updated, skipped } hoặc ném lỗi. */
+  /** wb = workbook SheetJS. Trả về { sheet, rows, addedCustomers, addedContracts, updated, skipped, skipReasons, warnings } hoặc ném lỗi. */
   function importWorkbook(wb) {
     let found = null;
     for (const sn of wb.SheetNames) {
@@ -403,8 +403,78 @@
     syncCompanies();
     const { G: rowsAll, hr, m } = found,
       cell = (row, k) => (m[k] === undefined ? null : row[m[k]]);
-    const out = { sheet: found.sn, rows: 0, addedCustomers: 0, addedContracts: 0, updated: 0, skipped: 0 };
-    rowsAll.slice(hr + 1).forEach((row) => {
+    const working = M.copy(state.data);
+    working.customers = working.customers || [];
+    working.contracts = working.contracts || [];
+    working.products = working.products || [];
+
+    const custByKey = new Map();
+    working.customers.forEach((c) => {
+      const k = keyName(c.name);
+      if (k && !custByKey.has(k)) custByKey.set(k, c);
+    });
+    const byNo = new Map();
+    const byTkhq = new Map();
+    const byShipDate = new Map();
+    const goodsByKey = new Map();
+    const gk = (s) =>
+      String(s || '')
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .trim();
+    working.products.forEach((g) => goodsByKey.set(gk(g.name), g));
+
+    const indexContract = (c) => {
+      if (c.deletedAt) return;
+      if (c.no) byNo.set(c.type + '|' + c.no, c);
+      M.active(c).forEach((d) => {
+        if (d.tkhq) byTkhq.set(d.tkhq, c);
+        else if (d.ship) byShipDate.set(keyName(d.ship) + '|' + (c.date || ''), c);
+      });
+    };
+    working.contracts.forEach(indexContract);
+
+    const ensureGoodsFast = (name) => {
+      name = String(name || '').trim();
+      if (!name) return;
+      const k = gk(name);
+      if (!goodsByKey.has(k)) {
+        const g = { id: 'goods-' + uid('').replace(/^id-/, ''), name, unit: 'BDMT' };
+        working.products.push(g);
+        goodsByKey.set(k, g);
+      }
+    };
+
+    const resolveCust = (name, addr, pending) => {
+      const cleanName = String(name || '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (!cleanName) return null;
+      const k = keyName(cleanName);
+      let c = custByKey.get(k);
+      if (c) {
+        if (!c.address && addr) c.address = String(addr).trim();
+        return { c, created: false };
+      }
+      const p = pending.find((x) => x.k === k);
+      if (p) return { c: p.c, created: false };
+      c = { id: uid('kh'), kind: 'ngoai', name: cleanName, address: String(addr || '').trim(), country: '', tax: '', note: '' };
+      pending.push({ k, c });
+      return { c, created: true };
+    };
+
+    const parseNumCell = (v, label, excelRow, out) => {
+      if (U().parseNumWarn) {
+        const r = U().parseNumWarn(v);
+        if (r.warn) out.warnings.push('Dòng ' + excelRow + ' (' + label + '): ' + r.warn);
+        return r.value === null || !isFinite(r.value) ? null : r.value;
+      }
+      return num(v);
+    };
+
+    const out = { sheet: found.sn, rows: 0, addedCustomers: 0, addedContracts: 0, updated: 0, skipped: 0, skipReasons: [], warnings: [] };
+    rowsAll.slice(hr + 1).forEach((row, idx) => {
+      const excelRow = hr + 2 + idx;
       row = row || [];
       const tkhq = tkhqOf(cell(row, 'tkhq')),
         ship = String(cell(row, 'ship') || '')
@@ -412,10 +482,9 @@
           .trim();
       if (!tkhq && !ship) return;
       out.rows++;
-      const cu = ensureCustomer(cell(row, 'customer'), cell(row, 'custAddr'));
-      if (cu && cu.created) out.addedCustomers++;
-      const se = cell(row, 'seller') ? ensureCustomer(cell(row, 'seller'), '') : null;
-      if (se && se.created) out.addedCustomers++;
+      const pendingCusts = [];
+      const cu = resolveCust(cell(row, 'customer'), cell(row, 'custAddr'), pendingCusts);
+      const se = cell(row, 'seller') ? resolveCust(cell(row, 'seller'), '', pendingCusts) : null;
       const inc = {
         type: m.type !== undefined ? typeOf(cell(row, 'type')) : undefined,
         date: cell(row, 'date'),
@@ -439,11 +508,14 @@
         whId: findWh(cell(row, 'wh')),
       };
       const isoD = isoOf(inc.date);
-      const old = contracts().find(
-        (c) =>
-          (inc.no && c.no === String(inc.no).trim() && (!inc.type || c.type === inc.type)) ||
-          M.active(c).some((d) => (tkhq ? d.tkhq === tkhq : !d.tkhq && keyName(d.ship) === keyName(ship) && c.date === isoD))
-      );
+      const noStr = inc.no ? String(inc.no).trim() : '';
+      let old = (noStr && inc.type && byNo.get(inc.type + '|' + noStr)) || null;
+      if (!old && noStr && !inc.type) {
+        old = byNo.get('xuatkhau|' + noStr) || byNo.get('uythac|' + noStr) || byNo.get('xuatban|' + noStr) || null;
+      }
+      if (!old) {
+        old = tkhq ? byTkhq.get(tkhq) : byShipDate.get(keyName(ship) + '|' + isoD);
+      }
       const incomingRoles = M.roles(Object.assign({}, inc, { type: inc.type || (old && old.type) || 'xuatkhau' }));
       const parent = old ? M.copy(old) : M.parent({ type: inc.type || 'xuatkhau', no: inc.no, date: isoD, currency: 'USD', details: [] });
       ['date', 'no', 'type', 'priceUsd', 'dryFactory', 'note'].forEach((k) => {
@@ -460,8 +532,9 @@
       const detail = existing ? M.copy(existing) : M.child(parent.id, {});
       M.childFields.forEach((k) => {
         const v = inc[k];
-        if (v !== undefined && v !== null && v !== '' && !(k === 'filterTrips' && !v))
-          detail[k] = ['mt', 'bdmt', 'moisture', 'qty', 'priceUsd'].includes(k) ? num(v) : v;
+        if (v !== undefined && v !== null && v !== '' && !(k === 'filterTrips' && !v)) {
+          detail[k] = ['mt', 'bdmt', 'moisture', 'qty', 'priceUsd'].includes(k) ? parseNumCell(v, k, excelRow, out) : v;
+        }
       });
       detail.certDate = isoOf(detail.certDate) || '';
       detail.fromDate = isoOf(detail.fromDate) || '';
@@ -469,14 +542,52 @@
       const index = parent.details.findIndex((d) => d.id === detail.id);
       if (index < 0) parent.details.push(detail);
       else parent.details[index] = detail;
-      const result = upsertContract(parent, old ? old.revision : undefined);
-      if (result.error) {
+
+      const cleaned = cleanContract(parent);
+      let err = '';
+      if (cleaned.dryFactory !== null && !(cleaned.dryFactory > 0 && cleaned.dryFactory < 1)) {
+        err = 'Độ khô nhà máy phải trong khoảng 0 – 1.';
+      } else if (!cleaned.no && !M.active(cleaned).some((d) => d.ship || d.tkhq)) {
+        err = 'Cần số hợp đồng hoặc tàu / TKHQ ở dòng chi tiết.';
+      } else if (cleaned.no) {
+        const dupNo = byNo.get(cleaned.type + '|' + cleaned.no);
+        if (dupNo && dupNo.id !== cleaned.id) err = 'Đã có hợp đồng số "' + cleaned.no + '".';
+      }
+      if (!err && detail.tkhq) {
+        const owner = byTkhq.get(detail.tkhq);
+        if (owner && owner.id !== cleaned.id) err = 'Số TKHQ "' + detail.tkhq + '" đã thuộc hợp đồng khác.';
+      }
+      if (err) {
         out.skipped++;
+        out.skipReasons.push({ row: excelRow, reason: err });
         return;
       }
-      if (old) out.updated++;
-      else out.addedContracts++;
+
+      // Hợp lệ → mới ghi khách hàng mới và hợp đồng vào working
+      pendingCusts.forEach((p) => {
+        if (!custByKey.has(p.k)) {
+          working.customers.push(p.c);
+          custByKey.set(p.k, p.c);
+          out.addedCustomers++;
+        }
+      });
+      const rec = M.parent(cleaned);
+      for (const d of rec.details) Object.assign(d, M.valuation(rec, d));
+      ensureGoodsFast(rec.contractProduct);
+      for (const d of rec.details) ensureGoodsFast(d.product);
+      rec.revision = (old ? old.revision : 0) + 1;
+      if (old) {
+        const at = working.contracts.findIndex((x) => x.id === old.id);
+        if (at >= 0) working.contracts[at] = rec;
+        else working.contracts.push(rec);
+        out.updated++;
+      } else {
+        working.contracts.push(rec);
+        out.addedContracts++;
+      }
+      indexContract(rec);
     });
+    state.data = working;
     save();
     return out;
   }
@@ -775,6 +886,9 @@
           ? ' step="' + opt.step + '" inputmode="decimal"'
           : '') +
       (opt.list ? ' list="' + opt.list + '"' : '') +
+      (!isNum && (!opt.type || opt.type === 'text')
+        ? ' maxlength="' + (opt.maxlength || (/note|address/i.test(id) ? 500 : 120)) + '"'
+        : '') +
       (opt.ro ? ' readonly' : '') +
       ' value="' +
       esc(shown) +
@@ -1790,6 +1904,18 @@
       state.tab = 'contracts';
       renderRows();
       changed();
+      const skipMsg = r.skipped
+        ? '; bỏ qua ' +
+          r.skipped +
+          ' dòng (' +
+          (r.skipReasons || [])
+            .slice(0, 3)
+            .map((x) => 'dòng ' + x.row + ': ' + x.reason)
+            .join('; ') +
+          ((r.skipReasons || []).length > 3 ? '…' : '') +
+          ')'
+        : '';
+      const warnMsg = r.warnings && r.warnings.length ? ' · ⚠ ' + r.warnings.slice(0, 2).join('; ') : '';
       toast(
         'Đã nhập sheet "' +
           r.sheet +
@@ -1802,9 +1928,10 @@
           ', thêm ' +
           r.addedCustomers +
           ' khách hàng' +
-          (r.skipped ? '; bỏ qua ' + r.skipped + ' dòng lỗi (trùng TKHQ / số liệu sai)' : '') +
+          skipMsg +
+          warnMsg +
           '.',
-        r.skipped ? 'warning' : 'success'
+        r.skipped || (r.warnings && r.warnings.length) ? 'warning' : 'success'
       );
     } catch (err) {
       console.error(err);

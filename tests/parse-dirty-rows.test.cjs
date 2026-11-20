@@ -35,3 +35,16 @@ test('dòng tổng/chữ ký không bị báo nhầm là thiếu khối lượng
   assert.equal(ds.rows.length, 1);
   assert.doesNotMatch(ds.warnings.join('\n'), /thiếu khối lượng|không đọc được khối lượng/i);
 });
+test('L-09: dòng Tổng cộng ở cột B bị bỏ; dòng chỉ có khối lượng (không nhãn) có cảnh báo mạnh', () => {
+  const ds = HAK.Excel.parseSheet(
+    sheet([HEAD, ['101', '43C-111.11', '05/01/2026', 20000], ['', 'Tổng cộng', '', 20000], ['', '', '', 20000]]),
+    'S'
+  );
+  assert.equal(ds.rows.length, 2, 'dòng Tổng cộng ở cột B phải bị bỏ');
+  assert.match(ds.warnings.join('\n'), /chỉ có khối lượng|tổng/i, 'dòng chỉ có KL phải có cảnh báo mạnh');
+});
+test('N-13: khối lượng bất thường (> 200.000 kg) có cảnh báo', () => {
+  const ds = HAK.Excel.parseSheet(sheet([HEAD, ['101', '43C-111.11', '05/01/2026', 500000]]), 'S');
+  assert.equal(ds.rows.length, 1);
+  assert.ok(ds.rows[0].warn.some((w) => /bất thường|200/i.test(w)));
+});

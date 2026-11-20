@@ -59,3 +59,41 @@ test('số âm trong ngoặc kiểu kế toán đọc thành số âm', () => {
   assert.equal(parseNum('(abc)'), null);
   assert.equal(parseNum('1.200'), 1200);
 });
+
+test('L-19: đọc giờ AM/PM, hệ ngày 1904, và 24:00:00 không làm ts1 lệch dateStr', () => {
+  const am12 = parseDT('05/01/2026 12:00 AM');
+  assert.equal(am12.hh, 0);
+  const pm1 = parseDT('05/01/2026 1:00 PM');
+  assert.equal(pm1.hh, 13);
+  const pm12 = parseDT('05/01/2026 12:30 PM');
+  assert.equal(pm12.hh, 12);
+
+  const XLSX = require('../app/libs/xlsx.full.min.js');
+  global.XLSX = XLSX;
+  const wb1904 = XLSX.utils.book_new();
+  wb1904.Workbook = { WBProps: { date1904: true } };
+  XLSX.utils.book_append_sheet(
+    wb1904,
+    XLSX.utils.aoa_to_sheet([
+      ['Số phiếu', 'Biển số xe', 'Ngày giờ cân', 'Khối lượng hàng (kg)'],
+      ['101', '43C-111.11', 44562, 20000], // 1904 system: 44562 -> 2026-01-02 (vs 1900: 2022-01-01)
+      ['102', '43C-222.22', '05/01/2026 24:00:00', 21000],
+    ]),
+    'S'
+  );
+  const ds = HAK.Excel.parseSheet(wb1904, 'S');
+  assert.equal(new Date(ds.rows[0].ts1).getUTCFullYear(), 2026, 'hệ ngày 1904 phải cộng 1462 ngày');
+  const r24 = ds.rows[1];
+  const dFromTs = new Date(r24.ts1);
+  const expectedDate =
+    String(dFromTs.getUTCDate()).padStart(2, '0') +
+    '/' +
+    String(dFromTs.getUTCMonth() + 1).padStart(2, '0') +
+    '/' +
+    dFromTs.getUTCFullYear();
+  assert.equal(r24.dateStr, expectedDate, 'ts1 và dateStr không được mâu thuẫn nhau ở 24:00:00');
+  assert.ok(
+    r24.warn.some((w) => /24:00/i.test(w)),
+    'phải cảnh báo giờ 24:00:00'
+  );
+});
