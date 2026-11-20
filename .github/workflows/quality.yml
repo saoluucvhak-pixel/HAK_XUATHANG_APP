@@ -159,20 +159,25 @@ jobs:
           if (-not $up) { throw 'HAKDocs không trả lời' }
           $env:HAK_DB_EXTERNAL_TOKEN = [regex]::Match((Get-Content app/native/hakdocs-token.js -Raw), "HAK_DOCS_TOKEN='([0-9a-f]{32})'").Groups[1].Value
           $fail = @()
-          foreach ($t in 'e2e-persist-keys', 'e2e-company-scope', 'e2e-backup-ui', 'e2e-month-backup', 'e2e-sqlite-backup') {
+          # e2e-sqlite-backup cần thư mục sao lưu mặc định TRỐNG: chạy đầu tiên (các bài sau tự sao lưu mỗi lần mở app — đúng tính năng)
+          Remove-Item (Join-Path $env:HAK_DATA_DIR 'backups\HAK_SQLite_*.db') -ErrorAction SilentlyContinue
+          foreach ($t in 'e2e-sqlite-backup', 'e2e-persist-keys', 'e2e-company-scope', 'e2e-backup-ui', 'e2e-month-backup') {
             Write-Host "=== SQLite (HAKDocs.exe thật): $t"
             node tools/e2e-sqlite.cjs "tools/$t.cjs"
             if ($LASTEXITCODE -ne 0) { $fail += "sqlite:$t" }
           }
+          # Phần IndexedDB: tệp mã bảo vệ trống (như bản HTML / portable) để app KHÔNG tự nối HAKDocs; phần SQLite trong roundtrip-cross
+          # vẫn đi qua e2e-sqlite.cjs (chèn mã bảo vệ vào trang) tới đúng HAKDocs.exe đang chạy.
+          Set-Content -Path app/native/hakdocs-token.js -Value "window.HAK_DOCS_TOKEN='';" -Encoding ascii
           Write-Host '=== Chuyển máy chéo IndexedDB <-> SQLite (HAKDocs.exe thật)'
           node tools/e2e-roundtrip-cross.cjs
           if ($LASTEXITCODE -ne 0) { $fail += 'roundtrip-cross' }
+          $tok = $env:HAK_DB_EXTERNAL_TOKEN; Remove-Item Env:HAK_DB_EXTERNAL_TOKEN
           foreach ($t in 'e2e-persist-keys', 'e2e-company-scope', 'e2e-sf-focus') {
             Write-Host "=== IndexedDB (Edge): $t"
-            $env:HAK_DB_EXTERNAL_TOKEN_SAVE = $env:HAK_DB_EXTERNAL_TOKEN; Remove-Item Env:HAK_DB_EXTERNAL_TOKEN
             node "tools/$t.cjs"
             if ($LASTEXITCODE -ne 0) { $fail += "idb:$t" }
-            $env:HAK_DB_EXTERNAL_TOKEN = $env:HAK_DB_EXTERNAL_TOKEN_SAVE
           }
+          $env:HAK_DB_EXTERNAL_TOKEN = $tok
           Stop-Process -Id $p.Id -Force
           if ($fail.Count) { throw ("Nghiệm thu mở rộng Windows lỗi: " + ($fail -join ', ')) }
