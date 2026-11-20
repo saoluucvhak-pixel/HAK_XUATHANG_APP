@@ -285,7 +285,65 @@ function makeScript(code) {
     r === true && rowsOf('NL_HOPDONG').length === 1 && rowsOf('NL_CHUNGTHU').length === 2,
     'gửi lại hợp đồng: không nhân đôi (1 hợp đồng, 2 chi tiết)'
   );
-  check(errs.length === 0, 'không có lỗi script' + (errs.length ? ': ' + errs.join(' | ') : ''));
+
+  console.log('4) L-01: lọc kỳ thiếu phiếu của lô → cảnh báo sẽ xóa dòng ngoài kỳ; hủy thì Sheet không giảm');
+  await p.evaluate(async () => {
+    const mk = (tag, n, kg) =>
+      Array.from({ length: n }, (_, i) => ({
+        idx: i + 2,
+        uid: tag + i,
+        ticket: tag + '-' + i,
+        plate: '43C-' + (2000 + i),
+        driver: '',
+        carrier: '',
+        wh: '',
+        weightType: '',
+        weigher: '',
+        note: '',
+        warn: [],
+        ts1: Date.UTC(2026, 6, 15, 8, i),
+        ts2: null,
+        dateStr: '15/07/2026',
+        time1: '08:' + String(i).padStart(2, '0'),
+        time2: '',
+        tare: 10000,
+        gross: 10000 + kg,
+        net: kg,
+      }));
+    await HAK.Archive.save(
+      'xuatkhau',
+      { giaoId: 'hak', nhanId: 'k-iwc', ship: 'TÀU GSA', contractId: window.__A, returned: [], filter: {} },
+      { files: [{ name: 'GS_A_T7.docx' }], summary: {} },
+      { rows: mk('GSA2', 2, 20000), excluded: [] },
+      'word'
+    );
+  });
+  r = await pushLots();
+  check(r.ok && rowsOf('NL_PC_XH').length === 10, 'đồng bộ không lọc: Sheet có đủ 10 phiếu (8 + 2)', String(rowsOf('NL_PC_XH').length));
+  await p.evaluate(() => (location.hash = '#/report'));
+  await p.waitForTimeout(800);
+  await p.evaluate(() => {
+    const f = document.getElementById('repFrom'),
+      t = document.getElementById('repTo');
+    f.value = '2026-07-01';
+    t.value = '2026-07-31';
+    t.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await p.waitForTimeout(500);
+  let warnMsg = '';
+  p.removeAllListeners('dialog');
+  p.on('dialog', async (d) => {
+    warnMsg = d.message();
+    await d.dismiss();
+  });
+  await p.click('#repGsXH');
+  await p.waitForTimeout(200);
+  await p.click('#repGsXH');
+  await p.waitForTimeout(1200);
+  check(/xóa/i.test(warnMsg) && /8/.test(warnMsg), 'L-01: hiện cảnh báo sẽ xóa 8 dòng ngoài kỳ', warnMsg.slice(0, 120));
+  check(rowsOf('NL_PC_XH').length === 10, 'L-01: hủy xác nhận → Sheet vẫn giữ đủ 10 phiếu', String(rowsOf('NL_PC_XH').length));
+
+  check(errs.length === 0, 'không có lỗi script' + (errs.length ? ': ' + errs.slice(0, 2).join(' | ') : ''));
   await browser.close();
   console.log(failures.length ? '\n✗ ' + failures.length + ' ca lỗi' : '\n✓ Đạt toàn bộ');
   process.exit(failures.length ? 1 : 0);

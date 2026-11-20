@@ -1883,16 +1883,58 @@
         toast(e.message || String(e), 'error');
       }
     });
+    function checkGsyncScope(allMetas, curLots, curOpts) {
+      curOpts = curOpts || {};
+      const scoped = curOpts.scope ? allMetas.filter((m) => curOpts.scope.indexOf(HAK.Auth.companyOfMeta(m)) >= 0) : allMetas;
+      const fullModel = compute(scoped, {
+        scope: curOpts.scope || null,
+        manual: curOpts.manual,
+        basis: 'start',
+        tickets: ticketMapAll || curOpts.tickets,
+      });
+      const fullLots = new Map(
+        xhLots(fullModel.used, { scope: curOpts.scope || null })
+          .lots.filter((L) => L.recs.length && L.type !== 'traodoi')
+          .map((L) => [L.key, L])
+      );
+      const partial = [];
+      let totalCurTrips = 0,
+        totalFullTrips = 0,
+        totalMissingTrips = 0;
+      (curLots || []).forEach((L) => {
+        const full = fullLots.get(L.key);
+        const curT = L.trips || 0;
+        const fullT = full ? full.trips || 0 : curT;
+        totalCurTrips += curT;
+        totalFullTrips += Math.max(curT, fullT);
+        if (full && (fullT > curT || full.recs.length > L.recs.length)) {
+          const missingTrips = Math.max(0, fullT - curT);
+          const missingRecs = Math.max(0, full.recs.length - L.recs.length);
+          totalMissingTrips += missingTrips;
+          partial.push({
+            key: L.key,
+            label: (L.c && L.c.no) || L.ship || L.key,
+            curTrips: curT,
+            fullTrips: fullT,
+            missingTrips,
+            missingRecs,
+          });
+        }
+      });
+      return { partial, totalCurTrips, totalFullTrips, totalMissingTrips };
+    }
     $('#repGsXH').addEventListener('click', (e) => {
       const { toast, Loading } = HAK.UI;
       if (!HAK.GSync) return;
+      const curOpts = opts();
       // Chỉ lô CÓ hồ sơ cân: lô chỉ có trong Danh mục không gửi → phiếu cũ nhập tay trên Sheet không bị xóa.
       // v2.6.7 (Thủy chốt 28/09/2026): Trao đổi hàng hóa KHÔNG đồng bộ lên Google Sheet (vẫn có trong báo cáo + Excel Xuất hàng).
-      const lots = model ? xhLots(model.used, opts()).lots.filter((L) => L.recs.length && L.type !== 'traodoi') : [];
+      const lots = model ? xhLots(model.used, curOpts).lots.filter((L) => L.recs.length && L.type !== 'traodoi') : [];
       if (!lots.length) {
         toast('Không có lô nào có hồ sơ cân trong khoảng đã chọn để đồng bộ.', 'warning');
         return;
       }
+      const scopeCheck = checkGsyncScope(metas, lots, curOpts);
       // v2.6.3: mỗi lô về Sheet của công ty BÊN XUẤT (công ty của hồ sơ đầu tiên của lô)
       const coOfLot = (L) =>
         (HAK.Auth && HAK.Auth.companyOfMeta ? HAK.Auth.companyOfMeta(L.recs[0]) : '') ||
@@ -1911,6 +1953,42 @@
       HAK.UI.confirmClick(
         e.currentTarget,
         async () => {
+          if (scopeCheck.partial.length) {
+            const ask = typeof confirm === 'function' ? confirm : () => true;
+            const names =
+              scopeCheck.partial
+                .slice(0, 3)
+                .map((x) => x.label + ' (' + x.curTrips + '/' + x.fullTrips + ' phiếu)')
+                .join(', ') + (scopeCheck.partial.length > 3 ? '…' : '');
+            if (
+              !ask(
+                '⚠ Bộ lọc hiện tại không phủ hết hồ sơ của ' +
+                  scopeCheck.partial.length +
+                  ' lô (' +
+                  names +
+                  ').\n\n' +
+                  'Đồng bộ chế độ thay thế sẽ gửi ' +
+                  scopeCheck.totalCurTrips.toLocaleString('vi-VN') +
+                  ' dòng đang lọc và sẽ XÓA ' +
+                  scopeCheck.totalMissingTrips.toLocaleString('vi-VN') +
+                  ' dòng ngoài kỳ trên Google Sheet.\n\n' +
+                  'Khuyên dùng: bấm Hủy, bỏ lọc kỳ rồi đồng bộ lại để không mất phiếu ngoài kỳ.\n' +
+                  'Bấm OK chỉ khi bạn chắc chắn muốn xóa ' +
+                  scopeCheck.totalMissingTrips.toLocaleString('vi-VN') +
+                  ' dòng ngoài kỳ.'
+              )
+            )
+              return;
+          }
+          console.info(
+            '[GSync] Đồng bộ',
+            lots.length,
+            'lô,',
+            scopeCheck.totalCurTrips,
+            'phiếu gửi,',
+            scopeCheck.totalMissingTrips,
+            'phiếu ngoài kỳ bị che.'
+          );
           try {
             Loading.show('Đang đọc phiếu cân từ Lưu trữ…');
             const trips = await xhTrips(lots, (i, n) => Loading.set(Math.round((i / n) * 40), 'Đang đọc hồ sơ ' + i + ' / ' + n + '…'));

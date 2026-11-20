@@ -58,4 +58,13 @@ Các quy tắc dưới đây đã được **suy ra từ mã nguồn / tài li�
 ## Tách theo công ty (v2.25.0) — ĐÃ XÁC NHẬN 19/11/2026
 36. **Một bộ cài, TÁCH HẲN THEO CÔNG TY — ĐÃ XÁC NHẬN (19/11/2026); ĐÃ triển khai v2.25.0.** Khi đã chọn công ty làm việc, mọi màn chỉ hiện / cho chọn dữ liệu của công ty đó: Danh mục, Lưu trữ, Báo cáo, Tổng quan (đã có từ v2.6.2), **ô "Chọn hợp đồng" ở các trang lập hồ sơ, ô hợp đồng ở Chứng từ, Tìm kiếm Ctrl+K** (từ v2.25.0). Thay quyết định v2.6.2 "hợp đồng công ty khác vẫn chọn được": nay nhóm "Hợp đồng công ty khác" chỉ hiện khi bật **Xem tất cả công ty** (Danh mục). Hợp đồng ĐÃ gắn với hồ sơ đang mở luôn được giữ. Đổi công ty = chọn lại ở nút công ty (tải lại app). Giới hạn: đợt Excel cân đang nạp ở Nhập liệu là của máy, không gắn công ty.
 
-**Không còn mục chờ xác nhận.** (Mục 1–16 xác nhận 17/11/2026; 17–24 giữ nguyên; 26–31 xác nhận 18/11/2026; 32–36 xác nhận 19/11/2026).
+## Mục chờ chủ dự án quyết
+
+- **D-01 (liên quan L-01 — Đồng bộ Google Sheet khi đang lọc kỳ):**
+  - **Câu hỏi:** Khi người dùng đang bật bộ lọc kỳ/tìm kiếm làm ẩn bớt hồ sơ hoặc phiếu cân của một lô, bấm **☁ Đồng bộ Google Sheet** (chế độ `replace` theo lô) nên xử lý thế nào?
+  - **Các phương án:**
+    - **(a) Luôn gửi TOÀN BỘ phiếu của lô** (bỏ qua bộ lọc kỳ khi gom phiếu đẩy lên Sheet): giữ đủ dữ liệu trên Sheet, nhưng người dùng có thể bất ngờ khi dữ liệu gửi đi rộng hơn bảng đang xem trên màn hình.
+    - **(b) Chặn / hỏi xác nhận** khi bộ lọc không phủ hết hồ sơ của lô, nêu rõ số dòng ngoài kỳ sẽ bị xóa (đang áp dụng phần cảnh báo xác nhận ở L-01 mà không đổi số liệu). *Gợi ý của kiểm toán: an toàn nhất, không tự ý đổi số liệu.*
+    - **(c) Giữ nguyên** như cũ (đẩy phần đang lọc và xóa phiếu ngoài kỳ mà không cảnh báo): dễ mất dữ liệu ngoài kỳ trên Sheet.
+  - **Tác động:** Chọn (a) đòi hỏi tách dữ liệu gửi Sheet khỏi bộ lọc màn hình Báo cáo; chọn (b) giữ an toàn tối đa và chỉ cần chốt câu chữ/hành vi chặn cứng hay cho phép xác nhận.
+
