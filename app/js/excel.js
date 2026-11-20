@@ -231,13 +231,21 @@
         try {
           if (onProgress) onProgress(70);
           // Cho trình duyệt cơ hội vẽ lại loading trước khi SheetJS parse (đồng bộ, có thể vài trăm ms)
-          setTimeout(() => {
+          setTimeout(async () => {
             try {
-              const wb = root.XLSX.read(new Uint8Array(fr.result), { type: 'array', cellDates: false, cellNF: false, cellStyles: false });
+              const bytes = new Uint8Array(fr.result);
+              if (bytes.length >= 2 && bytes[0] === 0x50 && bytes[1] === 0x4b && typeof root.JSZip === 'function') {
+                const U = root.HAK && root.HAK.Util;
+                if (U && U.checkZipLimits) {
+                  const z = await root.JSZip.loadAsync(bytes);
+                  U.checkZipLimits(z, { maxFile: 80 * 1024 * 1024, maxTotal: 160 * 1024 * 1024 });
+                }
+              }
+              const wb = root.XLSX.read(bytes, { type: 'array', cellDates: false, cellNF: false, cellStyles: false });
               if (onProgress) onProgress(100);
               resolve({ workbook: wb, sheetNames: wb.SheetNames.slice(), fileName: file.name, size: file.size });
             } catch (e) {
-              reject(new Error('File không phải Excel hợp lệ: ' + e.message));
+              reject(new Error('File không phải Excel hợp lệ hoặc vượt giới hạn: ' + e.message));
             }
           }, 30);
         } catch (e) {

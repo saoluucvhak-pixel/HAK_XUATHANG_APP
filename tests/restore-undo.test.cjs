@@ -39,17 +39,17 @@ test('khôi phục chụp bản hiện tại; hoàn tác trả lại đúng, g�
   HAK.Store.set('hak.config.v1', { a: 1 });
   HAK.Store.set('hak.catalog.v1', { v: 3, contracts: ['máy này'] });
   const r = await HAK.Backup.restoreFile(
-    fileOf(backupOf({ 'hak.config.v1': { a: 2 }, 'hak.catalog.v1': { v: 2 }, 'hak.moi.v1': { x: 1 } })),
+    fileOf(backupOf({ 'hak.config.v1': { a: 2 }, 'hak.catalog.v1': { v: 2 }, 'hak.tpl.moi': { x: 1 } })),
     { keepAuth: false, mode: 'replace' }
   );
   assert.equal(r.snapshot, true);
   assert.deepEqual(HAK.Store.get('hak.config.v1'), { a: 2 });
-  assert.ok(HAK.Store.get('hak.moi.v1'));
+  assert.ok(HAK.Store.get('hak.tpl.moi'));
   assert.ok(HAK.Backup.preRestoreInfo());
   const u = await HAK.Backup.undoRestore();
   assert.deepEqual(HAK.Store.get('hak.config.v1'), { a: 1 });
   assert.deepEqual(HAK.Store.get('hak.catalog.v1'), { v: 3, contracts: ['máy này'] });
-  assert.equal(HAK.Store.get('hak.moi.v1', null), null, 'khóa mới bị gỡ');
+  assert.equal(HAK.Store.get('hak.tpl.moi', null), null, 'khóa mới bị gỡ');
   assert.equal(HAK.Backup.preRestoreInfo(), null);
   assert.ok(u.removed >= 1);
   await assert.rejects(HAK.Backup.undoRestore(), /Chưa có bản chụp/);
@@ -130,7 +130,7 @@ test('SQLite: bản khác thay cài đặt trước khôi phục thì không b�
 test('SQLite: hoàn tác phải chờ ghi; lỗi vẫn giữ bản chụp để thử lại', async () => {
   const s = sqlite();
   s.seed('hak.config.v1', { a: 1 });
-  await HAK.Backup.restoreFile(fileOf(backupOf({ 'hak.config.v1': { a: 9 }, 'hak.moi.v1': { x: 1 } })), { mode: 'replace' });
+  await HAK.Backup.restoreFile(fileOf(backupOf({ 'hak.config.v1': { a: 9 }, 'hak.tpl.moi': { x: 1 } })), { mode: 'replace' });
   assert.deepEqual(s.durable.get('hak.config.v1'), { a: 9 });
   s.fail('hak.config.v1');
   await assert.rejects(HAK.Backup.undoRestore(), /SQLite write failed/);
@@ -138,6 +138,6 @@ test('SQLite: hoàn tác phải chờ ghi; lỗi vẫn giữ bản chụp để 
   s.fail(null);
   await HAK.Backup.undoRestore();
   assert.deepEqual(s.durable.get('hak.config.v1'), { a: 1 });
-  assert.equal(s.durable.has('hak.moi.v1'), false);
+  assert.equal(s.durable.has('hak.tpl.moi'), false);
   assert.equal(s.durable.has('hak.prerestore.v1'), false);
 });

@@ -352,6 +352,8 @@
       }
       const f = z.file(ZIP_INNER) || Object.values(z.files).find((x) => !x.dir && /\.json$/i.test(x.name));
       if (!f) throw new Error('File ZIP không có dữ liệu sao lưu (.json) của app.');
+      const U = (root.HAK && root.HAK.Util) || (typeof require === 'function' ? require('./util.js') : null);
+      if (U && U.checkZipLimits) U.checkZipLimits(z, { maxFile: 150 * 1024 * 1024, maxTotal: 250 * 1024 * 1024 });
       try {
         text = await f.async('string');
       } catch (e) {
@@ -454,6 +456,13 @@
       }
     }
     if (j.yearbook && HAK.Yearbook) HAK.Yearbook.validateBundle(j.yearbook.records);
+    const U = (root.HAK && root.HAK.Util) || (typeof require === 'function' ? require('./util.js') : null);
+    if (U && U.validateBackupKey && j.keys) {
+      for (const k of Object.keys(j.keys)) {
+        if (k === PRE_KEY || j.keys[k] === null) continue;
+        if (U.isAllowedBackupKey(k)) U.validateBackupKey(k, j.keys[k]);
+      }
+    }
   }
   async function verifyManifest(j) {
     if (!j || j.manifest === undefined) return 'unverified';
@@ -651,10 +660,12 @@
         label: 'cài đặt & danh mục',
         undoable: true,
         run: async () => {
+          const U = (root.HAK && root.HAK.Util) || (typeof require === 'function' ? require('./util.js') : null);
           for (const k of Object.keys(j.keys)) {
             if (k === PRE_KEY) continue;
             if (keepAuth && AUTH_KEYS.indexOf(k) >= 0) continue; // giữ tài khoản / mật khẩu / khóa khôi phục / loại máy hiện tại
             if (!(k.indexOf('hak.') === 0 && k !== LAST_KEY && k !== AUTO_KEY && k !== SQL_KEY && j.keys[k] !== null)) continue;
+            if (U && U.isAllowedBackupKey && !U.isAllowedBackupKey(k)) continue;
             if (k === CAT && merge && HAK.ContractModel) {
               // CÙNG quy tắc phiên bản với Gói cấu hình: bản cũ không ghi đè bản mới
               const merged = HAK.ContractModel.mergeCatalog(HAK.Store.get(CAT, null), j.keys[k]),

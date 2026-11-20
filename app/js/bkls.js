@@ -115,7 +115,10 @@
     return isNaN(d) ? null : d;
   }
   const r2 = (x) => Math.round(x * 100) / 100;
-  const escapeXmlText = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const escapeXmlText = (s) => {
+    const clean = HAK.Util && HAK.Util.stripXmlCtrl ? HAK.Util.stripXmlCtrl(s) : String(s == null ? '' : s);
+    return clean.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  };
   function stripLabelPrefix(line) {
     return line
       ? String(line)
@@ -1123,6 +1126,7 @@
     soThanhChu,
     formatSoVN,
     parseDMY,
+    escapeXmlText,
     splitCongTyHeader,
     stripLabelPrefix,
     templateBuffer,

@@ -556,17 +556,23 @@
     let added = 0,
       updated = 0,
       skipped = 0;
+    const U = (root.HAK && root.HAK.Util) || (typeof require === 'function' ? require('./util.js') : null);
     for (const it of list) {
-      if (!it || !it.meta || !it.meta.id || typeof it.data !== 'string') {
+      if (!it || !it.meta || typeof it.data !== 'string') {
         skipped++;
         continue;
       }
-      const cur = await getOne('meta', it.meta.id);
-      if (cur && cur.updatedAt >= it.meta.updatedAt) {
+      const meta = U && U.cleanArchiveMeta ? U.cleanArchiveMeta(it.meta) : it.meta;
+      if (!meta || !meta.id) {
         skipped++;
         continue;
       }
-      await putBoth(it.meta, it.data);
+      const cur = await getOne('meta', meta.id);
+      if (cur && cur.updatedAt >= meta.updatedAt) {
+        skipped++;
+        continue;
+      }
+      await putBoth(meta, it.data);
       cur ? updated++ : added++;
     }
     trim();
@@ -677,32 +683,32 @@
           (m.by ? esc(m.by) + (m.createdBy && m.createdBy !== m.by ? ' (lập đầu: ' + esc(m.createdBy) + ')' : '') : '(trước v2.6)') +
           '</div></td>' +
           '<td class="num">' +
-          m.trips.toLocaleString('vi-VN') +
+          Number(m.trips || 0).toLocaleString('vi-VN') +
           '</td><td class="num">' +
           HAK.Generator.fmtTon(m.kg) +
           '</td>' +
           '<td class="small">' +
-          (m.modes || []).map((x) => MODE_LABEL[x] || x).join(', ') +
+          (m.modes || []).map((x) => esc(MODE_LABEL[x] || x)).join(', ') +
           '</td>' +
           '<td class="text-nowrap text-end"><div class="btn-group btn-group-sm">' +
           '<button class="btn btn-outline-primary" data-act="word" data-id="' +
-          m.id +
+          esc(m.id) +
           '" type="button" title="Sinh lại Word">Word</button>' +
           '<button class="btn btn-outline-primary" data-act="pdf" data-id="' +
-          m.id +
+          esc(m.id) +
           '" type="button" title="Tải PDF">PDF</button>' +
           '<button class="btn btn-outline-success" data-act="xlsx" data-id="' +
-          m.id +
+          esc(m.id) +
           '" type="button" title="Xuất Excel">Excel</button>' +
           ((m.modes || []).indexOf('bkls') >= 0
             ? '<button class="btn btn-outline-dark" data-act="bkls" data-id="' +
-              m.id +
+              esc(m.id) +
               '" type="button" title="Tạo lại Bảng kê lâm sản (số BKLS ' +
               esc((m.summary || {})['Số BKLS'] || '') +
               ')">BKLS</button>'
             : '') +
           '<button class="btn btn-outline-danger" data-act="del" data-id="' +
-          m.id +
+          esc(m.id) +
           '" type="button" title="Xóa hồ sơ">🗑</button></div></td></tr>'
         );
       })
@@ -726,7 +732,7 @@
     const types = Array.from(new Set(cache.map((m) => m.type)));
     sel.innerHTML =
       '<option value="">Tất cả loại</option>' +
-      types.map((t) => '<option value="' + t + '">' + UI().esc(typeLabel(t)) + '</option>').join('');
+      types.map((t) => '<option value="' + UI().esc(t) + '">' + UI().esc(typeLabel(t)) + '</option>').join('');
     if (types.indexOf(cur) >= 0) sel.value = cur;
     renderRows();
     updateBadge();

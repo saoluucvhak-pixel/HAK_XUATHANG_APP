@@ -1218,7 +1218,7 @@
             '</td><td>' +
             esc(a.carrier) +
             '</td><td class="num">' +
-            a.trips.toLocaleString('vi-VN') +
+            Number(a.trips || 0).toLocaleString('vi-VN') +
             '</td><td class="num">' +
             ton(a.kg) +
             '</td>' +
@@ -1519,11 +1519,11 @@
         ton(b.delKg) +
         ' <span class="small muted">tấn</span></div>' +
         '<div class="small muted">' +
-        b.n +
+        Number(b.n || 0) +
         ' hồ sơ · ' +
-        b.trips.toLocaleString('vi-VN') +
+        Number(b.trips || 0).toLocaleString('vi-VN') +
         ' xe' +
-        (HAS_RET[k] && b.retTrips ? ' · trả về ' + b.retTrips + ' xe' : '') +
+        (HAS_RET[k] && b.retTrips ? ' · trả về ' + Number(b.retTrips || 0) + ' xe' : '') +
         '</div></div></div></div>'
       );
     }).join('');
@@ -1536,13 +1536,13 @@
         ' ' +
         esc(nm) +
         '</td><td class="num">' +
-        b.n +
+        Number(b.n || 0) +
         '</td><td class="num">' +
-        b.trips.toLocaleString('vi-VN') +
+        Number(b.trips || 0).toLocaleString('vi-VN') +
         '</td><td class="num">' +
         ton(b.kg) +
         '</td><td class="num">' +
-        (HAS_RET[k] ? (b.retTrips ? b.retTrips + ' xe · ' + ton(b.retKg) : '—') : '—') +
+        (HAS_RET[k] ? (b.retTrips ? Number(b.retTrips || 0) + ' xe · ' + ton(b.retKg) : '—') : '—') +
         '</td><td class="num fw-semibold">' +
         ton(b.delKg) +
         '</td></tr>'
@@ -1600,11 +1600,11 @@
               esc(r.giao) +
               (r.nhan ? ' → ' + esc(r.nhan) : '') +
               '</td><td class="num">' +
-              r.trips.toLocaleString('vi-VN') +
+              Number(r.trips || 0).toLocaleString('vi-VN') +
               '</td><td class="num">' +
               ton(r.kg) +
               '</td><td class="num">' +
-              (r.retTrips ? r.retTrips + ' xe · ' + ton(r.retKg) : '—') +
+              (r.retTrips ? Number(r.retTrips || 0) + ' xe · ' + ton(r.retKg) : '—') +
               '</td><td class="num fw-semibold">' +
               ton(r.delKg) +
               '</td></tr>'
@@ -1634,7 +1634,7 @@
           esc(r.from) +
           (r.to && r.to !== r.from ? ' → ' + esc(r.to) : '') +
           '</td><td class="num">' +
-          r.trips.toLocaleString('vi-VN') +
+          Number(r.trips || 0).toLocaleString('vi-VN') +
           '</td><td class="num">' +
           ton(r.kg) +
           '</td>' +

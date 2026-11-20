@@ -85,12 +85,14 @@ test('Nhập bổ sung: hợp đồng đã mở lại vẫn mở khi bản sao c
   HAK.Store.set('hak.catalog.v1', reopened);
   HAK.Store.set('hak.config.v1', { a: 1 });
   await HAK.Backup.restoreFile(
-    fileOf(backupOf({ 'hak.catalog.v1': cat({ revision: 2, closedAt: '2026-10-01' }), 'hak.config.v1': { a: 2 }, 'hak.moi.v1': { x: 1 } })),
+    fileOf(
+      backupOf({ 'hak.catalog.v1': cat({ revision: 2, closedAt: '2026-10-01' }), 'hak.config.v1': { a: 2 }, 'hak.tpl.moi': { x: 1 } })
+    ),
     { keepAuth: false, mode: 'merge' }
   );
   assert.equal(local().closedAt, undefined);
   assert.deepEqual(HAK.Store.get('hak.config.v1'), { a: 1 });
-  assert.deepEqual(HAK.Store.get('hak.moi.v1'), { x: 1 });
+  assert.deepEqual(HAK.Store.get('hak.tpl.moi'), { x: 1 });
 });
 test('Khôi phục (replace) thay danh mục bằng bản sao như thiết kế, và hoàn tác trả lại 700 / v4', async () => {
   boot();

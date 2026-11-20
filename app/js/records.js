@@ -135,20 +135,23 @@
     /** opts.keepNewer: không đè đợt đang có trên máy nếu phiên bản (rev) máy này >= bản sao (nhập bổ sung theo phiên bản; nhập lặp không đổi gì). */
     async importAll(items, opts) {
       let n = 0;
+      const U = (root.HAK && root.HAK.Util) || (typeof require === 'function' ? require('./util.js') : null);
       for (const it of items || []) {
-        if (!it || !it.meta || !it.meta.id || typeof it.b64 !== 'string') continue;
+        if (!it || !it.meta || typeof it.b64 !== 'string') continue;
+        const meta = U && U.cleanBatchMeta ? U.cleanBatchMeta(it.meta) : it.meta;
+        if (!meta || !meta.id) continue;
         if (opts && opts.keepNewer) {
-          const cur = await DB().get('batches', it.meta.id);
-          if (cur && (cur.rev || 0) >= (it.meta.rev || 0)) continue;
+          const cur = await DB().get('batches', meta.id);
+          if (cur && (cur.rev || 0) >= (meta.rev || 0)) continue;
         }
         await DB().guarded(
           ['batches', 'batchdata'],
           'batches',
-          it.meta.id,
+          meta.id,
           () => null,
           (tx) => {
-            tx.objectStore('batchdata').put(b64ToBuf(it.b64), it.meta.id);
-            tx.objectStore('batches').put(it.meta);
+            tx.objectStore('batchdata').put(b64ToBuf(it.b64), meta.id);
+            tx.objectStore('batches').put(meta);
           }
         );
         n++;
@@ -218,9 +221,11 @@
     },
     async importAll(items) {
       let n = 0;
+      const U = (root.HAK && root.HAK.Util) || (typeof require === 'function' ? require('./util.js') : null);
       for (const r of items || []) {
-        if (r && r.id && !this.list.some((x) => x.id === r.id)) {
-          await DB().put('issued', r);
+        const clean = U && U.cleanIssuedRec ? U.cleanIssuedRec(r) : r;
+        if (clean && clean.id && !this.list.some((x) => x.id === clean.id)) {
+          await DB().put('issued', clean);
           n++;
         }
       }

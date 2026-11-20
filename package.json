@@ -33,6 +33,8 @@
     "e2e:archive-ops": "node tools/e2e-archive-ops.cjs",
     "e2e:gsync-parity": "node tools/e2e-gsync-parity.cjs",
     "e2e:import-warn": "node tools/e2e-import-warn.cjs",
+    "e2e:import-hostile": "node tools/e2e-import-hostile.cjs",
+    "e2e:import-hostile-sqlite": "node tools/e2e-sqlite.cjs tools/e2e-import-hostile.cjs",
     "snapshot:customs": "node tools/customs-snapshot.cjs",
     "audit:data": "node tools/data-audit.cjs",
     "accept": "node tools/accept.cjs",

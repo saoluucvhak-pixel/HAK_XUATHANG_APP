@@ -304,7 +304,7 @@
       '" title="' +
       esc(b.veh.fileName || '') +
       '">🚚 ' +
-      b.veh.count +
+      Number(b.veh.count || 0) +
       ' xe' +
       (vi && vi.plates ? ' · ' + vi.matched + '/' + vi.plates : '') +
       '</span>'
@@ -996,7 +996,7 @@
       '</b>' +
       (veh.sheet ? ' · sheet "' + esc(veh.sheet) + '"' : '') +
       ' · ' +
-      veh.count +
+      Number(veh.count || 0) +
       ' xe' +
       (veh.at ? ' · ' + esc(vehDate(veh.at)) : '') +
       (veh.from ? ' <span class="muted">(từ đợt ' + esc(veh.from) + ')</span>' : '');
