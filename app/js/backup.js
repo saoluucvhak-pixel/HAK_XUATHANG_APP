@@ -1017,13 +1017,28 @@
       if (e.kind === 'file' && AUTO_RE.test(name)) {
         try {
           const f = await e.getFile();
-          out.push({ name, size: f.size, at: f.lastModified });
+          if (f.size > 0) out.push({ name, size: f.size, at: f.lastModified });
         } catch (x) {
           /* bỏ qua */
         }
       }
     }
-    return out.sort((a, b) => (a.name < b.name ? 1 : a.name > b.name ? -1 : 0)); // tên có ngày giờ → mới nhất trước
+    return out.sort((a, b) => (b.at || 0) - (a.at || 0) || (a.name < b.name ? 1 : a.name > b.name ? -1 : 0));
+  }
+  async function verifyAutoZip(file) {
+    if (!file || !(file.size > 0)) throw new Error('File sao lưu ghi ra bị rỗng (0 byte).');
+    if (typeof root.JSZip === 'function') {
+      let z;
+      try {
+        const buf = file.arrayBuffer ? await file.arrayBuffer() : file;
+        z = await root.JSZip.loadAsync(buf, { checkCRC32: true });
+      } catch (e) {
+        throw new Error('File sao lưu tự động đọc lại bị hỏng (CRC32).');
+      }
+      const inner = z.file(ZIP_INNER);
+      if (!inner) throw new Error('File sao lưu tự động thiếu dữ liệu bên trong.');
+      await inner.async('string');
+    }
   }
   const autoDue = (c) => c.on && !(c.last && c.last.ok && Date.now() - c.last.at < AUTO_EVERY);
   /** Ghi 1 bản vào thư mục. opts.ask = được hỏi quyền (đang trong thao tác bấm của người dùng); opts.force = chạy dù chưa bật / chưa tới hạn. */
@@ -1038,20 +1053,43 @@
       return { err: 'perm' };
     }
     auto.busy = true;
+    const name = 'HAK_TuDong_' + stamp(true) + '.zip';
+    const partName = name + '.part';
+    let committed = false;
+    let wroteFinal = false;
     try {
       const f = await buildFull(),
         zip = await zipParts(f.parts);
       if (!zip) throw new Error('Thiếu thư viện nén ZIP.');
-      const name = 'HAK_TuDong_' + stamp(true) + '.zip';
-      const fh = await h.getFileHandle(name, { create: true }),
-        w = await fh.createWritable();
+      const fhPart = await h.getFileHandle(partName, { create: true }),
+        w = await fhPart.createWritable();
       await w.write(zip);
       await w.close();
-      const chk = await (await h.getFileHandle(name)).getFile();
+      const chk = await (await h.getFileHandle(partName)).getFile();
       if (chk.size !== zip.size) throw new Error('File ghi ra không đủ (' + chk.size + ' / ' + zip.size + ' byte).');
+      await verifyAutoZip(chk);
+      if (typeof fhPart.move === 'function') {
+        await fhPart.move(name);
+        committed = true;
+      } else {
+        wroteFinal = true;
+        const fh = await h.getFileHandle(name, { create: true }),
+          w2 = await fh.createWritable();
+        await w2.write(zip);
+        await w2.close();
+        const chk2 = await (await h.getFileHandle(name)).getFile();
+        if (chk2.size !== zip.size) throw new Error('File ghi ra không đủ (' + chk2.size + ' / ' + zip.size + ' byte).');
+        await verifyAutoZip(chk2);
+        committed = true;
+        try {
+          await h.removeEntry(partName);
+        } catch (e) {
+          /* bỏ qua */
+        }
+      }
       const keep = Math.max(1, +c.keep || 10);
       let removed = 0;
-      for (const x of (await autoList()).slice(keep)) {
+      for (const x of (await autoList()).filter((x) => x.name !== name).slice(Math.max(0, keep - 1))) {
         try {
           await h.removeEntry(x.name);
           removed++;
@@ -1065,6 +1103,20 @@
       auto.warned = false;
       return { name, size: zip.size, removed, archive: f.archive };
     } catch (e) {
+      if (h && h.removeEntry) {
+        try {
+          await h.removeEntry(partName);
+        } catch (x) {
+          /* bỏ qua */
+        }
+        if (wroteFinal && !committed) {
+          try {
+            await h.removeEntry(name);
+          } catch (x) {
+            /* bỏ qua */
+          }
+        }
+      }
       console.error('Tự sao lưu lỗi:', e);
       autoSet({ last: Object.assign({}, autoCfg().last, { failAt: Date.now(), ok: false, err: e.message || String(e) }) });
       return { err: 'fail', msg: e.message || String(e) };
