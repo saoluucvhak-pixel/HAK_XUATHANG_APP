@@ -43,8 +43,41 @@
   };
 
   /** Gọi HAKDocs. Lỗi: Error có .code ('conflict' | 'fk' | 'unique' | 'scope' | 'unreachable' …), .status, .detail; .conflict = true khi xung đột phiên bản. */
+  /* v2.25.1: lệnh GHI đang chạy (POST không phải đọc). Tải lại trang khi còn lệnh ghi đang bay có thể HỦY nó → mất dữ liệu vừa lưu
+   * (vd lưu bộ lọc rồi đổi công ty ngay). idle() chờ các lệnh ghi xong (tối đa 5 giây) trước khi app tự tải lại trang. */
+  let inflight = 0,
+    waiters = [];
+  const settle = () => {
+    if (inflight > 0) return;
+    const w = waiters;
+    waiters = [];
+    w.forEach((f) => f());
+  };
+  S.idle = (maxMs) =>
+    inflight <= 0
+      ? Promise.resolve(true)
+      : new Promise((ok) => {
+          const t = setTimeout(() => ok(false), maxMs || 5000);
+          waiters.push(() => {
+            clearTimeout(t);
+            ok(true);
+          });
+        });
+  S.pendingWrites = () => inflight;
   async function call(path, body, opt) {
     opt = opt || {};
+    const isWrite = body !== undefined && path !== '/db/query' && path !== '/db/check' && path !== '/db/status';
+    if (isWrite) inflight++;
+    try {
+      return await callInner(path, body, opt);
+    } finally {
+      if (isWrite) {
+        inflight--;
+        settle();
+      }
+    }
+  }
+  async function callInner(path, body, opt) {
     const headers = { 'X-HAK-Client': 'documents-v1', 'X-HAK-Token': token() };
     if (body !== undefined) headers['Content-Type'] = 'application/json';
     if (S.session && !opt.noSession) headers['X-HAK-Session'] = S.session;
@@ -57,11 +90,14 @@
       const readOnly = path === '/db/query' || path === '/db/check';
       for (let attempt = 0; ; attempt++) {
         try {
+          const payload = body === undefined ? undefined : JSON.stringify(body);
           r = await fetch(url() + path, {
             method: body === undefined ? 'GET' : 'POST',
             headers,
-            body: body === undefined ? undefined : JSON.stringify(body),
+            body: payload,
             signal: ctl ? ctl.signal : undefined,
+            // lệnh ghi nhỏ: keepalive để vẫn tới HAKDocs khi trang bị đóng / tải lại giữa chừng (giới hạn trình duyệt ~64 KB)
+            keepalive: !readOnly && payload !== undefined && payload.length < 60000,
           });
           break;
         } catch (e) {
@@ -203,6 +239,9 @@
   }
 
   S.call = call;
+  /** Tải lại app SAU KHI các lệnh ghi vào SQLite đã xong (tối đa 5 giây) — dùng thay cho location.reload() trong app. */
+  HAK.reloadAfterWrites = (delayMs) =>
+    new Promise((ok) => setTimeout(ok, delayMs || 0)).then(() => S.idle(5000)).then(() => root.location.reload());
   S.openSession = openSession;
   S.hydrate = hydrate;
   S.adoptOrphans = adoptOrphans;

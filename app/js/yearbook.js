@@ -489,7 +489,8 @@
         const result = await H.YearClose.closeYear(workingYear);
         if (!result.canceled) {
           modal.hide();
-          root.location.reload();
+          if (H.reloadAfterWrites) H.reloadAfterWrites();
+          else root.location.reload();
         }
       });
     host.querySelector('[data-preview]').onchange = (e) => {

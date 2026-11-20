@@ -215,6 +215,23 @@ async function login(p) {
   const back = await p.evaluate(() => HAKSmartFilter.core.presets(HAK.Filters.presetStorage).list('archive'));
   check(back.includes('BL-HAK'), 'quay lại HAK (mở lại app): BL-HAK còn');
 
+  if (await p.evaluate(() => !!(HAK.Storage && HAK.Storage.isSqlite && HAK.Storage.isSqlite()))) {
+    console.log('4) SQLite: lưu rồi tải lại NGAY (như đổi công ty) — lệnh ghi chậm 1,5 giây vẫn không mất');
+    await p.route('**/db/tx', async (route) => {
+      await new Promise((ok) => setTimeout(ok, 1500));
+      await route.continue().catch(() => {}); // trang đã tải lại → yêu cầu bị hủy (đúng tình huống lỗi cần bắt)
+    });
+    await p.evaluate(() => {
+      HAKSmartFilter.core.presets(HAK.Filters.presetStorage).save('archive', 'BL-NHANH', { q: 'NHANH' });
+      HAK.reloadAfterWrites ? HAK.reloadAfterWrites() : location.reload(); // cách app tải lại khi đổi công ty / khôi phục / chuyển nguồn dữ liệu
+    });
+    await p.waitForTimeout(500);
+    await p.waitForFunction(() => window.HAK && HAK.Auth && HAK.Auth.company(), null, { timeout: 30000 });
+    await p.unroute('**/db/tx');
+    await p.waitForTimeout(2500);
+    const quick = await p.evaluate(() => HAKSmartFilter.core.presets(HAK.Filters.presetStorage).list('archive'));
+    check(quick.includes('BL-NHANH'), 'bộ lọc lưu ngay trước khi tải lại vẫn còn (' + JSON.stringify(quick) + ')');
+  }
   check(errs.length === 0, 'không có lỗi script' + (errs.length ? ': ' + errs.slice(0, 2).join(' | ') : ''));
   await browser.close();
   if (failures.length) {
