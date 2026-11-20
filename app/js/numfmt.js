@@ -12,6 +12,7 @@
   function parseDec(s) {
     const t = String(s == null ? '' : s)
       .trim()
+      .replace(/[−‒–—]/g, '-')
       .replace(/\s+/g, '');
     if (!t) return null;
     if (/^-?\d+[.,]\d+$/.test(t)) {

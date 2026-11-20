@@ -82,47 +82,53 @@
       .replace(/[^0-9A-Z]/g, '');
   const isBlank = (v) => v === null || v === undefined || (typeof v === 'string' && v.trim() === '');
 
-  /** Đọc số từ ô Excel: hỗ trợ "13.770", "13,770", "1,979", "36,042,650", "12.5", "12,5". */
-  function parseNum(v) {
-    if (typeof v === 'number') return isFinite(v) ? v : null;
-    if (isBlank(v)) return null;
-    const raw = String(v).trim();
+  /** Đọc số từ ô Excel kèm cảnh báo định dạng mơ hồ/đơn vị (L-10, L-11). */
+  function parseNumWarn(v) {
+    if (typeof v === 'number') return { value: isFinite(v) ? v : null, warn: null };
+    if (isBlank(v)) return { value: null, warn: null };
+    const raw = String(v)
+      .trim()
+      .replace(/[−‒–—]/g, '-');
     // Số âm kiểu kế toán trong ngoặc: "(1.200)" = -1200, "(1.200,50)" = -1200,5
     const paren = raw.match(/^\(([^()]*)\)$/);
     if (paren) {
-      const inner = parseNum(paren[1]);
-      return inner === null ? null : -Math.abs(inner);
+      const inner = parseNumWarn(paren[1]);
+      return { value: inner.value === null ? null : -Math.abs(inner.value), warn: inner.warn };
     }
     if (/^[+-]?\d+(?:\.\d+)?e[+-]?\d+$/i.test(raw)) {
-      // dạng khoa học (1.5E3) chuyển thành chữ: đọc đúng thay vì bỏ chữ E
       const sci = Number(raw);
-      return isFinite(sci) ? sci : null;
+      return { value: isFinite(sci) ? sci : null, warn: null };
     }
+    let warn = null;
+    if (/[^\d.,+\-\s]/.test(raw)) warn = 'Số có kèm chữ hoặc đơn vị ("' + raw.slice(0, 24) + '")';
     let s = raw.replace(/[^\d.,\-]/g, '');
-    if (!s || s === '-') return null;
+    if (!s || s === '-') return { value: null, warn: null };
     const dots = (s.match(/\./g) || []).length,
       commas = (s.match(/,/g) || []).length;
     if (dots && commas) {
-      // dấu xuất hiện cuối cùng là dấu thập phân
       if (s.lastIndexOf(',') > s.lastIndexOf('.')) s = s.replace(/\./g, '').replace(',', '.');
       else s = s.replace(/,/g, '');
     } else if (commas > 1 || dots > 1) {
+      if (!/^-?\d{1,3}([.,]\d{3})+$/.test(s)) warn = warn || 'Nhóm chữ số ngăn cách không đều 3 chữ số ("' + raw.slice(0, 24) + '")';
       s = s.replace(/[.,]/g, '');
     } else if (commas === 1) {
-      s = /,\d{3}$/.test(s) && !/^-?0,/.test(s) ? s.replace(',', '') : s.replace(',', '.'); // "0,123" = số thập phân (không bao giờ là dấu nghìn)
+      s = /,\d{3}$/.test(s) && !/^-?0,/.test(s) ? s.replace(',', '') : s.replace(',', '.');
     } else if (dots === 1) {
-      if (/\.\d{3}$/.test(s) && !/^-?0?\./.test(s)) s = s.replace('.', ''); // ".500" / "0.500" luôn là số thập phân
+      if (/\.\d{3}$/.test(s) && !/^-?0?\./.test(s)) s = s.replace('.', '');
     }
     const n = parseFloat(s);
-    return isFinite(n) ? n : null;
+    return isFinite(n) ? { value: n, warn } : { value: null, warn: null };
+  }
+  function parseNum(v) {
+    return parseNumWarn(v).value;
   }
 
   const pad = (n, w) => String(n).padStart(w || 2, '0');
 
-  /** Số serial Excel → {y,m,d,hh,mm,ss}. */
-  function serialToParts(n) {
-    const day = Math.floor(n);
-    let frac = Math.round((n - day) * 86400);
+  /** Số serial Excel → {y,m,d,hh,mm,ss}. Hỗ trợ hệ ngày 1904 (date1904 = true). */
+  function serialToParts(n, is1904) {
+    const day = Math.floor(n) + (is1904 && n >= 1 ? 1462 : 0);
+    let frac = Math.round((n - Math.floor(n)) * 86400);
     const ms = Date.UTC(1899, 11, 30) + day * 86400000;
     const dt = new Date(ms);
     const hh = Math.floor(frac / 3600);
@@ -134,7 +140,7 @@
 
   /**
    * Phân tích ngày / giờ ở nhiều dạng:
-   *   "16/08/2026", "16/08/2026 11:43:33", "2026-01-22 06:28:43", "16-08-2026", "11:43:33", số serial, Date.
+   *   "16/08/2026", "16/08/2026 11:43:33", "2026-01-22 06:28:43", "16-08-2026", "11:43:33", AM/PM, số serial, Date.
    * Trả về {y,m,d,hh,mm,ss,hasDate,hasTime} hoặc null.
    */
   /** Ngày giờ có tồn tại không (28/29/30/31 ngày, tháng 1–12, giờ 0–23; cho phép 24:00:00 = nửa đêm)? */
@@ -145,7 +151,14 @@
     if (p.mm > 59 || p.ss > 59) return false;
     return p.hh < 24 || (p.hh === 24 && p.mm === 0 && p.ss === 0);
   }
-  function parseDT(v) {
+  function applyAmPm(hh, ampm) {
+    if (!ampm) return hh;
+    const u = ampm.toUpperCase();
+    if (u === 'AM') return hh === 12 ? 0 : hh;
+    if (u === 'PM') return hh < 12 ? hh + 12 : hh;
+    return hh;
+  }
+  function parseDT(v, is1904) {
     if (isBlank(v)) return null;
     if (v instanceof Date) {
       return {
@@ -159,35 +172,44 @@
         hasTime: true,
       };
     }
-    if (typeof v === 'number') return v >= 0 ? serialToParts(v) : null; // v2.7.2: 0 < v < 1 = ô GIỜ của Excel (07:05 = 0,295…) → chỉ có giờ
-    const chk = (p) => (validParts(p) ? p : null); // ngày/giờ không tồn tại → null (dòng được cảnh báo "Thiếu/sai ngày cân")
+    if (typeof v === 'number') return v >= 0 ? serialToParts(v, is1904) : null;
+    const chk = (p) => (validParts(p) ? p : null);
     const s = String(v).trim();
-    let m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})(?:[ T]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
-    if (m)
+    let m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})(?:[ T]+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?)?/i);
+    if (m) {
+      const hh = m[4] !== undefined ? applyAmPm(+m[4], m[7]) : 0;
+      if (m[7] && (+m[4] < 1 || +m[4] > 12)) return null;
       return chk({
         y: +m[3],
         m: +m[2],
         d: +m[1],
-        hh: +(m[4] || 0),
+        hh,
         mm: +(m[5] || 0),
         ss: +(m[6] || 0),
         hasDate: true,
         hasTime: m[4] !== undefined,
       });
-    m = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})(?:[ T]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
-    if (m)
+    }
+    m = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})(?:[ T]+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?)?/i);
+    if (m) {
+      const hh = m[4] !== undefined ? applyAmPm(+m[4], m[7]) : 0;
+      if (m[7] && (+m[4] < 1 || +m[4] > 12)) return null;
       return chk({
         y: +m[1],
         m: +m[2],
         d: +m[3],
-        hh: +(m[4] || 0),
+        hh,
         mm: +(m[5] || 0),
         ss: +(m[6] || 0),
         hasDate: true,
         hasTime: m[4] !== undefined,
       });
-    m = s.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
-    if (m) return { y: 0, m: 0, d: 0, hh: +m[1], mm: +m[2], ss: +(m[3] || 0), hasDate: false, hasTime: true };
+    }
+    m = s.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?$/i);
+    if (m) {
+      if (m[4] && (+m[1] < 1 || +m[1] > 12)) return null;
+      return { y: 0, m: 0, d: 0, hh: applyAmPm(+m[1], m[4]), mm: +m[2], ss: +(m[3] || 0), hasDate: false, hasTime: true };
+    }
     return null;
   }
   const partsToTs = (p) => Date.UTC(p.y, p.m - 1, p.d, p.hh || 0, p.mm || 0, p.ss || 0);
@@ -456,8 +478,21 @@
     if (/\(t[ấáa]n\)|\(tan\)|\(t\)/i.test(String(headerCells[M.net] || ''))) unitFactor = 1000;
 
     // ---- chuẩn hoá từng dòng ----
+    const is1904 = !!(workbook && workbook.Workbook && workbook.Workbook.WBProps && workbook.Workbook.WBProps.date1904);
     const rows = [];
-    const issues = { swap: [], mismatch: [], noDate: [], dupTicket: [], nonPos: [], plate: [], noWeight: [] };
+    const issues = {
+      swap: [],
+      mismatch: [],
+      noDate: [],
+      dupTicket: [],
+      nonPos: [],
+      plate: [],
+      noWeight: [],
+      weightOnly: [],
+      weirdNum: [],
+      badTime24: [],
+      hugeWeight: [],
+    };
     const seenTicket = new Map();
     const excluded = []; // phiếu KL ≤ 0 (kể cả âm): KHÔNG cộng vào tổng, KHÔNG đưa vào biên bản — liệt kê riêng để đối soát (quy tắc 29)
     const cancelled = []; // phiếu "BO" (bỏ cân — xe cân lại phiếu khác) → loại khỏi biên bản
@@ -466,11 +501,21 @@
       const raw = G[r] || [];
       const g = (k) => (has(k) ? raw[M[k]] : null);
       const plate = isBlank(g('plate')) ? '' : String(g('plate')).trim();
-      let tare = parseNum(g('tare')),
-        gross = parseNum(g('gross')),
-        net = parseNum(g('net'));
+      const pTare = parseNumWarn(g('tare')),
+        pGross = parseNumWarn(g('gross')),
+        pNet = parseNumWarn(g('net'));
+      let tare = pTare.value,
+        gross = pGross.value,
+        net = pNet.value;
       const first = isBlank(raw[0]) ? '' : norm(raw[0]);
       if (/^(cong|tong)\b/.test(first)) {
+        skipped++;
+        continue;
+      }
+      const plateNorm = norm(plate);
+      const noIdentity =
+        (!plate || /^(tong(\s+cong)?|cong)\b/.test(plateNorm)) && isBlank(g('ticket')) && isBlank(g('datetime1')) && isBlank(g('date'));
+      if (noIdentity && raw.some((c) => !isBlank(c) && /^(tong(\s+cong)?|cong)\b/.test(norm(c)))) {
         skipped++;
         continue;
       }
@@ -506,13 +551,22 @@
         note: has('note') && !isBlank(g('note')) ? String(g('note')).trim() : '',
         warn: [],
       };
+      if (noIdentity) {
+        issues.weightOnly.push(row.idx);
+        row.warn.push('Dòng chỉ có khối lượng (thiếu biển, số phiếu, ngày — nghi dòng tổng cộng)');
+      }
+      const nw = pNet.warn || pGross.warn || pTare.warn;
+      if (nw) {
+        issues.weirdNum.push(row.idx + ' (' + nw + ')');
+        row.warn.push(nw);
+      }
       // --- thời gian ---
-      let d1 = has('datetime1') ? parseDT(g('datetime1')) : null;
-      let dDate = has('date') ? parseDT(g('date')) : null;
+      let d1 = has('datetime1') ? parseDT(g('datetime1'), is1904) : null;
+      let dDate = has('date') ? parseDT(g('date'), is1904) : null;
       const base = d1 && d1.hasDate ? d1 : dDate;
-      const tIn = has('timeIn') ? parseDT(g('timeIn')) : d1 && d1.hasTime ? d1 : null;
-      const tOut = has('timeOut') ? parseDT(g('timeOut')) : null;
-      let d2 = has('datetime2') ? parseDT(g('datetime2')) : null;
+      const tIn = has('timeIn') ? parseDT(g('timeIn'), is1904) : d1 && d1.hasTime ? d1 : null;
+      const tOut = has('timeOut') ? parseDT(g('timeOut'), is1904) : null;
+      let d2 = has('datetime2') ? parseDT(g('datetime2'), is1904) : null;
       if (!base || !base.hasDate) {
         issues.noDate.push(row.idx);
         row.warn.push('Thiếu/sai ngày cân');
@@ -531,8 +585,16 @@
           ss: tIn ? tIn.ss : base.hasTime ? base.ss : 0,
         };
         row.ts1 = partsToTs(p1);
-        row.dateStr = fmtDate(p1);
-        row.time1 = fmtDateTime(p1);
+        if (p1.hh === 24) {
+          issues.badTime24.push(row.idx);
+          row.warn.push('Giờ cân 24:00:00 không chuẩn — cần kiểm tra lại ngày cân');
+          const normP1 = tsToParts(row.ts1);
+          row.dateStr = fmtDate(normP1);
+          row.time1 = fmtDateTime(normP1);
+        } else {
+          row.dateStr = fmtDate(p1);
+          row.time1 = fmtDateTime(p1);
+        }
         let ts2 = null;
         if (d2 && d2.hasDate) ts2 = partsToTs(d2);
         else if (tOut && tOut.hasTime) {
@@ -555,6 +617,10 @@
         excluded.push({ idx: row.idx, ticket: row.ticket, plate, net, dateStr: row.dateStr });
         issues.nonPos.push(row.idx);
         continue;
+      }
+      if (net > 200000) {
+        issues.hugeWeight.push(row.idx + ' (' + Math.round(net).toLocaleString('vi-VN') + ' kg)');
+        row.warn.push('Khối lượng bất thường (> 200 tấn)');
       }
       if (tare !== null && gross !== null) {
         if (tare > gross) {
@@ -617,6 +683,28 @@
       );
     if (issues.noDate.length)
       ds.warnings.push('⚠ ' + issues.noDate.length + ' dòng thiếu/sai ngày cân (dòng Excel: ' + lim(issues.noDate) + ').');
+    if (issues.badTime24.length)
+      ds.warnings.push(
+        '⚠ ' +
+          issues.badTime24.length +
+          ' dòng có giờ 24:00:00 không chuẩn — cần kiểm tra lại ngày cân (dòng Excel: ' +
+          lim(issues.badTime24) +
+          ').'
+      );
+    if (issues.weightOnly.length)
+      ds.warnings.push(
+        '⚠ CẢNH BÁO: ' +
+          issues.weightOnly.length +
+          ' dòng chỉ có khối lượng (không biển số, số phiếu, ngày — nghi dòng tổng cộng không nhãn) ở dòng Excel: ' +
+          lim(issues.weightOnly) +
+          '.'
+      );
+    if (issues.weirdNum.length)
+      ds.warnings.push(
+        '⚠ ' + issues.weirdNum.length + ' dòng có ô số kèm chữ/đơn vị hoặc dấu phân cách bất thường: ' + lim(issues.weirdNum) + '.'
+      );
+    if (issues.hugeWeight.length)
+      ds.warnings.push('⚠ ' + issues.hugeWeight.length + ' dòng có khối lượng bất thường (> 200 tấn): ' + lim(issues.hugeWeight) + '.');
     if (cancelled.length)
       ds.warnings.push(
         '🚫 Đã loại ' +
@@ -766,6 +854,6 @@
     readBuffer,
     parseSheet,
     computeStats,
-    util: { norm, parseNum, parseDT, partsToTs, tsToParts, fmtDate, fmtDateTime, normTicket, plateKey, colName, isBlank },
+    util: { norm, parseNum, parseNumWarn, parseDT, partsToTs, tsToParts, fmtDate, fmtDateTime, normTicket, plateKey, colName, isBlank },
   };
 })(typeof window !== 'undefined' ? window : globalThis);
