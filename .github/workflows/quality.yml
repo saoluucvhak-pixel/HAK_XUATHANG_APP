@@ -143,3 +143,36 @@ jobs:
           $b = $LASTEXITCODE
           Stop-Process -Id $p.Id -Force
           if ($a -ne 0 -or $b -ne 0) { throw "Nghiệm thu SQLite lỗi (e2e:customs=$a, accept:release=$b)" }
+      - name: Nghiệm thu mở rộng trên Windows thật (HAKDocs.exe + SQLite + Edge) — các mục của danh sách thử tay
+        # Thay phần tự động hóa được của docs danh sách thử Windows: mở lại app giữ cài đặt (D), tách công ty + bộ lọc theo tài khoản (D'),
+        # tab Sao lưu & khôi phục + tự sao lưu SQLite vào thư mục (F), sao lưu tháng / toàn bộ chuyển máy chéo IndexedDB ↔ SQLite (G, H).
+        shell: pwsh
+        env:
+          HAK_BROWSER_CHANNEL: msedge
+        run: |
+          $env:NODE_OPTIONS = "--require $env:GITHUB_WORKSPACE/tools/pw-channel.cjs"
+          $env:HAK_DATA_DIR = Join-Path $env:RUNNER_TEMP 'dữ liệu HAK ƯT mở rộng'
+          $env:HAK_DB_ACTIVATE = '1'
+          $p = Start-Process -FilePath app/native/HAKDocs.exe -ArgumentList '--serve' -PassThru -WindowStyle Hidden
+          $up = $false
+          for ($i = 0; $i -lt 40 -and -not $up; $i++) { try { Invoke-RestMethod http://127.0.0.1:31879/status -TimeoutSec 2 | Out-Null; $up = $true } catch { Start-Sleep -Milliseconds 500 } }
+          if (-not $up) { throw 'HAKDocs không trả lời' }
+          $env:HAK_DB_EXTERNAL_TOKEN = [regex]::Match((Get-Content app/native/hakdocs-token.js -Raw), "HAK_DOCS_TOKEN='([0-9a-f]{32})'").Groups[1].Value
+          $fail = @()
+          foreach ($t in 'e2e-persist-keys', 'e2e-company-scope', 'e2e-backup-ui', 'e2e-month-backup', 'e2e-sqlite-backup') {
+            Write-Host "=== SQLite (HAKDocs.exe thật): $t"
+            node tools/e2e-sqlite.cjs "tools/$t.cjs"
+            if ($LASTEXITCODE -ne 0) { $fail += "sqlite:$t" }
+          }
+          Write-Host '=== Chuyển máy chéo IndexedDB <-> SQLite (HAKDocs.exe thật)'
+          node tools/e2e-roundtrip-cross.cjs
+          if ($LASTEXITCODE -ne 0) { $fail += 'roundtrip-cross' }
+          foreach ($t in 'e2e-persist-keys', 'e2e-company-scope', 'e2e-sf-focus') {
+            Write-Host "=== IndexedDB (Edge): $t"
+            $env:HAK_DB_EXTERNAL_TOKEN_SAVE = $env:HAK_DB_EXTERNAL_TOKEN; Remove-Item Env:HAK_DB_EXTERNAL_TOKEN
+            node "tools/$t.cjs"
+            if ($LASTEXITCODE -ne 0) { $fail += "idb:$t" }
+            $env:HAK_DB_EXTERNAL_TOKEN = $env:HAK_DB_EXTERNAL_TOKEN_SAVE
+          }
+          Stop-Process -Id $p.Id -Force
+          if ($fail.Count) { throw ("Nghiệm thu mở rộng Windows lỗi: " + ($fail -join ', ')) }
