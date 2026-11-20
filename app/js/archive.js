@@ -277,7 +277,8 @@
       const title = res.excel ? stripExt(res.excel.fileName) : stripExt((res.files[res.files.length - 1] || {}).name);
       const st = stats(type, params, rows);
       // Quy tắc 29: phiếu KL ≤ 0 đã loại khỏi tổng được lưu cùng hồ sơ (tối đa 50 dòng) để Báo cáo liệt kê ở "Ngoại lệ cần đối soát"
-      const ex = (ds && ds.excluded) || [];
+      const exAll = (ds && ds.excluded) || [];
+      const ex = exAll.length ? G.filterRows(exAll, params.filter) : [];
       if (ex.length) {
         st.nonPosTrips = ex.length;
         st.nonPosKg = ex.reduce((a, x) => a + (Number(x.net) || 0), 0);
@@ -317,8 +318,19 @@
       meta.by = who || (old && old.by) || '';
       meta.createdBy = (old && old.createdBy) || who || ''; // lập lại mà không chọn hợp đồng → giữ hợp đồng đã gắn trước đó
       let data;
-      if (!old || isBkls) {
-        // BKLS: luôn ghi lại thông số mới nhất (số BKLS, bên mua…) để tải lại đúng bản vừa lập
+      let paramsChanged = false;
+      if (old && !isBkls) {
+        try {
+          const oldData = await load(id);
+          if (oldData && JSON.stringify(oldData.params || {}) !== JSON.stringify(params || {})) {
+            paramsChanged = true;
+          }
+        } catch (e) {
+          paramsChanged = true;
+        }
+      }
+      if (!old || isBkls || paramsChanged) {
+        // Ghi lại thông số mới nhất (params, số BKLS, bên mua…) để tải lại đúng bản vừa lập
         const custom = {};
         Object.keys(params).forEach((k) => {
           const v = params[k];
@@ -441,12 +453,59 @@
     for (const id of ids) {
       const m = await getOne('meta', id);
       if (!m) continue;
+      const now = Date.now();
       m.contract = detailId || '';
-      m.linkedAt = detailId ? Date.now() : 0;
+      m.updatedAt = now;
+      m.linkedAt = detailId ? now : 0;
       await putBoth(m);
       n++;
     }
     return n;
+  }
+
+  /** Gán công ty cho các hồ sơ Lưu trữ (v2.25.4, L-24): companyId = id công ty (rỗng = gỡ). Chỉ sửa meta; dữ liệu phiếu cân giữ nguyên. */
+  async function setCompany(ids, companyId) {
+    if (!Array.isArray(ids)) ids = [ids];
+    let n = 0;
+    const now = Date.now();
+    for (const id of ids) {
+      const m = await getOne('meta', id);
+      if (!m) continue;
+      m.cid = companyId || '';
+      m.updatedAt = now;
+      await putBoth(m);
+      n++;
+    }
+    return n;
+  }
+  async function assignCompanyInteractive(noCo) {
+    const C = HAK.Config;
+    const cos = (C && C.companies ? C.companies() : []) || [];
+    if (!cos.length) {
+      UI().toast('Chưa có công ty nào được cấu hình.', 'warning');
+      return;
+    }
+    const names = cos.map((c, i) => i + 1 + '. ' + (c.short || c.name) + ' (' + c.id + ')').join('\n');
+    const ans = prompt(
+      'Chọn công ty để gán cho ' + noCo.length + ' hồ sơ chưa rõ công ty:\n' + names + '\n\nNhập số thứ tự hoặc mã công ty:'
+    );
+    if (!ans) return;
+    const trimmed = ans.trim();
+    let target = cos.find(
+      (c) => c.id.toLowerCase() === trimmed.toLowerCase() || (c.short && c.short.toLowerCase() === trimmed.toLowerCase())
+    );
+    if (!target && /^\d+$/.test(trimmed)) {
+      const idx = parseInt(trimmed, 10) - 1;
+      if (idx >= 0 && idx < cos.length) target = cos[idx];
+    }
+    if (!target) {
+      UI().toast('Lựa chọn công ty không hợp lệ.', 'error');
+      return;
+    }
+    const ids = noCo.map((m) => m.id);
+    const count = await setCompany(ids, target.id);
+    UI().toast('Đã gán công ty ' + (target.short || target.name) + ' cho ' + count + ' hồ sơ.', 'success');
+    await render();
   }
 
   /** Tải lại Word / PDF / Excel từ hồ sơ (không cần file Excel cân). */
@@ -644,7 +703,9 @@
         shown = PAGE;
         renderRows();
       },
-      summary: (r) => [{ label: 'Khối lượng', value: HAK.Generator.fmtTon(r.rows.reduce((a, m) => a + (+m.kg || 0), 0)) + ' tấn' }],
+      summary: (r) => [
+        { label: 'Khối lượng (chưa khử trùng)', value: HAK.Generator.fmtTon(r.rows.reduce((a, m) => a + (+m.kg || 0), 0)) + ' tấn' },
+      ],
     });
     return archiveSmart;
   }
@@ -727,6 +788,23 @@
     const total = cache.reduce((a, m) => a + (m.size || 0), 0);
     document.getElementById('archSize').textContent = cache.length ? '≈ ' + fmtMB(total) : '';
     document.getElementById('archMemWarn').classList.toggle('d-none', state.backend !== 'mem');
+    const noCo = cache.filter((m) => !(HAK.Auth && HAK.Auth.companyOfMeta ? HAK.Auth.companyOfMeta(m) : m.cid));
+    const noCoWarn = document.getElementById('archNoCoWarn');
+    if (noCoWarn) {
+      if (noCo.length) {
+        noCoWarn.classList.remove('d-none');
+        const isAdmin = HAK.Auth && HAK.Auth.isAdmin && HAK.Auth.isAdmin();
+        noCoWarn.innerHTML =
+          '⚠ Có <b>' +
+          noCo.length +
+          '</b> hồ sơ chưa rõ công ty nên bị ẩn khỏi chế độ xem theo công ty.' +
+          (isAdmin ? ' <button class="btn btn-sm btn-outline-warning ms-2" type="button" id="archAssignCoBtn">Gán công ty</button>' : '');
+        const btn = document.getElementById('archAssignCoBtn');
+        if (btn) btn.onclick = () => assignCompanyInteractive(noCo);
+      } else {
+        noCoWarn.classList.add('d-none');
+      }
+    }
     const sel = document.getElementById('archType'),
       cur = sel.value;
     const types = Array.from(new Set(cache.map((m) => m.type)));
@@ -963,6 +1041,7 @@
       return lastError;
     },
     setContract,
+    setCompany,
     closeVerified,
     indexIssues,
     remove: delOne,
@@ -981,6 +1060,7 @@
     render,
     init,
     updateBadge,
+    _mem: mem,
     get state() {
       return state;
     },

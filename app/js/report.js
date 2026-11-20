@@ -39,9 +39,10 @@
   };
   const dmyToTs = (s) => dayTs(s, false);
   const isoToTs = (s) => dayTs(s, true);
+  const UNKNOWN_DATE = 'Chưa rõ ngày';
   const monthOf = (s) => {
     const ts = dmyToTs(s);
-    return ts === null ? '(không rõ)' : new Date(ts).toISOString().slice(0, 7);
+    return ts === null ? UNKNOWN_DATE : new Date(ts).toISOString().slice(0, 7);
   };
   function validateRange(opt) {
     if ((opt.from && isoToTs(opt.from) === null) || (opt.to && isoToTs(opt.to) === null)) throw new RangeError('Ngày lọc không hợp lệ.');
@@ -280,7 +281,7 @@
         if (!months.has(pt.month)) months.set(pt.month, {});
         const mo = months.get(pt.month);
         mo[r.type] = (mo[r.type] || 0) + pt.kg;
-        const yk = pt.month.slice(0, 4);
+        const yk = /^\d{4}/.test(pt.month) ? pt.month.slice(0, 4) : UNKNOWN_DATE;
         if (!years.has(yk)) years.set(yk, {});
         const yo = years.get(yk);
         yo[r.type] = (yo[r.type] || 0) + pt.kg;
@@ -333,7 +334,7 @@
     const results = new Array(todo.length);
     const readOne = async (r, i) => {
       const hit = cache.get(r.id);
-      if (hit && hit.u === r.updatedAt) {
+      if (hit && hit.u === r.updatedAt && (hit.c || '') === (r.contract || '')) {
         results[i] = { t: hit.t };
         return;
       }
@@ -347,7 +348,7 @@
           rows = G().filterRows(d.rows || [], p.filter),
           ret = new Set(HAS_RET[r.type] ? p.returned || [] : []);
         const t = recTickets(r, p, rows, ret);
-        cache.set(r.id, { u: r.updatedAt, t });
+        cache.set(r.id, { u: r.updatedAt, c: r.contract || '', t });
         results[i] = { t };
       } catch (e) {
         console.warn('Không đọc được phiếu cân của hồ sơ', r.id, e);
@@ -1335,14 +1336,19 @@
   }
   const yearOfMeta = (m) => {
     const ts = dmyToTs(m.from);
-    return ts === null ? new Date(m.updatedAt || Date.now()).getFullYear() : new Date(ts).getUTCFullYear();
+    return ts === null ? UNKNOWN_DATE : new Date(ts).getUTCFullYear();
   };
   function drawYearSelect() {
     const sel = $('#repYear'),
       cur = sel.value,
-      ys = Array.from(new Set(metas.map((m) => yearOfMeta(m)))).sort((a, b) => b - a);
-    sel.innerHTML = '<option value="">Tất cả năm</option>' + ys.map((y) => '<option value="' + y + '">' + y + '</option>').join('');
-    sel.value = ys.indexOf(+cur) >= 0 ? cur : '';
+      allY = metas.map((m) => yearOfMeta(m)),
+      numY = Array.from(new Set(allY.filter((y) => typeof y === 'number'))).sort((a, b) => b - a),
+      hasUnknown = allY.includes(UNKNOWN_DATE);
+    sel.innerHTML =
+      '<option value="">Tất cả năm</option>' +
+      numY.map((y) => '<option value="' + y + '">' + y + '</option>').join('') +
+      (hasUnknown ? '<option value="' + UNKNOWN_DATE + '">' + UNKNOWN_DATE + '</option>' : '');
+    sel.value = numY.indexOf(+cur) >= 0 || cur === UNKNOWN_DATE ? cur : '';
   }
   const basisNow = () => ($('#repBasis') && $('#repBasis').value === 'weigh' ? 'weigh' : 'start');
   const BASIS_TEXT = { start: 'kỳ tính theo ngày BẮT ĐẦU của hồ sơ', weigh: 'kỳ tính theo NGÀY CÂN của từng phiếu' };
@@ -1756,8 +1762,9 @@
     });
     $('#repYear').addEventListener('change', (e) => {
       const y = e.target.value;
-      $('#repFrom').value = y ? y + '-01-01' : '';
-      $('#repTo').value = y ? y + '-12-31' : '';
+      const isNumYear = /^\d{4}$/.test(y);
+      $('#repFrom').value = isNumYear ? y + '-01-01' : '';
+      $('#repTo').value = isNumYear ? y + '-12-31' : '';
       draw();
     });
     $('#repQuery').addEventListener('input', HAK.UI.debounce(draw, 150));
@@ -2090,6 +2097,7 @@
     xhTrips,
     xhSheetRows,
     toExcelXuatHang,
+    ticketCache,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = HAK.Report;
 })(typeof window !== 'undefined' ? window : globalThis);

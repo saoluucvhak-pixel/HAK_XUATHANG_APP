@@ -614,7 +614,16 @@
         continue;
       }
       if (net <= 0) {
-        excluded.push({ idx: row.idx, ticket: row.ticket, plate, net, dateStr: row.dateStr });
+        excluded.push({
+          idx: row.idx,
+          ticket: row.ticket,
+          plate,
+          net,
+          dateStr: row.dateStr,
+          ts1: row.ts1,
+          time1: row.time1,
+          note: row.note,
+        });
         issues.nonPos.push(row.idx);
         continue;
       }
