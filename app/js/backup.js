@@ -152,9 +152,49 @@
       bklsTemplates: await HAK.DB.getAll('bklsTemplates'),
     };
   }
+  async function sha256Text(text) {
+    const c =
+      root.crypto && root.crypto.subtle ? root.crypto.subtle : typeof crypto !== 'undefined' && crypto.subtle ? crypto.subtle : null;
+    if (!c) return null;
+    const bytes = new TextEncoder().encode(String(text));
+    return Array.from(new Uint8Array(await c.digest('SHA-256', bytes)), (v) => v.toString(16).padStart(2, '0')).join('');
+  }
   /** Dựng nội dung sao lưu từ kết quả collect() (toàn bộ) hoặc BackupMonth.select() (theo tháng — có thêm "scope"). MỘT bộ dựng file cho cả hai. */
-  function serialize(coll) {
+  async function serialize(coll) {
     const { yearbook, keys, items, batches, issued, attachments, bklsTemplates, scope } = coll;
+    const keysJson = JSON.stringify(keys);
+    const itemStrs = items.map((it) => JSON.stringify(it));
+    const batchStrs = batches.map((it) => JSON.stringify(it));
+    const issuedJson = JSON.stringify(issued);
+    const attJson = JSON.stringify(attachments);
+    const tplJson = JSON.stringify(bklsTemplates);
+    const ybJson = JSON.stringify(yearbook);
+    const secStr = {
+      keys: keysJson,
+      archive: '[' + itemStrs.join(',') + ']',
+      batches: '[' + batchStrs.join(',') + ']',
+      issued: issuedJson,
+      attachments: attJson,
+      bklsTemplates: tplJson,
+      yearbook: ybJson,
+    };
+    const sha256 = {};
+    for (const k of Object.keys(secStr)) {
+      const h = await sha256Text(secStr[k]);
+      if (h) sha256[k] = h;
+    }
+    const manifest = {
+      v: 1,
+      counts: {
+        keys: Object.keys(keys).length,
+        archive: items.length,
+        batches: batches.length,
+        issued: issued.length,
+        attachments: attachments.length,
+        bklsTemplates: bklsTemplates.length,
+      },
+      sha256,
+    };
     const parts = [
       '{"app":"' +
         APP +
@@ -163,25 +203,27 @@
         '"' +
         (scope ? ',"scope":' + JSON.stringify(scope) : '') +
         ',"keys":',
-      JSON.stringify(keys),
+      keysJson,
       ',"archive":[',
     ];
-    items.forEach((it, i) => {
-      parts.push((i ? ',' : '') + JSON.stringify(it));
+    itemStrs.forEach((s, i) => {
+      parts.push((i ? ',' : '') + s);
     });
     parts.push('],"batches":[');
-    batches.forEach((it, i) => {
-      parts.push((i ? ',' : '') + JSON.stringify(it));
+    batchStrs.forEach((s, i) => {
+      parts.push((i ? ',' : '') + s);
     });
     parts.push(
       '],"issued":',
-      JSON.stringify(issued),
+      issuedJson,
       ',"attachments":',
-      JSON.stringify(attachments),
+      attJson,
       ',"bklsTemplates":',
-      JSON.stringify(bklsTemplates),
+      tplJson,
       ',"yearbook":',
-      JSON.stringify(yearbook),
+      ybJson,
+      ',"manifest":',
+      JSON.stringify(manifest),
       '}'
     );
     return {
@@ -191,6 +233,7 @@
       batches: batches.length,
       issued: issued.length,
       scope: scope || null,
+      manifest,
     };
   }
   /** Dựng nội dung sao lưu toàn bộ (mảng chuỗi JSON — không nối thành 1 chuỗi lớn) + số đếm. */
@@ -302,13 +345,18 @@
       if (typeof root.JSZip !== 'function') throw new Error('Không mở được file ZIP (thiếu thư viện nén).');
       let z;
       try {
-        z = await root.JSZip.loadAsync(file);
+        const buf = file.arrayBuffer ? await file.arrayBuffer() : file;
+        z = await root.JSZip.loadAsync(buf, { checkCRC32: true });
       } catch (e) {
-        throw new Error('File ZIP bị hỏng hoặc không đọc được.');
+        throw new Error('File sao lưu ZIP bị hỏng hoặc không đọc được.');
       }
       const f = z.file(ZIP_INNER) || Object.values(z.files).find((x) => !x.dir && /\.json$/i.test(x.name));
       if (!f) throw new Error('File ZIP không có dữ liệu sao lưu (.json) của app.');
-      text = await f.async('string');
+      try {
+        text = await f.async('string');
+      } catch (e) {
+        throw new Error('File sao lưu bị hỏng (lỗi giải nén hoặc sai mã kiểm tra CRC32).');
+      }
     } else text = await file.text();
     try {
       return JSON.parse(text);
@@ -407,11 +455,42 @@
     }
     if (j.yearbook && HAK.Yearbook) HAK.Yearbook.validateBundle(j.yearbook.records);
   }
+  async function verifyManifest(j) {
+    if (!j || j.manifest === undefined) return 'unverified';
+    const m = j.manifest;
+    if (!m || typeof m !== 'object') throw new Error('File sao lưu bị hỏng (manifest không hợp lệ).');
+    if (m.counts && typeof m.counts === 'object') {
+      const actualCounts = {
+        keys: Object.keys(j.keys || {}).length,
+        archive: (j.archive || []).length,
+        batches: (j.batches || []).length,
+        issued: (j.issued || []).length,
+        attachments: (j.attachments || []).length,
+        bklsTemplates: (j.bklsTemplates || []).length,
+      };
+      for (const k of Object.keys(actualCounts)) {
+        if (m.counts[k] !== undefined && m.counts[k] !== actualCounts[k]) {
+          throw new Error('File sao lưu bị hỏng (số lượng bản ghi không khớp).');
+        }
+      }
+    }
+    if (m.sha256 && typeof m.sha256 === 'object') {
+      for (const k of Object.keys(m.sha256)) {
+        const val = j[k] === undefined ? (k === 'yearbook' ? null : k === 'keys' ? {} : []) : j[k];
+        const actual = await sha256Text(JSON.stringify(val));
+        if (actual && actual !== m.sha256[k]) {
+          throw new Error('File sao lưu bị hỏng (sai mã kiểm tra toàn vẹn dữ liệu).');
+        }
+      }
+    }
+    return 'verified';
+  }
   /** Đọc + kiểm tra + tóm tắt bản sao (KHÔNG ghi gì): dùng để hiện phạm vi dữ liệu trước khi người dùng chọn Nhập bổ sung / Khôi phục. */
   async function inspect(file) {
     const j = await readJson(file);
     if (j && j.app === 'hak-bienban-archive' && Array.isArray(j.items)) return { j, legacy: true, plan: { archive: j.items.length } };
     validateBackup(j);
+    const manifest = await verifyManifest(j);
     const plan = {
       kind: kindOf(j),
       scope: j.scope || null,
@@ -460,7 +539,7 @@
           ),
       };
     }
-    return { j, legacy: false, plan };
+    return { j, legacy: false, plan, manifest };
   }
   /** Chạy tuần tự các bước ghi, ghi lại bước nào xong / lỗi / chưa chạy và bước nào hoàn tác được. */
   async function runSteps(steps) {
@@ -1017,13 +1096,28 @@
       if (e.kind === 'file' && AUTO_RE.test(name)) {
         try {
           const f = await e.getFile();
-          out.push({ name, size: f.size, at: f.lastModified });
+          if (f.size > 0) out.push({ name, size: f.size, at: f.lastModified });
         } catch (x) {
           /* bỏ qua */
         }
       }
     }
-    return out.sort((a, b) => (a.name < b.name ? 1 : a.name > b.name ? -1 : 0)); // tên có ngày giờ → mới nhất trước
+    return out.sort((a, b) => (b.at || 0) - (a.at || 0) || (a.name < b.name ? 1 : a.name > b.name ? -1 : 0));
+  }
+  async function verifyAutoZip(file) {
+    if (!file || !(file.size > 0)) throw new Error('File sao lưu ghi ra bị rỗng (0 byte).');
+    if (typeof root.JSZip === 'function') {
+      let z;
+      try {
+        const buf = file.arrayBuffer ? await file.arrayBuffer() : file;
+        z = await root.JSZip.loadAsync(buf, { checkCRC32: true });
+      } catch (e) {
+        throw new Error('File sao lưu tự động đọc lại bị hỏng (CRC32).');
+      }
+      const inner = z.file(ZIP_INNER);
+      if (!inner) throw new Error('File sao lưu tự động thiếu dữ liệu bên trong.');
+      await inner.async('string');
+    }
   }
   const autoDue = (c) => c.on && !(c.last && c.last.ok && Date.now() - c.last.at < AUTO_EVERY);
   /** Ghi 1 bản vào thư mục. opts.ask = được hỏi quyền (đang trong thao tác bấm của người dùng); opts.force = chạy dù chưa bật / chưa tới hạn. */
@@ -1038,20 +1132,43 @@
       return { err: 'perm' };
     }
     auto.busy = true;
+    const name = 'HAK_TuDong_' + stamp(true) + '.zip';
+    const partName = name + '.part';
+    let committed = false;
+    let wroteFinal = false;
     try {
       const f = await buildFull(),
         zip = await zipParts(f.parts);
       if (!zip) throw new Error('Thiếu thư viện nén ZIP.');
-      const name = 'HAK_TuDong_' + stamp(true) + '.zip';
-      const fh = await h.getFileHandle(name, { create: true }),
-        w = await fh.createWritable();
+      const fhPart = await h.getFileHandle(partName, { create: true }),
+        w = await fhPart.createWritable();
       await w.write(zip);
       await w.close();
-      const chk = await (await h.getFileHandle(name)).getFile();
+      const chk = await (await h.getFileHandle(partName)).getFile();
       if (chk.size !== zip.size) throw new Error('File ghi ra không đủ (' + chk.size + ' / ' + zip.size + ' byte).');
+      await verifyAutoZip(chk);
+      if (typeof fhPart.move === 'function') {
+        await fhPart.move(name);
+        committed = true;
+      } else {
+        wroteFinal = true;
+        const fh = await h.getFileHandle(name, { create: true }),
+          w2 = await fh.createWritable();
+        await w2.write(zip);
+        await w2.close();
+        const chk2 = await (await h.getFileHandle(name)).getFile();
+        if (chk2.size !== zip.size) throw new Error('File ghi ra không đủ (' + chk2.size + ' / ' + zip.size + ' byte).');
+        await verifyAutoZip(chk2);
+        committed = true;
+        try {
+          await h.removeEntry(partName);
+        } catch (e) {
+          /* bỏ qua */
+        }
+      }
       const keep = Math.max(1, +c.keep || 10);
       let removed = 0;
-      for (const x of (await autoList()).slice(keep)) {
+      for (const x of (await autoList()).filter((x) => x.name !== name).slice(Math.max(0, keep - 1))) {
         try {
           await h.removeEntry(x.name);
           removed++;
@@ -1065,6 +1182,20 @@
       auto.warned = false;
       return { name, size: zip.size, removed, archive: f.archive };
     } catch (e) {
+      if (h && h.removeEntry) {
+        try {
+          await h.removeEntry(partName);
+        } catch (x) {
+          /* bỏ qua */
+        }
+        if (wroteFinal && !committed) {
+          try {
+            await h.removeEntry(name);
+          } catch (x) {
+            /* bỏ qua */
+          }
+        }
+      }
       console.error('Tự sao lưu lỗi:', e);
       autoSet({ last: Object.assign({}, autoCfg().last, { failAt: Date.now(), ok: false, err: e.message || String(e) }) });
       return { err: 'fail', msg: e.message || String(e) };

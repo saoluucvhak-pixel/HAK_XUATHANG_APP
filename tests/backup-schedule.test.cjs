@@ -53,3 +53,108 @@ test('thư mục mặc định giữ kiểu dấu phân cách; record không s�
   S.record(base, { ok: true }, 1);
   assert.equal(base.last, null);
 });
+
+test('L-03: tự sao lưu ghi lỗi giữa chừng → không để lại tệp rác 0 byte, không xóa bản tốt khi xoay vòng', async () => {
+  const store = new Map();
+  global.window = global;
+  global.HAK = {};
+  global.JSZip = require('../app/libs/jszip.min.js');
+  HAK.Store = {
+    get: (k, d) => (store.has(k) ? JSON.parse(store.get(k)) : d),
+    set: (k, v) => {
+      store.set(k, JSON.stringify(v));
+      return true;
+    },
+    remove: (k) => store.delete(k),
+    keys: () => Array.from(store.keys()),
+  };
+  HAK.Archive = { collectItems: async () => [], importItems: async () => ({}) };
+  HAK.UI = { toast() {} };
+  global.location = { hash: '' };
+  global.showDirectoryPicker = async () => dirHandle;
+  global.showSaveFilePicker = async () => ({});
+  global.document = { querySelector: () => null, querySelectorAll: () => [], getElementById: () => null, addEventListener() {} };
+
+  const files = new Map();
+  let failWrite = true;
+  const makeEntry = (name, rec) => ({
+    kind: 'file',
+    name,
+    getFile: async () => {
+      const buf = rec.buf;
+      return {
+        name,
+        size: buf.length,
+        lastModified: rec.mtime,
+        arrayBuffer: async () => buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.length),
+        text: async () => buf.toString('utf8'),
+        slice: (a, b) => ({
+          arrayBuffer: async () => {
+            const sub = buf.subarray(a, b);
+            return sub.buffer.slice(sub.byteOffset, sub.byteOffset + sub.length);
+          },
+        }),
+      };
+    },
+    createWritable: async () => ({
+      write: async (blob) => {
+        if (failWrite) throw new Error('Disk full');
+        const ab = await blob.arrayBuffer();
+        rec.buf = Buffer.from(ab);
+        rec.mtime = Date.now();
+      },
+      close: async () => {},
+    }),
+    move: async (newName) => {
+      files.delete(name);
+      files.set(newName, rec);
+    },
+  });
+  const dirHandle = {
+    queryPermission: async () => 'granted',
+    requestPermission: async () => 'granted',
+    entries: async function* () {
+      for (const [name, rec] of files.entries()) yield [name, makeEntry(name, rec)];
+    },
+    getFileHandle: async (name, opts) => {
+      if (!files.has(name)) {
+        if (opts && opts.create) files.set(name, { buf: Buffer.alloc(0), mtime: Date.now() });
+        else throw new Error('NotFoundError');
+      }
+      return makeEntry(name, files.get(name));
+    },
+    removeEntry: async (name) => {
+      files.delete(name);
+    },
+  };
+  HAK.DB = {
+    get: async (s, k) => (s === 'handles' && k === 'autoDir' ? dirHandle : null),
+    put: async () => {},
+    del: async () => {},
+    getAll: async () => [],
+  };
+
+  delete require.cache[require.resolve('../app/js/backup.js')];
+  require('../app/js/backup.js');
+
+  files.set('HAK_TuDong_20261101_0800.zip', { buf: Buffer.from('good1'), mtime: 1000 });
+  files.set('HAK_TuDong_20261102_0800.zip', { buf: Buffer.from('good2'), mtime: 2000 });
+  HAK.Store.set('hak.backup.auto', { on: true, keep: 2 });
+
+  const r1 = await HAK.Backup.autoRun({ force: true });
+  assert.equal(r1.err, 'fail');
+  const zeroOrPart = Array.from(files.entries()).filter(([n, rec]) => rec.buf.length === 0 || n.endsWith('.part'));
+  assert.equal(zeroOrPart.length, 0, 'không được để lại tệp 0 byte hoặc .part sau khi ghi lỗi');
+  assert.equal(files.has('HAK_TuDong_20261101_0800.zip'), true);
+  assert.equal(files.has('HAK_TuDong_20261102_0800.zip'), true);
+
+  // Nếu có sẵn tệp 0 byte từ trước, autoList phải bỏ qua và xoay vòng không được xóa nhầm bản tốt
+  files.set('HAK_TuDong_20261103_0800.zip', { buf: Buffer.alloc(0), mtime: 3000 });
+  const listed = await HAK.Backup.autoList();
+  assert.equal(listed.length, 2, 'autoList phải bỏ qua tệp 0 byte');
+
+  failWrite = false;
+  const r2 = await HAK.Backup.autoRun({ force: true });
+  assert.ok(!r2.err, 'lần chạy thành công không lỗi: ' + r2.msg);
+  assert.equal(files.has('HAK_TuDong_20261102_0800.zip'), true, 'bản tốt gần nhất phải còn khi keep=2');
+});

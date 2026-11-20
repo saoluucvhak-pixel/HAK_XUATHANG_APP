@@ -1,5 +1,11 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.25.1 — Đợt 1: Sửa 4 lỗi mức Cao (L-01, L-02, L-03, L-04)
+- **L-01 (Google Sheet):** khi đang bật bộ lọc kỳ/tìm kiếm làm ẩn bớt hồ sơ hoặc phiếu cân của lô, bấm đồng bộ Google Sheet sẽ cảnh báo rõ số dòng ngoài kỳ sẽ bị xóa và hỏi xác nhận trước khi gửi; sửa tooltip mâu thuẫn trên nút đồng bộ. Ghi mục chờ quyết **D-01** vào `docs/QUY_TAC_NGHIEP_VU_CAN_XAC_NHAN.md`.
+- **L-02 / U-01 (Sao lưu toàn vẹn):** bật kiểm tra `checkCRC32: true` khi mở file sao lưu `.zip`, bọc lỗi giải nén thành thông báo tiếng Việt; bổ sung `manifest` (số bản ghi + SHA-256 từng phần) khi tạo bản sao lưu và kiểm tra trước khi khôi phục; bản sao lưu cũ không có `manifest` vẫn khôi phục được (đánh dấu "chưa kiểm").
+- **L-03 / U-02 (Tự sao lưu):** ghi ra tệp tạm `.part`, đọc lại kiểm tra dung lượng và `JSZip` CRC32 trước khi đổi tên; dọn sạch tệp tạm khi ghi lỗi; `autoList` bỏ qua tệp 0 byte và sắp xếp theo thời gian sửa để không xoay vòng xóa nhầm bản tốt.
+- **L-04 (Giao diện hộp Danh mục):** đưa `#catErr` lên đầu thân hộp thoại `#catModal`, hiện toast lỗi và đánh dấu `.is-invalid` các ô liên quan để người dùng thấy ngay trên màn hình 1366×768 và 390×844.
+
 ## v2.25.0 — Tách theo công ty; bộ lọc đã lưu theo tài khoản + công ty
 - **Tách hẳn theo công ty (quyết định 36):** khi đang làm một công ty, các chỗ trước đây còn lộ dữ liệu công ty khác nay chỉ hiện dữ liệu công ty đang làm: ô **"Chọn hợp đồng"** ở các trang lập hồ sơ (trước có nhóm "Hợp đồng công ty khác"), ô hợp đồng ở **Chứng từ** (điền số hợp đồng vào phiếu xuất kho), và **Tìm kiếm Ctrl+K** (hồ sơ Lưu trữ). Bật **Xem tất cả công ty** ở Danh mục / Lưu trữ thì thấy lại như trước; hợp đồng đã gắn với hồ sơ đang mở luôn được giữ.
 - **Bộ lọc đã lưu (mục 32):** mỗi tài khoản ở mỗi công ty có kho riêng — tài khoản khác / công ty khác không thấy tên và điều kiện bộ lọc của mình. Kho dùng chung của bản cũ không bị xóa; tài khoản Quản trị nhận bản sao của nó ở lần đầu, Nhân viên bắt đầu từ kho trống. Bền trên SQLite, có trong sao lưu.

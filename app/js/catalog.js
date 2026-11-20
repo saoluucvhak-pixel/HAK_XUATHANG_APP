@@ -522,7 +522,7 @@
       '</div></div>' +
       '<div class="modal fade" id="catModal" tabindex="-1"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content">' +
       '<div class="modal-header"><h5 class="modal-title" id="catModalTitle"></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>' +
-      '<div class="modal-body"><div class="row g-3" id="catForm"></div><div class="text-danger small mt-2" id="catErr"></div></div>' +
+      '<div class="modal-body"><div class="alert alert-danger py-2 px-3 small mb-3 d-none" role="alert" id="catErr"></div><div class="row g-3" id="catForm"></div></div>' +
       '<div class="modal-footer"><button class="btn btn-outline-secondary" data-bs-dismiss="modal" type="button">Hủy</button><button class="btn btn-primary" id="catSave" type="button">Lưu</button></div>' +
       '</div></div></div>';
     state.built = true;
@@ -1197,7 +1197,7 @@
       ? M.parent(rec || { type: state.type || 'xuatkhau', currency: 'USD', dryFactory: 0.48, details: [] })
       : rec || { kind: 'ngoai' };
     state.editing = { kind: isC ? 'contracts' : 'customers', id: c.id || '', revision: c.revision || 0, draft: isC ? M.copy(c) : null };
-    $('#catErr').textContent = '';
+    clearCatErr();
     $('#catModalTitle').textContent = (rec ? 'Sửa ' : 'Thêm ') + (isC ? 'hợp đồng' : 'khách hàng');
     if (isC) {
       $('#catForm').innerHTML =
@@ -1268,7 +1268,7 @@
     if (detailId && !existing) return;
     const d = existing ? M.copy(existing) : M.child(c.id, {});
     state.editing = { kind: 'exec', id: c.id, revision: c.revision || 0, draft: M.copy(c), detail: d };
-    $('#catErr').textContent = '';
+    clearCatErr();
     $('#catModalTitle').textContent = 'Chi tiết hợp đồng (tàu · chứng thư · tờ khai) — ' + (c.no || c.id);
     const whOpts =
       '<option value="">—</option>' +
@@ -1326,7 +1326,62 @@
     if (HAK.Customs) HAK.Customs.bindExec();
     bootstrap.Modal.getOrCreateInstance($('#catModal')).show();
   }
+  function clearCatErr() {
+    const err = $('#catErr');
+    if (err) {
+      err.textContent = '';
+      if (err.classList && typeof err.classList.add === 'function') err.classList.add('d-none');
+    }
+    const form = $('#catForm');
+    if (form && form.querySelectorAll) {
+      form.querySelectorAll('.is-invalid').forEach((el) => {
+        if (el.classList && typeof el.classList.remove === 'function') el.classList.remove('is-invalid');
+      });
+    }
+  }
+  function inferErrFields(msg) {
+    const m = String(msg || '');
+    const out = [];
+    if (/số hợp đồng|hợp đồng/i.test(m) && $('#cf-no')) out.push('no');
+    if (/độ khô nhà máy/i.test(m) && $('#cf-dryFactory')) out.push('dryFactory');
+    if (/tên khách hàng|khách hàng/i.test(m) && $('#cf-name')) out.push('name');
+    if (/tờ khai/i.test(m) && $('#cf-tkhq')) out.push('tkhq');
+    if (/ngày/i.test(m) && $('#cf-date')) out.push('date');
+    return out;
+  }
+  function showCatErr(msg, fieldIds) {
+    const err = $('#catErr');
+    if (err) {
+      err.textContent = msg;
+      if (err.classList && typeof err.classList.remove === 'function') err.classList.remove('d-none');
+      const body = err.closest ? err.closest('.modal-body') : null;
+      if (body) body.scrollTop = 0;
+      if (err.scrollIntoView) err.scrollIntoView({ block: 'nearest' });
+    }
+    let firstEl = null;
+    (fieldIds || []).forEach((fid) => {
+      const el = $('#cf-' + fid);
+      if (el && el.classList && typeof el.classList.add === 'function') {
+        el.classList.add('is-invalid');
+        if (!firstEl) firstEl = el;
+      }
+    });
+    if (firstEl && firstEl.focus) {
+      try {
+        firstEl.focus({ preventScroll: true });
+      } catch (e) {
+        /* ignore */
+      }
+    }
+    if (HAK.UI && HAK.UI.toast) HAK.UI.toast(msg, 'error');
+  }
+  function fieldErr(msg, field) {
+    const e = Error(msg);
+    e.field = field;
+    return e;
+  }
   function onFormInput(e) {
+    if (e && e.target && e.target.classList && typeof e.target.classList.remove === 'function') e.target.classList.remove('is-invalid');
     const ed = state.editing;
     if (!ed) return;
     if (ed.kind === 'contracts' || ed.kind === 'exec') {
@@ -1351,7 +1406,7 @@
     const node = $('#cf-' + id);
     if (node && ['contractProduct', 'product'].includes(id) && node.value === '__new') {
       const name = String($('#cf-' + id + '-newName').value).trim();
-      if (!name) throw Error('Chưa nhập tên hàng hóa mới');
+      if (!name) throw fieldErr('Chưa nhập tên hàng hóa mới', id + '-newName');
       return name;
     }
     if (!node) return '';
@@ -1360,7 +1415,8 @@
       const text = String(node.value).trim();
       if (text === '') return '';
       const n = HAK.NumFmt.parse(text, node.dataset.numfmt);
-      if (n === null) throw Error('Ô "' + (($('#cf-' + id + '-lbl') || {}).textContent || id) + '": "' + text + '" không phải là số');
+      if (n === null)
+        throw fieldErr('Ô "' + (($('#cf-' + id + '-lbl') || {}).textContent || id) + '": "' + text + '" không phải là số', id);
       return String(n);
     }
     return node.value;
@@ -1369,6 +1425,7 @@
     const ed = state.editing;
     if (!ed) return;
     const before = M.copy(state.data);
+    clearCatErr();
     $('#catSave').disabled = true;
     try {
       let res;
@@ -1531,7 +1588,7 @@
       );
     } catch (e) {
       state.data = before;
-      $('#catErr').textContent = 'Chưa lưu: ' + e.message;
+      showCatErr('Chưa lưu: ' + e.message, e.field ? [e.field] : inferErrFields(e.message));
     } finally {
       $('#catSave').disabled = false;
     }

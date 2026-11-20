@@ -166,6 +166,34 @@ const file = path.join(tmp, 'can.xlsx');
   await p.waitForTimeout(400);
   await p.keyboard.press('Escape');
   await p.waitForTimeout(700);
+  console.log('6) L-04: lỗi hộp Thêm hợp đồng nằm trong khung nhìn ở 1366×768 và 390×844');
+  for (const vp of [
+    { width: 1366, height: 768 },
+    { width: 390, height: 844 },
+  ]) {
+    await p.setViewportSize(vp);
+    await p.evaluate(() => (location.hash = '#/catalog'));
+    await p.waitForTimeout(600);
+    await p.click('#catAdd');
+    await p.waitForSelector('#catModal.show', { timeout: 5000 });
+    await p.waitForTimeout(300);
+    await p.click('#catSave');
+    await p.waitForTimeout(300);
+    const l04 = await p.evaluate(() => {
+      const err = document.getElementById('catErr');
+      const r = err ? err.getBoundingClientRect() : null;
+      const inVp = !!r && r.height > 0 && r.top >= 0 && r.bottom <= window.innerHeight;
+      const invalid = document.querySelectorAll('#catForm .is-invalid').length;
+      const overflowX = document.documentElement.scrollWidth > window.innerWidth;
+      return { inVp, invalid, overflowX, text: err ? err.textContent.trim() : '' };
+    });
+    check(
+      l04.inVp && l04.invalid > 0 && !l04.overflowX,
+      'L-04 (' + vp.width + '×' + vp.height + '): lỗi trong khung nhìn, đánh dấu ô lỗi, không tràn ngang'
+    );
+    await p.keyboard.press('Escape');
+    await p.waitForTimeout(400);
+  }
   check(errs.length === 0, 'không có lỗi script' + (errs.length ? ': ' + errs.slice(0, 2).join(' | ') : ''));
   await browser.close();
   if (failures.length) {
