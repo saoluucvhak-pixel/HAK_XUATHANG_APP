@@ -152,9 +152,49 @@
       bklsTemplates: await HAK.DB.getAll('bklsTemplates'),
     };
   }
+  async function sha256Text(text) {
+    const c =
+      root.crypto && root.crypto.subtle ? root.crypto.subtle : typeof crypto !== 'undefined' && crypto.subtle ? crypto.subtle : null;
+    if (!c) return null;
+    const bytes = new TextEncoder().encode(String(text));
+    return Array.from(new Uint8Array(await c.digest('SHA-256', bytes)), (v) => v.toString(16).padStart(2, '0')).join('');
+  }
   /** Dựng nội dung sao lưu từ kết quả collect() (toàn bộ) hoặc BackupMonth.select() (theo tháng — có thêm "scope"). MỘT bộ dựng file cho cả hai. */
-  function serialize(coll) {
+  async function serialize(coll) {
     const { yearbook, keys, items, batches, issued, attachments, bklsTemplates, scope } = coll;
+    const keysJson = JSON.stringify(keys);
+    const itemStrs = items.map((it) => JSON.stringify(it));
+    const batchStrs = batches.map((it) => JSON.stringify(it));
+    const issuedJson = JSON.stringify(issued);
+    const attJson = JSON.stringify(attachments);
+    const tplJson = JSON.stringify(bklsTemplates);
+    const ybJson = JSON.stringify(yearbook);
+    const secStr = {
+      keys: keysJson,
+      archive: '[' + itemStrs.join(',') + ']',
+      batches: '[' + batchStrs.join(',') + ']',
+      issued: issuedJson,
+      attachments: attJson,
+      bklsTemplates: tplJson,
+      yearbook: ybJson,
+    };
+    const sha256 = {};
+    for (const k of Object.keys(secStr)) {
+      const h = await sha256Text(secStr[k]);
+      if (h) sha256[k] = h;
+    }
+    const manifest = {
+      v: 1,
+      counts: {
+        keys: Object.keys(keys).length,
+        archive: items.length,
+        batches: batches.length,
+        issued: issued.length,
+        attachments: attachments.length,
+        bklsTemplates: bklsTemplates.length,
+      },
+      sha256,
+    };
     const parts = [
       '{"app":"' +
         APP +
@@ -163,25 +203,27 @@
         '"' +
         (scope ? ',"scope":' + JSON.stringify(scope) : '') +
         ',"keys":',
-      JSON.stringify(keys),
+      keysJson,
       ',"archive":[',
     ];
-    items.forEach((it, i) => {
-      parts.push((i ? ',' : '') + JSON.stringify(it));
+    itemStrs.forEach((s, i) => {
+      parts.push((i ? ',' : '') + s);
     });
     parts.push('],"batches":[');
-    batches.forEach((it, i) => {
-      parts.push((i ? ',' : '') + JSON.stringify(it));
+    batchStrs.forEach((s, i) => {
+      parts.push((i ? ',' : '') + s);
     });
     parts.push(
       '],"issued":',
-      JSON.stringify(issued),
+      issuedJson,
       ',"attachments":',
-      JSON.stringify(attachments),
+      attJson,
       ',"bklsTemplates":',
-      JSON.stringify(bklsTemplates),
+      tplJson,
       ',"yearbook":',
-      JSON.stringify(yearbook),
+      ybJson,
+      ',"manifest":',
+      JSON.stringify(manifest),
       '}'
     );
     return {
@@ -191,6 +233,7 @@
       batches: batches.length,
       issued: issued.length,
       scope: scope || null,
+      manifest,
     };
   }
   /** Dựng nội dung sao lưu toàn bộ (mảng chuỗi JSON — không nối thành 1 chuỗi lớn) + số đếm. */
@@ -302,13 +345,18 @@
       if (typeof root.JSZip !== 'function') throw new Error('Không mở được file ZIP (thiếu thư viện nén).');
       let z;
       try {
-        z = await root.JSZip.loadAsync(file);
+        const buf = file.arrayBuffer ? await file.arrayBuffer() : file;
+        z = await root.JSZip.loadAsync(buf, { checkCRC32: true });
       } catch (e) {
-        throw new Error('File ZIP bị hỏng hoặc không đọc được.');
+        throw new Error('File sao lưu ZIP bị hỏng hoặc không đọc được.');
       }
       const f = z.file(ZIP_INNER) || Object.values(z.files).find((x) => !x.dir && /\.json$/i.test(x.name));
       if (!f) throw new Error('File ZIP không có dữ liệu sao lưu (.json) của app.');
-      text = await f.async('string');
+      try {
+        text = await f.async('string');
+      } catch (e) {
+        throw new Error('File sao lưu bị hỏng (lỗi giải nén hoặc sai mã kiểm tra CRC32).');
+      }
     } else text = await file.text();
     try {
       return JSON.parse(text);
@@ -407,11 +455,42 @@
     }
     if (j.yearbook && HAK.Yearbook) HAK.Yearbook.validateBundle(j.yearbook.records);
   }
+  async function verifyManifest(j) {
+    if (!j || j.manifest === undefined) return 'unverified';
+    const m = j.manifest;
+    if (!m || typeof m !== 'object') throw new Error('File sao lưu bị hỏng (manifest không hợp lệ).');
+    if (m.counts && typeof m.counts === 'object') {
+      const actualCounts = {
+        keys: Object.keys(j.keys || {}).length,
+        archive: (j.archive || []).length,
+        batches: (j.batches || []).length,
+        issued: (j.issued || []).length,
+        attachments: (j.attachments || []).length,
+        bklsTemplates: (j.bklsTemplates || []).length,
+      };
+      for (const k of Object.keys(actualCounts)) {
+        if (m.counts[k] !== undefined && m.counts[k] !== actualCounts[k]) {
+          throw new Error('File sao lưu bị hỏng (số lượng bản ghi không khớp).');
+        }
+      }
+    }
+    if (m.sha256 && typeof m.sha256 === 'object') {
+      for (const k of Object.keys(m.sha256)) {
+        const val = j[k] === undefined ? (k === 'yearbook' ? null : k === 'keys' ? {} : []) : j[k];
+        const actual = await sha256Text(JSON.stringify(val));
+        if (actual && actual !== m.sha256[k]) {
+          throw new Error('File sao lưu bị hỏng (sai mã kiểm tra toàn vẹn dữ liệu).');
+        }
+      }
+    }
+    return 'verified';
+  }
   /** Đọc + kiểm tra + tóm tắt bản sao (KHÔNG ghi gì): dùng để hiện phạm vi dữ liệu trước khi người dùng chọn Nhập bổ sung / Khôi phục. */
   async function inspect(file) {
     const j = await readJson(file);
     if (j && j.app === 'hak-bienban-archive' && Array.isArray(j.items)) return { j, legacy: true, plan: { archive: j.items.length } };
     validateBackup(j);
+    const manifest = await verifyManifest(j);
     const plan = {
       kind: kindOf(j),
       scope: j.scope || null,
@@ -460,7 +539,7 @@
           ),
       };
     }
-    return { j, legacy: false, plan };
+    return { j, legacy: false, plan, manifest };
   }
   /** Chạy tuần tự các bước ghi, ghi lại bước nào xong / lỗi / chưa chạy và bước nào hoàn tác được. */
   async function runSteps(steps) {
