@@ -1,5 +1,10 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.25.1 — Không mất dữ liệu vừa lưu khi app tự tải lại (SQLite); nghiệm thu tự động trên Windows thật
+- **Lỗi đã sửa (bản Windows / SQLite):** mỗi lần lưu là một lệnh ghi gửi tới HAKDocs; khi app tự tải lại ngay sau đó (đổi công ty, khôi phục, chuyển nguồn dữ liệu, Sổ hồ sơ năm) lệnh ghi đang chạy có thể bị hủy → mất thứ vừa lưu (vd lưu bộ lọc rồi đổi công ty ngay). Nay app **chờ các lệnh ghi xong** (tối đa 5 giây) rồi mới tải lại; lệnh ghi nhỏ dùng `keepalive` để vẫn tới HAKDocs khi cửa sổ bị đóng giữa chừng. Phát hiện nhờ chạy nghiệm thu trên máy Windows thật (HAKDocs.exe chậm hơn máy chủ thử).
+- **Nghiệm thu tự động trên Windows thật** (CI `accept-windows`, HAKDocs.exe + SQLite + Edge, thư mục dữ liệu có dấu): giữ cài đặt khi mở lại, tách công ty + bộ lọc theo tài khoản, tab Sao lưu & khôi phục, tự sao lưu SQLite vào thư mục, sao lưu tháng, chuyển máy chéo IndexedDB ↔ SQLite.
+- Kiểm thử: `e2e-company-scope` thêm ca "lưu rồi tải lại ngay khi lệnh ghi chậm 1,5 giây" (đỏ trên v2.25.0 → xanh).
+
 ## v2.25.0 — Tách theo công ty; bộ lọc đã lưu theo tài khoản + công ty
 - **Tách hẳn theo công ty (quyết định 36):** khi đang làm một công ty, các chỗ trước đây còn lộ dữ liệu công ty khác nay chỉ hiện dữ liệu công ty đang làm: ô **"Chọn hợp đồng"** ở các trang lập hồ sơ (trước có nhóm "Hợp đồng công ty khác"), ô hợp đồng ở **Chứng từ** (điền số hợp đồng vào phiếu xuất kho), và **Tìm kiếm Ctrl+K** (hồ sơ Lưu trữ). Bật **Xem tất cả công ty** ở Danh mục / Lưu trữ thì thấy lại như trước; hợp đồng đã gắn với hồ sơ đang mở luôn được giữ.
 - **Bộ lọc đã lưu (mục 32):** mỗi tài khoản ở mỗi công ty có kho riêng — tài khoản khác / công ty khác không thấy tên và điều kiện bộ lọc của mình. Kho dùng chung của bản cũ không bị xóa; tài khoản Quản trị nhận bản sao của nó ở lần đầu, Nhân viên bắt đầu từ kho trống. Bền trên SQLite, có trong sao lưu.
