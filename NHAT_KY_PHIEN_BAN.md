@@ -1,5 +1,16 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.25.4 — Đợt 3: Nhóm dữ liệu / số liệu (L-05..08, L-20..24)
+- **L-05 (Phiếu KL ≤ 0):** lưu đủ thông tin `ts1, time1, note` cho dòng loại trừ trong `excel.js`; lọc theo kỳ ở Lưu trữ (`st.nonPos` và `st.nonPosTrips/Kg`); khử trùng danh sách phiếu loại trừ trong `batch-merge.js` tránh nhân đôi số lượng khi gộp nhiều đợt.
+- **L-06 & L-07 (Chuẩn hóa biển số & khử trùng):** `normPlate` chuẩn hóa `Đ/đ` thành `D` (đồng bộ `plateKey`); bổ sung `normTicket`; chuẩn hóa khóa `omitKey` kèm `legacyOmitKey` tương thích ngược; phụ lục theo xe `plateRows` gom theo `plateKey` tránh đếm trùng xe khi khác định dạng biển số.
+- **L-08 (Trạng thái HĐ khi bỏ tick hồ sơ):** mô hình hải quan (`customs-model.js`) nhận diện `hak.report.manual`, ghi chú `(chưa tính hồ sơ bị bỏ tick)` vào cơ sở tính khi có hồ sơ bị bỏ tick ở Báo cáo.
+- **L-20 (Dải ngày chứng từ vượt 1 tháng — D-03):** bổ sung cảnh báo tiếng Việt trong `generator.js` khi dải ngày hồ sơ kéo dài qua nhiều tháng ở mẫu chứng từ "tháng".
+- **L-21 (Báo cáo — Nhóm ngày không xác định):** phiếu thiếu ngày cân không còn gom thành nhóm rác `(khô`, thay bằng nhóm rõ nghĩa `Chưa rõ ngày` (`UNKNOWN_DATE`).
+- **L-22 (Đệm phiếu cân & liên kết HĐ):** cập nhật `updatedAt` khi gán hợp đồng trong Lưu trữ (`setContract`); làm mới bộ đệm phiếu cân `ticketCache` khi hợp đồng thay đổi; chia sẻ `ticketCache` giữa `report.js` và `trip-details.js`.
+- **L-23 (Lưu trữ — Cập nhật params & nhãn):** khi lưu lại hồ sơ đã có, đồng bộ `data.params` theo `contractId/docDate`; nhãn tổng hợp bộ lọc thông minh đổi thành `Khối lượng (chưa khử trùng)`.
+- **L-24 (Phạm vi công ty — Hồ sơ chưa rõ công ty — D-04):** cảnh báo `#archNoCoWarn` trên màn Lưu trữ khi có hồ sơ chưa gắn công ty (`cid` rỗng), cung cấp nút cho Quản trị viên gán công ty hàng loạt.
+- Ghi nhận các mục chờ quyết **D-02, D-03, D-04, D-07** vào `docs/QUY_TAC_NGHIEP_VU_CAN_XAC_NHAN.md`.
+
 ## v2.25.3 — Đợt 2: Nhập liệu (L-09, L-10, L-11, L-19, N-04, N-05, N-13, N-14)
 - **L-10 (Dấu trừ Unicode):** chuẩn hóa `−`, `–`, `—`, `‒` (`U+2212`…) thành `-` trong `excel.js` (`parseNumWarn`) và `numfmt.js` (`parseDec`).
 - **L-11 (Cảnh báo số mơ hồ — D-06):** thêm `parseNumWarn` cảnh báo khi số có kèm chữ/đơn vị hoặc nhóm phân cách không đều 3 chữ số (giữ nguyên giá trị đọc theo quy tắc 27).

@@ -398,17 +398,22 @@
           missingDetails: [],
         };
     }
+    const reportManual = (HAK.Store && HAK.Store.get && HAK.Store.get('hak.report.manual', {})) || {};
+    const hasUntickedManual = Object.values(reportManual).some((v) => v === false);
+    const untickNote = hasUntickedManual ? ' (chưa tính hồ sơ bị bỏ tick)' : '';
     // Quy tắc nghiệp vụ ĐÃ XÁC NHẬN (14/11/2026): hợp đồng "Đã hoàn thành" khi mọi tờ khai đã thông quan. Không bao hàm đủ KL / đã nộp thuế / đã giao hết — các chỉ tiêu đó hiển thị riêng (axes).
     return {
       code: done ? 'done' : 'running',
       label: done ? 'Đã hoàn thành' : 'Đang thực hiện',
       unverified: unverified && done ? true : undefined,
-      basis: done
-        ? 'Mọi tờ khai đã thông quan và mọi chi tiết đã có chứng thư / phiếu cân đều có tờ khai thông quan' +
-          (unverified ? ' (CHƯA đối chiếu được phiếu cân trong Lưu trữ — chỉ xét chứng thư)' : '')
-        : missing.length
-          ? 'Còn ' + missing.length + ' chi tiết chưa có tờ khai thông quan: ' + missing.map((d) => d.ship || d.certNo || d.id).join(', ')
-          : '',
+      untickedManual: hasUntickedManual ? true : undefined,
+      basis:
+        (done
+          ? 'Mọi tờ khai đã thông quan và mọi chi tiết đã có chứng thư / phiếu cân đều có tờ khai thông quan' +
+            (unverified ? ' (CHƯA đối chiếu được phiếu cân trong Lưu trữ — chỉ xét chứng thư)' : '')
+          : missing.length
+            ? 'Còn ' + missing.length + ' chi tiết chưa có tờ khai thông quan: ' + missing.map((d) => d.ship || d.certNo || d.id).join(', ')
+            : '') + untickNote,
       total: list.length,
       cleared,
       missingDetails: missing.map((d) => d.id),

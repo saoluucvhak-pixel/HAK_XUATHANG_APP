@@ -22,7 +22,11 @@
 
   /** Chuẩn hoá biển số để so khớp: "43H-010.68" / "43H-01068" / "43h 01068" → "43H01068". */
   function normPlate(p) {
+    if (HAK.Excel && HAK.Excel.util && HAK.Excel.util.plateKey) return HAK.Excel.util.plateKey(p);
     return String(p == null ? '' : p)
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[đĐ]/g, 'D')
       .toUpperCase()
       .replace(/[^0-9A-Z]/g, '');
   }

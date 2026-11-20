@@ -12,7 +12,7 @@
 (function (root) {
   'use strict';
   const HAK = (root.HAK = root.HAK || {});
-  const ticketCache = new Map(); // dùng chung với trang Chi tiết xuất hàng theo HĐ (cùng khóa id + updatedAt)
+  const ticketCache = (HAK.Report && HAK.Report.ticketCache) || new Map(); // dùng chung với trang Chi tiết xuất hàng theo HĐ (cùng khóa id + updatedAt)
   const DELAY = 250;
   let ids = null,
     sig = null,

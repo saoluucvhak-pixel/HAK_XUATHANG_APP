@@ -67,6 +67,27 @@ Các quy tắc dưới đây đã được **suy ra từ mã nguồn / tài li�
     - **(b) Chặn / hỏi xác nhận** khi bộ lọc không phủ hết hồ sơ của lô, nêu rõ số dòng ngoài kỳ sẽ bị xóa (đang áp dụng phần cảnh báo xác nhận ở L-01 mà không đổi số liệu). *Gợi ý của kiểm toán: an toàn nhất, không tự ý đổi số liệu.*
     - **(c) Giữ nguyên** như cũ (đẩy phần đang lọc và xóa phiếu ngoài kỳ mà không cảnh báo): dễ mất dữ liệu ngoài kỳ trên Sheet.
   - **Tác động:** Chọn (a) đòi hỏi tách dữ liệu gửi Sheet khỏi bộ lọc màn hình Báo cáo; chọn (b) giữ an toàn tối đa và chỉ cần chốt câu chữ/hành vi chặn cứng hay cho phép xác nhận.
+- **D-02 (liên quan L-08 — Trạng thái "đã có phiếu cân/Đã hoàn thành" khi bỏ tick hồ sơ):**
+  - **Câu hỏi:** Trạng thái "đã có phiếu cân" để tính "Đã hoàn thành" của hợp đồng (Quy tắc 30) có tính theo tick "bỏ hồ sơ" (`manual=false`) trong màn Báo cáo không? Quy tắc 30 chỉ mới chốt dùng "MỘT nguồn" tính từ Lưu trữ (`HAK.TripDetails`), chưa làm rõ trường hợp người dùng bỏ tick hồ sơ trong bảng Báo cáo.
+  - **Các phương án:**
+    - **(a) Không tính hồ sơ bị bỏ tick** khi xác định chi tiết đã có phiếu cân (thống nhất hoàn toàn với bảng Báo cáo xuất hàng).
+    - **(b) Giữ nguyên cơ chế xét toàn bộ hồ sơ trong Lưu trữ** (kể cả bị bỏ tick) nhưng ghi nhãn rõ trên cơ sở tính `(chưa tính hồ sơ bị bỏ tick)` như đang áp dụng ở L-08. *Gợi ý của kiểm toán: an toàn, không thay đổi tiêu chí hoàn thành đã lưu của hợp đồng.*
+    - **(c) Cho phép người dùng cấu hình** trong Cài đặt tùy chọn có trừ hồ sơ bỏ tick hay không.
+  - **Tác động:** Chọn (a) có thể khiến một hợp đồng đang "Đã hoàn thành" chuyển về chưa hoàn thành nếu hồ sơ duy nhất bị bỏ tick ở Báo cáo; chọn (b) giữ tính ổn định và minh bạch lý do.
+- **D-03 (liên quan L-20 — Mẫu chứng từ "tháng" khi dải ngày vượt 1 tháng):**
+  - **Câu hỏi:** Khi dải ngày cân trong hồ sơ vượt quá 1 tháng (ví dụ 28/11 đến 02/12), nhãn "TỔNG CỘNG THÁNG 11/2026", tiêu đề và tên file chứng từ xuất bán / gửi kho nên xử lý thế nào? (Quy tắc 33 chỉ mới chốt hồ sơ thuộc tháng của ngày cân đầu tiên cho sao lưu/Năm).
+  - **Các phương án:**
+    - **(a) Chỉ cảnh báo, không chặn và giữ nguyên nhãn** tháng của phiếu đầu (đang áp dụng ở L-20). *Gợi ý của kiểm toán: an toàn, tránh vỡ format biểu mẫu kế toán.*
+    - **(b) Đổi nhãn thành khoảng tháng** (ví dụ "THÁNG 11–12/2026").
+    - **(c) Tự động tách thành nhiều biên bản** theo từng tháng.
+  - **Tác động:** Chọn (b) hoặc (c) đòi hỏi sửa đổi template Word/Excel và logic sinh tài liệu; chọn (a) thông báo rõ ràng cho người dùng kiểm tra lại dải ngày.
+- **D-04 (liên quan L-24 — Hồ sơ Lưu trữ không rõ công ty):**
+  - **Câu hỏi:** Hồ sơ Lưu trữ không rõ công ty (`cid` rỗng, bên giao không khớp công ty nào) nên xử lý thế nào trong môi trường đa công ty? (Hiện tại hồ sơ bị ẩn khỏi mọi chế độ có phạm vi, trong khi HĐ không rõ công ty lại hiện ở mọi công ty theo Quy tắc 17).
+  - **Các phương án:**
+    - **(a) Giữ nguyên hành vi ẩn, thêm cảnh báo trên màn Lưu trữ và công cụ gán công ty cho Quản trị** (đang áp dụng ở L-24). *Gợi ý của kiểm toán: bảo đảm an toàn dữ liệu, tuân thủ nguyên tắc tách công ty của Quy tắc 36.*
+    - **(b) Cho hiện ở mọi công ty** tương tự như hợp đồng ở Quy tắc 17.
+    - **(c) Gom thành nhóm riêng "Chưa rõ công ty"** hiển thị riêng cho Quản trị viên xử lý.
+  - **Tác động:** Chọn (b) có thể làm lộ số liệu cân giữa các công ty; chọn (a) giúp Quản trị khắc phục dữ liệu lịch sử mồ côi mà không vi phạm cô lập công ty.
 - **D-05 (liên quan L-09 — Dòng chỉ có khối lượng, thiếu biển/số phiếu/ngày):**
   - **Câu hỏi:** Khi nhập Excel cân gặp dòng chỉ có khối lượng (không biển số, không số phiếu, không ngày giờ, và không có nhãn "Tổng cộng"): nên loại bỏ, chỉ cảnh báo, hay chặn nạp có xác nhận? (Quy tắc 15 chỉ mới chốt dòng sai ngày là cảnh báo.)
   - **Các phương án:** (a) Chặn nạp có xác nhận (giống quy tắc 12) — *gợi ý của kiểm toán*; (b) Chỉ cảnh báo mạnh (đang áp dụng ở L-09 mà không đổi số liệu); (c) Tự động loại bỏ.
@@ -75,6 +96,12 @@ Các quy tắc dưới đây đã được **suy ra từ mã nguồn / tài li�
   - **Câu hỏi:** Với chuỗi như `"5 tấn"`, `"1200kg"`, `"1.2.3"`, `"1.200.5"`: nên chấp nhận có cảnh báo hay từ chối không đọc? (Quy tắc 27 chỉ mới chốt `"1,200"`.)
   - **Các phương án:** (a) Chấp nhận giá trị hiện tại và cảnh báo (đang áp dụng ở L-11) — *gợi ý của kiểm toán*; (b) Từ chối trả về trống (`null`) và báo lỗi dòng.
   - **Tác động:** Chọn (b) có thể làm giảm số dòng đọc được từ các file cân gõ kèm đơn vị.
+- **D-07 (liên quan L-07, L-23 — Chuẩn hóa khóa nhận diện `omitKey` và băm mã hồ sơ Lưu trữ):**
+  - **Câu hỏi:** Có cho phép chuyển đổi cách băm mã hồ sơ Lưu trữ (hiện băm cả `idx` dòng) và khóa `omitKey` (hiện dùng biển số thô) sang khóa chuẩn hóa không?
+  - **Các phương án:**
+    - **(a) Tạm thời giữ nguyên cách băm ID hồ sơ và hỗ trợ backward compatibility cho `omitKey`** (hỗ trợ cả khóa cũ và mới như L-06/L-07 đã làm). *Gợi ý của kiểm toán: an toàn cao nhất, không làm vỡ các hồ sơ và cấu hình tick tay đã lưu.*
+    - **(b) Chuyển hoàn toàn sang khóa chuẩn hóa mới kèm script di trú tự động (migration)** dữ liệu cũ khi nâng cấp.
+  - **Tác động:** Chọn (b) đòi hỏi quy trình di trú dữ liệu toàn diện khi người dùng mở phiên bản mới; chọn (a) duy trì tương thích ngược 100% với dữ liệu cũ.
 - **D-09 (liên quan L-19 — Giờ cân `24:00:00`):**
   - **Câu hỏi:** Khi file cân ghi `24:00:00` (hoặc serial làm tròn thành `24:00:00`): coi là `00:00` ngày hôm sau (đổi ngày cân), kẹp `23:59:59` giữ nguyên ngày, hay coi là sai giờ + cảnh báo (như giờ `25:00` ở quy tắc 15)?
   - **Các phương án:** (a) Coi là "sai giờ" + cảnh báo theo quy tắc 15 — *gợi ý của kiểm toán*; (b) Chuyển sang `00:00` ngày sau đồng bộ cả `ts1` và `dateStr` kèm cảnh báo (đang áp dụng tạm ở L-19 để `ts1` và `dateStr` không mâu thuẫn); (c) Kẹp `23:59:59` giữ ngày cũ.

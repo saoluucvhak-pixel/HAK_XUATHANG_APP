@@ -66,9 +66,26 @@
     if (!p || !p.hasDate) return null;
     return Date.UTC(p.y, p.m - 1, p.d, endOfDay ? 23 : 0, endOfDay ? 59 : 0, endOfDay ? 59 : 0);
   }
-  /** Khóa nhận diện 1 phiếu để bỏ tay: số phiếu | biển số | giờ cân vào (cùng khóa khử trùng đợt) — bền khi nạp lại file đổi thứ tự dòng. */
+  const normTicket = (t) =>
+    String(t == null ? '' : t)
+      .toUpperCase()
+      .trim();
+  /** Khóa nhận diện cũ theo ký tự thô để đối chiếu các lựa chọn bỏ tay đã lưu của người dùng (D-07). */
+  const legacyOmitKey = (r) =>
+    (r.ticket || '') +
+    '|' +
+    (r.plate || '') +
+    '|' +
+    (r.ts1 !== null && r.ts1 !== undefined ? r.ts1 : r.time1) +
+    (r.ticket ? '' : '|' + r.net);
+  /** Khóa nhận diện chuẩn hóa (L-07, D-07): số phiếu chuẩn hóa | biển số chuẩn hóa | giờ cân vào. */
   const omitKey = (r) =>
-    (r.ticket || '') + '|' + r.plate + '|' + (r.ts1 !== null && r.ts1 !== undefined ? r.ts1 : r.time1) + (r.ticket ? '' : '|' + r.net);
+    normTicket(r.ticket) +
+    '|' +
+    (U().plateKey(r.plate) || r.plate || '') +
+    '|' +
+    (r.ts1 !== null && r.ts1 !== undefined ? r.ts1 : r.time1) +
+    (r.ticket ? '' : '|' + r.net);
   /**
    * Dòng TRÙNG HOÀN TOÀN trong cùng một file: cùng khóa omitKey (số phiếu + biển số + giờ cân vào; không có số phiếu thì thêm khối lượng).
    * Chỉ xét dòng nhận diện được (có số phiếu hoặc có thời điểm cân) — dòng thiếu cả hai không bị coi là trùng.
@@ -138,11 +155,11 @@
     };
     const pick = filter.pick && filter.pick.length ? new Set(filter.pick) : null; // CHỌN TỪNG PHIẾU của tàu này (khóa omitKey) — dùng khi 2 tàu cân xen kẽ trong ngày
     const selected = rows.filter((r) => {
-      if (pick && !pick.has(omitKey(r))) return false;
+      if (pick && !pick.has(omitKey(r)) && !pick.has(legacyOmitKey(r))) return false;
       if (!inTime(r) || !inTicket(r)) return false;
       if (files && r.uid !== undefined && !files.has(fileOf(r))) return false;
       if (excl && excl.has(r.uid !== undefined ? r.uid : r.idx)) return false;
-      if (omit && omit.has(omitKey(r))) return false;
+      if (omit && (omit.has(omitKey(r)) || omit.has(legacyOmitKey(r)))) return false;
       if (groups && !groups.has(r.note || '')) return false;
       if (from !== null && (r.ts1 === null || r.ts1 < from)) return false;
       if (to !== null && (r.ts1 === null || r.ts1 > to)) return false;
@@ -253,10 +270,11 @@
   function plateRows(rows) {
     const map = new Map();
     rows.forEach((r) => {
-      let p = map.get(r.plate);
+      const k = U().plateKey(r.plate) || r.plate;
+      let p = map.get(k);
       if (!p) {
         p = { plate: r.plate, trips: 0, kg: 0, min: Infinity, max: -Infinity };
-        map.set(r.plate, p);
+        map.set(k, p);
       }
       p.trips++;
       p.kg += r.net;
@@ -273,6 +291,7 @@
         plate: p.plate,
         dFrom: isFinite(p.min) ? U().fmtDate(U().tsToParts(p.min)) : '',
         dTo: isFinite(p.max) ? U().fmtDate(U().tsToParts(p.max)) : '',
+        kg: p.kg,
         tons: fmtTon(p.kg),
         note: '',
       }));
@@ -906,12 +925,33 @@
     plateRows,
     detailRows,
     retKey,
+    legacyOmitKey,
     omitKey,
     duplicateRows,
     build(type, ds, params) {
       if (!ds || !ds.ok)
         return { files: [], summary: {}, warnings: [], errors: ['Chưa có dữ liệu Excel hợp lệ. Hãy thêm file ở mục "Nhập liệu".'] };
       const res = BUILDERS[type](ds, params);
+      const rows = filterRows(ds.rows, params.filter);
+      const sum = summarize(rows);
+      if (sum.minTs !== null && sum.maxTs !== null) {
+        const t1 = U().tsToParts(sum.minTs),
+          t2 = U().tsToParts(sum.maxTs);
+        if (t1.y !== t2.y || t1.m !== t2.m) {
+          const per = period(sum, params.period);
+          res.warnings.push(
+            'Dải ngày cân (' +
+              sum.from +
+              ' → ' +
+              sum.to +
+              ') trải qua nhiều tháng — tiêu đề/nhãn tháng đang lấy theo tháng đầu (' +
+              per.periodMonth +
+              '/' +
+              per.periodYear +
+              ').'
+          );
+        }
+      }
       if (params.filter && params.filter.smart && HAK.Filters && res.excel) {
         const scope = 'Phạm vi: ' + HAK.Filters.core.scopeText(HAK.Filters.tripConfig(), params.filter.smart);
         if (res.excel.kind === 'A') res.excel.lines = (res.excel.lines || []).concat(scope);

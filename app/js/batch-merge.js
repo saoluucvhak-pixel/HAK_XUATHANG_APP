@@ -89,6 +89,27 @@
       );
     const t = (r) => (r.ts1 !== null && r.ts1 !== undefined ? r.ts1 : Infinity);
     rows.sort((a, b) => (t(a) === t(b) ? 0 : t(a) < t(b) ? -1 : 1));
+    // L-05: Khử trùng excluded giữa các đợt bằng omitKey
+    const exGroups = new Map();
+    ok.forEach((b) => {
+      (b.ds.excluded || []).forEach((x) => {
+        const item = Object.assign({ file: b.fileName }, x);
+        const k = G.omitKey(item);
+        if (!exGroups.has(k)) exGroups.set(k, []);
+        exGroups.get(k).push(item);
+      });
+    });
+    const mergedExcluded = [];
+    exGroups.forEach((g, k) => {
+      const files = new Set(g.map((x) => x.file));
+      if (files.size === 1) {
+        g.forEach((x) => mergedExcluded.push(x));
+      } else {
+        const pickNew = useNew.has(k);
+        const keepFile = pickNew ? g[g.length - 1].file : g[0].file;
+        g.filter((x) => x.file === keepFile).forEach((x) => mergedExcluded.push(x));
+      }
+    });
     sl.ds = {
       ok: true,
       merged: true,
@@ -98,8 +119,8 @@
       rows,
       stats: X.computeStats(rows),
       // phiếu KL ≤ 0 đã loại khỏi tổng ở từng đợt (quy tắc 29) — gom lại để lưu cùng hồ sơ và liệt kê ở "Ngoại lệ cần đối soát"
-      excluded: ok.flatMap((b) => (b.ds.excluded || []).map((x) => Object.assign({ file: b.fileName }, x))),
-      excludedKg: ok.reduce((a, b) => a + (b.ds.excludedKg || 0), 0),
+      excluded: mergedExcluded,
+      excludedKg: mergedExcluded.reduce((a, x) => a + (Number(x.net) || 0), 0),
       warnings,
       errors: [],
       meta: {},

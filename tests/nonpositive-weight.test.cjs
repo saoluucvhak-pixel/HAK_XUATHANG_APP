@@ -93,3 +93,41 @@ test('gộp nhiều đợt: danh sách phiếu đã loại của từng đợt �
     ['a.xlsx:102', 'a.xlsx:103', 'b.xlsx:302']
   );
 });
+
+test('L-05: gộp đợt trùng nội dung: phiếu KL ≤ 0 không bị nhân đôi (dedup bằng omitKey)', () => {
+  const a = HAK.Excel.parseSheet(book(RIGHT), 'S'),
+    b = HAK.Excel.parseSheet(book(RIGHT), 'S');
+  const sl = {
+    batches: [
+      { fileName: 'a.xlsx', ds: a },
+      { fileName: 'b.xlsx', ds: b },
+    ],
+    sel: 0,
+  };
+  BM.merge(sl);
+  assert.equal(sl.ds.excluded.length, 2, 'không nhân đôi lên 4');
+  assert.equal(sl.ds.excludedKg, -500, 'không nhân đôi kg');
+});
+
+test('L-05: lưu hồ sơ: hồ sơ lọc theo ngày chỉ giữ phiếu KL ≤ 0 trong khoảng ngày lọc', () => {
+  const multiDay = [
+    ['101', '43C-111.11', '05/01/2026', 20000],
+    ['102', '43C-222.22', '05/01/2026', 0],
+    ['201', '43C-333.33', '10/01/2026', 22000],
+    ['202', '43C-444.44', '10/01/2026', -300],
+  ];
+  const ds = HAK.Excel.parseSheet(book(multiDay), 'S');
+  assert.equal(ds.excluded.length, 2);
+  const filterDay5 = { from: '2026-01-05', to: '2026-01-05' };
+  const filterDay10 = { from: '2026-01-10', to: '2026-01-10' };
+  const ex5 = HAK.Generator.filterRows(ds.excluded, filterDay5);
+  const ex10 = HAK.Generator.filterRows(ds.excluded, filterDay10);
+  assert.deepEqual(
+    ex5.map((x) => x.ticket),
+    ['102']
+  );
+  assert.deepEqual(
+    ex10.map((x) => x.ticket),
+    ['202']
+  );
+});

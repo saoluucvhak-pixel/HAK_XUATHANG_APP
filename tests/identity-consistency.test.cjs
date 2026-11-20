@@ -76,3 +76,44 @@ test('mục 26: mọi nơi dùng CÙNG một khóa biển số (Excel computeSta
   assert.equal(st.plates, 2);
   assert.equal(st.byPlate.find((x) => HAK.Weigh.plateKey(x.plate) === '43C11111').trips, 3);
 });
+
+test('L-06: normPlate trực tiếp giữ chữ Đ -> D không bị rơi chữ', () => {
+  assert.equal(HAK.Vehicles.normPlate('43Đ-123.45'), '43D12345');
+  assert.equal(HAK.Vehicles.normPlate('43đ-123.45'), '43D12345');
+});
+
+test('L-06: Generator.plateRows (Phụ lục theo xe) gom các biến thể biển số thành 1 xe', () => {
+  global.HAK.Generator || require('../app/js/generator.js');
+  const rows = [
+    { plate: '43C-111.11', net: 10000, ts1: 1000 },
+    { plate: '43c-111.11', net: 12000, ts1: 2000 },
+    { plate: ' 43C 11111 ', net: 15000, ts1: 3000 },
+    { plate: '51D-999.99', net: 20000, ts1: 4000 },
+  ];
+  const pr = HAK.Generator.plateRows(rows);
+  assert.equal(pr.length, 2, '2 xe duy nhất, không phải 4 dòng');
+  const c111 = pr.find((x) => HAK.Excel.util.plateKey(x.plate) === '43C11111');
+  assert.ok(c111);
+  assert.equal(c111.trips, '3');
+  assert.equal(c111.kg, 37000);
+});
+
+test('L-07: duplicateRows nhận diện trùng khi khác hoa/thường hoặc dấu biển số/phiếu', () => {
+  global.HAK.Generator || require('../app/js/generator.js');
+  const rows = [
+    { ticket: 'T1', plate: '43C-111.11', ts1: 1736064000000, time1: '08:00', net: 20000 },
+    { ticket: 't1', plate: '43c 11111', ts1: 1736064000000, time1: '08:00', net: 20000 },
+  ];
+  const dups = HAK.Generator.duplicateRows(rows);
+  assert.equal(dups.length, 1, 'nhận diện được 1 nhóm trùng');
+  assert.equal(dups[0].rows.length, 2);
+});
+
+test('L-07: tương thích ngược: lựa chọn bỏ tay đã lưu bằng khóa cũ vẫn có tác dụng', () => {
+  global.HAK.Generator || require('../app/js/generator.js');
+  const r = { ticket: 't1', plate: '43c 11111', ts1: 1736064000000, time1: '08:00', net: 20000 };
+  const legacyKey = 't1|43c 11111|1736064000000';
+  const filter = { omit: [legacyKey] };
+  const filtered = HAK.Generator.filterRows([r], filter);
+  assert.equal(filtered.length, 0, 'khóa cũ vẫn bỏ được phiếu');
+});

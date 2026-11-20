@@ -227,3 +227,11 @@ test('prepareTickets đọc song song theo lô: thứ tự kết quả giữ ngu
     delete HAK.Archive;
   }
 });
+
+test('L-21: hồ sơ không có ngày cân đưa vào nhóm "Chưa rõ ngày" riêng thay vì "(khô"', () => {
+  const noDateMeta = meta('NODATE', '', '', 15000);
+  const m = R.compute([noDateMeta], {});
+  const yearKeys = m.years.map(([y]) => y);
+  assert.ok(!yearKeys.includes('(khô'), 'không có nhóm rác (khô');
+  assert.ok(yearKeys.includes('Chưa rõ ngày'), 'có nhóm Chưa rõ ngày');
+});

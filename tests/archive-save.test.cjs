@@ -152,3 +152,33 @@ test('lỗi ĐỒNG BỘ ở lần ghi thứ 2 (meta đã put, data chưa): hủ
     'giao dịch ghi đã bị hủy'
   );
 });
+
+test('L-23: lưu lại hồ sơ với params thay đổi (docDate/contractId) cập nhật data.params trong kho', async () => {
+  const { f, A } = load('ok');
+  assert.equal(await A.save(...args()), true);
+  const id = Array.from(f.stores.meta.keys())[0];
+  const d1 = await A.load(id);
+  assert.equal(d1.params.docDate, undefined);
+
+  // Lưu lại cùng hồ sơ (id giữ nguyên do cùng rows/type) nhưng params đổi docDate và contractId
+  const p2 = { ship: 'ĐẠI DƯƠNG', giaoId: 'hak', contractId: 'd2', docDate: '20/01/2026', filter: {} };
+  assert.equal(
+    await A.save(
+      'xuatkhau',
+      p2,
+      { files: [{ name: 'BB.docx' }], summary: {} },
+      {
+        rows: [
+          { idx: 1, net: 1000 },
+          { idx: 2, net: 2500 },
+        ],
+      },
+      'word'
+    ),
+    true
+  );
+
+  const d2 = await A.load(id);
+  assert.equal(d2.params.docDate, '20/01/2026', 'params.docDate phải được cập nhật mới');
+  assert.equal(d2.params.contractId, 'd2', 'params.contractId phải được cập nhật mới');
+});
