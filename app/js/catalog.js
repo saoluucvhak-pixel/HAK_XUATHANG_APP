@@ -662,6 +662,55 @@
     $('#catSave').addEventListener('click', onSave);
     $('#catForm').addEventListener('input', onFormInput);
     $('#catForm').addEventListener('change', onFormInput);
+    $('#catForm').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        $('#catSave').click();
+      }
+    });
+    $('#catModal').addEventListener('shown.bs.modal', () => {
+      const first = $('#catModal').querySelector(
+        '#catForm input:not([type=hidden]):not([disabled]):not([readonly]), #catModal #catForm select:not([disabled])'
+      );
+      if (first) first.focus();
+    });
+    $('#catModal').addEventListener('hide.bs.modal', (e) => {
+      if (state.forceClose) return;
+      if (!state.editing) return;
+      const current = formSnapshot();
+      if (current !== state.snapshot) {
+        e.preventDefault();
+        const ask =
+          HAK.UI && HAK.UI.confirm
+            ? HAK.UI.confirm('Dữ liệu đang nhập chưa được lưu. Bạn có chắc muốn hủy và đóng không?', {
+                title: 'Xác nhận hủy',
+                okText: 'Đóng và hủy',
+                cancelText: 'Tiếp tục sửa',
+                type: 'warning',
+              })
+            : Promise.resolve(
+                typeof root.confirm === 'function'
+                  ? root.confirm('Dữ liệu đang nhập chưa được lưu. Bạn có chắc muốn hủy và đóng không?')
+                  : true
+              );
+        ask.then((ok) => {
+          if (ok) {
+            state.forceClose = true;
+            state.editing = null;
+            bootstrap.Modal.getOrCreateInstance($('#catModal')).hide();
+          }
+        });
+      }
+    });
+    $('#catModal').addEventListener('hidden.bs.modal', () => {
+      state.forceClose = false;
+    });
+  }
+  function formSnapshot() {
+    const el = $('#catForm');
+    if (!el || typeof el.querySelectorAll !== 'function') return '';
+    const inputs = Array.from(el.querySelectorAll('input, select, textarea'));
+    return inputs.map((i) => i.id + '=' + (i.type === 'checkbox' ? i.checked : i.value)).join('&');
   }
 
   const catalogViews = {};
@@ -1373,6 +1422,8 @@
         inp('note', 'Ghi chú', 12, c.note);
     }
     onFormInput();
+    state.snapshot = formSnapshot();
+    state.forceClose = false;
     bootstrap.Modal.getOrCreateInstance($('#catModal')).show();
   }
   function openExec(parentId, detailId) {
@@ -1438,6 +1489,8 @@
     HAK.Documents.mount($('#catForm'), 'certificate', d.certificateFiles || [], { customers });
     onFormInput();
     if (HAK.Customs) HAK.Customs.bindExec();
+    state.snapshot = formSnapshot();
+    state.forceClose = false;
     bootstrap.Modal.getOrCreateInstance($('#catModal')).show();
   }
   function clearCatErr() {
@@ -1692,6 +1745,7 @@
           HAK.UI.toast('Đã lưu chi tiết hợp đồng nhưng chưa gắn được tờ khai: ' + error.message, 'warning');
         }
       }
+      state.forceClose = true;
       bootstrap.Modal.getOrCreateInstance($('#catModal')).hide();
       state.editing = null;
       renderRows();

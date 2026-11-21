@@ -37,7 +37,7 @@ test('Tổng quan có ô "Thực giao đã lập hồ sơ" dùng cùng engine B�
   assert.match(d, /scopeIds\('report'\)/);
   assert.match(d, /dupNote/);
   assert.match(p, /function confirmScope/);
-  assert.match(p, /if \(!src && !confirmScope\(type\)\) return;/);
+  assert.match(p, /if \(!src && !(?:\(await )?confirmScope\(type\)\)?\) return;/);
   const order = ['① Chuẩn bị dữ liệu', '② Lập hồ sơ', '③ Xuất chứng từ', '④ Báo cáo &amp; theo dõi'].map((k) => h.indexOf(k));
   assert.ok(
     order.every((x, i) => x > 0 && (i === 0 || x > order[i - 1])),

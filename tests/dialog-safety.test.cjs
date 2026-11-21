@@ -36,8 +36,8 @@ test('nút mặc định của <form> (Enter trong ô nhập) không phải nút
   assert.ok(n >= 4, 'quét được các form (' + n + ')');
   assert.deepEqual(bad, []);
 });
-test('xử lý phím Enter tự viết: chỉ bảng điều khiển và Tìm kiếm chung (không có đường Enter phá hủy khác)', () => {
+test('xử lý phím Enter tự viết: chỉ bảng điều khiển, tìm kiếm chung, danh mục và đổi mật khẩu (không có đường Enter phá hủy khác)', () => {
   const hits = [];
   for (const { f, s } of sources) if (/e\.key === 'Enter'|keyCode === 13/.test(s)) hits.push(f);
-  assert.deepEqual(hits.sort(), ['app/js/dashboard.js', 'app/js/search.js']);
+  assert.deepEqual(hits.sort(), ['app/js/auth.js', 'app/js/catalog.js', 'app/js/dashboard.js', 'app/js/search.js']);
 });

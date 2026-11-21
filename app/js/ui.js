@@ -108,6 +108,70 @@
     setTheme(document.documentElement.getAttribute('data-bs-theme') === 'dark' ? 'light' : 'dark');
   }
 
+  let confirmEl = null,
+    confirmResolve = null;
+  function ensureConfirmModal() {
+    if (confirmEl || typeof document === 'undefined') return;
+    confirmEl = document.createElement('div');
+    confirmEl.className = 'modal fade';
+    confirmEl.id = 'hakConfirmModal';
+    confirmEl.tabIndex = -1;
+    confirmEl.setAttribute('role', 'dialog');
+    confirmEl.setAttribute('aria-modal', 'true');
+    confirmEl.innerHTML =
+      '<div class="modal-dialog modal-dialog-centered"><div class="modal-content">' +
+      '<div class="modal-header"><h5 class="modal-title" id="hakConfirmTitle">Xác nhận</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button></div>' +
+      '<div class="modal-body" id="hakConfirmBody" style="white-space:pre-wrap;word-break:break-word;"></div>' +
+      '<div class="modal-footer"><button type="button" class="btn btn-outline-secondary" id="hakConfirmCancel" data-bs-dismiss="modal">Hủy</button>' +
+      '<button type="button" class="btn btn-primary" id="hakConfirmOk">Đồng ý</button></div>' +
+      '</div></div>';
+    document.body.appendChild(confirmEl);
+    const okBtn = confirmEl.querySelector('#hakConfirmOk');
+    okBtn.addEventListener('click', () => {
+      const res = confirmResolve;
+      confirmResolve = null;
+      if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+        bootstrap.Modal.getOrCreateInstance(confirmEl).hide();
+      }
+      if (res) res(true);
+    });
+    confirmEl.addEventListener('hidden.bs.modal', () => {
+      const res = confirmResolve;
+      confirmResolve = null;
+      if (res) res(false);
+    });
+  }
+
+  /**
+   * Hộp thoại xác nhận thay thế window.confirm.
+   * Trả về Promise<boolean>.
+   * opts: { title, okText, cancelText, type: 'primary'|'danger'|'warning' }
+   */
+  function uiConfirm(msg, opts) {
+    opts = opts || {};
+    if (typeof HAK.UI._confirm === 'function') {
+      return Promise.resolve(HAK.UI._confirm(msg, opts));
+    }
+    if (typeof document === 'undefined' || typeof bootstrap === 'undefined' || !bootstrap.Modal) {
+      return Promise.resolve(typeof root.confirm === 'function' ? root.confirm(msg) : true);
+    }
+    ensureConfirmModal();
+    const titleEl = confirmEl.querySelector('#hakConfirmTitle'),
+      bodyEl = confirmEl.querySelector('#hakConfirmBody'),
+      okBtn = confirmEl.querySelector('#hakConfirmOk'),
+      cancelBtn = confirmEl.querySelector('#hakConfirmCancel');
+    titleEl.textContent = opts.title || 'Xác nhận';
+    bodyEl.textContent = String(msg == null ? '' : msg);
+    okBtn.textContent = opts.okText || 'Đồng ý';
+    cancelBtn.textContent = opts.cancelText || 'Hủy';
+    const btnCls = opts.type === 'danger' ? 'btn-danger' : opts.type === 'warning' ? 'btn-warning' : 'btn-primary';
+    okBtn.className = 'btn ' + btnCls;
+    return new Promise((resolve) => {
+      confirmResolve = resolve;
+      bootstrap.Modal.getOrCreateInstance(confirmEl).show();
+    });
+  }
+
   /** Nút "bấm 2 lần để xác nhận" (tránh dùng hộp thoại confirm của trình duyệt). */
   function confirmClick(btn, action, label) {
     if (btn.dataset.armed === '1') {
@@ -199,5 +263,20 @@
       }
     });
   }
-  HAK.UI = { $, $$, esc, toast, friendly, Loading, setTheme, toggleTheme, confirmClick, debounce, todayISO, loadScript, needLib };
+  HAK.UI = {
+    $,
+    $$,
+    esc,
+    toast,
+    friendly,
+    Loading,
+    setTheme,
+    toggleTheme,
+    confirm: uiConfirm,
+    confirmClick,
+    debounce,
+    todayISO,
+    loadScript,
+    needLib,
+  };
 })(window);

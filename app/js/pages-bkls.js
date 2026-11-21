@@ -69,7 +69,7 @@
       }
       // v2.12.4: LUÔN hỏi phạm vi / định dạng (mặc định "BKLS tổng · Word"), kể cả khi tạo lại từ Lưu trữ — trước đây Lưu trữ dùng 4 ô đã lưu
       // (mặc định đều tick) nên luôn tạo cả bản từng xe Word + PDF rất lâu dù chỉ cần bản tổng.
-      if (!src && !confirmScope(type, 'Lập Bảng kê lâm sản (BKLS) "' + DOCS[type].title + '"')) return; // cùng hộp xác nhận phạm vi như Word / PDF / Excel
+      if (!src && !(await confirmScope(type, 'Lập Bảng kê lâm sản (BKLS) "' + DOCS[type].title + '"'))) return; // cùng hộp xác nhận phạm vi như Word / PDF / Excel
       const chosen = await HAK.BklsTemplates.choose(p);
       if (!chosen) return;
       p.bklsTemplate = chosen.template;

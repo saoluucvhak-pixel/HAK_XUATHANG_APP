@@ -6,26 +6,76 @@
 (function (root) {
   'use strict';
   const HAK = (root.HAK = root.HAK || {});
+  function normTicketToken(s) {
+    return String(s == null ? '' : s)
+      .replace(/[\u200B-\u200D\uFEFF]/g, '')
+      .trim()
+      .replace(/^["'“”‘’]+|["'“”‘’]+$/g, '')
+      .trim();
+  }
+  function parseTicketTokens(text) {
+    const raw = String(text || '').trim();
+    if (!raw) return [];
+    const tokens = [];
+    const re = /"([^"\r\n]+)"|'([^'\r\n]+)'|[“‘]([^”’\r\n]+)[”’]|([^\s,;]+)/g;
+    let m;
+    while ((m = re.exec(raw))) {
+      const val = normTicketToken(m[1] || m[2] || m[3] || m[4]);
+      if (val) tokens.push(val);
+    }
+    return tokens;
+  }
+  const normTicketKey = (s) => normTicketToken(s).toLowerCase().replace(/\s+/g, ' ');
+
+  function resolveTicket(rows, token) {
+    const t = normTicketKey(token);
+    if (!t) return { kind: 'none', hits: [] };
+    const exact = (rows || []).filter((r) => normTicketKey(r.ticket) === t);
+    if (exact.length === 1) return { kind: 'one', hits: exact };
+    if (exact.length > 1) return { kind: 'many', hits: exact };
+    const partial = (rows || []).filter((r) => {
+      const kt = normTicketKey(r.ticket);
+      return kt.endsWith(t) || kt.startsWith(t + '/');
+    });
+    if (partial.length === 1) return { kind: 'one', hits: partial };
+    return { kind: partial.length ? 'many' : 'none', hits: partial };
+  }
+
   /**
-   * Tách các số phiếu "không có trong danh sách" thành: bị LOẠI vì KL ≤ 0 (quy tắc 29: nằm trong ds.excluded — khớp đúng số phiếu hoặc đuôi số phiếu)
-   * và thật sự KHÔNG TÌM THẤY. Hàm thuần: excluded = ds.excluded, tokens = các số đã dán.
+   * Tách các số phiếu "không có trong danh sách" thành:
+   * - ngoài phạm vi giờ/ngày: nằm trong ds.rows nhưng không thuộc rows đang lọc
+   * - bị LOẠI vì KL ≤ 0 (quy tắc 29: nằm trong ds.excluded — khớp đúng số phiếu hoặc đuôi số phiếu)
+   * - thật sự KHÔNG TÌM THẤY.
    */
-  const splitMissing = (excluded, tokens) => {
-    const low = (v) =>
-      String(v == null ? '' : v)
-        .trim()
-        .toLowerCase();
-    const ex = (excluded || []).map((x) => low(x.ticket)).filter(Boolean),
-      out = { excluded: [], notFound: [] };
+  const splitMissing = (excluded, tokens, allRows, inScopeRows) => {
+    const ex = (excluded || []).map((x) => normTicketKey(x.ticket)).filter(Boolean);
+    const out = { excluded: [], notFound: [] };
+    if (allRows && allRows.length) out.outOfRange = [];
     (tokens || []).forEach((t) => {
-      const k = low(t);
-      (k && ex.some((e) => e === k || e.endsWith(k)) ? out.excluded : out.notFound).push(t);
+      const k = normTicketKey(t);
+      if (!k) {
+        out.notFound.push(t);
+        return;
+      }
+      if (allRows && allRows.length) {
+        const inAll = resolveTicket(allRows, t);
+        if (inAll.hits.length) {
+          out.outOfRange.push(t);
+          return;
+        }
+      }
+      if (ex.some((e) => e === k || e.endsWith(k))) {
+        out.excluded.push(t);
+        return;
+      }
+      out.notFound.push(t);
     });
     return out;
   };
   const missText = (esc, parts) =>
-    (parts.notFound.length ? '; không tìm thấy: ' + esc(parts.notFound.join(', ')) : '') +
-    (parts.excluded.length
+    (parts.outOfRange && parts.outOfRange.length ? '; ngoài phạm vi giờ/ngày: ' + esc(parts.outOfRange.join(', ')) : '') +
+    (parts.notFound && parts.notFound.length ? '; không tìm thấy: ' + esc(parts.notFound.join(', ')) : '') +
+    (parts.excluded && parts.excluded.length
       ? '; đã LOẠI vì khối lượng ≤ 0 (không cộng vào tổng, xem Báo cáo › Ngoại lệ cần đối soát): ' + esc(parts.excluded.join(', '))
       : '');
   HAK.PagesModals = function (ctx) {
@@ -159,26 +209,6 @@
         all = rowsForPick(pickType).filter((r) => pickMatch(r, q));
       return { all, shown: all.slice(0, PICK_PAGE) };
     }
-    /** Phân giải một số phiếu dán vào: khớp ĐẦY ĐỦ trước; chỉ khớp đuôi khi có đúng MỘT kết quả; nhiều kết quả → để người dùng xác nhận. */
-    function resolveTicket(rows, token) {
-      const t = String(token).trim().toLowerCase();
-      if (!t) return { kind: 'none', hits: [] };
-      const exact = rows.filter(
-        (r) =>
-          String(r.ticket || '')
-            .trim()
-            .toLowerCase() === t
-      );
-      if (exact.length === 1) return { kind: 'one', hits: exact };
-      if (exact.length > 1) return { kind: 'many', hits: exact };
-      const tail = rows.filter((r) =>
-        String(r.ticket || '')
-          .toLowerCase()
-          .endsWith(t)
-      );
-      if (tail.length === 1) return { kind: 'one', hits: tail };
-      return { kind: tail.length ? 'many' : 'none', hits: tail };
-    }
     function ensurePickModal() {
       if ($('#pickModal')) return;
       const m = document.createElement('div');
@@ -242,10 +272,9 @@
         $('#pickPasteMsg').innerHTML = '<span class="text-success">Đã chọn ' + n + ' phiếu (toàn bộ ' + v.all.length + ' kết quả).</span>';
       });
       $('#pickApply').addEventListener('click', () => {
-        const tokens = $('#pickPaste')
-            .value.split(/[\s,;]+/)
-            .filter(Boolean),
-          rows = rowsForPick(pickType);
+        const tokens = parseTicketTokens($('#pickPaste').value),
+          rows = rowsForPick(pickType),
+          ds = getDs(pickType) || {};
         let auto = [],
           miss = [];
         pickAmb = [];
@@ -256,7 +285,7 @@
           else miss.push(t);
         });
         const added = addKeys(auto),
-          parts = splitMissing((getDs(pickType) || {}).excluded, miss);
+          parts = splitMissing(ds.excluded, miss, ds.rows, rows);
         $('#pickPasteMsg').innerHTML =
           '<span class="' +
           (miss.length || pickAmb.length ? 'text-warning' : 'text-success') +
@@ -434,11 +463,13 @@
       pickState = 'ok';
       const n = pickDupCount();
       if (!n) return true;
-      return confirm(
+      const msg =
         '⚠ ' +
-          n +
-          ' phiếu bạn đã chọn đang thuộc hồ sơ khác trong Lưu trữ.\n\nNếu lưu, các phiếu này sẽ được tính ở cả hai hồ sơ (báo cáo sẽ cảnh báo trùng).\n\nBấm OK để vẫn lưu; Hủy để quay lại chỉnh phiếu.'
-      );
+        n +
+        ' phiếu bạn đã chọn đang thuộc hồ sơ khác trong Lưu trữ.\n\nNếu lưu, các phiếu này sẽ được tính ở cả hai hồ sơ (báo cáo sẽ cảnh báo trùng).\n\nBấm OK để vẫn lưu; Hủy để quay lại chỉnh phiếu.';
+      if (HAK.UI && HAK.UI.confirm)
+        return await HAK.UI.confirm(msg, { title: 'Xung đột phiếu chọn', okText: 'Vẫn lưu', cancelText: 'Quay lại', type: 'warning' });
+      return typeof confirm === 'function' ? confirm(msg) : true;
     }
     let omitType = null;
     function ensureOmitModal() {
@@ -616,25 +647,26 @@
         updateSummary(retType);
       });
       $('#retApply').addEventListener('click', () => {
-        const tokens = $('#retPaste')
-          .value.split(/[\s,;]+/)
-          .filter(Boolean);
-        const rows = currentRows(retType),
+        const tokens = parseTicketTokens($('#retPaste').value),
+          rows = currentRows(retType),
+          ds = getDs(retType) || {},
           miss = [];
         let add = 0;
         tokens.forEach((t) => {
-          const hit = rows.filter((r) => r.ticket === t || r.ticket.startsWith(t + '/'));
-          if (!hit.length) miss.push(t);
-          else
-            hit.forEach((r) => {
-              const k = G().retKey(r);
+          const r = resolveTicket(rows, t);
+          if (r.kind === 'one' || r.kind === 'many') {
+            r.hits.forEach((row) => {
+              const k = G().retKey(row);
               if (!ST[retType].returned.has(k)) {
                 ST[retType].returned.add(k);
                 add++;
               }
             });
+          } else {
+            miss.push(t);
+          }
         });
-        const parts = splitMissing((getDs(retType) || {}).excluded, miss);
+        const parts = splitMissing(ds.excluded, miss, ds.rows, rows);
         $('#retPasteMsg').innerHTML =
           '<span class="' + (miss.length ? 'text-warning' : 'text-success') + '">Đã thêm ' + add + ' xe' + missText(esc, parts) + '</span>';
         renderReturnList();
@@ -654,5 +686,8 @@
       resolveTicket,
     };
   };
+  HAK.PagesModals.normTicketToken = normTicketToken;
+  HAK.PagesModals.parseTicketTokens = parseTicketTokens;
+  HAK.PagesModals.resolveTicket = resolveTicket;
   HAK.PagesModals.splitMissing = splitMissing;
 })(window);

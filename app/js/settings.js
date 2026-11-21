@@ -32,7 +32,16 @@
    * ============================================================= */
   let modal = null,
     saveFn = null,
-    warnKey = '';
+    warnKey = '',
+    forceClose = false,
+    initialSnapshot = '',
+    lastTrigger = null;
+  function getFormSnapshot() {
+    const el = document.getElementById('setModalBody');
+    if (!el || typeof el.querySelectorAll !== 'function') return '';
+    const inputs = Array.from(el.querySelectorAll('input, select'));
+    return inputs.map((i) => i.id + '=' + (i.type === 'checkbox' ? i.checked : i.value.trim())).join('&');
+  }
   function ensureModal() {
     if (modal) return;
     const el = document.createElement('div');
@@ -57,10 +66,47 @@
       const f = el.querySelector('#setModalBody input, #setModalBody select');
       if (f) f.focus();
     });
+    el.addEventListener('hide.bs.modal', (e) => {
+      if (forceClose) return;
+      const curSnapshot = getFormSnapshot();
+      if (curSnapshot !== initialSnapshot) {
+        e.preventDefault();
+        const ask =
+          HAK.UI && HAK.UI.confirm
+            ? HAK.UI.confirm('Dữ liệu đang sửa chưa được lưu. Bạn có chắc muốn hủy và đóng hộp thoại không?', {
+                title: 'Xác nhận hủy',
+                okText: 'Đóng và hủy',
+                cancelText: 'Tiếp tục sửa',
+                type: 'warning',
+              })
+            : Promise.resolve(
+                typeof root.confirm === 'function'
+                  ? root.confirm('Dữ liệu đang sửa chưa được lưu. Bạn có chắc muốn hủy và đóng hộp thoại không?')
+                  : true
+              );
+        ask.then((ok) => {
+          if (ok) {
+            forceClose = true;
+            modal.hide();
+            forceClose = false;
+          }
+        });
+      }
+    });
+    el.addEventListener('hidden.bs.modal', () => {
+      forceClose = false;
+      if (lastTrigger && document.contains(lastTrigger) && !lastTrigger.disabled) {
+        try {
+          lastTrigger.focus({ preventScroll: true });
+        } catch (err) {}
+      }
+    });
   }
   /** fields: [{k, label, col, type:'text'|'select', options:[[v, text]], value, ph, req, help}]; onSave(v, ack) → { errors?, warnings? } */
-  function openForm(title, fields, onSave) {
+  function openForm(title, fields, onSave, triggerEl) {
     ensureModal();
+    lastTrigger = triggerEl || (document.activeElement && document.activeElement !== document.body ? document.activeElement : null);
+    forceClose = false;
     $('#setModalTitle').textContent = title;
     $('#setModalBody').innerHTML = fields
       .map((f) => {
@@ -114,8 +160,11 @@
         msg.innerHTML = r.warnings.map(esc).join('<br>') + '<br><b>Bấm Lưu lần nữa để vẫn lưu.</b>';
         return;
       }
+      forceClose = true;
       modal.hide();
+      forceClose = false;
     };
+    initialSnapshot = getFormSnapshot();
     modal.show();
   }
   const norm = (x) =>
