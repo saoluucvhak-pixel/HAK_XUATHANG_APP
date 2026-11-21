@@ -42,6 +42,8 @@
     }
     return d;
   }
+  /** U-06: nhật ký các lần đồng bộ lô phiếu (mới nhất trước): thời điểm, số lô / phiếu, dòng thêm / xóa / cập nhật, lần dừng giữa chừng. Tối đa LOG_MAX lần. */
+  const LOG_MAX = 20;
   const curCo = () => (HAK.Auth && HAK.Auth.company ? HAK.Auth.company() : '') || 'hak';
   const cfg = (cid) => Object.assign({ url: '', token: '', last: null }, all().cos[cid || curCo()] || {});
   const saveCfg = (cid, c) => {
@@ -52,6 +54,7 @@
       last: c.last || null,
       lastContracts: c.lastContracts || null,
       partial: c.partial || null,
+      log: Array.isArray(c.log) ? c.log.slice(0, LOG_MAX) : [],
     };
     d.migV1 = true;
     HAK.Store.set(KEY, d);
@@ -398,7 +401,9 @@
           it.batchesDone++;
         }
         const c = cfg(it.cid);
-        c.last = { at: Date.now(), lots: it.lots, trips: it.trips };
+        const entry = { at: Date.now(), lots: it.lots, trips: it.trips, added: it.added, removed: it.removed, updated: it.updated };
+        c.last = entry;
+        c.log = [entry].concat(c.log || []).slice(0, LOG_MAX);
         delete c.partial;
         saveCfg(it.cid, c);
       } catch (e) {
@@ -409,6 +414,21 @@
         it.lotsPending = Math.max(0, it.lots - it.lotsDone - it.lotsFailed);
         const c = cfg(it.cid);
         c.partial = { at: Date.now(), lotsDone: it.lotsDone, lotsFailed: it.lotsFailed, lotsPending: it.lotsPending, error: it.error };
+        // Các nhóm đã ghi TRƯỚC khi dừng vẫn có thể đã thêm / xóa dòng trên Sheet → ghi nhật ký để người dùng biết.
+        c.log = [
+          {
+            at: c.partial.at,
+            lots: it.lots,
+            trips: it.trips,
+            added: it.added,
+            removed: it.removed,
+            updated: it.updated,
+            partial: true,
+            error: it.error,
+          },
+        ]
+          .concat(c.log || [])
+          .slice(0, LOG_MAX);
         saveCfg(it.cid, c);
       }
       delete it.batches;
@@ -448,7 +468,16 @@
         ') — bấm đồng bộ lại để gửi tiếp'
       );
     return l
-      ? 'đồng bộ gần nhất ' + fmtTime(l.at) + ' — ' + l.lots + ' lô, ' + l.trips.toLocaleString('vi-VN') + ' phiếu'
+      ? 'đồng bộ gần nhất ' +
+          fmtTime(l.at) +
+          ' — ' +
+          l.lots +
+          ' lô, ' +
+          l.trips.toLocaleString('vi-VN') +
+          ' phiếu' +
+          (typeof l.removed === 'number'
+            ? ' (thêm ' + l.added + ', xóa ' + l.removed + ', cập nhật ' + l.updated + ' dòng trên Sheet)'
+            : '')
       : 'chưa đồng bộ lần nào';
   }
   /** Báo cáo: trạng thái Sheet của công ty đang làm (hoặc mọi công ty đang xem khi bật "Xem tất cả"). */
@@ -643,5 +672,8 @@
     _call: call,
     BATCH_TRIPS,
     _cfg: cfg,
+    log: (cid) => (cfg(cid).log || []).slice(),
+    _lastText: lastText,
+    LOG_MAX,
   };
 })(window);

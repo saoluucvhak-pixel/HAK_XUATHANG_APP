@@ -1,5 +1,9 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.25.9 — U-06: nhật ký đồng bộ Google Sheet
+- **Nhật ký đồng bộ lô phiếu (U-06):** mỗi lần đồng bộ ghi lại thời điểm, số lô / phiếu và số dòng **thêm / xóa / cập nhật** trên Sheet (20 lần gần nhất, mới nhất trước; lần dừng giữa chừng cũng được ghi kèm lỗi). Dòng trạng thái ở Báo cáo và Cài đặt › Chung hiện "(thêm X, xóa Y, cập nhật Z dòng trên Sheet)" để thấy ngay khi một lần đồng bộ đã xóa dòng. Cấu hình cũ chưa có nhật ký vẫn dùng được; gói cấu hình và sao lưu không đổi định dạng.
+- Không đổi hành vi gửi: bộ lọc kỳ vẫn hỏi xác nhận trước khi xóa dòng ngoài kỳ (L-01); lựa chọn D-01 vẫn chờ chủ dự án.
+
 ## v2.25.8 — Đợt 7: Nâng cấp cấu trúc (U-03..U-15)
 - **U-03 (Hằng số hệ thống & Khóa Storage tập trung):** xây dựng `HAK.Constants` và `HAK.Config.KEYS` chứa đầy đủ tất cả các khóa lưu trữ cục bộ (`hak.config.v1`, `hak.catalog.v1`, `hak.yearbook.v1`, `hak.auth.v1`, `hak.draft.general`, `hak.restore.undo.v1`, v.v.), được đóng băng bằng `Object.freeze` để tránh bị sửa đổi ngoài ý muốn và chấm dứt việc hardcode chuỗi rải rác.
 - **U-04 (Module HAK.Identity dùng chung):** gom và chuẩn hóa toàn bộ các hàm nhận diện thực thể vào `HAK.Identity` (`normPlate`, `plateKey`, `normTicket`, `normTicketToken`, `parseTicketTokens`, `resolveTicket`, `normContractId`, `normCompanyId`) để sử dụng nhất quán trong toàn bộ hệ thống.
