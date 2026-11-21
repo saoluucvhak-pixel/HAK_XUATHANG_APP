@@ -69,7 +69,7 @@
   const normTicket = (t) =>
     String(t == null ? '' : t)
       .toUpperCase()
-      .trim();
+      .replace(/\s+/g, ''); // cùng chuẩn với HAK.Weigh.identity / Tìm kiếm: bỏ MỌI khoảng trắng
   /** Khóa nhận diện cũ theo ký tự thô để đối chiếu các lựa chọn bỏ tay đã lưu của người dùng (D-07). */
   const legacyOmitKey = (r) =>
     (r.ticket || '') +
@@ -133,7 +133,8 @@
       return m && +m[1] < 24 && +m[2] < 60 ? +m[1] * 60 + +m[2] : null;
     };
     const tnum = (s) => {
-      const m = String(s == null ? '' : s).match(/(\d+)\D*$/);
+      const t = String(s == null ? '' : s).trim();
+      const m = /^\d/.test(t) ? t.match(/^(\d+)/) : t.match(/(\d+)\D*$/); // "7998/2026/XK" → 7998 (không phải năm 2026); "PC-000101" → 101
       return m ? Number(m[1]) : null;
     };
     const tf = tmin(filter.timeFrom),
