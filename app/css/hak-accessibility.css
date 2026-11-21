@@ -9,10 +9,10 @@
 }
 
 /* HAK UI Designer audit: header wrapping, scrollable dialogs, theme contrast. */
-.topbar { flex-wrap: wrap; }
+.topbar { flex-wrap: wrap; min-height: 52px; padding: 8px 16px; }
 .topbar > * { min-width: 0; }
 .topbar .btn { flex-shrink: 0; }
-.topbar #pageTitle { flex: 1 1 130px; }
+.topbar #pageTitle { flex: 1 1 auto; min-width: 0; white-space: normal; line-height: 1.25; }
 .hak-download-history { max-height: 45vh; overflow: auto; overscroll-behavior: contain; }
 .hak-download-notice { position:fixed; bottom:20px; right:20px; z-index:1090; width:440px; max-width:calc(100vw - 32px); max-height:calc(100dvh - 40px); overflow:auto; overflow-wrap:anywhere; }
 .hak-download-notice > .btn-close { align-self:flex-end; }

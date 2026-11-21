@@ -1372,7 +1372,7 @@
     const lastTxt = !L
       ? okT(false, 'Chưa có')
       : L.ok === false
-        ? '<span class="text-danger">✗ Lỗi ' +
+        ? '<span class="text-danger text-break" style="overflow-wrap:anywhere;word-break:break-word;">✗ Lỗi ' +
           esc(fmtDT(L.failAt || L.at)) +
           ': ' +
           esc(L.err || '') +
@@ -1775,7 +1775,11 @@
       : okT(true, '✓ ' + esc(fmtDT(lastOk))) + (L && L.ok && L.name ? ' — <span class="mono">' + esc(L.name) + '</span>' : '');
     const errTxt =
       L && L.ok === false
-        ? '<span class="text-danger">✗ ' + esc(fmtDT(L.at)) + ': ' + esc(L.error || '') + '</span>'
+        ? '<span class="text-danger text-break" style="overflow-wrap:anywhere;word-break:break-word;">✗ ' +
+          esc(fmtDT(L.at)) +
+          ': ' +
+          esc(L.error || '') +
+          '</span>'
         : okT(true, 'Không có');
     return (
       '<hr><div class="fw-semibold mb-1">🗄 Tự sao lưu SQLite <span class="muted small fw-normal">— ' +
