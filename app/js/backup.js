@@ -1766,7 +1766,9 @@
   function sqlAutoHtml() {
     const okT = (v, t) => '<span class="' + (v ? 'text-success' : 'text-warning') + '">' + t + '</span>';
     if (!sqlAvailable())
-      return '<hr><div class="fw-semibold mb-1">🗄 Tự sao lưu SQLite</div><div class="small muted">Chỉ có ở bản Windows đang lưu dữ liệu bằng SQLite.</div>';
+      return (
+        '<hr><div class="fw-semibold mb-1">🗄 Tự sao lưu SQLite <span class="badge text-bg-secondary ms-1">Chỉ trên Windows</span></div><div class="small muted">Chỉ có ở bản Windows đang lưu dữ liệu bằng SQLite.</div>'
+      );
     const c = sqlCfg(),
       L = c.last;
     const lastOk = L && (L.ok ? L.at : L.okAt);
@@ -1885,9 +1887,7 @@
       '</select></label><label class="small mb-0">Năm <select class="form-select form-select-sm" id="bkMonthY" aria-label="Năm">' +
       years.map((y) => '<option value="' + y + '"' + (+defYm.slice(0, 4) === y ? ' selected' : '') + '>' + y + '</option>').join('') +
       '</select></label><button class="btn btn-outline-primary" id="bkSaveMonth" type="button">⬇ Theo tháng (.json)</button><span class="small muted ms-1" id="bkMonthInfo"></span></div>' +
-      (sqlAvailable()
-        ? '<button class="btn btn-outline-primary" id="bkSqlNow" type="button">🗄 SQLite ngay (.db)</button>'
-        : '<button class="btn btn-outline-secondary" id="bkSqlNow" type="button" disabled title="Chỉ khả dụng khi ứng dụng kết nối cơ sở dữ liệu SQLite (bản Windows)">🗄 SQLite ngay (chỉ trên Windows)</button>') +
+      (sqlAvailable() ? '<button class="btn btn-outline-primary" id="bkSqlNow" type="button">🗄 SQLite ngay (.db)</button>' : '') +
       '</div>' +
       '<div class="form-text mt-2">Bản <b>theo tháng</b> = hồ sơ, đợt Excel, chứng từ của tháng (tính theo <b>ngày cân đầu tiên</b>) cùng hợp đồng / tờ khai / khách hàng mà chúng gắn tới' +
       (mo.undated ? ' · ⚠ ' + mo.undated + ' hồ sơ không có ngày cân nên không thuộc tháng nào (chỉ có trong bản toàn bộ)' : '') +
