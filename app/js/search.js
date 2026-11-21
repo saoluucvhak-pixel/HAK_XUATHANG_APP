@@ -274,6 +274,36 @@
       if (e.target === ov) close();
     });
     ov.querySelector('#gsClose').addEventListener('click', close);
+    ov.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        close();
+        return;
+      }
+      if (e.key === 'Tab') {
+        const focusables = Array.from(
+          ov.querySelectorAll('input:not([disabled]), button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])')
+        ).filter((el) => el.offsetParent !== null || (el.getClientRects && el.getClientRects().length > 0));
+        if (!focusables.length) {
+          e.preventDefault();
+          return;
+        }
+        const first = focusables[0],
+          last = focusables[focusables.length - 1];
+        if (e.shiftKey) {
+          if (document.activeElement === first || !ov.contains(document.activeElement)) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else {
+          if (document.activeElement === last || !ov.contains(document.activeElement)) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      }
+    });
     inp.addEventListener(
       'input',
       HAK.UI.debounce(() => {
@@ -477,6 +507,11 @@
   }
   function init() {
     document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && ov && !ov.hidden) {
+        e.preventDefault();
+        close();
+        return;
+      }
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && String(e.key).toLowerCase() === 'k') {
         // Đang có hộp thoại: bẫy tiêu điểm của hộp thoại sẽ giật tiêu điểm khỏi ô tìm (gõ nhầm ô) → không mở tìm kiếm chồng lên
         if (document.querySelector('.modal.show') && (!ov || ov.hidden)) return;

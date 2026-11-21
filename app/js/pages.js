@@ -1624,6 +1624,7 @@
    * ============================================================= */
   function showMessages(type, res) {
     const box = $('#msgs-' + type);
+    if (!box) return;
     let h = '';
     if (res.errors.length)
       h +=
@@ -1632,10 +1633,17 @@
         '</ul></div>';
     if (res.warnings.length)
       h +=
-        '<div class="alert alert-warning py-2 mb-2"><ul class="alert-list">' +
+        '<div class="alert alert-warning py-2 mb-2" id="warnBox-' +
+        type +
+        '"><div class="fw-semibold mb-1">Lưu ý khi lập hồ sơ:</div><ul class="alert-list">' +
         res.warnings.map((e) => '<li>' + esc(e) + '</li>').join('') +
         '</ul></div>';
     box.innerHTML = h;
+    if (res.warnings.length && !res.errors.length) {
+      try {
+        box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      } catch (err) {}
+    }
   }
 
   /** Lưu hồ sơ vào 🗄️ Lưu trữ (không bao giờ làm hỏng việc xuất file). */
@@ -1691,17 +1699,33 @@
     for (let i = 0; i < batches.length; i++) {
       if (
         i > 0 &&
-        !confirm(
-          'Đã mở hộp thoại in đợt ' +
-            i +
-            '/' +
-            batches.length +
-            '.\n\nBấm OK để in đợt ' +
-            (i + 1) +
-            '/' +
-            batches.length +
-            ' (nhớ đã lưu PDF đợt trước); Hủy để dừng.'
-        )
+        !(await (HAK.UI && HAK.UI.confirm
+          ? HAK.UI.confirm(
+              'Đã mở hộp thoại in đợt ' +
+                i +
+                '/' +
+                batches.length +
+                '.\n\nBấm Đồng ý để in đợt ' +
+                (i + 1) +
+                '/' +
+                batches.length +
+                ' (nhớ đã lưu PDF đợt trước); Hủy để dừng.',
+              { title: 'In theo đợt', okText: 'In đợt tiếp' }
+            )
+          : Promise.resolve(
+              typeof confirm === 'function' &&
+                confirm(
+                  'Đã mở hộp thoại in đợt ' +
+                    i +
+                    '/' +
+                    batches.length +
+                    '.\n\nBấm OK để in đợt ' +
+                    (i + 1) +
+                    '/' +
+                    batches.length +
+                    ' (nhớ đã lưu PDF đợt trước); Hủy để dừng.'
+                )
+            )))
       ) {
         toast('Đã dừng sau đợt in ' + i + '/' + batches.length + '.', 'warning');
         return;
@@ -1713,10 +1737,19 @@
   }
 
   /** Xác nhận trước khi xuất: công ty · tàu · số phiếu · bỏ · trả về · thực giao (cùng tập phiếu với màn hình). Test đặt HAK.Pages._confirmScope. */
-  function confirmScope(type, what) {
-    const txt =
-      (what || 'Lập chứng từ "' + DOCS[type].title + '"') + ' cho:\n' + scopeSummary(type) + '\n\nĐúng phạm vi cần lập? (Hủy để chỉnh lại)';
-    if (HAK.Pages && HAK.Pages._confirmScope) return HAK.Pages._confirmScope(txt, type);
+  async function confirmScope(type, what, warnings) {
+    let txt = (what || 'Lập chứng từ "' + DOCS[type].title + '"') + ' cho:\n' + scopeSummary(type);
+    let w = warnings;
+    if (!w) {
+      const box = $('#warnBox-' + type);
+      if (box) w = Array.from(box.querySelectorAll('li')).map((li) => li.textContent);
+    }
+    if (w && w.length) {
+      txt += '\n\nLưu ý:\n' + w.map((x) => '• ' + x).join('\n');
+    }
+    txt += '\n\nĐúng phạm vi cần lập? (Hủy để chỉnh lại)';
+    if (HAK.Pages && HAK.Pages._confirmScope) return await HAK.Pages._confirmScope(txt, type);
+    if (HAK.UI && HAK.UI.confirm) return await HAK.UI.confirm(txt, { title: 'Xác nhận tạo biên bản', okText: 'Đồng ý', cancelText: 'Hủy' });
     return typeof root.confirm === 'function' ? root.confirm(txt) : true;
   }
   /** src (tùy chọn) = { ds, params } lấy từ hồ sơ Lưu trữ → dựng lại mà không cần file Excel cân. */
@@ -1743,7 +1776,7 @@
       if (!src) focusError(type, res.errors[0]);
       return;
     }
-    if (!src && !confirmScope(type)) return;
+    if (!src && !(await confirmScope(type))) return;
     const btn = $('#' + (mode === 'pdf' ? 'pdf-' : mode === 'xlsx' ? 'xls-' : 'gen-') + type);
     btn.disabled = true;
     if (mode === 'pdf') {

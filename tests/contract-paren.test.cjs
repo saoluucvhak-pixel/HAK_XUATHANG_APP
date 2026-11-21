@@ -23,13 +23,22 @@ test('bộ đọc không biến "(1.200)" / "(150)" thành số: không có kh�
 });
 test('số dạng ngoặc sát nhãn / đơn vị khối lượng hoặc giá được báo (kể cả tiếng Việt)', () => {
   assert.deepEqual(D.parenNumberNotes(po('(1.200)', '150.0')), ['(1.200)']);
+  assert.deepEqual(CP.parenNumberNotes(po('(1.200)', '150.0')), ['(1.200)']);
   assert.deepEqual(D.parenNumberNotes(po('1,200', '(150)')), ['(150)']);
+  assert.deepEqual(CP.parenNumberNotes(po('1,200', '(150)')), ['(150)']);
   assert.deepEqual(D.parenNumberNotes('Số lượng: (1.200) tấn\nĐơn giá: (150) USD/BDMT'), ['(1.200)', '(150)']);
+  assert.deepEqual(CP.parenNumberNotes('Số lượng: (1.200) tấn\nĐơn giá: (150) USD/BDMT'), ['(1.200)', '(150)']);
   assert.deepEqual(D.parenNumberNotes('Thành tiền: ( 1.250.000 ) VND'), ['(1.250.000)']);
+  const ex = CP.extract([{ page: 1, text: po('(1.200)', '150.0') }]);
+  assert.equal(ex.warnings.length, 1);
+  assert.match(ex.warnings[0], /quy tắc 28/i);
 });
 test('ngoặc thông thường KHÔNG báo nhầm: (6 Holds), (+/-10%), (2026), (V-12), số hiệu', () => {
   const t = 'Quantity: 12,000 BDMT ( +/-10%)\nVessel MV Test Star V-12 ( 6 Holds)\nAgreement No. 2026XY dated (2026)\nĐiều (3) khoản (a)';
   assert.deepEqual(D.parenNumberNotes(t), []);
+  assert.deepEqual(CP.parenNumberNotes(t), []);
   assert.deepEqual(D.parenNumberNotes(po('1,200', '150.0')), []);
+  assert.deepEqual(CP.parenNumberNotes(po('1,200', '150.0')), []);
   assert.deepEqual(D.parenNumberNotes(''), []);
+  assert.deepEqual(CP.parenNumberNotes(''), []);
 });

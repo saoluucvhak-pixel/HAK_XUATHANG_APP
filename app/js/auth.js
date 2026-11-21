@@ -860,6 +860,17 @@
       '<div class="card admin-only mt-3"><div class="card-header">🔐 Mật khẩu chủ của nhóm <span class="muted small fw-normal d-none d-md-inline">— 1 câu cho mọi máy, quên mật khẩu Quản trị thì tự đặt lại trong app</span></div><div class="card-body" id="mpBody"></div></div>' +
       '<div class="card admin-only mt-3"><div class="card-header">🛡 Khóa khôi phục của nhóm <span class="muted small fw-normal d-none d-md-inline">— quên mật khẩu Quản trị thì nhờ công cụ HAK_KhoiPhucQuanTri.exe</span></div><div class="card-body" id="gkBody"></div></div>';
     $('#acSave').addEventListener('click', saveMine);
+    ['#acName', '#acOld', '#acNew', '#acNew2'].forEach((sel) => {
+      const el = $(sel);
+      if (el) {
+        el.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            $('#acSave').click();
+          }
+        });
+      }
+    });
     if (cur.role === 'admin') {
       $('#usAdd').addEventListener('click', () => {
         editing = '';
@@ -949,6 +960,17 @@
         HAK.UI.toast('Đã lưu mật khẩu chủ của nhóm — dấu vân tay ' + mm.fp + '. Xuất lại Gói cấu hình để cài cho các máy khác.', 'success');
       } catch (x) {
         msg('Không lưu được: ' + (x.message || x));
+      }
+    });
+    ['#mpNew', '#mpNew2', '#mpMe'].forEach((sel) => {
+      const el = $(sel);
+      if (el) {
+        el.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            $('#mpSave').click();
+          }
+        });
       }
     });
     const del = $('#mpDel');
@@ -1213,6 +1235,17 @@
       $('#usForm').innerHTML = '';
     });
     $('#usSave').addEventListener('click', saveUser);
+    ['#usUser', '#usName', '#usPw'].forEach((sel) => {
+      const el = $(sel);
+      if (el) {
+        el.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            $('#usSave').click();
+          }
+        });
+      }
+    });
     $('#usName').focus();
   }
   async function saveUser() {

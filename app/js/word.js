@@ -279,9 +279,7 @@
             response = await send();
           } catch (err) {
             if (err && err.name === 'AbortError') throw err;
-            throw Error(
-              'không kết nối được trình hỗ trợ lưu tệp (HAKDocs) — có thể nó đã tắt khi cài bản mới hoặc sau thời gian dài không dùng'
-            );
+            throw Error('không kết nối được trình hỗ trợ lưu tệp — có thể nó đã tắt khi cài bản mới hoặc sau thời gian dài không dùng');
           }
           if (response.status !== 409 || attempt >= 40) break; // 409 = trình hỗ trợ đang bận (hộp Lưu còn mở / tệp trước chưa xong) → đợi rồi thử lại
           if (attempt === 2 && HAK.UI && HAK.UI.toast) HAK.UI.toast('Trình hỗ trợ lưu tệp đang bận — đang đợi để lưu tiếp…', 'info');
@@ -289,41 +287,48 @@
         }
         clearTimeout(hintTimer);
         const result = await response.json();
-        if (!response.ok)
+        if (!response.ok) {
+          const errDetail =
+            result && typeof result.error === 'object' && result.error !== null
+              ? result.error.message || JSON.stringify(result.error)
+              : result && result.error;
           throw Error(
             response.status === 409
               ? 'trình hỗ trợ lưu tệp vẫn đang bận — đóng hộp Lưu còn mở (nếu có) rồi bấm lại'
-              : result.error || 'Không lưu được tệp.'
+              : errDetail || 'Không lưu được tệp.'
           );
+        }
         if (result.canceled) return false;
         if (HAK.Downloads) HAK.Downloads.saved(result.path, result.warning);
         return result.path;
       } catch (e) {
         clearTimeout(hintTimer);
-        // v2.12.5: trình hỗ trợ (HAKDocs) không dùng được / bận / tệp quá lớn → TỰ tải qua trình duyệt thay vì báo lỗi chặn người dùng.
+        // v2.12.5: trình hỗ trợ lưu tệp không dùng được / bận / tệp quá lớn → TỰ tải qua trình duyệt thay vì báo lỗi chặn người dùng.
         // Chờ hộp Lưu quá 3 phút (AbortError) thì không tự tải — hộp Lưu có thể còn mở.
         if (!(e && e.name === 'AbortError')) {
           const done = browserDownload(blob, name);
           if (done) {
-            if (HAK.UI)
+            if (HAK.UI) {
+              const rawReason = (e && e.message) || String(e || '');
+              const cleanReason = HAK.UI.friendly ? HAK.UI.friendly(rawReason) : rawReason;
               HAK.UI.toast(
-                'Đã tải "' +
-                  name +
-                  '" về thư mục Tải xuống của trình duyệt (trình hỗ trợ lưu tệp không dùng được: ' +
-                  ((e && e.message) || e) +
-                  ').',
+                'Đã tải "' + name + '" về thư mục Tải xuống của trình duyệt (trình hỗ trợ lưu tệp không dùng được: ' + cleanReason + ').',
                 'info'
               );
+            }
             return done;
           }
         }
-        if (HAK.UI)
+        if (HAK.UI) {
+          const rawErr = e && e.message ? e.message : String(e || '');
+          const cleanErr = HAK.UI.friendly ? HAK.UI.friendly(rawErr) : rawErr;
           HAK.UI.toast(
-            e.name === 'AbortError'
+            e && e.name === 'AbortError'
               ? 'Chờ chọn nơi lưu quá 3 phút. Đóng hộp Lưu thành còn mở rồi thử lại.'
-              : 'Chưa lưu tệp: ' + e.message + '. Mở app bằng lối tắt của bản cài mới rồi thử lại.',
+              : 'Chưa lưu tệp: ' + cleanErr + '. Mở app bằng lối tắt của bản cài mới rồi thử lại.',
             'error'
           );
+        }
         return false;
       }
     },

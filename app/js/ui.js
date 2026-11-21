@@ -108,6 +108,22 @@
     setTheme(document.documentElement.getAttribute('data-bs-theme') === 'dark' ? 'light' : 'dark');
   }
 
+  /**
+   * Hộp thoại xác nhận thay thế việc gọi trực tiếp window.confirm trong các trang.
+   * Trả về Promise<boolean>.
+   * Cho phép unit test gắn hook HAK.UI._confirm.
+   * Khi chạy trên trình duyệt, gọi root.confirm để tương thích hoàn toàn với sự kiện dialog (p.on('dialog')).
+   * opts: { title, okText, cancelText, type: 'primary'|'danger'|'warning' }
+   */
+  function uiConfirm(msg, opts) {
+    opts = opts || {};
+    if (typeof HAK.UI._confirm === 'function') {
+      return Promise.resolve(HAK.UI._confirm(msg, opts));
+    }
+    const ans = typeof root.confirm === 'function' ? root.confirm(msg) : true;
+    return Promise.resolve(ans);
+  }
+
   /** Nút "bấm 2 lần để xác nhận" (tránh dùng hộp thoại confirm của trình duyệt). */
   function confirmClick(btn, action, label) {
     if (btn.dataset.armed === '1') {
@@ -199,5 +215,20 @@
       }
     });
   }
-  HAK.UI = { $, $$, esc, toast, friendly, Loading, setTheme, toggleTheme, confirmClick, debounce, todayISO, loadScript, needLib };
+  HAK.UI = {
+    $,
+    $$,
+    esc,
+    toast,
+    friendly,
+    Loading,
+    setTheme,
+    toggleTheme,
+    confirm: uiConfirm,
+    confirmClick,
+    debounce,
+    todayISO,
+    loadScript,
+    needLib,
+  };
 })(window);

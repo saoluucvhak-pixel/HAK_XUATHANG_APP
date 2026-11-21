@@ -195,7 +195,38 @@
       lines.map((x) => fold(x.text)).join('\n')
     );
     if (vessel) lots.forEach((lot) => (lot.ship = vessel[1].toUpperCase()));
-    return { type: agency ? 'uythac' : 'xuatkhau', parties, product, lots };
+    const fullText = lines.map((x) => x.text).join('\n');
+    const parens = parenNumberNotes(fullText);
+    const warnings = [];
+    if (parens.length) {
+      warnings.push(
+        'Có ô số dạng ngoặc (' + parens.join('; ') + '): app KHÔNG đọc ngoặc là số âm (quy tắc 28) — kiểm tra lại số liệu trên file gốc.'
+      );
+    }
+    return { type: agency ? 'uythac' : 'xuatkhau', parties, product, lots, warnings };
+  }
+  /**
+   * Quy tắc 28: app KHÔNG đọc số trong ngoặc "(1.200)" là số âm. Ở hợp đồng / PO, ô khối lượng hoặc đơn giá dạng ngoặc nên bộ đọc để TRỐNG;
+   * hàm này tìm các số dạng ngoặc nằm sát nhãn / đơn vị khối lượng hoặc giá để báo cho người dùng (hàm thuần, trả về danh sách chuỗi gốc).
+   */
+  function parenNumberNotes(text) {
+    const num = '\\(\\s*\\d[\\d.,\\s]*\\)';
+    const marker = '(?:quantity|so luong|khoi luong|price|don gia|gia ban|amount|thanh tien|tong gia tri)';
+    const unit = '(?:bdmt|mt|tan|usd|us\\$|vnd|\\$|kg)\\b';
+    const near = new RegExp(marker + '[^\\n(]{0,30}' + num + '|' + num + '\\s*' + unit, 'g');
+    const out = [];
+    String(text || '')
+      .split(/\r?\n/)
+      .forEach((line) => {
+        const f = fold(line);
+        near.lastIndex = 0;
+        let m;
+        while ((m = near.exec(f))) {
+          const hit = /\(\s*\d[\d.,\s]*\)/.exec(m[0]);
+          if (hit && out.length < 5 && out.indexOf(hit[0].replace(/\s+/g, '')) < 0) out.push(hit[0].replace(/\s+/g, ''));
+        }
+      });
+    return out;
   }
   function matchParty(party, customers) {
     if (!party) return null;
@@ -209,6 +240,6 @@
     const existing = String(exact[0].tax || '').replace(/\D/g, '');
     return tax && existing && existing !== tax ? null : exact[0];
   }
-  HAK.ContractParser = { extract, amount, fold, matchParty };
+  HAK.ContractParser = { extract, amount, fold, matchParty, parenNumberNotes };
   if (typeof module === 'object' && module.exports) module.exports = HAK.ContractParser;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -542,6 +542,7 @@
       );
 
     const per = period(sum, p.period);
+    if (!String(p.contractNo || '').trim()) res.warnings.push('Chưa nhập số hợp đồng ủy thác — sẽ để trống để điền tay.');
     const qty = N(p.contractQty);
     const ctx = Object.assign(
       commonCtx(giao, nhan, null, null, sum, per, p.docDate, 'chủ sở hữu hàng hóa', 'thực hiện thủ tục xuất khẩu'),
@@ -842,6 +843,7 @@
     const per = period(sum, p.period);
     // ---- đơn giá / thành tiền: tấn (2 số lẻ như in trong biên bản) × đơn giá ----
     const price = String(p.unitPrice || '').trim() === '' ? null : U().parseNum(p.unitPrice);
+    if (String(p.unitPrice || '').trim() === '') res.warnings.push('Chưa nhập đơn giá — biên bản sẽ không in giá và thành tiền.');
     if (String(p.unitPrice || '').trim() !== '' && (price === null || price < 0)) res.errors.push('Đơn giá không hợp lệ.');
     if (res.errors.length) return res;
     const tons = Math.round(sum.kg / 10) / 100;
