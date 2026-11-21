@@ -420,7 +420,8 @@
       draw();
     } catch (e) {
       console.error(e);
-      $('#csrBody').innerHTML = '<tr><td colspan="17" class="text-danger text-center py-4">' + esc(e.message || e) + '</td></tr>';
+      $('#csrBody').innerHTML =
+        '<tr><td colspan="17" class="text-danger text-center py-4">' + esc(HAK.UI.friendly(e.message || e)) + '</td></tr>';
     } finally {
       state.loading = false;
     }
@@ -577,7 +578,7 @@
         toast('Đã gắn ' + ids.length + ' đợt giao hàng vào hợp đồng.', 'success');
         await render();
       } catch (e) {
-        $('#csrAsErr').textContent = 'Chưa gắn: ' + (e.message || e);
+        $('#csrAsErr').textContent = 'Chưa gắn: ' + HAK.UI.friendly(e.message || e);
       } finally {
         btn.disabled = false;
       }

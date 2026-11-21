@@ -198,7 +198,7 @@
         await spec.onSave(readFields((spec.fields || []).filter((f) => !f.section)));
         bootstrap.Modal.getOrCreateInstance(m).hide();
       } catch (e) {
-        $('#csErr').textContent = 'Chưa lưu: ' + (e.message || e);
+        $('#csErr').textContent = 'Chưa lưu: ' + HAK.UI.friendly(e.message || e);
       } finally {
         save.disabled = false;
       }

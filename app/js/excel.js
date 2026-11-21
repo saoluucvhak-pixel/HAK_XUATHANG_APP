@@ -267,7 +267,16 @@
               if (onProgress) onProgress(100);
               resolve({ workbook: wb, sheetNames: wb.SheetNames.slice(), fileName: file.name, size: file.size });
             } catch (e) {
-              reject(new Error('File không phải Excel hợp lệ hoặc vượt giới hạn: ' + e.message));
+              console.error(e);
+              // giữ thông báo tiếng Việt của app (vd. giới hạn zip); lỗi thô của thư viện (tiếng Anh) chỉ ghi Console
+              const vi = /[àáảãạăâđêôơưèéẻẽẹìíòóõọùúũụỳýỹỵ]/i.test(e && e.message);
+              reject(
+                new Error(
+                  vi
+                    ? 'File không phải Excel hợp lệ hoặc vượt giới hạn: ' + e.message
+                    : 'File không phải Excel hợp lệ (hoặc hỏng). Mở bằng Excel, lưu lại dạng .xlsx rồi nhập lại.'
+                )
+              );
             }
           }, 30);
         } catch (e) {

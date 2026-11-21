@@ -378,7 +378,7 @@
       draw();
     } catch (e) {
       console.error(e);
-      $('#coBody').innerHTML = '<div class="text-danger text-center py-4">' + esc(e.message || e) + '</div>';
+      $('#coBody').innerHTML = '<div class="text-danger text-center py-4">' + esc(HAK.UI.friendly(e.message || e)) + '</div>';
     } finally {
       state.loading = false;
     }
