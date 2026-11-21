@@ -1766,9 +1766,7 @@
   function sqlAutoHtml() {
     const okT = (v, t) => '<span class="' + (v ? 'text-success' : 'text-warning') + '">' + t + '</span>';
     if (!sqlAvailable())
-      return (
-        '<hr><div class="fw-semibold mb-1">🗄 Tự sao lưu SQLite <span class="badge text-bg-secondary ms-1">Chỉ trên Windows</span></div><div class="small muted">Chỉ có ở bản Windows đang lưu dữ liệu bằng SQLite.</div>'
-      );
+      return '<hr><div class="fw-semibold mb-1">🗄 Tự sao lưu SQLite <span class="badge text-bg-secondary ms-1">Chỉ trên Windows</span></div><div class="small muted">Chỉ có ở bản Windows đang lưu dữ liệu bằng SQLite.</div>';
     const c = sqlCfg(),
       L = c.last;
     const lastOk = L && (L.ok ? L.at : L.okAt);
