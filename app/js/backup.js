@@ -1218,7 +1218,7 @@
       await inner.async('string');
     }
   }
-  const autoDue = (c) => c.on && !(c.last && c.last.ok && Date.now() - c.last.at < AUTO_EVERY);
+  const autoDue = (c) => c.on && !(c.last && c.last.ok && c.last.at <= Date.now() && Date.now() - c.last.at < AUTO_EVERY);
   /** Ghi 1 bản vào thư mục. opts.ask = được hỏi quyền (đang trong thao tác bấm của người dùng); opts.force = chạy dù chưa bật / chưa tới hạn. */
   async function autoRun(opts) {
     opts = opts || {};

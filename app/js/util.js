@@ -176,6 +176,7 @@
     'hak.design.theme',
     'hak.yearbook.v1',
     'hak.sf.presets',
+    'hak.report.manual',
   ]);
   function isAllowedBackupKey(k) {
     if (typeof k !== 'string' || k === '__proto__' || k === 'constructor' || k === 'prototype') return false;
@@ -207,6 +208,8 @@
       }
     } else if (k === 'hak.design.theme') {
       if (v !== null && typeof v !== 'string' && !isPlainObj(v)) throw new Error('Cấu hình giao diện không hợp lệ.');
+    } else if (k === 'hak.report.manual') {
+      if (v !== null && !isPlainObj(v)) throw new Error('Danh sách hồ sơ bỏ tick ở Báo cáo không hợp lệ.');
     } else if (k === 'hak.sf.presets' || k.startsWith('hak.sf.presets@')) {
       if (v !== null && !isPlainObj(v)) throw new Error('Bộ lọc đã lưu không hợp lệ.');
     }

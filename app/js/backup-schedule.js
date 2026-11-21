@@ -33,8 +33,9 @@
     const c = normalize(cfg);
     if (!c.on) return false;
     const last = c.last;
-    if (last && last.ok === false && now - (last.at || 0) < RETRY_AFTER_FAIL) return false;
-    const okAt = last && last.ok !== false && last.okAt ? last.okAt : last && last.ok ? last.at : 0;
+    if (last && last.ok === false && (last.at || 0) <= now && now - (last.at || 0) < RETRY_AFTER_FAIL) return false;
+    const okAt0 = last && last.ok !== false && last.okAt ? last.okAt : last && last.ok ? last.at : 0;
+    const okAt = okAt0 > now ? 0 : okAt0; // BK-4: mốc ở tương lai (đồng hồ máy từng chạy lệch) không được chặn tự sao lưu
     if (!okAt) return true;
     return c.freq === 'week' ? now - okAt >= 7 * DAY : !sameDay(okAt, now);
   }
