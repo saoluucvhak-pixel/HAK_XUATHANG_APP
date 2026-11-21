@@ -9,7 +9,30 @@
   const HAK = (root.HAK = root.HAK || {});
 
   /* ---------------------------------------------------------------
-   * 1. Lưu trữ an toàn (localStorage có thể bị chặn khi mở file://)
+   * 1. Hằng số khóa lưu trữ tập trung (U-03)
+   * ------------------------------------------------------------- */
+  const KEYS = Object.freeze({
+    CONFIG: 'hak.config.v1',
+    CATALOG: 'hak.catalog.v1',
+    YEARBOOK: 'hak.yearbook.v1',
+    AUTH: 'hak.auth.v1',
+    USERS: 'hak.users.v1',
+    AUTH_LASTCO: 'hak.auth.lastco',
+    WORKING_YEAR: 'hak.workingYear',
+    DESIGN_THEME: 'hak.design.theme',
+    SF_PRESETS: 'hak.sf.presets',
+    GSYNC: 'hak.gsync.v2',
+    DRAFT_GENERAL: 'hak.draft.general',
+    RESTORE_UNDO: 'hak.restore.undo.v1',
+    REPORT_MANUAL: 'hak.report.manual',
+  });
+  HAK.Constants = Object.freeze({
+    KEYS,
+    STORAGE_PREFIX: 'hak.',
+  });
+
+  /* ---------------------------------------------------------------
+   * 1b. Lưu trữ an toàn (localStorage có thể bị chặn khi mở file://)
    * ------------------------------------------------------------- */
   const mem = {};
   const memOnly = new Set();
@@ -441,5 +464,6 @@
       };
     },
   };
+  HAK.Config.KEYS = KEYS;
   HAK.Config.load();
 })(typeof window !== 'undefined' ? window : globalThis);

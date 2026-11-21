@@ -211,6 +211,140 @@
       archiveLinked: (metas || []).filter((m) => m.contract).length,
     };
   }
-  HAK.Integrity = { audit, relations };
+
+  /* ---------------------------------------------------------------
+   * U-11: Đối chiếu chéo 3 chiều (Triple-Check Cross-Reconciliation)
+   * 1. Hợp đồng / Chi tiết hợp đồng (contracts.details)
+   * 2. Tờ khai hải quan (customs)
+   * 3. Phiếu cân Lưu trữ (archiveMetas)
+   * ------------------------------------------------------------- */
+  function reconcileThreeWay(catalogData, customsData, archiveMetas, opts) {
+    opts = opts || {};
+    const thresholdKg = Number(opts.thresholdKg) || 0;
+    const cat = catalogData || {};
+    const contracts = cat.contracts || [];
+    const customs = Array.isArray(customsData) ? customsData : cat.customs || [];
+    const metas = archiveMetas || [];
+
+    const detailsMap = new Map();
+    contracts.forEach((c) => {
+      (c.details || []).forEach((d) => {
+        detailsMap.set(d.id, {
+          detail: d,
+          contract: c,
+          contractId: c.id,
+          contractNo: c.no || c.id,
+          contractQtyKg: (Number(d.mt) || 0) * 1000,
+          declaredQtyKg: 0,
+          clearedQtyKg: 0,
+          actualWeighKg: 0,
+          customs: [],
+          metas: [],
+        });
+      });
+    });
+
+    const orphanCustoms = [];
+    customs.forEach((t) => {
+      if (!t || t.deletedAt) return;
+      const declQtyKg = (Number(t.qty) || 0) * (t.unit === 'tan' || !t.unit ? 1000 : 1);
+      const isCleared = t.status === 'cleared' || !!t.clearedAt;
+      if (t.detailId && detailsMap.has(t.detailId)) {
+        const item = detailsMap.get(t.detailId);
+        item.declaredQtyKg += declQtyKg;
+        if (isCleared) item.clearedQtyKg += declQtyKg;
+        item.customs.push(t);
+      } else {
+        orphanCustoms.push(t);
+      }
+    });
+
+    const unlinkedMetas = [];
+    const orphanMetas = [];
+    metas.forEach((m) => {
+      if (!m) return;
+      const weighKg = Number(m.delKg !== undefined ? m.delKg : m.kg) || 0;
+      if (!m.contract) {
+        unlinkedMetas.push(m);
+      } else if (detailsMap.has(m.contract)) {
+        const item = detailsMap.get(m.contract);
+        item.actualWeighKg += weighKg;
+        item.metas.push(m);
+      } else {
+        orphanMetas.push(m);
+      }
+    });
+
+    const detailsReport = [];
+    let totalContractKg = 0,
+      totalDeclaredKg = 0,
+      totalWeighKg = 0;
+
+    detailsMap.forEach((it, detailId) => {
+      totalContractKg += it.contractQtyKg;
+      totalDeclaredKg += it.declaredQtyKg;
+      totalWeighKg += it.actualWeighKg;
+
+      const diffContract = it.actualWeighKg - it.contractQtyKg;
+      const diffCustoms = it.declaredQtyKg - it.actualWeighKg;
+      let status = 'MATCH';
+      const issues = [];
+
+      if (it.actualWeighKg === 0 && it.declaredQtyKg === 0) {
+        status = 'IDLE';
+      } else if (it.actualWeighKg > 0 && it.declaredQtyKg === 0) {
+        status = 'NO_CUSTOMS';
+        issues.push('Đã cân nhưng chưa có tờ khai hải quan');
+      } else if (it.actualWeighKg === 0 && it.declaredQtyKg > 0) {
+        status = 'UNWEIGHED';
+        issues.push('Đã mở tờ khai nhưng chưa có dữ liệu cân');
+      } else if (diffContract > thresholdKg) {
+        status = 'OVER_CONTRACT';
+        issues.push('Khối lượng cân vượt hợp đồng (' + Math.round(diffContract) + ' kg)');
+      } else if (diffCustoms < -thresholdKg) {
+        status = 'UNDER_DECLARED';
+        issues.push('Khối lượng cân nhiều hơn tờ khai (' + Math.round(-diffCustoms) + ' kg)');
+      } else if (diffCustoms > thresholdKg) {
+        status = 'OVER_DECLARED';
+        issues.push('Tờ khai mở dư so với thực cân (' + Math.round(diffCustoms) + ' kg)');
+      }
+
+      detailsReport.push({
+        detailId,
+        contractId: it.contractId,
+        contractNo: it.contractNo,
+        detailNo: it.detail.no || it.detail.id,
+        contractQtyKg: it.contractQtyKg,
+        declaredQtyKg: it.declaredQtyKg,
+        clearedQtyKg: it.clearedQtyKg,
+        actualWeighKg: it.actualWeighKg,
+        diffContract,
+        diffCustoms,
+        status,
+        issues,
+        customsCount: it.customs.length,
+        metasCount: it.metas.length,
+      });
+    });
+
+    return {
+      details: detailsReport,
+      summary: {
+        totalContractKg,
+        totalDeclaredKg,
+        totalWeighKg,
+        diffContract: totalWeighKg - totalContractKg,
+        diffCustoms: totalDeclaredKg - totalWeighKg,
+        hasIssues:
+          detailsReport.some((x) => x.issues.length > 0) || orphanCustoms.length > 0 || unlinkedMetas.length > 0 || orphanMetas.length > 0,
+      },
+      unlinkedMetas,
+      orphanMetas,
+      orphanCustoms,
+    };
+  }
+
+  HAK.Integrity = { audit, relations, reconcileThreeWay };
+  HAK.Reconciliation = { reconcileThreeWay };
   if (typeof module === 'object' && module.exports) module.exports = HAK.Integrity;
 })(typeof window !== 'undefined' ? window : globalThis);

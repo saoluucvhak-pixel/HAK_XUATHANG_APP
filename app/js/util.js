@@ -27,7 +27,6 @@
     return SAFE_ID_RE.test(s) ? s : '';
   };
   // Loại bỏ ký tự điều khiển XML 1.0 không hợp lệ (giữ \t \n \r)
-  // eslint-disable-next-line no-control-regex
   const XML_CTRL_RE = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g;
   const stripXmlCtrl = (s) => String(s == null ? '' : s).replace(XML_CTRL_RE, '');
 
@@ -235,6 +234,87 @@
     return total;
   }
 
+  /* ---------------------------------------------------------------
+   * U-10 & U-13..U-15: Tra cứu tối ưu O(1) và Helper dùng chung
+   * ------------------------------------------------------------- */
+  function createLookupMap(list, keyFn) {
+    const m = new Map();
+    if (!Array.isArray(list)) return m;
+    const fn = typeof keyFn === 'function' ? keyFn : (x) => (x ? x[keyFn] : undefined);
+    for (let i = 0; i < list.length; i++) {
+      const k = fn(list[i], i);
+      if (k !== undefined && k !== null && k !== '') m.set(k, list[i]);
+    }
+    return m;
+  }
+
+  function indexBy(list, keyProp) {
+    const res = Object.create(null);
+    if (!Array.isArray(list)) return res;
+    for (let i = 0; i < list.length; i++) {
+      const it = list[i];
+      const k = it ? it[keyProp] : undefined;
+      if (k !== undefined && k !== null && k !== '') res[k] = it;
+    }
+    return res;
+  }
+
+  function groupBy(list, keyFn) {
+    const m = new Map();
+    if (!Array.isArray(list)) return m;
+    const fn = typeof keyFn === 'function' ? keyFn : (x) => (x ? x[keyFn] : undefined);
+    for (let i = 0; i < list.length; i++) {
+      const k = fn(list[i], i);
+      if (!m.has(k)) m.set(k, []);
+      m.get(k).push(list[i]);
+    }
+    return m;
+  }
+
+  function deepClone(obj) {
+    if (obj === null || typeof obj !== 'object') return obj;
+    if (Array.isArray(obj)) return obj.map(deepClone);
+    const res = {};
+    for (const k of Object.keys(obj)) {
+      res[k] = deepClone(obj[k]);
+    }
+    return res;
+  }
+
+  function escapeHtml(str) {
+    return String(str == null ? '' : str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function compareVersions(v1, v2) {
+    const p1 = String(v1 || '')
+      .split('.')
+      .map((x) => parseInt(x, 10) || 0);
+    const p2 = String(v2 || '')
+      .split('.')
+      .map((x) => parseInt(x, 10) || 0);
+    const len = Math.max(p1.length, p2.length);
+    for (let i = 0; i < len; i++) {
+      const a = p1[i] || 0,
+        b = p2[i] || 0;
+      if (a > b) return 1;
+      if (a < b) return -1;
+    }
+    return 0;
+  }
+
+  function formatNumber(num, decimals = 0, decPoint = ',', thousandsSep = '.') {
+    if (!hasNum(num)) return '';
+    const n = Number(num);
+    const parts = n.toFixed(decimals).split('.');
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, thousandsSep);
+    return decimals > 0 && parts[1] ? parts.join(decPoint) : parts[0];
+  }
+
   HAK.Util = {
     hasNum,
     vnDate,
@@ -251,6 +331,13 @@
     isAllowedBackupKey,
     validateBackupKey,
     checkZipLimits,
+    createLookupMap,
+    indexBy,
+    groupBy,
+    deepClone,
+    escapeHtml,
+    compareVersions,
+    formatNumber,
   };
   if (typeof module === 'object' && module.exports) module.exports = HAK.Util;
 })(typeof window !== 'undefined' ? window : globalThis);

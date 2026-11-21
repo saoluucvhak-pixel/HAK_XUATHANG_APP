@@ -1,5 +1,14 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.25.8 — Đợt 7: Nâng cấp cấu trúc (U-03..U-15)
+- **U-03 (Hằng số hệ thống & Khóa Storage tập trung):** xây dựng `HAK.Constants` và `HAK.Config.KEYS` chứa đầy đủ tất cả các khóa lưu trữ cục bộ (`hak.config.v1`, `hak.catalog.v1`, `hak.yearbook.v1`, `hak.auth.v1`, `hak.draft.general`, `hak.restore.undo.v1`, v.v.), được đóng băng bằng `Object.freeze` để tránh bị sửa đổi ngoài ý muốn và chấm dứt việc hardcode chuỗi rải rác.
+- **U-04 (Module HAK.Identity dùng chung):** gom và chuẩn hóa toàn bộ các hàm nhận diện thực thể vào `HAK.Identity` (`normPlate`, `plateKey`, `normTicket`, `normTicketToken`, `parseTicketTokens`, `resolveTicket`, `normContractId`, `normCompanyId`) để sử dụng nhất quán trong toàn bộ hệ thống.
+- **U-05 (Khung kiểm tra form mức ô):** cung cấp `HAK.Validation` và bộ tiện ích `HAK.UI.validateCell`, `HAK.UI.validateForm`, `HAK.UI.applyFieldStatus` hỗ trợ kiểm tra linh hoạt mức ô (bắt buộc, số, giới hạn min/max, độ dài, biểu thức chính quy, hàm tùy chỉnh) và tự động cập nhật phản hồi lỗi `.is-invalid` / `.invalid-feedback`.
+- **U-08 (Đóng gói createReportEngine độc lập):** bổ sung hàm nhà máy `HAK.createReportEngine` và `HAK.Report.createReportEngine` trả về instance engine tính toán báo cáo độc lập với bộ nhớ đệm phiếu cân (`ticketCache`) và cấu hình riêng biệt, hỗ trợ tái sử dụng và kiểm thử độc lập mà không ảnh hưởng tới trạng thái toàn cục.
+- **U-10 (Tối ưu tra cứu mảng lớn O(1)):** bổ sung `createLookupMap`, `indexBy`, `groupBy` trong `HAK.Util` phục vụ tra cứu nhanh O(1) cho các tập danh mục và mảng lớn.
+- **U-11 (Đối chiếu chéo 3 chiều):** bổ sung hàm `reconcileThreeWay` trong `HAK.Integrity` và `HAK.Reconciliation` đối chiếu 3 chiều giữa Phiếu cân Lưu trữ, Chi tiết hợp đồng và Tờ khai hải quan; tự động tính toán độ chênh lệch khối lượng và phát hiện các trường hợp cân vượt hợp đồng, mở tờ khai thiếu, hoặc hồ sơ cân chưa liên kết.
+- **U-13..U-15 (Helper dùng chung tinh gọn):** bổ sung `deepClone`, `escapeHtml`, `compareVersions`, `formatNumber` vào `HAK.Util` hỗ trợ các thao tác dữ liệu an toàn và chuẩn hóa.
+
 ## v2.25.7 — Đợt 6: Mức Thấp: Bố cục & Tinh chỉnh còn lại (L-27, L-29, N-15, N-16)
 - **L-27 (Chống tràn ngang trên màn hình hẹp 390px):** bổ sung `overflow-wrap: anywhere; word-break: break-word;` cho `.sum-list`, `.sum-list li`, `.sum-list li b` và các thẻ hiển thị dòng lỗi tự sao lưu SQLite/JSON trong `backup.js`, đảm bảo các đường dẫn dài không bao giờ làm tràn ngang màn hình hẹp.
 - **L-29 (Tinh chỉnh bố cục ở 1366×768 và 768px):** hạ chiều cao `.topbar` từ 70px xuống 52–54px để tiết kiệm không gian dọc; cho phép tiêu đề trang `#pageTitle` co giãn tự nhiên không bị cắt cụt "…"; tối ưu hiển thị các khối bước `.step` (1–5) trên máy tính bảng; đặt `pointer-events: none` cho `.toast-container` và tinh chỉnh vị trí đáy để toast không che khuất các nút hành động/phân trang ở góc dưới bên phải.
