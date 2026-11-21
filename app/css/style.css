@@ -114,8 +114,9 @@ body {
 }
 .hero h2 { font-weight: 800; margin-bottom: 6px; }
 .hero p { opacity: .85; max-width: 640px; margin-bottom: 18px; }
-.step { display: flex; gap: 12px; align-items: flex-start; }
+.step { display: flex; gap: 12px; align-items: flex-start; min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
 .step .n { flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--brand-soft); color: var(--brand); display: grid; place-items: center; font-weight: 800; }
+.step > div:last-child { min-width: 0; flex: 1 1 auto; }
 .doc-card { cursor: pointer; transition: transform .15s, box-shadow .15s, border-color .15s; height: 100%; text-decoration: none; color: inherit; display: block; }
 .doc-card:hover { transform: translateY(-3px); border-color: var(--brand); color: inherit; box-shadow: 0 10px 26px rgba(14, 124, 134, .16); }
 .doc-card .big { font-size: 2rem; }
@@ -151,11 +152,11 @@ tr.row-warn td { background: rgba(255, 193, 7, .16) !important; }
 
 /* ---------- Trang sinh biên bản ---------- */
 .sticky-side { position: sticky; top: 76px; }
-.sum-list { list-style: none; padding: 0; margin: 0; }
-.sum-list li { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px dashed var(--card-border); font-size: .88rem; }
+.sum-list { list-style: none; padding: 0; margin: 0; overflow-wrap: anywhere; word-break: break-word; }
+.sum-list li { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px dashed var(--card-border); font-size: .88rem; min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
 .sum-list li:last-child { border-bottom: 0; }
-.sum-list li span:first-child { color: var(--muted); }
-.sum-list li b { text-align: right; font-variant-numeric: tabular-nums; }
+.sum-list li span:first-child { color: var(--muted); flex-shrink: 0; }
+.sum-list li b { text-align: right; font-variant-numeric: tabular-nums; min-width: 0; max-width: 100%; overflow-wrap: anywhere; word-break: break-word; }
 .sum-big { font-size: 1.6rem; white-space: nowrap; font-weight: 800; color: var(--brand); line-height: 1; font-variant-numeric: tabular-nums; }
 .group-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border: 1px solid var(--card-border); border-radius: 999px; cursor: pointer; user-select: none; font-size: .84rem; background: var(--card-bg); }
 .group-chip:has(input:checked) { background: var(--brand-soft); border-color: var(--brand); color: var(--brand); font-weight: 600; }
@@ -168,8 +169,9 @@ tr.row-warn td { background: rgba(255, 193, 7, .16) !important; }
 #topProgress .bar { height: 100%; width: 0; background: linear-gradient(90deg, var(--brand-2), #7be0e6); transition: width .2s; box-shadow: 0 0 10px var(--brand-2); }
 .loading-overlay { position: fixed; inset: 0; z-index: 2500; background: rgba(8, 16, 26, .55); backdrop-filter: blur(3px); display: grid; place-items: center; }
 .loading-box { background: var(--card-bg); border-radius: 16px; padding: 26px 30px; width: min(420px, 90vw); text-align: center; box-shadow: 0 20px 60px rgba(0, 0, 0, .35); }
-.toast { border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
-.toast-container { z-index: 3100; }
+.toast { border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); pointer-events: auto; }
+.toast-container { z-index: 3100; pointer-events: none; max-width: calc(100vw - 32px); }
+.toast-container.bottom-0 { bottom: 18px !important; right: 18px !important; }
 
 /* ---------- Tuỳ chỉnh nhỏ ---------- */
 .nav-pills .nav-link { color: var(--muted); font-weight: 600; border-radius: 10px; }
@@ -199,8 +201,8 @@ code.ph { color: var(--brand); word-break: break-word; }
 /* Bảng xem trước: không xuống dòng, cuộn ngang khi hẹp */
 .tbl-wrap .table td { white-space: nowrap; }
 
-.badge[hidden] { display: none !important; }
-.topbar h1 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.topbar h1 { min-width: 0; line-height: 1.25; font-size: 1.1rem; }
+@media (max-width: 991.98px) { .topbar h1 { font-size: 1rem; } }
 
 /* Trang Lưu trữ: cột "Hồ sơ" được xuống dòng để không đẩy các nút thao tác ra ngoài màn hình */
 #archTableWrap { max-height: none; }

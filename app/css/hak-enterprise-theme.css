@@ -25,8 +25,8 @@ body {background:var(--page-bg);color:var(--ink);font-family:'Be Vietnam Pro','S
 .sb-link.active {background:rgba(220,187,133,.13);color:#f6e7cc;box-shadow:inset 3px 0 0 var(--hak-accent);border-color:rgba(220,187,133,.14);}
 .sb-link.active .ico svg.i {color:var(--hak-accent);}
 .sb-label {color:#c4ced9;opacity:.75;letter-spacing:.08em;}
-.topbar {background:var(--card-bg);backdrop-filter:none;min-height:70px;gap:12px;}
-.topbar h1 {color:var(--ink);font-size:1.05rem;font-weight:700;}
+.topbar {background:var(--card-bg);backdrop-filter:none;min-height:54px;padding:8px 20px;gap:10px;}
+.topbar h1 {color:var(--ink);font-size:1.05rem;font-weight:700;line-height:1.25;}
 .hak-theme-select {max-width:155px;color:var(--ink);background-color:var(--card-bg);border-color:var(--card-border);}
 .card,.stat,.step,.zone-nav {background:var(--card-bg);border-color:var(--card-border);box-shadow:var(--shadow);}
 .card-header {background:color-mix(in srgb,var(--card-bg) 92%,var(--brand));border-color:var(--card-border);font-weight:600;}

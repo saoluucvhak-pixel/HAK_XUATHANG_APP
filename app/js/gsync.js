@@ -492,7 +492,10 @@
           esc(c.token) +
           '" autocomplete="off">' +
           '<button class="btn btn-outline-secondary" type="button" data-gsa="show" title="Hiện / ẩn">👁</button><button class="btn btn-outline-secondary" type="button" data-gsa="gen" title="Tạo mã mới">🎲</button></div></td>' +
-          '<td class="text-nowrap"><div class="btn-group btn-group-sm"><button class="btn btn-outline-primary" type="button" data-gsa="copy" title="Sao chép Code.gs (có sẵn mã bí mật của công ty này)">📋 Code.gs</button>' +
+          '<td class="text-nowrap"><div class="btn-group btn-group-sm">' +
+          '<button class="btn btn-outline-success" type="button" data-gsa="save" title="Lưu cấu hình cho công ty này" disabled>💾 Lưu</button>' +
+          '<button class="btn btn-outline-secondary" type="button" data-gsa="cancel" title="Hủy thay đổi chưa lưu" disabled>↩ Hủy</button>' +
+          '<button class="btn btn-outline-primary" type="button" data-gsa="copy" title="Sao chép Code.gs (có sẵn mã bí mật của công ty này)">📋 Code.gs</button>' +
           '<button class="btn btn-primary" type="button" data-gsa="test">🔌 Kiểm tra</button></div></td>' +
           '<td class="small" style="min-width:220px;white-space:normal" data-gs="msg">' +
           (configured(co.id) ? esc(lastText(co.id)) : '<span class="muted">chưa cài</span>') +
@@ -510,8 +513,8 @@
       '<li>Bấm <b>🎲</b> (nếu ô Mã bí mật trống) rồi <b>📋 Code.gs</b> ở dòng công ty đó.</li>' +
       '<li>Mở Google Sheet của công ty → <b>Tiện ích mở rộng → Apps Script</b> → xóa mã có sẵn → dán → <b>Lưu</b>.</li>' +
       '<li><b>Triển khai → Tùy chọn triển khai mới</b> → loại <b>Ứng dụng web</b> · Thực thi với tư cách <b>Tôi</b> · Người có quyền truy cập <b>Bất kỳ ai</b> → <b>Triển khai</b> → cấp quyền.</li>' +
-      '<li>Sao chép <b>URL ứng dụng web</b> dán vào ô URL của đúng công ty → <b>🔌 Kiểm tra</b>.</li></ol>' +
-      '<div class="tbl-wrap" style="max-height:none"><table class="table table-sm align-middle mb-0"><thead><tr><th>Công ty</th><th>URL ứng dụng web</th><th>Mã bí mật</th><th></th><th>Trạng thái</th></tr></thead><tbody id="gsBody"></tbody></table></div>' +
+      '<li>Sao chép <b>URL ứng dụng web</b> dán vào ô URL của đúng công ty → bấm <b>💾 Lưu</b> → <b>🔌 Kiểm tra</b>.</li></ol>' +
+      '<div class="tbl-wrap" style="max-height:none"><table class="table table-sm align-middle mb-0"><thead><tr><th>Công ty</th><th>URL ứng dụng web</th><th>Mã bí mật</th><th>Thao tác</th><th>Trạng thái</th></tr></thead><tbody id="gsBody"></tbody></table></div>' +
       '<div class="form-text">Đồng bộ 1 chiều app → Sheet, bấm ở <b>Báo cáo → 📑 Xuất hàng theo hợp đồng → ☁ Đồng bộ Google Sheet</b>. Lô được gửi bị <b>thay toàn bộ phiếu</b> trên NL_PC_XH và cập nhật dòng ở NL_DH_XB; lô khác trên Sheet giữ nguyên. Công ty chưa cài Sheet: lô của công ty đó được bỏ qua (có báo). Đổi mã bí mật phải dán lại Code.gs và triển khai phiên bản mới.<br><b>Mới (Code.gs bản 2):</b> nút <b>☁ Đồng bộ Google Sheet</b> ở <b>Báo cáo thực hiện hợp đồng</b> ghi thêm 4 sheet <b>NL_HOPDONG</b> (hợp đồng: KL gốc / hiện hành, tờ khai, thuế còn nợ, thực giao), <b>NL_CHUNGTHU</b> (từng chứng thư: KL tươi / khô, độ ẩm, giá trị, tờ khai gắn), <b>NL_TOKHAI</b> (tờ khai) và <b>NL_PHULUC</b> (phụ lục khối lượng) — mỗi lần ghi lại toàn bộ 4 bảng. Ai đã cài trước đây cần <b>📋 Code.gs → dán lại → Triển khai → Quản lý → Sửa → Phiên bản mới</b> (URL và mã bí mật giữ nguyên).</div>';
     renderTable();
     const body = $('#gsBody');
@@ -522,17 +525,25 @@
       m.className = 'small ' + (cls || '');
       m.textContent = t;
     };
-    const upd = (tr) => {
+    const setDirty = (tr, dirty) => {
+      const saveBtn = tr.querySelector('[data-gsa="save"]'),
+        cancelBtn = tr.querySelector('[data-gsa="cancel"]');
+      if (saveBtn) saveBtn.disabled = !dirty;
+      if (cancelBtn) cancelBtn.disabled = !dirty;
+      if (dirty) say(tr, '● Có thay đổi chưa lưu — bấm 💾 Lưu', 'text-warning');
+    };
+    const checkDirty = (tr) => {
       const cid = tr.dataset.cid,
         c = cfg(cid);
-      c.url = val(tr, 'url').value.trim();
-      c.token = val(tr, 'token').value.trim();
-      saveCfg(cid, c);
-      renderStatus();
+      const curUrl = val(tr, 'url').value.trim(),
+        curTok = val(tr, 'token').value.trim();
+      const dirty = curUrl !== (c.url || '') || curTok !== (c.token || '');
+      setDirty(tr, dirty);
+      if (!dirty) say(tr, configured(cid) ? lastText(cid) : 'chưa cài', 'muted');
     };
     body.addEventListener('input', (e) => {
       const tr = rowOf(e.target);
-      if (tr) upd(tr);
+      if (tr) checkDirty(tr);
     });
     body.addEventListener('click', async (e) => {
       const b = e.target.closest('[data-gsa]');
@@ -546,23 +557,43 @@
         return;
       }
       if (act === 'gen') {
-        const go = () => {
-          tok.value = genToken();
-          upd(tr);
-          say(
-            tr,
-            'Đã tạo mã mới — nhớ 📋 Code.gs dán lại lên Apps Script của ' + coName(cid) + ' và triển khai phiên bản mới.',
-            'text-warning'
-          );
-        };
-        if (cfg(cid).token) HAK.UI.confirmClick(b, go, 'Đổi mã?');
-        else go();
+        tok.value = genToken();
+        setDirty(tr, true);
+        say(
+          tr,
+          'Đã tạo mã mới — bấm 💾 Lưu rồi 📋 Code.gs dán lại lên Apps Script của ' + coName(cid) + ' và triển khai phiên bản mới.',
+          'text-warning'
+        );
+        return;
+      }
+      if (act === 'save') {
+        const c = cfg(cid);
+        c.url = val(tr, 'url').value.trim();
+        c.token = val(tr, 'token').value.trim();
+        saveCfg(cid, c);
+        setDirty(tr, false);
+        say(tr, '✓ Đã lưu cấu hình.', 'text-success');
+        renderStatus();
+        if (HAK.UI && HAK.UI.toast) HAK.UI.toast('Đã lưu cấu hình Google Sheet cho ' + coName(cid) + '.', 'success');
+        return;
+      }
+      if (act === 'cancel') {
+        const c = cfg(cid);
+        val(tr, 'url').value = c.url || '';
+        val(tr, 'token').value = c.token || '';
+        setDirty(tr, false);
+        say(tr, configured(cid) ? lastText(cid) : 'chưa cài', 'muted');
+        if (HAK.UI && HAK.UI.toast) HAK.UI.toast('Đã hủy thay đổi cấu hình cho ' + coName(cid) + '.', 'info');
         return;
       }
       if (act === 'copy') {
         if (!cfg(cid).token) {
           tok.value = genToken();
-          upd(tr);
+          const c = cfg(cid);
+          c.token = tok.value;
+          c.url = val(tr, 'url').value.trim();
+          saveCfg(cid, c);
+          setDirty(tr, false);
         }
         const code = codeGs(cfg(cid).token);
         try {

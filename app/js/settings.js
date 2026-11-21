@@ -309,7 +309,10 @@
           /* bỏ qua */
         }
       }
-      commit((isNew ? 'Đã thêm' : 'Đã lưu') + ' công ty ' + (v.short || v.name) + '.');
+      if (!commit((isNew ? 'Đã thêm' : 'Đã lưu') + ' công ty ' + (v.short || v.name) + '.')) {
+        if (isNew) C().data.companies.pop();
+        return { errors: [C().conflict ? CONFLICT_MSG + ' (Bản nháp được giữ lại trên form này).' : 'Không lưu được.'] };
+      }
       renderCompanies();
       return {};
     });
@@ -422,7 +425,10 @@
         const obj = isNew ? { id: C().newId('w_') } : w;
         Object.assign(obj, v, { short: v.short || v.name });
         if (isNew) C().data.warehouses.push(obj);
-        commit((isNew ? 'Đã thêm' : 'Đã lưu') + ' kho ' + (obj.short || obj.name) + '.');
+        if (!commit((isNew ? 'Đã thêm' : 'Đã lưu') + ' kho ' + (obj.short || obj.name) + '.')) {
+          if (isNew) C().data.warehouses.pop();
+          return { errors: [C().conflict ? CONFLICT_MSG + ' (Bản nháp được giữ lại trên form này).' : 'Không lưu được.'] };
+        }
         renderWarehouses();
         renderCompanies();
         return {};
@@ -551,33 +557,41 @@
   /* ---------------- Chung ---------------- */
   let gDraft = null,
     gDirty = false;
+  const DRAFT_GENERAL_KEY = 'hak.draft.general';
   function renderGeneral() {
     const g = C().data.general;
-    gDraft = Object.assign({}, g);
-    gDirty = false;
+    const savedDraft = HAK.Store ? HAK.Store.get(DRAFT_GENERAL_KEY, null) : null;
+    gDraft = Object.assign({}, g, savedDraft && typeof savedDraft === 'object' ? savedDraft : {});
+    gDirty = !!savedDraft;
     $('#generalBody').innerHTML =
       '<div class="row g-3">' +
       '<div class="col-md-4"><label class="form-label">Nơi lập văn bản</label><input class="form-control" data-g="place" value="' +
-      esc(g.place) +
+      esc(gDraft.place) +
       '"><div class="form-text">Dùng cho "Đà Nẵng, ngày … tháng … năm …" trong Quyết định.</div></div>' +
       '<div class="col-md-4"><label class="form-label">Ký hiệu cho giá trị bỏ trống</label><input class="form-control" data-g="blank" value="' +
-      esc(g.blank) +
+      esc(gDraft.blank) +
       '"><div class="form-text">Hiện trong Word khi bạn chưa nhập (vd số hợp đồng) để điền tay.</div></div>' +
       '<div class="col-md-4"><label class="form-label">Kiểu cân mặc định (Điều chuyển)</label><input class="form-control" data-g="defaultWeightType" value="' +
-      esc(g.defaultWeightType) +
+      esc(gDraft.defaultWeightType) +
       '"></div>' +
       '<div class="col-md-6"><label class="form-label">Đơn vị vận chuyển mặc định</label><input class="form-control" data-g="defaultCarrier" value="' +
-      esc(g.defaultCarrier) +
+      esc(gDraft.defaultCarrier) +
       '"><div class="form-text">Dùng khi Excel không có cột "Đơn vị vận chuyển".</div></div>' +
       '<div class="col-md-6"><label class="form-label">Tài xế mặc định</label><input class="form-control" data-g="defaultDriver" value="' +
-      esc(g.defaultDriver) +
+      esc(gDraft.defaultDriver) +
       '"><div class="form-text">Dùng khi Excel không có cột "Tài xế". Thường để trống.</div></div>' +
       '<div class="col-12"><div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="setSwap" data-g="autoSwap"' +
-      (g.autoSwap ? ' checked' : '') +
+      (gDraft.autoSwap ? ' checked' : '') +
       '><label class="form-check-label" for="setSwap">Tự hoán đổi Cân lần 1 / Cân lần 2 khi lần 1 lớn hơn lần 2 (nghi nhập đảo)</label></div></div>' +
       '</div>' +
-      '<div class="d-flex flex-wrap align-items-center gap-2 mt-3"><button class="btn btn-primary" id="gSave" type="button" disabled>💾 Lưu</button>' +
-      '<button class="btn btn-outline-secondary" id="gCancel" type="button" disabled>Hủy thay đổi</button><span class="small" id="gState"></span></div><hr>' +
+      '<div class="d-flex flex-wrap align-items-center gap-2 mt-3"><button class="btn btn-primary" id="gSave" type="button"' +
+      (gDirty ? '' : ' disabled') +
+      '>💾 Lưu</button>' +
+      '<button class="btn btn-outline-secondary" id="gCancel" type="button"' +
+      (gDirty ? '' : ' disabled') +
+      '>Hủy thay đổi</button><span class="small" id="gState">' +
+      (savedDraft ? '● Đã khôi phục bản nháp chưa lưu' : '') +
+      '</span></div><hr>' +
       '<div class="d-flex flex-wrap gap-2">' +
       '<button class="btn btn-outline-primary" id="btnExportCfg" type="button">⬇ Xuất cấu hình (.json)</button>' +
       '<label class="btn btn-outline-primary mb-0">⬆ Nhập cấu hình<input type="file" id="importCfg" accept=".json" hidden></label>' +
@@ -589,6 +603,11 @@
       const st = $('#gState');
       st.className = 'small ' + (dirty ? 'text-warning' : 'text-success');
       st.textContent = dirty ? '● Có thay đổi chưa lưu' : '';
+      if (dirty) {
+        if (HAK.Store) HAK.Store.set(DRAFT_GENERAL_KEY, gDraft);
+      } else {
+        if (HAK.Store) HAK.Store.remove(DRAFT_GENERAL_KEY);
+      }
     };
     $$('#generalBody [data-g]').forEach((el) =>
       el.addEventListener('input', () => {
@@ -599,10 +618,19 @@
     $('#gSave').addEventListener('click', () => {
       const swapChanged = !!gDraft.autoSwap !== !!g.autoSwap;
       Object.assign(g, gDraft);
-      if (commit('Đã lưu cài đặt chung.')) mark(false);
+      const ok = commit('Đã lưu cài đặt chung.');
+      if (ok) {
+        mark(false);
+      } else {
+        if (HAK.Store) HAK.Store.set(DRAFT_GENERAL_KEY, gDraft);
+        const st = $('#gState');
+        st.className = 'small text-danger fw-semibold';
+        st.textContent = '● ' + (C().conflict ? 'Xung đột: tab khác đã lưu. Bản nháp đã được giữ lại.' : 'Lỗi lưu dữ liệu.');
+      }
       if (swapChanged && HAK.App && HAK.App.reparse) HAK.App.reparse();
     });
     $('#gCancel').addEventListener('click', () => {
+      if (HAK.Store) HAK.Store.remove(DRAFT_GENERAL_KEY);
       renderGeneral();
       toast('Đã hủy thay đổi cài đặt chung.', 'info');
     });
@@ -682,7 +710,10 @@
         if (errors.length) return { errors };
         if (isNew) C().data.carrierCodes.push(v);
         else Object.assign(c, v);
-        commit((isNew ? 'Đã thêm' : 'Đã lưu') + ' mã ' + v.code + '.');
+        if (!commit((isNew ? 'Đã thêm' : 'Đã lưu') + ' mã ' + v.code + '.')) {
+          if (isNew) C().data.carrierCodes.pop();
+          return { errors: [C().conflict ? CONFLICT_MSG + ' (Bản nháp được giữ lại trên form này).' : 'Không lưu được.'] };
+        }
         renderCarriers();
         if (HAK.App && HAK.App.reparse) HAK.App.reparse();
         return {};

@@ -1,5 +1,11 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.25.7 — Đợt 6: Mức Thấp: Bố cục & Tinh chỉnh còn lại (L-27, L-29, N-15, N-16)
+- **L-27 (Chống tràn ngang trên màn hình hẹp 390px):** bổ sung `overflow-wrap: anywhere; word-break: break-word;` cho `.sum-list`, `.sum-list li`, `.sum-list li b` và các thẻ hiển thị dòng lỗi tự sao lưu SQLite/JSON trong `backup.js`, đảm bảo các đường dẫn dài không bao giờ làm tràn ngang màn hình hẹp.
+- **L-29 (Tinh chỉnh bố cục ở 1366×768 và 768px):** hạ chiều cao `.topbar` từ 70px xuống 52–54px để tiết kiệm không gian dọc; cho phép tiêu đề trang `#pageTitle` co giãn tự nhiên không bị cắt cụt "…"; tối ưu hiển thị các khối bước `.step` (1–5) trên máy tính bảng; đặt `pointer-events: none` cho `.toast-container` và tinh chỉnh vị trí đáy để toast không che khuất các nút hành động/phân trang ở góc dưới bên phải.
+- **N-15 (Thống nhất mô hình Lưu/Hủy cho Google Sheet):** bổ sung nút 💾 Lưu và ↩ Hủy trên từng dòng cấu hình Google Sheet trong Cài đặt; loại bỏ cơ chế tự động ghi storage khi gõ ô URL/token dở dang; chỉ ghi vào storage khi người dùng bấm Lưu và hỗ trợ nút Hủy khôi phục lại cấu hình đã lưu.
+- **N-16 (Giữ lại bản nháp đã gõ khi báo xung đột 2 tab):** trong Cài đặt, khi gặp lỗi xung đột phiên bản giữa 2 tab (`C().conflict`), các form công ty, kho, đơn vị vận chuyển không còn đóng modal mà giữ nguyên toàn bộ dữ liệu đang gõ dở trên màn hình kèm thông báo lỗi; biểu mẫu Cài đặt chung tự động lưu bản nháp vào `hak.draft.general` để người dùng không phải gõ lại từ đầu.
+
 ## v2.25.6 — Đợt 5: Nhóm Giao diện / Thông báo & Hộp thoại (L-16..18, L-31, N-08..12, U-04)
 - **L-16 & N-07 (Chặn đóng im lặng khi sửa dở):** hộp Danh mục (`#catModal`) và hộp Cài đặt (`#setModal`) kiểm tra dữ liệu đang nhập dở khi bấm ra ngoài nền (backdrop) hoặc bấm phím `Esc`; nếu form có thay đổi chưa lưu, hộp thoại xác nhận hủy `HAK.UI.confirm` sẽ xuất hiện để ngăn mất dữ liệu ngoài ý muốn.
 - **L-17 (Tạo biên bản thiếu HĐ/đơn giá & chuyển sang modal xác nhận):** phát hiện và cảnh báo rõ khi lập biên bản thiếu số hợp đồng ủy thác (`buildUyThac`), thiếu hợp đồng mua bán hoặc thiếu đơn giá (`buildXuatBan`); hiển thị danh sách lưu ý trên màn hình và tự động tổng hợp vào hộp thoại xác nhận `HAK.UI.confirm` thay thế hoàn toàn `window.confirm` gốc.
