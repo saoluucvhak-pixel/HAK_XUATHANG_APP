@@ -366,8 +366,11 @@
         delete saved.warehouses;
         saved.general = Object.assign({}, saved.general, { autoSwap: true });
       }
+      this._rev = Number(saved.rev) || 0; // N-03: số phiên bản bản ghi — phát hiện cửa sổ / tab khác đã lưu cấu hình sau lúc nạp
+      this.conflict = false;
       this.data = {
         ver: VER,
+        rev: this._rev,
         companies: Array.isArray(saved.companies) && saved.companies.length ? saved.companies : clone(DEFAULT_COMPANIES),
         warehouses: Array.isArray(saved.warehouses) && saved.warehouses.length ? saved.warehouses : clone(DEFAULT_WAREHOUSES),
         general: Object.assign(clone(DEFAULT_GENERAL), saved.general || {}),
@@ -382,8 +385,23 @@
     },
     /** Kho nhập tay trong form (chỉ tồn tại trong phiên, không lưu vào danh mục) */
     custom: {},
+    /**
+     * N-03: giống Danh mục — chỉ lưu khi bản đang lưu trên máy còn CÙNG phiên bản (rev) với lúc nạp; đã có tab khác lưu trước thì
+     * KHÔNG ghi đè (trả false, this.conflict = true) để người dùng tải lại thay vì làm mất thay đổi của tab kia.
+     */
     save() {
-      return HAK.Store.set(KEY, this.data);
+      const cur = HAK.Store.get(KEY, null);
+      const curRev = cur && typeof cur === 'object' ? Number(cur.rev) || 0 : 0;
+      if (cur && curRev !== (this._rev || 0)) {
+        this.conflict = true;
+        return false;
+      }
+      this.conflict = false;
+      const next = Object.assign({}, this.data, { rev: (this._rev || 0) + 1 });
+      if (HAK.Store.set(KEY, next) === false) return false;
+      this._rev = next.rev;
+      this.data.rev = next.rev;
+      return true;
     },
     reset() {
       HAK.Store.remove(KEY);

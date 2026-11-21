@@ -102,6 +102,13 @@ Các quy tắc dưới đây đã được **suy ra từ mã nguồn / tài li�
     - **(a) Tạm thời giữ nguyên cách băm ID hồ sơ và hỗ trợ backward compatibility cho `omitKey`** (hỗ trợ cả khóa cũ và mới như L-06/L-07 đã làm). *Gợi ý của kiểm toán: an toàn cao nhất, không làm vỡ các hồ sơ và cấu hình tick tay đã lưu.*
     - **(b) Chuyển hoàn toàn sang khóa chuẩn hóa mới kèm script di trú tự động (migration)** dữ liệu cũ khi nâng cấp.
   - **Tác động:** Chọn (b) đòi hỏi quy trình di trú dữ liệu toàn diện khi người dùng mở phiên bản mới; chọn (a) duy trì tương thích ngược 100% với dữ liệu cũ.
+- **D-08 (liên quan L-14 — Xử lý khóa bộ lọc đã lưu theo tài khoản + công ty khi khôi phục sang máy khác):**
+  - **Câu hỏi:** Khóa bộ lọc lưu trữ `hak.sf.presets@<userId>@<companyId>` gắn với ID người dùng tự sinh trên từng máy. Khi khôi phục bản sao lưu toàn bộ sang máy khác (với tùy chọn giữ tài khoản của máy này), ID người dùng nguồn không tồn tại trên máy đích, khiến bộ lọc trở thành mồ côi. Nên xử lý thế nào?
+  - **Các phương án:**
+    - **(a) Ánh xạ theo tên đăng nhập (username) + bỏ qua nếu không khớp** (đang áp dụng ở L-14): nếu máy đích có tài khoản cùng tên đăng nhập (không phân biệt hoa/thường), tự động chuyển khóa sang ID của tài khoản đó; nếu không có tài khoản khớp, bỏ qua không ghi vào máy đích (giữ nguyên trong file sao lưu). — *gợi ý của kiểm toán: an toàn, tránh lẫn lộn bộ lọc giữa các nhân viên khác nhau.*
+    - **(b) Chuyển toàn bộ các bộ lọc không khớp về tài khoản quản trị hiện tại** của máy đích.
+    - **(c) Xóa tiền tố tài khoản và chuyển thành bộ lọc dùng chung** cho mọi người trên máy đích.
+  - **Tác động:** Phương án (a) bảo đảm tính riêng tư và đúng chủ sở hữu bộ lọc của từng nhân viên giữa các máy khác nhau; không làm ô nhiễm bộ lọc của người dùng khác.
 - **D-09 (liên quan L-19 — Giờ cân `24:00:00`):**
   - **Câu hỏi:** Khi file cân ghi `24:00:00` (hoặc serial làm tròn thành `24:00:00`): coi là `00:00` ngày hôm sau (đổi ngày cân), kẹp `23:59:59` giữ nguyên ngày, hay coi là sai giờ + cảnh báo (như giờ `25:00` ở quy tắc 15)?
   - **Các phương án:** (a) Coi là "sai giờ" + cảnh báo theo quy tắc 15 — *gợi ý của kiểm toán*; (b) Chuyển sang `00:00` ngày sau đồng bộ cả `ts1` và `dateStr` kèm cảnh báo (đang áp dụng tạm ở L-19 để `ts1` và `dateStr` không mâu thuẫn); (c) Kẹp `23:59:59` giữ ngày cũ.

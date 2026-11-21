@@ -1939,6 +1939,10 @@
         if (ST[type].baseSig === undefined) markClean(type);
       }
     },
+    /** N-06: có biểu mẫu nào đang sửa dở chưa lưu (phiếu chọn / bỏ, xe trả về, phạm vi lọc, thông tin đã nhập) — cho cảnh báo khi đóng / tải lại trang. */
+    hasUnsaved() {
+      return Object.keys(ST).some((t) => isDirty(t));
+    },
     unloadSnapshot(type) {
       resetRecordState(type, { fields: false });
     },

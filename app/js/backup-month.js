@@ -87,14 +87,42 @@
       const cids = new Set(contracts.map((c) => c.id));
       const customs = (src.customs || []).filter((x) => x && cids.has(x.contractId));
       const custIds = new Set();
+      const custNames = new Set();
+      // L-15 (Quy tắc 34): thu thập đủ khách hàng liên quan, kể cả khách hàng chỉ tham chiếu qua details[].buyer hoặc commissionCustomer
       const collectCust = (o) => {
-        Object.keys(o || {}).forEach((k) => {
-          if (/Id$/.test(k) && typeof o[k] === 'string') custIds.add(o[k]);
+        if (!o || typeof o !== 'object') return;
+        Object.keys(o).forEach((k) => {
+          const val = o[k];
+          if (typeof val === 'string' && val.trim()) {
+            if (/Id$/.test(k)) custIds.add(val.trim());
+            if (k === 'buyer' || k === 'commissionCustomer' || k === 'customer' || k === 'receiver' || k === 'deliver') {
+              custIds.add(val.trim());
+              custNames.add(val.trim().toLowerCase());
+            }
+          }
         });
       };
-      contracts.forEach(collectCust);
-      customs.forEach(collectCust);
-      const customers = (src.customers || []).filter((c) => c && custIds.has(c.id));
+      contracts.forEach((c) => {
+        collectCust(c);
+        (c.details || []).forEach(collectCust);
+        (c.addenda || []).forEach(collectCust);
+      });
+      customs.forEach((cu) => {
+        collectCust(cu);
+        (cu.supplements || []).forEach(collectCust);
+      });
+      const customers = (src.customers || []).filter(
+        (c) =>
+          c &&
+          (custIds.has(c.id) ||
+            custIds.has(c.name) ||
+            custNames.has(String(c.id).toLowerCase()) ||
+            custNames.has(
+              String(c.name || '')
+                .trim()
+                .toLowerCase()
+            ))
+      );
       fileIds(contracts, attach);
       fileIds(customs, attach);
       keys[CAT] = Object.assign({}, src, { contracts, customs, customers });
