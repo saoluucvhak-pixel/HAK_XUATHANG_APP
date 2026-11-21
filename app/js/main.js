@@ -1321,6 +1321,16 @@
     if (HAK.Catalog) HAK.Catalog.init();
     HAK.Pages.init();
     HAK.Settings.init();
+    // N-06: đóng / tải lại trang khi còn phiếu đã chọn hoặc Cài đặt chung sửa dở chưa lưu → trình duyệt hỏi xác nhận
+    root.addEventListener('beforeunload', (e) => {
+      const unsaved =
+        (HAK.Pages && HAK.Pages.hasUnsaved && HAK.Pages.hasUnsaved()) ||
+        (HAK.Settings && HAK.Settings.hasUnsaved && HAK.Settings.hasUnsaved());
+      if (!unsaved) return undefined;
+      e.preventDefault();
+      e.returnValue = 'Có thay đổi chưa lưu (phiếu đã chọn hoặc cài đặt đang sửa dở). Rời trang sẽ mất các thay đổi này.';
+      return e.returnValue;
+    });
     if (HAK.Archive) HAK.Archive.init();
     if (HAK.GSync) HAK.GSync.init();
     if (HAK.Auth) HAK.Auth.init();

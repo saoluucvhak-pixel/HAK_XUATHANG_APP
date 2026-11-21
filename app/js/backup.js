@@ -286,6 +286,8 @@
   const sqlCfg = () => HAK.BackupSchedule.normalize(HAK.Store.get(SQL_KEY, null));
   const sqlSet = (c) => HAK.Store.set(SQL_KEY, c);
   const sqlDir = (cfg) => (cfg || sqlCfg()).dir || HAK.BackupSchedule.defaultDir(((HAK.Storage && HAK.Storage.status) || {}).dataDir);
+  /** L-25: ẩn đường dẫn tuyệt đối (ổ đĩa / UNC) của máy chủ trong thông báo lỗi hiển thị cho người dùng. */
+  const hidePaths = (m) => String(m == null ? '' : m).replace(/(?:[A-Za-z]:|\\\\[^\\/\s]+)[\\/][^\s"':]*/g, '[đường dẫn đã ẩn]');
   /** Sao lưu SQLite NGAY (nút "Sao lưu SQLite ngay" và tự động): máy chủ ghi bản nhất quán vào thư mục, kiểm integrity_check, xoay vòng (chỉ xóa HAK_SQLite_*.db). */
   async function sqlRunNow(opts) {
     if (!sqlAvailable()) throw new Error('Chỉ dùng được ở bản Windows đang lưu dữ liệu bằng SQLite.');
@@ -313,7 +315,9 @@
       return r;
     } catch (e) {
       const msg =
-        e && e.code === 'scope' ? 'Chỉ tài khoản toàn quyền (không giới hạn công ty) mới sao lưu SQLite.' : (e && e.message) || String(e);
+        e && e.code === 'scope'
+          ? 'Chỉ tài khoản toàn quyền (không giới hạn công ty) mới sao lưu SQLite.'
+          : hidePaths((e && e.message) || String(e));
       sqlSet(HAK.BackupSchedule.record(cfg, { ok: false, error: msg }, Date.now()));
       throw Object.assign(new Error(msg), { code: e && e.code });
     }
@@ -392,16 +396,31 @@
       HAK.Store.remove(key, { dbCommitted: true });
     } else HAK.Store.remove(key);
   }
+  /**
+   * L-13: nếu lần khôi phục trước DỪNG GIỮA CHỪNG (bản chụp còn cờ incomplete) thì GIỮ NGUYÊN bản chụp đó khi thử lại —
+   * ghi đè sẽ chụp luôn trạng thái đã khôi phục dở và làm mất điểm quay về ban đầu của nút "Hoàn tác khôi phục".
+   */
   async function snapshotBeforeRestore() {
     try {
+      const prev = HAK.Store.get(PRE_KEY, null);
+      if (prev && prev.incomplete && prev.keys) return true;
       const keys = {};
       HAK.Store.keys().forEach((k) => {
         if (k.indexOf('hak.') === 0 && k !== LAST_KEY && k !== AUTO_KEY && k !== SQL_KEY && k !== PRE_KEY) keys[k] = HAK.Store.get(k, null);
       });
-      await writeRestoreKey(PRE_KEY, { at: Date.now(), keys });
+      await writeRestoreKey(PRE_KEY, { at: Date.now(), keys, incomplete: true });
       return true;
     } catch (e) {
       return false;
+    }
+  }
+  /** Khôi phục xong trọn vẹn → bỏ cờ incomplete (lần khôi phục sau được chụp bản mới). Không ghi được thì giữ cờ: an toàn hơn là mất điểm quay về. */
+  async function markSnapshotComplete() {
+    try {
+      const p = HAK.Store.get(PRE_KEY, null);
+      if (p && p.incomplete) await writeRestoreKey(PRE_KEY, { at: p.at, keys: p.keys });
+    } catch (e) {
+      console.warn('Không đánh dấu hoàn tất bản chụp trước khi khôi phục', e);
     }
   }
   const preRestoreInfo = () => {
@@ -428,6 +447,25 @@
     }
     await removeRestoreKey(PRE_KEY);
     return { set, removed };
+  }
+  /**
+   * L-14 (D-08): bộ lọc đã lưu nằm ở khóa "hak.sf.presets@<mã tài khoản>@<mã công ty>[.bak…]". Mã tài khoản sinh ra riêng trên từng máy,
+   * nên khi khôi phục sang máy khác (giữ tài khoản của máy này) khóa cũ thành MỒ CÔI. Quy tắc (D-08, phương án gợi ý):
+   *   · mã tài khoản còn tồn tại sau khôi phục → giữ nguyên khóa;
+   *   · không còn nhưng có tài khoản CÙNG TÊN ĐĂNG NHẬP trên máy này → chuyển khóa sang mã tài khoản của máy này;
+   *   · không khớp được → không ghi (báo số bộ lọc bỏ qua) — file sao lưu vẫn còn nguyên để nhập lại.
+   * Trả khóa đích hoặc null (bỏ qua).
+   */
+  const FILTER_KEY = /^(hak\.sf\.presets)@([^@]+)@([^@.]+)(\..*)?$/;
+  function remapFilterKey(k, ctx) {
+    const m = FILTER_KEY.exec(k);
+    if (!m) return k;
+    const final = ctx.finalUsers || [];
+    if (final.some((u) => u && u.id === m[2])) return k;
+    const src = (ctx.backupUsers || []).find((u) => u && u.id === m[2]);
+    const un = src && String(src.username || '').toLowerCase();
+    const mine = un && final.find((u) => u && String(u.username || '').toLowerCase() === un);
+    return mine ? m[1] + '@' + mine.id + '@' + m[3] + (m[4] || '') : null;
   }
   const CAT = 'hak.catalog.v1';
   /** Kiểm tra cấu trúc bản sao TRƯỚC khi ghi bất cứ gì (ném lỗi nếu hỏng). */
@@ -463,6 +501,39 @@
         if (U.isAllowedBackupKey(k)) U.validateBackupKey(k, j.keys[k]);
       }
     }
+  }
+  /**
+   * L-12: kiểm tra cấu trúc từng hồ sơ Lưu trữ trong bản sao (meta.id, data là chuỗi, nội dung giải nén được và rows là mảng)
+   * TRƯỚC khi ghi bất cứ gì — hồ sơ hỏng làm hỏng cả lần khôi phục thay vì bị bỏ qua âm thầm sau khi đã đổi cài đặt.
+   */
+  async function validateArchive(items) {
+    const bad = [];
+    const decode = HAK.Archive && HAK.Archive.decode;
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      let why = '';
+      if (!it || typeof it !== 'object' || !it.meta || typeof it.meta !== 'object' || typeof it.meta.id !== 'string' || !it.meta.id)
+        why = 'thiếu mục lục (meta.id)';
+      else if (typeof it.data !== 'string') why = 'thiếu nội dung';
+      else if (it.data !== '' && typeof decode === 'function') {
+        try {
+          const d = await decode(it.data);
+          if (!d || !Array.isArray(d.rows)) why = 'danh sách phiếu (rows) không phải mảng';
+        } catch (e) {
+          why = 'không giải nén được nội dung';
+        }
+      }
+      if (why) bad.push('#' + (i + 1) + (it && it.meta && it.meta.id ? ' (' + it.meta.id + ')' : '') + ': ' + why);
+    }
+    if (bad.length)
+      throw new Error(
+        'Bản sao lưu có ' +
+          bad.length +
+          ' hồ sơ Lưu trữ không hợp lệ — ' +
+          bad.slice(0, 3).join('; ') +
+          (bad.length > 3 ? '…' : '') +
+          '. Chưa thay đổi gì trên máy này.'
+      );
   }
   async function verifyManifest(j) {
     if (!j || j.manifest === undefined) return 'unverified';
@@ -616,6 +687,7 @@
         );
       mode = 'merge';
     }
+    await validateArchive(ins.legacy ? j.items : j.archive); // L-12: kiểm trước khi ghi bất cứ gì
     if (ins.legacy) {
       // file sao lưu riêng Lưu trữ (bản cũ)
       const r = await HAK.Archive.importItems(j.items);
@@ -661,10 +733,24 @@
         undoable: true,
         run: async () => {
           const U = (root.HAK && root.HAK.Util) || (typeof require === 'function' ? require('./util.js') : null);
-          for (const k of Object.keys(j.keys)) {
+          const localUsers = (HAK.Store.get('hak.auth.v1', null) || {}).users || [],
+            backupUsers = (j.keys['hak.auth.v1'] || {}).users || [],
+            fctx = { finalUsers: keepAuth ? localUsers : backupUsers.length ? backupUsers : localUsers, backupUsers };
+          out.filtersRemapped = 0;
+          out.filtersSkipped = 0;
+          for (const k0 of Object.keys(j.keys)) {
+            let k = k0;
             if (k === PRE_KEY) continue;
             if (keepAuth && AUTH_KEYS.indexOf(k) >= 0) continue; // giữ tài khoản / mật khẩu / khóa khôi phục / loại máy hiện tại
-            if (!(k.indexOf('hak.') === 0 && k !== LAST_KEY && k !== AUTO_KEY && k !== SQL_KEY && j.keys[k] !== null)) continue;
+            if (FILTER_KEY.test(k)) {
+              k = remapFilterKey(k, fctx);
+              if (k === null) {
+                out.filtersSkipped++;
+                continue;
+              }
+              if (k !== k0) out.filtersRemapped++;
+            }
+            if (!(k.indexOf('hak.') === 0 && k !== LAST_KEY && k !== AUTO_KEY && k !== SQL_KEY && j.keys[k0] !== null)) continue;
             if (U && U.isAllowedBackupKey && !U.isAllowedBackupKey(k)) continue;
             if (k === CAT && merge && HAK.ContractModel) {
               // CÙNG quy tắc phiên bản với Gói cấu hình: bản cũ không ghi đè bản mới
@@ -679,7 +765,7 @@
               continue;
             }
             if (merge && k !== CAT && HAK.Store.get(k, null) !== null) continue; // nhập bổ sung: không đè cài đặt đang có
-            await writeRestoreKey(k, j.keys[k]);
+            await writeRestoreKey(k, j.keys[k0]);
             out.keys++;
           }
           return { n: out.keys };
@@ -724,6 +810,7 @@
       },
     ];
     out.report = await runSteps(steps);
+    await markSnapshotComplete();
     return out;
   }
 
@@ -891,6 +978,7 @@
     const r = { tpl: 0, cat: 0, gs: 0 };
     const mergedCatalog = j.catalog && HAK.ContractModel ? HAK.ContractModel.mergeCatalog(HAK.Store.get(CAT_KEY, null), j.catalog) : null;
     HAK.Store.set(CFG_KEY, j.config);
+    if (HAK.Config && typeof HAK.Config.load === 'function') HAK.Config.load(); // N-03: nạp lại để số phiên bản (rev) khớp bản vừa ghi
     Object.keys(j.tpl || {}).forEach((k) => {
       if (k.indexOf('hak.tpl.') === 0 && j.tpl[k]) {
         HAK.Store.set(k, j.tpl[k]);
@@ -1577,10 +1665,10 @@
         '<div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Nhập từ bản sao lưu — chọn cách nhập</h5></div><div class="modal-body">' +
         planHtml(info.plan) +
         '<div class="border rounded p-2 mb-2"><b>Nhập bổ sung (khuyên dùng)</b><div class="small">Gộp theo phiên bản: dữ liệu <b>mới hơn trên máy này được giữ</b> (vd. máy 700 BDMT phiên bản 4 + bản sao 500 BDMT phiên bản 2 → giữ 700); hợp đồng đã mở lại vẫn mở; cài đặt đang có không bị đè; nhập lặp lại cho cùng kết quả.</div></div>' +
-        '<div class="border border-danger rounded p-2"><b>Khôi phục về đúng thời điểm sao lưu</b><div class="small">Cài đặt và <b>danh mục hợp đồng' +
+        '<div class="border border-danger rounded p-2"><b>Thay thế (ghi đè các mục có trong file)</b><div class="small">Cài đặt và <b>danh mục hợp đồng' +
         (c ? ' (' + c.willOverwrite + ' hợp đồng khác nội dung sẽ bị thay bằng bản sao, kể cả khi máy này mới hơn)' : '') +
         '</b> bị <b>ghi đè</b> bằng bản sao. Hồ sơ Lưu trữ / đợt Excel / nhật ký vẫn gộp theo phiên bản; dữ liệu chỉ có trên máy này không bị xóa. Có nút "Hoàn tác khôi phục" cho phần cài đặt &amp; danh mục.</div></div>' +
-        '</div><div class="modal-footer"><button class="btn btn-primary" data-choice="merge" type="button">Nhập bổ sung</button><button class="btn btn-outline-danger" data-choice="replace" type="button">Khôi phục (ghi đè)</button><button class="btn btn-outline-secondary" data-choice="cancel" type="button">Hủy</button></div></div></div>';
+        '</div><div class="modal-footer"><button class="btn btn-primary" data-choice="merge" type="button">Nhập bổ sung</button><button class="btn btn-outline-danger" data-choice="replace" type="button">Thay thế (ghi đè các mục có trong file)</button><button class="btn btn-outline-secondary" data-choice="cancel" type="button">Hủy</button></div></div></div>';
       document.body.appendChild(m);
       const inst = bootstrap.Modal.getOrCreateInstance(m, { backdrop: 'static', keyboard: false });
       m.addEventListener('click', (e) => {
@@ -1797,7 +1885,9 @@
       '</select></label><label class="small mb-0">Năm <select class="form-select form-select-sm" id="bkMonthY" aria-label="Năm">' +
       years.map((y) => '<option value="' + y + '"' + (+defYm.slice(0, 4) === y ? ' selected' : '') + '>' + y + '</option>').join('') +
       '</select></label><button class="btn btn-outline-primary" id="bkSaveMonth" type="button">⬇ Theo tháng (.json)</button><span class="small muted ms-1" id="bkMonthInfo"></span></div>' +
-      (sqlAvailable() ? '<button class="btn btn-outline-primary" id="bkSqlNow" type="button">🗄 SQLite ngay (.db)</button>' : '') +
+      (sqlAvailable()
+        ? '<button class="btn btn-outline-primary" id="bkSqlNow" type="button">🗄 SQLite ngay (.db)</button>'
+        : '<button class="btn btn-outline-secondary" id="bkSqlNow" type="button" disabled title="Chỉ khả dụng khi ứng dụng kết nối cơ sở dữ liệu SQLite (bản Windows)">🗄 SQLite ngay (chỉ trên Windows)</button>') +
       '</div>' +
       '<div class="form-text mt-2">Bản <b>theo tháng</b> = hồ sơ, đợt Excel, chứng từ của tháng (tính theo <b>ngày cân đầu tiên</b>) cùng hợp đồng / tờ khai / khách hàng mà chúng gắn tới' +
       (mo.undated ? ' · ⚠ ' + mo.undated + ' hồ sơ không có ngày cân nên không thuộc tháng nào (chỉ có trong bản toàn bộ)' : '') +
@@ -1815,7 +1905,7 @@
         : '') +
       '</div>' +
       '<div class="form-check mt-2 admin-only"><input class="form-check-input" type="checkbox" id="bkKeepAuth" checked><label class="form-check-label small" for="bkKeepAuth"><b>Giữ tài khoản đang dùng trên máy này</b> khi khôi phục bản toàn bộ. Bỏ tick khi chuyển sang máy mới và muốn mọi người đăng nhập bằng mật khẩu cũ.</label></div>' +
-      '<div class="form-text mt-1">Bản <b>toàn bộ</b>: chọn <b>Nhập bổ sung</b> (giữ dữ liệu mới hơn trên máy) hoặc <b>Thay thế</b> (về đúng thời điểm sao lưu, có Hoàn tác). Bản <b>theo tháng</b>: chỉ Nhập bổ sung, không đụng tháng khác. Bản <b>theo năm</b>: nhập vào Sổ hồ sơ năm. Xem trước nội dung trước khi ghi.</div>' +
+      '<div class="form-text mt-1">Bản <b>toàn bộ</b>: chọn <b>Nhập bổ sung</b> (giữ dữ liệu mới hơn trên máy) hoặc <b>Thay thế (ghi đè các mục có trong file)</b> (về đúng thời điểm sao lưu, không xóa dữ liệu chỉ có trên máy này, có Hoàn tác). Bản <b>theo tháng</b>: chỉ Nhập bổ sung, không đụng tháng khác. Bản <b>theo năm</b>: nhập vào Sổ hồ sơ năm. Xem trước nội dung trước khi ghi.</div>' +
       blockHead('④', 'Tự sao lưu định kỳ') +
       (await autoHtml()) +
       sqlAutoHtml() +
@@ -1862,7 +1952,7 @@
             r.batches +
             ' đợt Excel, ' +
             r.issued +
-            ' chứng từ).',
+            ' chứng từ). Tệp đã lưu vào thư mục Tải xuống của trình duyệt (hoặc thư mục bạn đã chọn).',
           'success'
         );
       } catch (err) {
@@ -1914,7 +2004,7 @@
             r.batches +
             ' đợt Excel, ' +
             r.issued +
-            ' chứng từ đã lập).',
+            ' chứng từ đã lập). Tệp đã lưu vào thư mục Tải xuống của trình duyệt (hoặc thư mục bạn đã chọn).',
           'success'
         );
         render();
@@ -2192,6 +2282,9 @@
     render,
     saveAll,
     restoreFile,
+    validateArchive,
+    remapFilterKey,
+    hidePaths,
     inspect,
     planHtml,
     undoRestore,

@@ -108,6 +108,8 @@ class HAKDocs {
  /* Sao lưu vào THƯ MỤC NGƯỜI DÙNG CHỌN — cùng hợp đồng với tools/hakdb/server.cjs (backupToDir): dir tuyệt đối, không có "..", tên HAK_SQLite_<yyyymmdd-HHMMSS>.db, kiểm integrity_check bản vừa ghi, xoay vòng chỉ xóa tệp đúng mẫu đó. (C# 5: không dùng cú pháp mới.) */
  static readonly System.Text.RegularExpressions.Regex AutoBackupName=new System.Text.RegularExpressions.Regex(@"^HAK_SQLite_\d{8}-\d{6}\.db$");
  static string SchemaSqlText(){using(var rs=Assembly.GetExecutingAssembly().GetManifestResourceStream("hak.schema.v1.sql"))using(var rd=new StreamReader(rs,Encoding.UTF8))return rd.ReadToEnd();}
+ /* L-25: không đưa đường dẫn tuyệt đối của máy chủ (ổ đĩa, thư mục người dùng) vào thông báo lỗi trả về trình duyệt. */
+ static string HidePaths(string m){if(m==null)return m;return System.Text.RegularExpressions.Regex.Replace(m,@"(?:[A-Za-z]:|\\\\[^\\/\s]+)[\\/][^\s\""':]*","[đường dẫn đã ẩn]");}
  static string FsReason(Exception e){if(e is UnauthorizedAccessException)return "không đủ quyền ghi";if(e is DirectoryNotFoundException||e is DriveNotFoundException)return "ổ đĩa hoặc thư mục cha không tồn tại";if(e is PathTooLongException)return "đường dẫn quá dài";if(e is IOException){int hr=e.HResult&0xFFFF;if(hr==112||hr==39)return "ổ đĩa đầy";if(hr==80||hr==183||hr==267)return "đường dẫn này là một tệp, không phải thư mục";}return "lỗi hệ thống tệp";}
  static Dictionary<string,object> BackupToDir(HakDb db,Dictionary<string,object> data,string dir){
   bool badDrive=dir.Length>=2&&dir[1]==':'&&(dir.Length<3||(dir[2]!='\\'&&dir[2]!='/'));
@@ -118,17 +120,18 @@ class HAKDocs {
   string name=(given!=null&&AutoBackupName.IsMatch(given))?given:"HAK_SQLite_"+DateTime.Now.ToString("yyyyMMdd-HHmmss")+".db";
   string dest=Path.Combine(root,name);
   try{Directory.CreateDirectory(root);string probe=Path.Combine(root,".hak-ghi-"+Guid.NewGuid().ToString("N"));File.WriteAllText(probe,"x");File.Delete(probe);}
-  catch(Exception e){throw new HakDbException("io","Không ghi được vào thư mục sao lưu \""+root+"\" ("+FsReason(e)+"). Chọn thư mục khác.");}
+  catch(Exception e){throw new HakDbException("io","Không ghi được vào thư mục sao lưu đã chọn ("+FsReason(e)+"). Chọn thư mục khác.");}
   Dictionary<string,object> r;
   try{r=db.Backup(dest);}
   catch(HakDbException e){if(e.Code=="bad-request")throw;throw new HakDbException("io",(e.Message.IndexOf("disk",StringComparison.OrdinalIgnoreCase)>=0||e.Message.IndexOf("full",StringComparison.OrdinalIgnoreCase)>=0)?"Ổ đĩa đầy, không ghi được bản sao lưu. Giải phóng dung lượng hoặc chọn ổ khác.":"Không ghi được bản sao lưu ("+FsReason(e)+").");}
   string integrity="ok";
-  try{using(var chk=HakDb.Open(dest,SchemaSqlText())){var c=chk.Check();if(!(bool)c["ok"])integrity="không đạt";}}catch(Exception e){integrity="không mở được: "+e.Message;}
+  try{using(var chk=HakDb.Open(dest,SchemaSqlText())){var c=chk.Check();if(!(bool)c["ok"])integrity="không đạt";}}catch(Exception e){integrity="không mở được: "+HidePaths(e.Message);}
   if(integrity!="ok"){try{File.Delete(dest);}catch{}throw new HakDbException("io","Bản sao lưu vừa ghi không đạt kiểm tra toàn vẹn ("+integrity+"), đã xóa bản đó. Dữ liệu gốc không bị ảnh hưởng.");}
   var removed=new List<string>();int keep=0;try{keep=Convert.ToInt32(Get(data,"keep",0));}catch{keep=0;}
-  if(keep>=1){var mine=new List<string>();foreach(var f in Directory.GetFiles(root)){var n=Path.GetFileName(f);if(AutoBackupName.IsMatch(n))mine.Add(n);}
-   mine.Sort(StringComparer.Ordinal);mine.Reverse();
-   for(int i=keep;i<mine.Count;i++){try{File.Delete(Path.Combine(root,mine[i]));removed.Add(mine[i]);}catch{}}}
+  if(keep>=1){var mine=new List<FileInfo>();foreach(var f in Directory.GetFiles(root)){var n=Path.GetFileName(f);if(AutoBackupName.IsMatch(n))mine.Add(new FileInfo(f));}
+   /* L-25: xoay vòng theo LastWriteTimeUtc (mới nhất giữ lại), không theo tên — đổi đồng hồ / đổi tên tệp không làm xóa nhầm bản mới; trùng giờ thì so tên. */
+   mine.Sort(delegate(FileInfo a,FileInfo b){int c=b.LastWriteTimeUtc.CompareTo(a.LastWriteTimeUtc);return c!=0?c:String.CompareOrdinal(b.Name,a.Name);});
+   for(int i=keep;i<mine.Count;i++){try{File.Delete(mine[i].FullName);removed.Add(mine[i].Name);}catch{}}}
   var res=new Dictionary<string,object>();foreach(var kv in r)res[kv.Key]=kv.Value;res["integrity"]=integrity;res["removed"]=removed;res["dir"]=root;res["keep"]=keep;return res;
  }
  static async Task HandleDb(Stream stream,string method,string path,Dictionary<string,string> headers,bool cors){
@@ -156,8 +159,8 @@ class HAKDocs {
      else{code=404;resp=DbErr("bad-request","Không có điểm cuối "+path,null);}
     }
    }
-  }catch(HakDbException e){code=e.Code=="conflict"||e.Code=="fk"||e.Code=="unique"?409:e.Code=="scope"?403:e.Code=="bad-request"?400:500;resp=DbErr(e.Code,e.Message,e.Extra);}
-  catch(Exception e){code=500;resp=DbErr("io",e.Message,null);}
+  }catch(HakDbException e){code=e.Code=="conflict"||e.Code=="fk"||e.Code=="unique"?409:e.Code=="scope"?403:e.Code=="bad-request"?400:500;resp=DbErr(e.Code,HidePaths(e.Message),e.Extra);}
+  catch(Exception e){code=500;resp=DbErr("io",HidePaths(e.Message),null);}
   await Reply(stream,code,resp,cors);
  }
  static object Get(Dictionary<string,object> d,string k,object fallback){object v;return d.TryGetValue(k,out v)?v:fallback;}
@@ -188,7 +191,7 @@ class HAKDocs {
     else {var bytes=Convert.FromBase64String((string)Get(data,"base64",""));
     var job=Read(bytes,Convert.ToInt32(Get(data,"from",1)),Convert.ToInt32(Get(data,"to",0)),(string)Get(data,"language",""),(string)Get(data,"kind","document"));
     response=await job;}
-   }catch(Exception e){responseCode=400;response=new{error=e.Message};}finally{gate.Release();}
+   }catch(Exception e){responseCode=400;response=new{error=HidePaths(e.Message)};}finally{gate.Release();}
    await Reply(stream,responseCode,response,origin=="null");
   }
  }

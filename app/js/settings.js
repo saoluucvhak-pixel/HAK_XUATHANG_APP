@@ -122,11 +122,13 @@
     String(x || '')
       .trim()
       .toLowerCase();
+  /** N-03: cấu hình đã được lưu ở cửa sổ / tab khác sau lúc trang này nạp → không ghi đè. */
+  const CONFLICT_MSG = 'Cài đặt đã được lưu ở cửa sổ / tab khác — chưa ghi đè. Hãy tải lại trang (F5) rồi nhập lại thay đổi.';
   /** Lưu cấu hình + cập nhật các ô chọn ở các trang. */
   function commit(msg) {
     const ok = C().save();
     if (HAK.Pages) HAK.Pages.refreshSelects();
-    toast(ok ? msg : 'Không lưu được — bộ nhớ trình duyệt đầy hoặc bị chặn.', ok ? 'success' : 'error');
+    toast(ok ? msg : C().conflict ? CONFLICT_MSG : 'Không lưu được — bộ nhớ trình duyệt đầy hoặc bị chặn.', ok ? 'success' : 'error');
     return ok;
   }
   /** Nút Xóa: lần 1 kiểm tra nơi đang dùng (đang dùng → chặn), không dùng → chờ bấm lần 2. */
@@ -583,7 +585,7 @@
         C().data.warehouses = valid.warehouses;
         C().data.general = Object.assign(C().data.general, valid.general || {});
         if (Array.isArray(valid.carrierCodes)) C().data.carrierCodes = valid.carrierCodes;
-        C().save();
+        if (!C().save()) throw new Error(C().conflict ? CONFLICT_MSG : 'Không lưu được cấu hình.');
         HAK.Settings.render();
         HAK.Pages.refreshSelects();
         toast('Đã nhập cấu hình.', 'success');
@@ -666,6 +668,8 @@
   }
 
   HAK.Settings = {
+    /** N-06: Cài đặt chung đang sửa dở chưa lưu (dùng cho cảnh báo khi đóng / tải lại trang). */
+    hasUnsaved: () => !!gDirty,
     init() {
       $('#btnAddCarrier').addEventListener('click', () => carrierForm(-1));
       $('#btnAddCompany').addEventListener('click', () => companyForm(-1));

@@ -45,7 +45,7 @@ function backupToDir(db, body, clean) {
     fs.mkdirSync(root, { recursive: true });
     fs.accessSync(root, fs.constants.W_OK);
   } catch (e) {
-    throw new HakDbError('io', 'Không ghi được vào thư mục sao lưu "' + root + '" (' + fsReason(e) + '). Chọn thư mục khác.');
+    throw new HakDbError('io', 'Không ghi được vào thư mục sao lưu đã chọn (' + fsReason(e) + '). Chọn thư mục khác.');
   }
   let r;
   try {
@@ -75,11 +75,13 @@ function backupToDir(db, body, clean) {
   const removed = [];
   const keep = Number.isInteger(body.keep) && body.keep >= 1 ? body.keep : 0;
   if (keep) {
+    // L-25: xoay vòng theo thời điểm ghi (mới nhất giữ lại), không theo tên; trùng thời điểm thì so tên — giống HAKDocs.cs
     const mine = fs
       .readdirSync(root)
       .filter((f) => AUTO_NAME.test(f))
-      .sort()
-      .reverse();
+      .map((f) => ({ f, t: fs.statSync(path.join(root, f)).mtimeMs }))
+      .sort((x, y) => y.t - x.t || (x.f < y.f ? 1 : x.f > y.f ? -1 : 0))
+      .map((x) => x.f);
     for (const f of mine.slice(keep)) {
       try {
         fs.rmSync(path.join(root, f), { force: true });
