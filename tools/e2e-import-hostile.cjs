@@ -68,7 +68,7 @@ const XSS = '<img src=x onerror=window.__xss=1>';
           updatedAt: Date.now(),
           modes: ['word', XSS],
         },
-        data: JSON.stringify({ rows: [], excluded: [], params: {} }),
+        data: 'raw:' + JSON.stringify({ rows: [], excluded: [], params: {} }), // đúng định dạng hồ sơ thật (tiền tố raw:); thiếu tiền tố thì L-12 từ chối cả bản sao lưu trước khi tới phần kiểm XSS
       },
       {
         meta: {
@@ -83,7 +83,7 @@ const XSS = '<img src=x onerror=window.__xss=1>';
           updatedAt: Date.now(),
           modes: ['word', XSS],
         },
-        data: JSON.stringify({ rows: [], excluded: [], params: {} }),
+        data: 'raw:' + JSON.stringify({ rows: [], excluded: [], params: {} }), // đúng định dạng hồ sơ thật (tiền tố raw:); thiếu tiền tố thì L-12 từ chối cả bản sao lưu trước khi tới phần kiểm XSS
       },
     ],
     batches: [
@@ -128,6 +128,10 @@ const XSS = '<img src=x onerror=window.__xss=1>';
   }, JSON.stringify(hostileBackup));
 
   check(res.evilKey === null, 'khóa lạ hak.evil.key bị chặn không ghi vào Store');
+  check(
+    res.metas.some((m) => m.id === 'hs-safe-xss'),
+    'lần khôi phục THỰC SỰ chạy: hồ sơ hợp lệ hs-safe-xss (chỉ có trường text độc) được nhập, để các kiểm tra XSS bên dưới có ý nghĩa'
+  );
   check(
     !res.metas.some((m) => m.id.includes('<img')),
     'meta có id chứa HTML bị loại khỏi Lưu trữ',

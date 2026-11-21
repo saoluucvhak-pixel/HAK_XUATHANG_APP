@@ -8,6 +8,7 @@
     "release": "node tools/build-release.cjs",
     "lint": "eslint app/js",
     "smoke": "node tools/smoke.cjs",
+    "verify": "npm run check && npm run format:check && npm run lint && npm test && npm run smoke",
     "format": "prettier --write \"app/js/**/*.js\" \"tests/*.cjs\" \"tools/*.cjs\" \"tools/hakdb/*.cjs\" \"eslint.config.cjs\"",
     "format:check": "prettier --check \"app/js/**/*.js\" \"tests/*.cjs\" \"tools/*.cjs\" \"tools/hakdb/*.cjs\" \"eslint.config.cjs\"",
     "ui-audit": "node tools/ui-audit.cjs",
