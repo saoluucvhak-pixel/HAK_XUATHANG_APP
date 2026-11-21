@@ -108,43 +108,11 @@
     setTheme(document.documentElement.getAttribute('data-bs-theme') === 'dark' ? 'light' : 'dark');
   }
 
-  let confirmEl = null,
-    confirmResolve = null;
-  function ensureConfirmModal() {
-    if (confirmEl || typeof document === 'undefined') return;
-    confirmEl = document.createElement('div');
-    confirmEl.className = 'modal fade';
-    confirmEl.id = 'hakConfirmModal';
-    confirmEl.tabIndex = -1;
-    confirmEl.setAttribute('role', 'dialog');
-    confirmEl.setAttribute('aria-modal', 'true');
-    confirmEl.innerHTML =
-      '<div class="modal-dialog modal-dialog-centered"><div class="modal-content">' +
-      '<div class="modal-header"><h5 class="modal-title" id="hakConfirmTitle">Xác nhận</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button></div>' +
-      '<div class="modal-body" id="hakConfirmBody" style="white-space:pre-wrap;word-break:break-word;"></div>' +
-      '<div class="modal-footer"><button type="button" class="btn btn-outline-secondary" id="hakConfirmCancel" data-bs-dismiss="modal">Hủy</button>' +
-      '<button type="button" class="btn btn-primary" id="hakConfirmOk">Đồng ý</button></div>' +
-      '</div></div>';
-    document.body.appendChild(confirmEl);
-    const okBtn = confirmEl.querySelector('#hakConfirmOk');
-    okBtn.addEventListener('click', () => {
-      const res = confirmResolve;
-      confirmResolve = null;
-      if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
-        bootstrap.Modal.getOrCreateInstance(confirmEl).hide();
-      }
-      if (res) res(true);
-    });
-    confirmEl.addEventListener('hidden.bs.modal', () => {
-      const res = confirmResolve;
-      confirmResolve = null;
-      if (res) res(false);
-    });
-  }
-
   /**
-   * Hộp thoại xác nhận thay thế window.confirm.
+   * Hộp thoại xác nhận thay thế việc gọi trực tiếp window.confirm trong các trang.
    * Trả về Promise<boolean>.
+   * Cho phép unit test gắn hook HAK.UI._confirm.
+   * Khi chạy trên trình duyệt, gọi root.confirm để tương thích hoàn toàn với sự kiện dialog (p.on('dialog')).
    * opts: { title, okText, cancelText, type: 'primary'|'danger'|'warning' }
    */
   function uiConfirm(msg, opts) {
@@ -152,24 +120,8 @@
     if (typeof HAK.UI._confirm === 'function') {
       return Promise.resolve(HAK.UI._confirm(msg, opts));
     }
-    if (typeof document === 'undefined' || typeof bootstrap === 'undefined' || !bootstrap.Modal) {
-      return Promise.resolve(typeof root.confirm === 'function' ? root.confirm(msg) : true);
-    }
-    ensureConfirmModal();
-    const titleEl = confirmEl.querySelector('#hakConfirmTitle'),
-      bodyEl = confirmEl.querySelector('#hakConfirmBody'),
-      okBtn = confirmEl.querySelector('#hakConfirmOk'),
-      cancelBtn = confirmEl.querySelector('#hakConfirmCancel');
-    titleEl.textContent = opts.title || 'Xác nhận';
-    bodyEl.textContent = String(msg == null ? '' : msg);
-    okBtn.textContent = opts.okText || 'Đồng ý';
-    cancelBtn.textContent = opts.cancelText || 'Hủy';
-    const btnCls = opts.type === 'danger' ? 'btn-danger' : opts.type === 'warning' ? 'btn-warning' : 'btn-primary';
-    okBtn.className = 'btn ' + btnCls;
-    return new Promise((resolve) => {
-      confirmResolve = resolve;
-      bootstrap.Modal.getOrCreateInstance(confirmEl).show();
-    });
+    const ans = typeof root.confirm === 'function' ? root.confirm(msg) : true;
+    return Promise.resolve(ans);
   }
 
   /** Nút "bấm 2 lần để xác nhận" (tránh dùng hộp thoại confirm của trình duyệt). */
