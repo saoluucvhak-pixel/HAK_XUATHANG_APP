@@ -37,7 +37,7 @@
   /** Số theo kiểu hải quan Việt: "1.078.598,4" · "27.584.832.000" · "551696640" · "6.000". */
   function vn(s) {
     const raw = String(s == null ? '' : s);
-    let t = raw.replace(/[^\d.,\-]/g, '');
+    let t = raw.replace(/[−‒–—]/g, '-').replace(/[^\d.,\-]/g, '');
     if (!/\d/.test(t)) return null;
     if (/^-?0\.\d+$/.test(t)) return Number(t); // "0.500" luôn là số thập phân (không có nhóm nghìn nào bắt đầu bằng 0)
     if (/^-?\d+$/.test(t)) return Number(t);

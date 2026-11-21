@@ -1,5 +1,10 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.25.10 — Rà soát độc lập: nhập liệu, sao lưu, giao diện
+- **Nhập liệu:** biển số có chữ Đ (43Đ / 43D) nay là MỘT xe trong Bảng kê lâm sản; lọc số phiếu từ–đến hiểu đúng "7998/2026/XK" (số 7998, không phải năm 2026); giờ có SA/CH, dấu phẩy hay NBSP không còn rơi về 00:00 hoặc lệch 12 giờ; dấu trừ Unicode (U+2212) trong tờ khai không còn đổi thành số dương; số phiếu khác khoảng trắng gộp thành một phiếu. Quy tắc 26–36 không đổi; lựa chọn bỏ tay cũ vẫn khớp.
+- **Sao lưu:** xoay vòng SQLite không còn xóa chính bản vừa ghi khi có bản cũ mang giờ ở tương lai; khôi phục giữ lại danh sách hồ sơ bỏ tick ở Báo cáo; đồng hồ máy lệch không còn chặn lịch tự sao lưu. (Phần tương ứng trong HAKDocs.exe chưa sửa — chờ kiểm trên Windows.)
+- **Giao diện:** Enter trên nút "Bỏ đính kèm" không còn bấm Lưu; lỗi tải hiện bằng tiếng Việt; tệp Excel hỏng báo câu tiếng Việt; menu di động đóng thì không nhận Tab; nút đóng có nhãn cho trình đọc màn hình.
+
 ## v2.25.9 — U-06: nhật ký đồng bộ Google Sheet
 - **Nhật ký đồng bộ lô phiếu (U-06):** mỗi lần đồng bộ ghi lại thời điểm, số lô / phiếu và số dòng **thêm / xóa / cập nhật** trên Sheet (20 lần gần nhất, mới nhất trước; lần dừng giữa chừng cũng được ghi kèm lỗi). Dòng trạng thái ở Báo cáo và Cài đặt › Chung hiện "(thêm X, xóa Y, cập nhật Z dòng trên Sheet)" để thấy ngay khi một lần đồng bộ đã xóa dòng. Cấu hình cũ chưa có nhật ký vẫn dùng được; gói cấu hình và sao lưu không đổi định dạng.
 - Không đổi hành vi gửi: bộ lọc kỳ vẫn hỏi xác nhận trước khi xóa dòng ngoài kỳ (L-01); lựa chọn D-01 vẫn chờ chủ dự án.

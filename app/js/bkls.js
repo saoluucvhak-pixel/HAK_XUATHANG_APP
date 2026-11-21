@@ -250,6 +250,9 @@
   const fmtIntVN = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   const plateKey = (x) =>
     String(x || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[đĐ]/g, 'D')
       .toUpperCase()
       .replace(/[^0-9A-Z]/g, '');
   const NO_DV = '………';

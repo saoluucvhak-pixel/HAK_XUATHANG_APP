@@ -78,11 +78,11 @@ function backupToDir(db, body, clean) {
     // L-25: xoay vòng theo thời điểm ghi (mới nhất giữ lại), không theo tên; trùng thời điểm thì so tên — giống HAKDocs.cs
     const mine = fs
       .readdirSync(root)
-      .filter((f) => AUTO_NAME.test(f))
+      .filter((f) => AUTO_NAME.test(f) && f !== path.basename(dest)) // BK-1: không bao giờ xóa chính bản vừa ghi
       .map((f) => ({ f, t: fs.statSync(path.join(root, f)).mtimeMs }))
       .sort((x, y) => y.t - x.t || (x.f < y.f ? 1 : x.f > y.f ? -1 : 0))
       .map((x) => x.f);
-    for (const f of mine.slice(keep)) {
+    for (const f of mine.slice(Math.max(0, keep - 1))) {
       try {
         fs.rmSync(path.join(root, f), { force: true });
         removed.push(f);

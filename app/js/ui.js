@@ -63,7 +63,7 @@
       '</div>' +
       '<button type="button" class="btn-close ' +
       (type === 'warning' ? '' : 'btn-close-white') +
-      ' me-2 m-auto" data-bs-dismiss="toast"></button></div>';
+      ' me-2 m-auto" data-bs-dismiss="toast" aria-label="Đóng thông báo"></button></div>';
     $('#toasts').appendChild(el);
     const t = new bootstrap.Toast(el, { delay: ms || (type === 'error' ? 8000 : 4500) });
     el.addEventListener('hidden.bs.toast', () => el.remove());

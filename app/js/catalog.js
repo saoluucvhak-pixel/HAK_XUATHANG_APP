@@ -632,7 +632,7 @@
       'Danh mục nằm trong <b>Sao lưu toàn bộ</b>.</div></div>' +
       '</div></div>' +
       '<div class="modal fade" id="catModal" tabindex="-1"><div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content">' +
-      '<div class="modal-header"><h5 class="modal-title" id="catModalTitle"></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>' +
+      '<div class="modal-header"><h5 class="modal-title" id="catModalTitle"></h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button></div>' +
       '<div class="modal-body"><div class="alert alert-danger py-2 px-3 small mb-3 d-none" role="alert" id="catErr"></div><div class="row g-3" id="catForm"></div></div>' +
       '<div class="modal-footer"><button class="btn btn-outline-secondary" data-bs-dismiss="modal" type="button">Hủy</button><button class="btn btn-primary" id="catSave" type="button">Lưu</button></div>' +
       '</div></div></div>';
@@ -663,7 +663,7 @@
     $('#catForm').addEventListener('input', onFormInput);
     $('#catForm').addEventListener('change', onFormInput);
     $('#catForm').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
+      if (e.key === 'Enter' && !/^(TEXTAREA|BUTTON|A)$/.test(e.target.tagName)) {
         e.preventDefault();
         $('#catSave').click();
       }

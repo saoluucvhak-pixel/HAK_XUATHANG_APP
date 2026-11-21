@@ -154,8 +154,8 @@
   function applyAmPm(hh, ampm) {
     if (!ampm) return hh;
     const u = ampm.toUpperCase();
-    if (u === 'AM') return hh === 12 ? 0 : hh;
-    if (u === 'PM') return hh < 12 ? hh + 12 : hh;
+    if (u === 'AM' || u === 'SA') return hh === 12 ? 0 : hh;
+    if (u === 'PM' || u === 'CH') return hh < 12 ? hh + 12 : hh;
     return hh;
   }
   function parseDT(v, is1904) {
@@ -175,7 +175,7 @@
     if (typeof v === 'number') return v >= 0 ? serialToParts(v, is1904) : null;
     const chk = (p) => (validParts(p) ? p : null);
     const s = String(v).trim();
-    let m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})(?:[ T]+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?)?/i);
+    let m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})(?:[ T\u00a0,]+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM|SA|CH)?)?/i);
     if (m) {
       const hh = m[4] !== undefined ? applyAmPm(+m[4], m[7]) : 0;
       if (m[7] && (+m[4] < 1 || +m[4] > 12)) return null;
@@ -190,7 +190,7 @@
         hasTime: m[4] !== undefined,
       });
     }
-    m = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})(?:[ T]+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?)?/i);
+    m = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})(?:[ T\u00a0,]+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM|SA|CH)?)?/i);
     if (m) {
       const hh = m[4] !== undefined ? applyAmPm(+m[4], m[7]) : 0;
       if (m[7] && (+m[4] < 1 || +m[4] > 12)) return null;
@@ -205,7 +205,7 @@
         hasTime: m[4] !== undefined,
       });
     }
-    m = s.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?$/i);
+    m = s.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM|SA|CH)?$/i);
     if (m) {
       if (m[4] && (+m[1] < 1 || +m[1] > 12)) return null;
       return { y: 0, m: 0, d: 0, hh: applyAmPm(+m[1], m[4]), mm: +m[2], ss: +(m[3] || 0), hasDate: false, hasTime: true };
@@ -267,7 +267,16 @@
               if (onProgress) onProgress(100);
               resolve({ workbook: wb, sheetNames: wb.SheetNames.slice(), fileName: file.name, size: file.size });
             } catch (e) {
-              reject(new Error('File không phải Excel hợp lệ hoặc vượt giới hạn: ' + e.message));
+              console.error(e);
+              // giữ thông báo tiếng Việt của app (vd. giới hạn zip); lỗi thô của thư viện (tiếng Anh) chỉ ghi Console
+              const vi = /[àáảãạăâđêôơưèéẻẽẹìíòóõọùúũụỳýỹỵ]/i.test(e && e.message);
+              reject(
+                new Error(
+                  vi
+                    ? 'File không phải Excel hợp lệ hoặc vượt giới hạn: ' + e.message
+                    : 'File không phải Excel hợp lệ (hoặc hỏng). Mở bằng Excel, lưu lại dạng .xlsx rồi nhập lại.'
+                )
+              );
             }
           }, 30);
         } catch (e) {
