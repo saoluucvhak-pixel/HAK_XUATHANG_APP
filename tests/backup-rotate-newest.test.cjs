@@ -1,3 +1,4 @@
+if (require('./helpers/needs-sqlite.cjs')()) return;
 // BK-1: xoay vòng SQLite xóa chính bản vừa ghi khi có bản cũ mang mtime ở tương lai (đồng hồ chỉnh lùi / sao chép từ máy khác)
 const { test } = require('node:test'),
   assert = require('node:assert/strict');
