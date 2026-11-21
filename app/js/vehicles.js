@@ -362,4 +362,25 @@
     },
   };
   HAK.Vehicles.loadSaved();
+
+  /* ---------------------------------------------------------------
+   * U-04: Module HAK.Identity dùng chung
+   * ------------------------------------------------------------- */
+  HAK.Identity = HAK.Identity || {};
+  Object.assign(HAK.Identity, {
+    normPlate,
+    plateKey: normPlate,
+    normTicket: (s) =>
+      String(s == null ? '' : s)
+        .trim()
+        .replace(/^["'“”‘’]+|["'“”‘’]+$/g, ''),
+    normContractId: (id) =>
+      String(id == null ? '' : id)
+        .trim()
+        .toLowerCase(),
+    normCompanyId: (id) =>
+      String(id == null ? '' : id)
+        .trim()
+        .toLowerCase(),
+  });
 })(typeof window !== 'undefined' ? window : globalThis);

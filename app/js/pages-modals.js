@@ -690,4 +690,11 @@
   HAK.PagesModals.parseTicketTokens = parseTicketTokens;
   HAK.PagesModals.resolveTicket = resolveTicket;
   HAK.PagesModals.splitMissing = splitMissing;
+  HAK.Identity = HAK.Identity || {};
+  Object.assign(HAK.Identity, {
+    normTicketToken,
+    parseTicketTokens,
+    resolveTicket,
+    splitMissing,
+  });
 })(window);

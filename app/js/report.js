@@ -1740,6 +1740,47 @@
     draw();
   }
 
+  function checkGsyncScope(allMetas, curLots, curOpts) {
+    curOpts = curOpts || {};
+    const scoped = curOpts.scope ? allMetas.filter((m) => curOpts.scope.indexOf(HAK.Auth.companyOfMeta(m)) >= 0) : allMetas;
+    const fullModel = compute(scoped, {
+      scope: curOpts.scope || null,
+      manual: curOpts.manual,
+      basis: 'start',
+      tickets: ticketMapAll || curOpts.tickets,
+    });
+    const fullLots = new Map(
+      xhLots(fullModel.used, { scope: curOpts.scope || null })
+        .lots.filter((L) => L.recs.length && L.type !== 'traodoi')
+        .map((L) => [L.key, L])
+    );
+    const partial = [];
+    let totalCurTrips = 0,
+      totalFullTrips = 0,
+      totalMissingTrips = 0;
+    (curLots || []).forEach((L) => {
+      const full = fullLots.get(L.key);
+      const curT = L.trips || 0;
+      const fullT = full ? full.trips || 0 : curT;
+      totalCurTrips += curT;
+      totalFullTrips += Math.max(curT, fullT);
+      if (full && (fullT > curT || full.recs.length > L.recs.length)) {
+        const missingTrips = Math.max(0, fullT - curT);
+        const missingRecs = Math.max(0, full.recs.length - L.recs.length);
+        totalMissingTrips += missingTrips;
+        partial.push({
+          key: L.key,
+          label: (L.c && L.c.no) || L.ship || L.key,
+          curTrips: curT,
+          fullTrips: fullT,
+          missingTrips,
+          missingRecs,
+        });
+      }
+    });
+    return { partial, totalCurTrips, totalFullTrips, totalMissingTrips };
+  }
+
   function init() {
     if (!$('#page-report')) return;
     if (HAK.Customs && HAK.Customs.initReport) HAK.Customs.initReport();
@@ -1890,46 +1931,6 @@
         toast(e.message || String(e), 'error');
       }
     });
-    function checkGsyncScope(allMetas, curLots, curOpts) {
-      curOpts = curOpts || {};
-      const scoped = curOpts.scope ? allMetas.filter((m) => curOpts.scope.indexOf(HAK.Auth.companyOfMeta(m)) >= 0) : allMetas;
-      const fullModel = compute(scoped, {
-        scope: curOpts.scope || null,
-        manual: curOpts.manual,
-        basis: 'start',
-        tickets: ticketMapAll || curOpts.tickets,
-      });
-      const fullLots = new Map(
-        xhLots(fullModel.used, { scope: curOpts.scope || null })
-          .lots.filter((L) => L.recs.length && L.type !== 'traodoi')
-          .map((L) => [L.key, L])
-      );
-      const partial = [];
-      let totalCurTrips = 0,
-        totalFullTrips = 0,
-        totalMissingTrips = 0;
-      (curLots || []).forEach((L) => {
-        const full = fullLots.get(L.key);
-        const curT = L.trips || 0;
-        const fullT = full ? full.trips || 0 : curT;
-        totalCurTrips += curT;
-        totalFullTrips += Math.max(curT, fullT);
-        if (full && (fullT > curT || full.recs.length > L.recs.length)) {
-          const missingTrips = Math.max(0, fullT - curT);
-          const missingRecs = Math.max(0, full.recs.length - L.recs.length);
-          totalMissingTrips += missingTrips;
-          partial.push({
-            key: L.key,
-            label: (L.c && L.c.no) || L.ship || L.key,
-            curTrips: curT,
-            fullTrips: fullT,
-            missingTrips,
-            missingRecs,
-          });
-        }
-      });
-      return { partial, totalCurTrips, totalFullTrips, totalMissingTrips };
-    }
     $('#repGsXH').addEventListener('click', (e) => {
       const { toast, Loading } = HAK.UI;
       if (!HAK.GSync) return;
@@ -2075,6 +2076,33 @@
     });
   }
 
+  /* ---------------------------------------------------------------
+   * U-08: Đóng gói createReportEngine độc lập, có thể tái sử dụng
+   * ------------------------------------------------------------- */
+  function createReportEngine(options) {
+    const opts = options || {};
+    const engineTicketCache = opts.ticketCache || new Map();
+    const manualOffKey = opts.manualOffKey || OFF_KEY;
+    return {
+      compute: (metas, computeOpts) => compute(metas, Object.assign({}, computeOpts, { ticketCache: engineTicketCache, manualOffKey })),
+      prepareTickets: (metas, prepOpts) => prepareTickets(metas, Object.assign({}, prepOpts, { ticketCache: engineTicketCache })),
+      xhLots: (metas, xhOpts) => xhLots(metas, Object.assign({}, xhOpts, { ticketCache: engineTicketCache })),
+      xhTrips: (lots, xhTripsOpts) => xhTrips(lots, xhTripsOpts),
+      xhSheetRows: (trips, xhRowsOpts) => xhSheetRows(trips, xhRowsOpts),
+      checkGsyncScope: (lots, scopeOpts) => checkGsyncScope(lots, scopeOpts),
+      ticketCache: engineTicketCache,
+      TYPES,
+      HAS_RET,
+      monthOf,
+      dayTs,
+      dmyToTs,
+      isoToTs,
+      UNKNOWN_DATE,
+    };
+  }
+
+  HAK.createReportEngine = createReportEngine;
+
   HAK.Report = {
     newWorkbook,
     buildSheet,
@@ -2098,6 +2126,7 @@
     xhSheetRows,
     toExcelXuatHang,
     ticketCache,
+    createReportEngine,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = HAK.Report;
 })(typeof window !== 'undefined' ? window : globalThis);

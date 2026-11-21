@@ -215,6 +215,85 @@
       }
     });
   }
+
+  /* ---------- U-05: Khung kiểm tra form mức ô (Cell-level Form Validation) ---------- */
+  const Validation = {
+    validateCell(val, rules, fieldName) {
+      const name = fieldName || 'Trường này';
+      const s = String(val == null ? '' : val).trim();
+      const list = Array.isArray(rules) ? rules : [rules];
+      for (const r of list) {
+        if (!r) continue;
+        if (r === 'required' || (typeof r === 'object' && r.required)) {
+          if (!s) return { valid: false, error: (typeof r === 'object' && r.message) || name + ' không được để trống.' };
+        }
+        if (s && (r === 'number' || (typeof r === 'object' && r.number))) {
+          const n = Number(s.replace(/,/g, ''));
+          if (!Number.isFinite(n)) return { valid: false, error: (typeof r === 'object' && r.message) || name + ' phải là số hợp lệ.' };
+          if (typeof r === 'object') {
+            if (r.min !== undefined && n < r.min) return { valid: false, error: r.message || name + ' không được nhỏ hơn ' + r.min + '.' };
+            if (r.max !== undefined && n > r.max) return { valid: false, error: r.message || name + ' không được lớn hơn ' + r.max + '.' };
+            if (r.integer && !Number.isInteger(n)) return { valid: false, error: r.message || name + ' phải là số nguyên.' };
+          }
+        }
+        if (s && typeof r === 'object') {
+          if (r.maxlength && s.length > r.maxlength) {
+            return { valid: false, error: r.message || name + ' không được vượt quá ' + r.maxlength + ' ký tự.' };
+          }
+          if (r.regex instanceof RegExp && !r.regex.test(s)) {
+            return { valid: false, error: r.message || name + ' định dạng không hợp lệ.' };
+          }
+          if (typeof r.custom === 'function') {
+            const res = r.custom(val, s);
+            if (res === false) return { valid: false, error: r.message || name + ' không hợp lệ.' };
+            if (typeof res === 'string') return { valid: false, error: res };
+          }
+        }
+      }
+      return { valid: true };
+    },
+
+    applyFieldStatus(inputEl, result) {
+      if (!inputEl) return;
+      if (!result || result.valid) {
+        inputEl.classList.remove('is-invalid');
+        inputEl.classList.add('is-valid');
+        const fb = inputEl.parentElement ? inputEl.parentElement.querySelector('.invalid-feedback') : null;
+        if (fb) fb.textContent = '';
+      } else {
+        inputEl.classList.remove('is-valid');
+        inputEl.classList.add('is-invalid');
+        let fb = inputEl.parentElement ? inputEl.parentElement.querySelector('.invalid-feedback') : null;
+        if (!fb && inputEl.parentElement && typeof document !== 'undefined') {
+          fb = document.createElement('div');
+          fb.className = 'invalid-feedback';
+          inputEl.parentElement.appendChild(fb);
+        }
+        if (fb) fb.textContent = result.error || 'Giá trị không hợp lệ.';
+      }
+    },
+
+    validateForm(formEl, schema) {
+      const errors = {};
+      let count = 0;
+      if (!formEl || !schema) return { valid: true, errors, count: 0 };
+      for (const [selector, rules] of Object.entries(schema)) {
+        const input = typeof selector === 'string' && formEl.querySelector ? formEl.querySelector(selector) : selector;
+        if (!input) continue;
+        const val = input.value;
+        const name = (input.getAttribute && input.getAttribute('placeholder')) || input.name || input.id || 'Trường này';
+        const res = this.validateCell(val, rules, name);
+        this.applyFieldStatus(input, res);
+        if (!res.valid) {
+          errors[selector] = res.error;
+          count++;
+        }
+      }
+      return { valid: count === 0, errors, count };
+    },
+  };
+  HAK.Validation = Validation;
+
   HAK.UI = {
     $,
     $$,
@@ -230,5 +309,9 @@
     todayISO,
     loadScript,
     needLib,
+    Validation,
+    validateCell: Validation.validateCell.bind(Validation),
+    validateForm: Validation.validateForm.bind(Validation),
+    applyFieldStatus: Validation.applyFieldStatus.bind(Validation),
   };
-})(window);
+})(typeof window !== 'undefined' ? window : globalThis);
