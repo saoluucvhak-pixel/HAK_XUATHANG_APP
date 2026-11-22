@@ -1,5 +1,10 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.25.11 — Tách dữ liệu theo công ty (quy tắc 36)
+- **Sao lưu Lưu trữ (.json):** nhân viên giới hạn một công ty chỉ xuất hồ sơ thuộc công ty đó (trước đây file chứa cả hồ sơ công ty khác). Huy hiệu menu và số đếm "x / y hồ sơ" cũng chỉ tính hồ sơ trong phạm vi.
+- **Nhật ký Chứng từ, Tìm kiếm (Ctrl+K), Tổng quan:** chứng từ đã lập và số "Hồ sơ đã xuất" chỉ gồm công ty đang xem (bật "Xem tất cả công ty" thì thấy đủ như trước). Bản ghi cũ chưa gắn công ty vẫn hiển thị.
+- Không đổi quy tắc 26–36; không đổi dữ liệu đã lưu. DA-3 / DA-5 (trạng thái hợp đồng theo công tắc Báo cáo; Tổng quan chưa trừ hồ sơ bỏ tick) vẫn chờ chủ dự án quyết.
+
 ## v2.25.10 — Rà soát độc lập: nhập liệu, sao lưu, giao diện
 - **Nhập liệu:** biển số có chữ Đ (43Đ / 43D) nay là MỘT xe trong Bảng kê lâm sản; lọc số phiếu từ–đến hiểu đúng "7998/2026/XK" (số 7998, không phải năm 2026); giờ có SA/CH, dấu phẩy hay NBSP không còn rơi về 00:00 hoặc lệch 12 giờ; dấu trừ Unicode (U+2212) trong tờ khai không còn đổi thành số dương; số phiếu khác khoảng trắng gộp thành một phiếu. Quy tắc 26–36 không đổi; lựa chọn bỏ tay cũ vẫn khớp.
 - **Sao lưu:** xoay vòng SQLite không còn xóa chính bản vừa ghi khi có bản cũ mang giờ ở tương lai; khôi phục giữ lại danh sách hồ sơ bỏ tick ở Báo cáo; đồng hồ máy lệch không còn chặn lịch tự sao lưu. (Phần tương ứng trong HAKDocs.exe chưa sửa — chờ kiểm trên Windows.)
