@@ -1211,7 +1211,9 @@
           (f.req ? ' req' : '') +
           '">' +
           esc(f.label) +
-          '</div><select class="form-select form-select-sm" data-map="' +
+          '</div><select class="form-select form-select-sm" aria-label="Cột nguồn cho ' +
+          esc(f.label) +
+          '" data-map="' +
           f.key +
           '">' +
           opts +
@@ -1343,13 +1345,20 @@
 
     // Điều hướng & menu di động
     window.addEventListener('hashchange', route);
-    $('#btnMenu').addEventListener('click', () => {
-      $('#sidebar').classList.toggle('open');
-      $('#sbBackdrop').classList.toggle('show');
+    const setMenu = (open) => {
+      $('#sidebar').classList.toggle('open', open);
+      $('#sbBackdrop').classList.toggle('show', open);
+      $('#btnMenu').setAttribute('aria-expanded', open ? 'true' : 'false');
+    };
+    $('#btnMenu').addEventListener('click', () => setMenu(!$('#sidebar').classList.contains('open')));
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && $('#sidebar').classList.contains('open')) {
+        setMenu(false);
+        $('#btnMenu').focus();
+      }
     });
     $('#sbBackdrop').addEventListener('click', () => {
-      $('#sidebar').classList.remove('open');
-      $('#sbBackdrop').classList.remove('show');
+      setMenu(false);
     });
     $('#btnTheme').addEventListener('click', toggleTheme);
     $('#btnThemeSb').addEventListener('click', toggleTheme);

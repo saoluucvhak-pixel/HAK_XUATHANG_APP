@@ -393,9 +393,12 @@ svg.i { width: 1.1em; height: 1.1em; vertical-align: -.18em; flex: none; }
 .zone-tab .zl b { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: .76rem; background: color-mix(in srgb, var(--muted) 14%, transparent); flex: none; }
 .zone-tab .zs { margin-left: auto; min-width: 20px; height: 20px; border-radius: 10px; font-size: .7rem; font-weight: 700; display: grid; place-items: center; padding: 0 6px; flex: none; }
 .zone-tab .zs:empty { display: none; }
-.zone-tab .zs.ok { background: rgba(47, 158, 68, .14); color: #2f9e44; }
-.zone-tab .zs.bad { background: rgba(224, 49, 49, .14); color: #e03131; }
-.zone-tab .zs.warn { background: rgba(245, 159, 0, .18); color: #c77700; }
+.zone-tab .zs.ok { background: rgba(47, 158, 68, .14); color: #1f7a35; }
+.zone-tab .zs.bad { background: rgba(224, 49, 49, .14); color: #b02525; }
+.zone-tab .zs.warn { background: rgba(245, 159, 0, .18); color: #8a5200; }
+[data-bs-theme="dark"] .zone-tab .zs.ok, [data-bs-theme="dark"] .hl-badge.hl-ok { color: #69db7c; }
+[data-bs-theme="dark"] .zone-tab .zs.bad, [data-bs-theme="dark"] .hl-badge.hl-bad { color: #ff8787; }
+[data-bs-theme="dark"] .zone-tab .zs.warn { color: #ffc078; }
 .zone-tab.active { background: var(--brand-soft); color: var(--ink); }
 .zone-tab.active .zl b { background: var(--brand); color: #fff; }
 [data-bs-theme="dark"] .zone-tab.active .zl b { color: #062c30; }
@@ -423,7 +426,7 @@ svg.i { width: 1.1em; height: 1.1em; vertical-align: -.18em; flex: none; }
 .hl-ok .dot { background: #2f9e44; } .hl-warn .dot { background: #f08c00; } .hl-bad .dot { background: #e03131; }
 .hl-item.hl-bad { border-color: rgba(224,49,49,.45); } .hl-item.hl-warn { border-color: rgba(240,140,0,.4); }
 .hl-badge { font-size: .72rem; font-weight: 700; padding: 2px 8px; border-radius: 10px; }
-.hl-badge.hl-ok { background: rgba(47,158,68,.14); color: #2f9e44; } .hl-badge.hl-warn { background: rgba(240,140,0,.16); color: #d9480f; } .hl-badge.hl-bad { background: rgba(224,49,49,.14); color: #e03131; }
+.hl-badge.hl-ok { background: rgba(47,158,68,.14); color: #1f7a35; } .hl-badge.hl-warn { background: rgba(240,140,0,.16); color: #d9480f; } .hl-badge.hl-bad { background: rgba(224,49,49,.14); color: #b02525; }
 [data-bs-theme="dark"] .hl-badge.hl-warn { color: #ffa94d; }
 .min-w-0 { min-width: 0; }
 
