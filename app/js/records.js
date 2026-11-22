@@ -252,6 +252,11 @@
       return m[1] + String(Number(m[2]) + 1).padStart(m[2].length, '0') + m[3];
     },
 
+    /** Chứng từ đã lập thuộc phạm vi công ty đang xem (quy tắc 36). Bản ghi cũ chưa có cid vẫn hiện (không giấu dữ liệu). */
+    scoped(key) {
+      const scope = HAK.Auth && HAK.Auth.scopeIds ? HAK.Auth.scopeIds(key || 'archive') : null;
+      return scope ? this.list.filter((r) => !r.cid || scope.indexOf(r.cid) >= 0) : this.list;
+    },
     /** Xung đột khi lập PXK: dải số chồng lên lần trước (cùng công ty) / cùng đợt đã lập PXK rồi. */
     checkPxk(o) {
       const out = [];

@@ -53,7 +53,7 @@
   /* ---------------- Cảnh báo ---------------- */
   function alerts() {
     const A = [],
-      issued = (HAK.Issued && HAK.Issued.list) || [],
+      issued = HAK.Issued ? HAK.Issued.scoped('archive') : [],
       CT = HAK.CHUNGTU || {};
     // 1. đợt chưa lập chứng từ
     const todo = [];
@@ -505,7 +505,7 @@
   function render() {
     const host = $('#dashBody');
     if (!host) return;
-    const issued = (HAK.Issued && HAK.Issued.list) || [];
+    const issued = HAK.Issued ? HAK.Issued.scoped('archive') : [];
     const bl = batchesList();
     const empty = !bl.length && !issued.length;
     $('#homeIntro').hidden = !empty;
@@ -668,7 +668,9 @@
     drawDelivered();
     if (HAK.Archive)
       HAK.Archive.list()
-        .then((l) => {
+        .then((l0) => {
+          const sc = HAK.Auth && HAK.Auth.scopeIds ? HAK.Auth.scopeIds('archive') : null;
+          const l = sc ? l0.filter((m) => sc.indexOf(HAK.Auth.companyOfMeta(m)) >= 0) : l0;
           const el = $('#dashArch');
           if (el)
             el.innerHTML =

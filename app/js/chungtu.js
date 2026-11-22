@@ -620,12 +620,12 @@
   let logSmart;
   function renderLog() {
     if (!HAK.Issued) return;
-    const all = HAK.Issued.list,
+    const all = HAK.Issued.scoped('archive'),
       F = HAK.Filters;
     if (!logSmart)
       logSmart = F.mount('#ctLogFilter', {
         screenId: 'document-log',
-        source: () => HAK.Issued.list,
+        source: () => HAK.Issued.scoped('archive'),
         fields: [
           F.multi(
             'kind',

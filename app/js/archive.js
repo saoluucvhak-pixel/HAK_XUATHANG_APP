@@ -585,7 +585,9 @@
     });
   }
   async function exportAll() {
-    const items = await collectItems();
+    // Chỉ hồ sơ trong phạm vi công ty / tài khoản đang xem (quy tắc 36): nhân viên giới hạn không được xuất hồ sơ công ty khác.
+    const inScope = scopeFilter();
+    const items = await collectItems((await list()).filter(inScope).map((m) => m.id));
     const blob = new Blob([JSON.stringify({ app: 'hak-bienban-archive', v: 1, exportedAt: new Date().toISOString(), items })], {
       type: 'application/json',
     });
@@ -654,7 +656,7 @@
 
   async function updateBadge() {
     try {
-      const n = (await getAll('meta')).length,
+      const n = (await getAll('meta')).filter(scopeFilter()).length,
         el = document.getElementById('archCount');
       if (el) {
         el.textContent = n ? String(n) : '';
@@ -776,11 +778,12 @@
       .join('');
     document.getElementById('archEmpty').classList.toggle('d-none', rows.length > 0);
     document.getElementById('archTableWrap').classList.toggle('d-none', rows.length === 0);
+    const total = archiveSource().length;
     document.getElementById('archCountInfo').innerHTML =
-      (rows.length === cache.length
-        ? cache.length.toLocaleString('vi-VN') + ' hồ sơ'
-        : rows.length.toLocaleString('vi-VN') + ' / ' + cache.length.toLocaleString('vi-VN') + ' hồ sơ') +
-      (cache.length > SOFT_WARN ? ' <span class="badge text-bg-warning" title="Nên Xuất & dọn hồ sơ cũ">nhiều — nên dọn</span>' : '');
+      (rows.length === total
+        ? total.toLocaleString('vi-VN') + ' hồ sơ'
+        : rows.length.toLocaleString('vi-VN') + ' / ' + total.toLocaleString('vi-VN') + ' hồ sơ') +
+      (total > SOFT_WARN ? ' <span class="badge text-bg-warning" title="Nên Xuất & dọn hồ sơ cũ">nhiều — nên dọn</span>' : '');
   }
 
   async function render() {

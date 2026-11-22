@@ -191,7 +191,7 @@
     );
 
     // Chứng từ đã lập: số PXK, số BKLS, bên mua, đơn vị, đợt
-    const issued = (HAK.Issued && HAK.Issued.list) || [];
+    const issued = HAK.Issued ? HAK.Issued.scoped('archive') : [];
     let pxkNo = null;
     const mp = q.match(/^pxk\s*0*(\d+)$/i) || (/^\d{3,}$/.test(q) ? [0, q] : null);
     if (mp) pxkNo = Number(mp[1]);
