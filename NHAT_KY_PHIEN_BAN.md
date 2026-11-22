@@ -1,5 +1,9 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.25.15 — Tổng quan theo ô tick của Báo cáo
+- **Tổng quan:** số "Thực giao đã lập hồ sơ (tấn)" nay theo đúng ô tick ở Báo cáo tổng hợp: tick thì cộng vào, không tick thì bỏ ra; trước đây vẫn cộng cả hồ sơ đã bỏ tick nên lệch với Báo cáo dù ghi "khớp Báo cáo tổng hợp".
+- Trạng thái hợp đồng không đổi theo ô tick (tránh báo "Đã hoàn thành" sai khi bỏ tick). Không đổi quy tắc 26–36; không đổi dữ liệu đã lưu.
+
 ## v2.25.14 — Thông báo rõ khi file sao lưu bị cắt cụt
 - Khi chọn file sao lưu `.json` bị cắt cụt (chép dở, đĩa đầy, mất điện), app báo "File sao lưu bị hỏng hoặc bị cắt cụt" và nói rõ dữ liệu hiện tại chưa bị thay đổi; trước đây báo nhầm "không phải file sao lưu". File sai loại vẫn báo như cũ. Không đổi dữ liệu, không đổi quy tắc nghiệp vụ.
 
