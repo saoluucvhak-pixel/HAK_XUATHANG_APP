@@ -24,9 +24,11 @@
     failed = false;
   const signature = (s) => (s ? Array.from(s).sort().join('|') : null);
 
-  /** Tính tập mã chi tiết hợp đồng đã có phiếu cân (≥ 1 phiếu trong phạm vi công ty đang xem). */
+  /** Tính tập mã chi tiết hợp đồng đã có phiếu cân (≥ 1 phiếu trong MỌI hồ sơ Lưu trữ — quy tắc 30: một nguồn).
+   * KHÔNG lọc theo công tắc phạm vi 'report': kết quả chỉ là cờ có/không theo từng chi tiết, và trạng thái hợp đồng
+   * (Danh mục, tab Tờ khai, Hồ sơ hợp đồng) không được đổi theo công tắc "Xem tất cả công ty" của màn Báo cáo. */
   async function compute() {
-    const scope = HAK.Auth && HAK.Auth.scopeIds ? HAK.Auth.scopeIds('report') : null;
+    const scope = null;
     const metas0 = await HAK.Archive.ensureStats(await HAK.Archive.list());
     const metas = scope ? metas0.filter((m) => scope.indexOf(HAK.Auth.companyOfMeta(m)) >= 0) : metas0;
     const tickets = await HAK.Report.prepareTickets(metas, ticketCache);

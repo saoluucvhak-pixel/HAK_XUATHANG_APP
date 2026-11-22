@@ -1,5 +1,10 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.25.12 — Trạng thái hợp đồng ổn định, trợ năng
+- **Trạng thái hợp đồng (DA-3):** "Đã hoàn thành / Đang thực hiện" không còn đổi theo công tắc "Xem tất cả công ty" của màn Báo cáo; hợp đồng có chi tiết chưa chứng thư không bị báo hoàn thành sai khi hồ sơ cân của công ty khác bị lọc khỏi tính toán (quy tắc 30: một nguồn).
+- **Trợ năng:** menu di động có `aria-expanded` và đóng bằng Esc; ô chọn Sheet / ánh xạ cột có tên cho trình đọc màn hình; chữ nhỏ của huy hiệu Zone / "Nguy hiểm" đạt tương phản ≥ 4,5:1 (sáng và tối).
+- Không đổi quy tắc 26–36. D-02 (bỏ tick hồ sơ có tính vào "Đã hoàn thành" không), Tổng quan chưa trừ hồ sơ bỏ tick, và hành vi khôi phục đợt Excel vẫn CHỜ chủ dự án — chỉ ghi vào docs.
+
 ## v2.25.11 — Tách dữ liệu theo công ty (quy tắc 36)
 - **Sao lưu Lưu trữ (.json):** nhân viên giới hạn một công ty chỉ xuất hồ sơ thuộc công ty đó (trước đây file chứa cả hồ sơ công ty khác). Huy hiệu menu và số đếm "x / y hồ sơ" cũng chỉ tính hồ sơ trong phạm vi.
 - **Nhật ký Chứng từ, Tìm kiếm (Ctrl+K), Tổng quan:** chứng từ đã lập và số "Hồ sơ đã xuất" chỉ gồm công ty đang xem (bật "Xem tất cả công ty" thì thấy đủ như trước). Bản ghi cũ chưa gắn công ty vẫn hiển thị.
