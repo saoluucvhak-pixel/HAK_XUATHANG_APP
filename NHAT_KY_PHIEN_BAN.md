@@ -1,5 +1,8 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.25.14 — Thông báo rõ khi file sao lưu bị cắt cụt
+- Khi chọn file sao lưu `.json` bị cắt cụt (chép dở, đĩa đầy, mất điện), app báo "File sao lưu bị hỏng hoặc bị cắt cụt" và nói rõ dữ liệu hiện tại chưa bị thay đổi; trước đây báo nhầm "không phải file sao lưu". File sai loại vẫn báo như cũ. Không đổi dữ liệu, không đổi quy tắc nghiệp vụ.
+
 ## v2.25.13 — HAKDocs.exe: các lỗi nhỏ phát hiện khi rà soát
 - **Sao lưu SQLite tự động:** xoay vòng không còn xóa chính bản vừa ghi khi trong thư mục có bản cũ mang giờ ở tương lai (đồng bộ với máy chủ tham chiếu).
 - **Tải tệp:** tệp lịch sử tải hỏng không còn chặn việc lưu tệp mới; kết quả quá lớn trả lỗi tiếng Việt rõ ràng (mã 500) thay vì làm đứt kết nối.

@@ -568,6 +568,20 @@
   /** Đọc + kiểm tra + tóm tắt bản sao (KHÔNG ghi gì): dùng để hiện phạm vi dữ liệu trước khi người dùng chọn Nhập bổ sung / Khôi phục. */
   async function inspect(file) {
     const j = await readJson(file);
+    if (!j) {
+      // JSON không đọc được nhưng mở đầu đúng là file sao lưu của app → bị cắt cụt / chép dở (đĩa đầy, mất điện), không phải "sai loại file"
+      let head = '';
+      try {
+        head = await file.text();
+        head = head.slice(0, 200);
+      } catch (e) {
+        /* bỏ qua */
+      }
+      if (/^\s*\{\s*"app"\s*:\s*"hak-bienban-/.test(head))
+        throw new Error(
+          'File sao lưu bị hỏng hoặc bị cắt cụt (chép dở, đĩa đầy hoặc mất điện). Hãy dùng bản sao lưu khác; dữ liệu hiện tại chưa bị thay đổi.'
+        );
+    }
     if (j && j.app === 'hak-bienban-archive' && Array.isArray(j.items)) return { j, legacy: true, plan: { archive: j.items.length } };
     validateBackup(j);
     const manifest = await verifyManifest(j);
