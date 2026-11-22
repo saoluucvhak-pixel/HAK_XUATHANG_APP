@@ -29,6 +29,7 @@
     "e2e:sf-focus": "node tools/e2e-sf-focus.cjs",
     "e2e:company-scope": "node tools/e2e-company-scope.cjs",
     "e2e:scope-restricted": "node tools/e2e-scope-restricted.cjs",
+    "e2e:report-tick": "node tools/e2e-report-tick.cjs",
     "e2e:contract-status-scope": "node tools/e2e-contract-status-scope.cjs",
     "e2e:backup-ui-sqlite": "node tools/e2e-sqlite.cjs tools/e2e-backup-ui.cjs",
     "e2e:sqlite-backup": "node tools/e2e-sqlite.cjs tools/e2e-sqlite-backup.cjs",

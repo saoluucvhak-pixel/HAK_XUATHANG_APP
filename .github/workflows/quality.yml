@@ -64,6 +64,8 @@ jobs:
       - run: node tools/e2e-sqlite.cjs tools/e2e-company-scope.cjs
       - run: npm run e2e:scope-restricted   # nhân viên giới hạn 1 công ty: sao lưu / đếm Lưu trữ, Nhật ký Chứng từ, Tổng quan không lộ công ty khác
       - run: node tools/e2e-sqlite.cjs tools/e2e-scope-restricted.cjs
+      - run: npm run e2e:report-tick   # ô tick ở Báo cáo: Tổng quan khớp Báo cáo; trạng thái hợp đồng không đổi theo ô tick
+      - run: node tools/e2e-sqlite.cjs tools/e2e-report-tick.cjs
       - run: npm run e2e:contract-status-scope   # trạng thái hợp đồng không đổi theo công tắc phạm vi của Báo cáo
       - run: node tools/e2e-sqlite.cjs tools/e2e-contract-status-scope.cjs
       - run: node tools/e2e-sqlite.cjs tools/e2e-roundtrip.cjs   # như trên trên SQLite (máy chủ tham chiếu)

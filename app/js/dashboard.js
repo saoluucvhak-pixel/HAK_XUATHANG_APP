@@ -479,13 +479,21 @@
       try {
         const list = await HAK.Archive.list(),
           sc = HAK.Auth && HAK.Auth.scopeIds ? HAK.Auth.scopeIds('report') : null,
-          key = list.length + '|' + list.reduce((a, m) => Math.max(a, m.updatedAt || 0), 0) + '|' + (sc ? sc.join(',') : '*');
+          manual = HAK.Store.get('hak.report.manual', {}) || {}, // ô tick của Báo cáo: tick = cộng, không tick = bỏ ra
+          key =
+            list.length +
+            '|' +
+            list.reduce((a, m) => Math.max(a, m.updatedAt || 0), 0) +
+            '|' +
+            (sc ? sc.join(',') : '*') +
+            '|' +
+            JSON.stringify(manual);
         if (delCache.key === key && delCache.html) return;
         const all = await HAK.Archive.ensureStats(list),
           tickets = await HAK.Report.prepareTickets(all, delCache.tk),
           scope = HAK.Auth && HAK.Auth.scopeIds ? HAK.Auth.scopeIds('report') : null;
         const metas = scope ? all.filter((x) => scope.indexOf(HAK.Auth.companyOfMeta(x)) >= 0) : all,
-          m = HAK.Report.compute(metas, { tickets }); // cùng phạm vi công ty như Báo cáo tổng hợp
+          m = HAK.Report.compute(metas, { tickets, manual }); // cùng phạm vi công ty và cùng ô tick như Báo cáo tổng hợp
         const del = Object.keys(m.byType).reduce((a, t) => a + (m.byType[t].delKg || 0), 0);
         delCache = {
           key,
