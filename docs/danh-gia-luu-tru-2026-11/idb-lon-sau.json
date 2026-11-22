@@ -1,0 +1,162 @@
+{
+ "host": {
+  "platform": "linux",
+  "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+  "cores": 4,
+  "memGB": 15.7,
+  "node": "v22.23.4"
+ },
+ "results": [
+  {
+   "size": "lớn",
+   "records": 1500,
+   "ticketsPerRecord": 100,
+   "tickets": 150000,
+   "env": {
+    "ua": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36",
+    "cores": 4,
+    "mem": 16
+   },
+   "archiveSave": {
+    "totalMs": 19243,
+    "medianMs": 12.2,
+    "p95Ms": 24.1,
+    "maxMs": 60.7
+   },
+   "batchSave": {
+    "batches": 200,
+    "medianMs": 0.7,
+    "maxMs": 25.1
+   },
+   "archiveOpen": {
+    "medianMs": 1.8,
+    "maxMs": 3.2,
+    "listMs": 16.4,
+    "listed": 1500
+   },
+   "report": {
+    "ensureStatsMs": 13,
+    "prepareTicketsColdMs": 1856,
+    "prepareTicketsCachedMs": 4,
+    "computeWeighMs": 171,
+    "computeStartMs": 9,
+    "usedWeigh": 125,
+    "kgWeigh": 349953750,
+    "usedStart": 125,
+    "ticketMapSize": 1500
+   },
+   "yearbook": {
+    "bulkCommitMs": 220,
+    "addOneMedianMs": 567.3,
+    "addOneMaxMs": 624.6,
+    "readMs": 108,
+    "jsonMB": 17.09
+   },
+   "storage": {
+    "usageMB": 12.3,
+    "quotaGB": 10
+   },
+   "backup": {
+    "buildMs": 544,
+    "zipMs": 1378,
+    "rawJsonMB": 27.7,
+    "zipMB": 5.6,
+    "archive": 1500,
+    "batches": 200
+   },
+   "restore": {
+    "inspectMs": 800,
+    "restoreMergeMs": 1007,
+    "result": {
+     "legacy": false,
+     "keys": 0,
+     "added": 0,
+     "updated": 0,
+     "skipped": 1500,
+     "batches": 0,
+     "issued": 0,
+     "keepAuth": false,
+     "snapshot": true,
+     "mode": "merge",
+     "keptNewer": 0,
+     "conflicts": 0,
+     "report": [
+      {
+       "id": "keys",
+       "label": "cài đặt & danh mục",
+       "undoable": true,
+       "status": "done",
+       "n": {
+        "n": 0
+       }
+      },
+      {
+       "id": "yearbook",
+       "label": "hồ sơ năm",
+       "undoable": false,
+       "status": "done",
+       "n": {
+        "n": 1505
+       }
+      },
+      {
+       "id": "archive",
+       "label": "hồ sơ Lưu trữ",
+       "undoable": false,
+       "status": "done",
+       "n": {
+        "added": 0,
+        "updated": 0,
+        "skipped": 1500
+       }
+      },
+      {
+       "id": "attachments",
+       "label": "tệp đính kèm",
+       "undoable": false,
+       "status": "done",
+       "n": {
+        "n": 0
+       }
+      },
+      {
+       "id": "bklsTemplates",
+       "label": "mẫu BKLS",
+       "undoable": false,
+       "status": "done",
+       "n": {
+        "n": 0
+       }
+      },
+      {
+       "id": "batches",
+       "label": "đợt Excel",
+       "undoable": false,
+       "status": "done",
+       "n": {
+        "n": 0
+       }
+      },
+      {
+       "id": "issued",
+       "label": "nhật ký chứng từ",
+       "undoable": false,
+       "status": "done",
+       "n": {
+        "n": 0
+       }
+      }
+     ]
+    }
+   },
+   "restoreEmpty": {
+    "inspectMs": 1184,
+    "restoreMs": 1917,
+    "archiveAdded": 1500,
+    "archiveNow": 1500,
+    "usageMB": 18.7
+   },
+   "wallSeconds": 43
+  }
+ ]
+}

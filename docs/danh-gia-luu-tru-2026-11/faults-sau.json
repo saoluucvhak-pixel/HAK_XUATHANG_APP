@@ -1,0 +1,114 @@
+[
+ {
+  "id": "F1-abort",
+  "ca": "Archive.save lỗi (giao dịch bị hủy lúc ghi)",
+  "expect": "trả false, không có meta mồ côi (meta = data); chạy lại thành công, không nhân đôi",
+  "got": "{\"trả\":false,\"trước\":{\"meta\":1,\"data\":1},\"sau\":{\"meta\":1,\"data\":1},\"chạyLại\":true,\"cuối\":{\"meta\":2,\"data\":2}}",
+  "ok": true
+ },
+ {
+  "id": "F1-throw",
+  "ca": "Archive.save lỗi (lỗi đồng bộ khi dựng giao dịch)",
+  "expect": "trả false, không có meta mồ côi (meta = data); chạy lại thành công, không nhân đôi",
+  "got": "{\"trả\":false,\"trước\":{\"meta\":1,\"data\":1},\"sau\":{\"meta\":1,\"data\":1},\"chạyLại\":true,\"cuối\":{\"meta\":2,\"data\":2}}",
+  "ok": true
+ },
+ {
+  "id": "F2-abort",
+  "ca": "Batches.save lỗi (abort)",
+  "expect": "báo lỗi, không còn thông số mồ côi; chạy lại ghi đủ 1 đợt",
+  "got": "{\"lần1\":\"lỗi: Không ghi được IndexedDB\",\"sau\":{\"meta\":0,\"data\":0},\"lần2\":\"ok\",\"cuối\":{\"meta\":1,\"data\":1}}",
+  "ok": true
+ },
+ {
+  "id": "F2-throw",
+  "ca": "Batches.save lỗi (throw)",
+  "expect": "báo lỗi, không còn thông số mồ côi; chạy lại ghi đủ 1 đợt",
+  "got": "{\"lần1\":\"lỗi: Không ghi được IndexedDB\",\"sau\":{\"meta\":0,\"data\":0},\"lần2\":\"ok\",\"cuối\":{\"meta\":1,\"data\":1}}",
+  "ok": true
+ },
+ {
+  "id": "F3-abort",
+  "ca": "Yearbook.commit lỗi (abort)",
+  "expect": "ném lỗi; phiên bản và số hồ sơ không đổi",
+  "got": "{\"yErr\":\"lỗi: Chưa ghi được hồ sơ.\",\"y0\":0,\"y1\":{\"rev\":0,\"n\":0}}",
+  "ok": true
+ },
+ {
+  "id": "F3-throw",
+  "ca": "Yearbook.commit lỗi (throw)",
+  "expect": "ném lỗi; phiên bản và số hồ sơ không đổi",
+  "got": "{\"yErr\":\"lỗi: Mô phỏng hết dung lượng\",\"y0\":0,\"y1\":{\"rev\":0,\"n\":0}}",
+  "ok": true
+ },
+ {
+  "id": "F4-abort",
+  "ca": "Catalog.persist lỗi (abort)",
+  "expect": "ném lỗi; bản lưu giữ nguyên",
+  "got": "{\"cErr\":\"lỗi: Không ghi được danh mục.\",\"giữNguyên\":true}",
+  "ok": true
+ },
+ {
+  "id": "F4-throw",
+  "ca": "Catalog.persist lỗi (throw)",
+  "expect": "ném lỗi; bản lưu giữ nguyên",
+  "got": "{\"cErr\":\"lỗi: Không ghi được danh mục.\",\"giữNguyên\":true}",
+  "ok": true
+ },
+ {
+  "id": "F5-abort",
+  "ca": "Khôi phục lỗi giữa chừng (abort)",
+  "expect": "báo DỪNG GIỮA CHỪNG nêu kho đã nhập / chưa chạy; chạy lại đủ 6 hồ sơ + 3 đợt; chạy lần 3 không đổi",
+  "got": "{\"lần1\":{\"ok\":false,\"err\":\"Khôi phục DỪNG GIỮA CHỪNG tại \\\"hồ sơ Lưu trữ\\\": Không ghi được dữ liệu lưu trữ. Đã nhập: cài đặt & danh mục (0), hồ sơ năm (1). Chưa chạy: tệp đính kèm, mẫu BKLS\"},\"giữa\":{\"arch\":{\"meta\":2,\"data\":2},\"bat\":{\"meta\":0,\"data\":0}},\"lần2\":\"keys:done yearbook:done archive:done attachments:done bklsTemplates:done batches:done issued:done\",\"cuối\":{\"arch\":{\"meta\":6,\"data\":6},\"bat\":{\"meta\":3,\"data\":3}},\"lần3\":{\"added\":0,\"skipped\":6},\"cuối3\":{\"arch\":{\"meta\":6,\"data\":6},\"bat\":{\"meta\":3,\"data\":3}}}",
+  "ok": true
+ },
+ {
+  "id": "F5-throw",
+  "ca": "Khôi phục lỗi giữa chừng (throw)",
+  "expect": "báo DỪNG GIỮA CHỪNG nêu kho đã nhập / chưa chạy; chạy lại đủ 6 hồ sơ + 3 đợt; chạy lần 3 không đổi",
+  "got": "{\"lần1\":{\"ok\":false,\"err\":\"Khôi phục DỪNG GIỮA CHỪNG tại \\\"hồ sơ Lưu trữ\\\": Mô phỏng hết dung lượng. Đã nhập: cài đặt & danh mục (0), hồ sơ năm (1). Chưa chạy: tệp đính kèm, mẫu BKLS, đợt E\"},\"giữa\":{\"arch\":{\"meta\":2,\"data\":2},\"bat\":{\"meta\":0,\"data\":0}},\"lần2\":\"keys:done yearbook:done archive:done attachments:done bklsTemplates:done batches:done issued:done\",\"cuối\":{\"arch\":{\"meta\":6,\"data\":6},\"bat\":{\"meta\":3,\"data\":3}},\"lần3\":{\"added\":0,\"skipped\":6},\"cuối3\":{\"arch\":{\"meta\":6,\"data\":6},\"bat\":{\"meta\":3,\"data\":3}}}",
+  "ok": true
+ },
+ {
+  "id": "F6a",
+  "ca": "Sổ hồ sơ năm: hai cửa sổ cùng phiên bản cũ",
+  "expect": "cửa sổ thứ hai bị từ chối có thông báo, không ghi đè",
+  "got": "{\"ya\":\"ok\",\"yb\":\"lỗi: Hồ sơ đã thay đổi ở cửa sổ khác. Mở lại trước khi lưu.\",\"yEnd\":[\"wa\"]}",
+  "ok": true
+ },
+ {
+  "id": "F6b",
+  "ca": "Danh mục: hai cửa sổ cùng sửa",
+  "expect": "cửa sổ thứ hai bị từ chối (\"Danh mục đã thay đổi\")",
+  "got": "{\"ca\":\"ok\",\"cb\":\"lỗi: Danh mục đã thay đổi ở cửa sổ khác. Tải lại trang trước khi lưu.\"}",
+  "ok": true
+ },
+ {
+  "id": "F6c",
+  "ca": "Đợt Excel cùng tên: hai cửa sổ",
+  "expect": "cửa sổ thứ hai (phiên bản cũ) bị từ chối, không ghi đè bản mới",
+  "got": "{\"ba\":\"ok\",\"bb\":\"lỗi: Đợt \\\"same.xlsx\\\" đã được lưu / thay ở cửa sổ khác. Tải lại trang rồi nạp lại file.\",\"bytes\":[1]}",
+  "ok": true
+ },
+ {
+  "id": "F6d",
+  "ca": "Lưu trữ cùng nội dung từ hai cửa sổ đồng thời",
+  "expect": "đúng 1 hồ sơ (mã theo nội dung), không nhân đôi",
+  "got": "{\"sa\":true,\"sb\":true,\"same\":1}",
+  "ok": true
+ },
+ {
+  "id": "F6e",
+  "ca": "Lưu trữ: hai cửa sổ lưu nội dung KHÁC nhau của cùng tàu",
+  "expect": "không mất bản nào (2 hồ sơ, mã theo nội dung)",
+  "got": "{\"s1\":true,\"s2\":true,\"two\":2}",
+  "ok": true
+ },
+ {
+  "id": "F7",
+  "ca": "Hết dung lượng (giới hạn 20 KB)",
+  "expect": "khi hết chỗ: save trả false (có báo) và meta = data",
+  "got": "{\"origin\":\"file://\",\"trả\":\"111111111111\",\"keys\":{\"meta\":12,\"data\":12}} — CHƯA XÁC MINH: trình duyệt không áp giới hạn dung lượng nên không gây được lỗi thật",
+  "ok": null
+ }
+]

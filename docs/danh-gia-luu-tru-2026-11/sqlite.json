@@ -1,0 +1,105 @@
+{
+ "node": "v22.23.4",
+ "sqlite": "3.53.4 (node:sqlite) / sql.js 1.12.0",
+ "results": [
+  {
+   "size": "nhỏ",
+   "records": 50,
+   "tickets": 2000,
+   "native": {
+    "bulkInsertMs": 9.6,
+    "addOneRecordMedianMs": 0.6,
+    "openRecordMedianMs": 0.1,
+    "reportAggregateMs": 0.1,
+    "reportFetchRowsMs": 0.4,
+    "reportRows": 240,
+    "dupScanMs": 0.5,
+    "dupFound": 0,
+    "fileMB": 0.31,
+    "backupVacuumMs": 2.7,
+    "restoreOpenMs": 0.1,
+    "restoreCount": 2800
+   },
+   "wasm": {
+    "initWasmMs": 96.9,
+    "bulkInsertMs": 52.9,
+    "openRecordMedianMs": 0.8,
+    "reportAggregateMs": 1.1,
+    "reportFetchRowsMs": 3,
+    "reportRows": 160,
+    "persistExportMs": 0.2,
+    "persistIdbPutMs": 2.3,
+    "fileMB": 0.23,
+    "reloadIdbReadMs": 1.6,
+    "reloadOpenMs": 0.5,
+    "heapMB": 23
+   }
+  },
+  {
+   "size": "vừa",
+   "records": 500,
+   "tickets": 30000,
+   "native": {
+    "bulkInsertMs": 127.8,
+    "addOneRecordMedianMs": 0.6,
+    "openRecordMedianMs": 0.1,
+    "reportAggregateMs": 1,
+    "reportFetchRowsMs": 3.9,
+    "reportRows": 2640,
+    "dupScanMs": 4.3,
+    "dupFound": 0,
+    "fileMB": 3.47,
+    "backupVacuumMs": 16.8,
+    "restoreOpenMs": 0.1,
+    "restoreCount": 31200
+   },
+   "wasm": {
+    "initWasmMs": 68,
+    "bulkInsertMs": 264.4,
+    "openRecordMedianMs": 0.4,
+    "reportAggregateMs": 3.3,
+    "reportFetchRowsMs": 11.6,
+    "reportRows": 2520,
+    "persistExportMs": 2,
+    "persistIdbPutMs": 20.6,
+    "fileMB": 3.36,
+    "reloadIdbReadMs": 8.9,
+    "reloadOpenMs": 2,
+    "heapMB": 51
+   }
+  },
+  {
+   "size": "lớn",
+   "records": 1500,
+   "tickets": 150000,
+   "native": {
+    "bulkInsertMs": 789.4,
+    "addOneRecordMedianMs": 0.9,
+    "openRecordMedianMs": 0.2,
+    "reportAggregateMs": 5.8,
+    "reportFetchRowsMs": 19.6,
+    "reportRows": 12700,
+    "dupScanMs": 24.6,
+    "dupFound": 0,
+    "fileMB": 16.89,
+    "backupVacuumMs": 82.1,
+    "restoreOpenMs": 0.1,
+    "restoreCount": 152000
+   },
+   "wasm": {
+    "initWasmMs": 78.6,
+    "bulkInsertMs": 1352.1,
+    "openRecordMedianMs": 0.6,
+    "reportAggregateMs": 10.6,
+    "reportFetchRowsMs": 48.5,
+    "reportRows": 12500,
+    "persistExportMs": 11.2,
+    "persistIdbPutMs": 74.1,
+    "fileMB": 16.67,
+    "reloadIdbReadMs": 31.3,
+    "reloadOpenMs": 12.9,
+    "heapMB": 159
+   }
+  }
+ ]
+}
