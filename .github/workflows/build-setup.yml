@@ -8,6 +8,9 @@ on:
 permissions:
   contents: write
   actions: read
+concurrency:
+  group: build-setup-release   # main và tag v* cùng commit không được đăng song song (kiểm 'đã có Release' không còn bị đua)
+  cancel-in-progress: false
 jobs:
   setup:
     runs-on: windows-latest
