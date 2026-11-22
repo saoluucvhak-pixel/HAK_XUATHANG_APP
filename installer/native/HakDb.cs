@@ -48,7 +48,7 @@ class HakDb : IDisposable {
  Dictionary<string,Tbl> tables=new Dictionary<string,Tbl>();
  static readonly System.Text.RegularExpressions.Regex Ident=new System.Text.RegularExpressions.Regex("^[a-z_][a-z0-9_]*$");
  public static string LibVersion(){return Sqlite.Str(Sqlite.sqlite3_libversion());}
- public static HakDb Open(string file,string schemaSql){var h=new HakDb();h.File=file;Directory.CreateDirectory(Path.GetDirectoryName(file));h.OpenDb();h.Migrate(schemaSql);h.LoadMeta();return h;}
+ public static HakDb Open(string file,string schemaSql){var h=new HakDb();h.File=file;try{Directory.CreateDirectory(Path.GetDirectoryName(file));h.OpenDb();h.Migrate(schemaSql);h.LoadMeta();}catch{h.Dispose();throw;}return h;}/* đóng kết nối khi mở/di trú lỗi (tránh rò tay cầm: Windows không xóa được tệp đang mở) */
  void OpenDb(){
   if(Sqlite.sqlite3_open_v2(Sqlite.U8(File),out db,Sqlite.OPEN_READWRITE|Sqlite.OPEN_CREATE,IntPtr.Zero)!=Sqlite.OK)throw new HakDbException("io","Không mở được cơ sở dữ liệu: "+Err());
   Sqlite.sqlite3_busy_timeout(db,5000);

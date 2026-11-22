@@ -75,6 +75,8 @@ jobs:
       - run: npm run e2e:import-hostile   # bản sao lưu độc (XSS trong meta hồ sơ, chứng từ, đợt Excel; khóa lạ; cấu hình hỏng): không kích hoạt script, không ghi khóa lạ
       - run: npm run e2e:import-hostile-sqlite
       - run: node tools/e2e-sqlite.cjs tools/e2e-contract-status.cjs   # trạng thái hợp đồng một nguồn trên SQLite
+      - run: node tools/e2e-versions.cjs   # phiên bản hồ sơ: xem / in lại bản cũ chỉ xem, không ghi kho (NGHIEM_THU_SQLITE.md nêu là đã nghiệm thu)
+      - run: node tools/e2e-migrate.cjs   # di trú IDB → SQLite qua giao diện, quay lui, mất kết nối bị chặn (NGHIEM_THU_SQLITE.md)
       - run: npm run accept:release   # Word và PDF BẮT BUỘC: thiếu / không đọc lại được file → lỗi (chưa xác minh)
 
   accept-windows:

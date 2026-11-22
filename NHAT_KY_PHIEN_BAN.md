@@ -1,5 +1,12 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.25.13 — HAKDocs.exe: các lỗi nhỏ phát hiện khi rà soát
+- **Sao lưu SQLite tự động:** xoay vòng không còn xóa chính bản vừa ghi khi trong thư mục có bản cũ mang giờ ở tương lai (đồng bộ với máy chủ tham chiếu).
+- **Tải tệp:** tệp lịch sử tải hỏng không còn chặn việc lưu tệp mới; kết quả quá lớn trả lỗi tiếng Việt rõ ràng (mã 500) thay vì làm đứt kết nối.
+- **Cơ sở dữ liệu:** mở / di trú lỗi thì đóng kết nối (không rò tay cầm tệp; tránh không xóa được tệp .db trên Windows).
+- **CI:** thêm `e2e-versions` và `e2e-migrate` vào chuỗi kiểm; workflow bộ cài không chạy song song để đăng Release.
+- Phần C# chỉ được kiểm bằng CI Windows (biên dịch + bộ kiểm hợp đồng); chưa kiểm tay trên máy Windows thật.
+
 ## v2.25.12 — Trạng thái hợp đồng ổn định, trợ năng
 - **Trạng thái hợp đồng (DA-3):** "Đã hoàn thành / Đang thực hiện" không còn đổi theo công tắc "Xem tất cả công ty" của màn Báo cáo; hợp đồng có chi tiết chưa chứng thư không bị báo hoàn thành sai khi hồ sơ cân của công ty khác bị lọc khỏi tính toán (quy tắc 30: một nguồn).
 - **Trợ năng:** menu di động có `aria-expanded` và đóng bằng Esc; ô chọn Sheet / ánh xạ cột có tên cho trình đọc màn hình; chữ nhỏ của huy hiệu Zone / "Nguy hiểm" đạt tương phản ≥ 4,5:1 (sáng và tối).
