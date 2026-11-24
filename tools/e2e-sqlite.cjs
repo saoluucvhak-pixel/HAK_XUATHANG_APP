@@ -17,7 +17,7 @@ if (!target) {
 const EXTERNAL = !!process.env.HAK_DB_EXTERNAL_TOKEN; // máy chủ ngoài (HAKDocs.exe thật, đã kích hoạt SQLite): không tự dựng máy chủ tham chiếu
 const TOKEN = EXTERNAL ? process.env.HAK_DB_EXTERNAL_TOKEN : require('node:crypto').randomBytes(16).toString('hex');
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hak-e2e-sqlite-'));
-process.env.HAK_E2E_DATA_DIR = dir; // thư mục dữ liệu của máy chủ SQLite tham chiếu (cho script đích kiểm tệp sao lưu)
+process.env.HAK_E2E_DATA_DIR = EXTERNAL && process.env.HAK_DATA_DIR ? process.env.HAK_DATA_DIR : dir;
 const srv = EXTERNAL ? null : createServer({ dataDir: dir, token: TOKEN });
 if (srv) srv.hakdb.setMeta('active_backend', 'sqlite');
 const port = Number(process.env.HAK_DB_PORT || 31879);
@@ -77,6 +77,12 @@ Module._load = function (request) {
       b.newContext = async (...x) => {
         await resetData(); // ngữ cảnh trình duyệt mới = hồ sơ trống: dữ liệu SQLite cũng phải trống (như IndexedDB của hồ sơ mới)
         const c = await newContext(...x);
+        await c.addInitScript(
+          (url) => {
+            window.HAK_DB_URL = url;
+          },
+          process.env.HAK_DB_URL || 'http://127.0.0.1:' + port
+        );
         await c.route('**/native/hakdocs-token.js', (r) =>
           r.fulfill({ contentType: 'application/javascript', body: "window.HAK_DOCS_TOKEN='" + TOKEN + "';" })
         );

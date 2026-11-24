@@ -43,7 +43,18 @@
   };
 
   /** Gọi HAKDocs. Lỗi: Error có .code ('conflict' | 'fk' | 'unique' | 'scope' | 'unreachable' …), .status, .detail; .conflict = true khi xung đột phiên bản. */
+  const writes = new Set();
   async function call(path, body, opt) {
+    const isWrite = body !== undefined && path !== '/db/query' && path !== '/db/check' && path !== '/db/status';
+    const p = callInner(path, body, opt);
+    if (isWrite) writes.add(p);
+    try {
+      return await p;
+    } finally {
+      writes.delete(p);
+    }
+  }
+  async function callInner(path, body, opt) {
     opt = opt || {};
     const headers = { 'X-HAK-Client': 'documents-v1', 'X-HAK-Token': token() };
     if (body !== undefined) headers['Content-Type'] = 'application/json';
@@ -57,11 +68,17 @@
       const readOnly = path === '/db/query' || path === '/db/check';
       for (let attempt = 0; ; attempt++) {
         try {
+          const payload = body === undefined ? undefined : JSON.stringify(body);
           r = await fetch(url() + path, {
             method: body === undefined ? 'GET' : 'POST',
             headers,
-            body: body === undefined ? undefined : JSON.stringify(body),
+            body: payload,
             signal: ctl ? ctl.signal : undefined,
+            keepalive:
+              !readOnly &&
+              payload !== undefined &&
+              typeof TextEncoder === 'function' &&
+              new TextEncoder().encode(payload).byteLength < 60000,
           });
           break;
         } catch (e) {
@@ -203,6 +220,51 @@
   }
 
   S.call = call;
+  S.pendingWrites = () => writes.size;
+  let reloading = null;
+  HAK.reloadAfterWrites = (delayMs = 0, maxMs = 15000) => {
+    if (reloading) return reloading;
+    reloading = (async () => {
+      if (delayMs) await new Promise((ok) => setTimeout(ok, delayMs));
+      const deadline = Date.now() + maxMs;
+      do {
+        if (HAK.Store && HAK.Store.flush) await HAK.Store.flush(Math.max(1, deadline - Date.now()));
+        const remaining = deadline - Date.now();
+        if (remaining <= 0) throw new Error('Dữ liệu vẫn đang được lưu. Hãy chờ rồi thử lại.');
+        let timer;
+        try {
+          await Promise.race([
+            Promise.all(Array.from(writes)),
+            new Promise((_, reject) => {
+              timer = setTimeout(() => reject(new Error('Dữ liệu vẫn đang được lưu. Hãy chờ rồi thử lại.')), remaining);
+            }),
+          ]);
+        } finally {
+          clearTimeout(timer);
+        }
+      } while (writes.size || (HAK.Store && HAK.Store.pendingWrites && HAK.Store.pendingWrites()));
+      root.location.reload();
+      return true;
+    })()
+      .catch((e) => {
+        if (HAK.UI && HAK.UI.toast) HAK.UI.toast('Chưa tải lại app: ' + e.message, 'error');
+        return false;
+      })
+      .finally(() => {
+        reloading = null;
+      });
+    return reloading;
+  };
+  if (root.addEventListener)
+    root.addEventListener('beforeunload', (e) => {
+      if (
+        writes.size ||
+        (HAK.Store && ((HAK.Store.pendingWrites && HAK.Store.pendingWrites()) || (HAK.Store.hasWriteErrors && HAK.Store.hasWriteErrors())))
+      ) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    });
   S.openSession = openSession;
   S.hydrate = hydrate;
   S.adoptOrphans = adoptOrphans;

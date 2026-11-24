@@ -78,7 +78,7 @@
         try {
           await HAK.Migrate.rollback();
           out.textContent = 'Đã tắt SQLite. Đang tải lại app…';
-          root.setTimeout(() => root.location.reload(), 800);
+          HAK.reloadAfterWrites ? HAK.reloadAfterWrites(800) : root.setTimeout(() => root.location.reload(), 800);
         } catch (e) {
           b.disabled = false;
           out.textContent = 'Không quay lui được: ' + (e.message || e);
@@ -228,7 +228,7 @@
         }
         mark('activate', 'ok', 'bản sao SQLite trước kích hoạt: ' + (a.backup && a.backup.path));
         out.append(el('div', 'Đã chuyển sang SQLite. Đang tải lại app…', 'text-success mt-2'));
-        root.setTimeout(() => root.location.reload(), 1200);
+        HAK.reloadAfterWrites ? HAK.reloadAfterWrites(1200) : root.setTimeout(() => root.location.reload(), 1200);
       });
     });
   }

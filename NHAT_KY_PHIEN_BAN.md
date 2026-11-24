@@ -1,5 +1,11 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.25.16 — Chờ ghi dữ liệu trước khi tự tải lại
+- Theo dõi đầy đủ lệnh ghi/xóa nền, gồm phần chuẩn bị trước HTTP; đổi công ty, khôi phục và đóng năm chờ các lệnh hoàn tất trước khi tải lại.
+- Khi ghi SQLite lỗi hoặc chờ quá 15 giây, giữ nguyên trang và báo chưa lưu được; không bỏ dữ liệu vừa nhập chỉ vì bộ đệm trình duyệt đã ghi xong. Cảnh báo khi đóng trang còn dữ liệu chưa lưu.
+- Lệnh ghi nhỏ dùng keepalive theo số byte UTF-8, không theo số ký tự.
+- Thêm 6 kiểm thử và E2E ghi chậm 1,5 giây; mở rộng nghiệm thu Windows native về bộ lọc, lưu cài đặt và sao lưu.
+
 ## v2.25.15 — Tổng quan theo ô tick của Báo cáo
 - **Tổng quan:** số "Thực giao đã lập hồ sơ (tấn)" nay theo đúng ô tick ở Báo cáo tổng hợp: tick thì cộng vào, không tick thì bỏ ra; trước đây vẫn cộng cả hồ sơ đã bỏ tick nên lệch với Báo cáo dù ghi "khớp Báo cáo tổng hợp".
 - Trạng thái hợp đồng không đổi theo ô tick (tránh báo "Đã hoàn thành" sai khi bỏ tick). Không đổi quy tắc 26–36; không đổi dữ liệu đã lưu.

@@ -387,7 +387,7 @@
     $('#auPkApply').addEventListener('click', (e) => {
       e.currentTarget.disabled = true;
       HAK.UI.toast(HAK.Backup.packMsg(HAK.Backup.packApply(j)), 'success');
-      setTimeout(() => location.reload(), 1200);
+      HAK.reloadAfterWrites ? HAK.reloadAfterWrites(1200) : setTimeout(() => location.reload(), 1200);
     });
   }
   function screenRecovery(code, next, optional) {
@@ -796,14 +796,14 @@
       const last2 = HAK.Store.get(LASTCO, {}) || {};
       last2[cur.id] = b.dataset.co;
       HAK.Store.set(LASTCO, last2);
-      location.reload();
+      HAK.reloadAfterWrites ? HAK.reloadAfterWrites() : location.reload();
     });
     if (switching) gate.querySelector('#auCancel').addEventListener('click', hideGate);
   }
   function logout() {
     sessSet(null);
     cur = null;
-    location.reload();
+    HAK.reloadAfterWrites ? HAK.reloadAfterWrites() : location.reload();
   }
   /** Gọi khi khởi động: resolve khi đã đăng nhập (có phiên hợp lệ thì vào thẳng). */
   function require() {

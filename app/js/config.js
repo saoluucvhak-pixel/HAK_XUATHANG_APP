@@ -36,6 +36,31 @@
    * ------------------------------------------------------------- */
   const mem = {};
   const memOnly = new Set();
+  const pending = new Set();
+  const writeErrors = new Map();
+  const latestWrite = new Map();
+  function trackWrite(key, promise, required) {
+    const p = Promise.resolve(promise);
+    pending.add(p);
+    latestWrite.set(key, p);
+    p.then(
+      () => {
+        pending.delete(p);
+        if (latestWrite.get(key) === p) {
+          writeErrors.delete(key);
+          latestWrite.delete(key);
+        }
+      },
+      (error) => {
+        pending.delete(p);
+        if (required && latestWrite.get(key) === p) {
+          writeErrors.set(key, error);
+          HAK.Store._fail(key);
+        }
+        if (latestWrite.get(key) === p) latestWrite.delete(key);
+      }
+    );
+  }
   /**
    * Ghi: localStorage (đồng bộ) + bản sao ngầm sang IndexedDB (HAK.DB kho "kv") → localStorage đầy / bị xóa vẫn khôi phục được ở lần mở sau
    * (HAK.Backup.boot). set() trả false CHỈ KHI cả hai đều không lưu được; khi đó gọi HAK.Store.onError(key) để giao diện báo người dùng.
@@ -43,6 +68,24 @@
   HAK.Store = {
     onError: null,
     lastError: null,
+    pendingWrites: () => pending.size,
+    hasWriteErrors: () => writeErrors.size > 0,
+    async flush(maxMs = 15000) {
+      let timer;
+      try {
+        await Promise.race([
+          (async () => {
+            while (pending.size) await Promise.allSettled(Array.from(pending));
+            if (writeErrors.size) throw new Error('Có dữ liệu chưa ghi được vào nơi lưu chính. Hãy lưu lại trước khi tải lại app.');
+          })(),
+          new Promise((_, reject) => {
+            timer = setTimeout(() => reject(new Error('Dữ liệu vẫn đang được lưu. App giữ nguyên trang; hãy chờ rồi thử lại.')), maxMs);
+          }),
+        ]);
+      } finally {
+        clearTimeout(timer);
+      }
+    },
     _fail(key) {
       this.lastError = { key, at: Date.now() };
       if (typeof this.onError === 'function') {
@@ -75,10 +118,9 @@
       if (ls) memOnly.delete(key);
       else memOnly.add(key);
       const db = HAK.DB && HAK.DB.usable() ? HAK.DB : null;
+      if (opts && opts.dbCommitted) writeErrors.delete(key);
       if (db && !(opts && opts.dbCommitted))
-        db.kvPut(key, val, ls).catch(() => {
-          if (!ls) this._fail(key);
-        });
+        trackWrite(key, db.kvPut(key, val, ls), !ls || !!(HAK.Storage && HAK.Storage.mode === 'sqlite'));
       if (!ls && !db) {
         this._fail(key);
         return false;
@@ -93,10 +135,9 @@
       } catch (e) {
         /* noop */
       }
+      if (opts && opts.dbCommitted) writeErrors.delete(key);
       if (HAK.DB && HAK.DB.usable() && !(opts && opts.dbCommitted))
-        HAK.DB.kvDel(key).catch(() => {
-          /* bỏ qua */
-        });
+        trackWrite(key, HAK.DB.kvDel(key), !!(HAK.Storage && HAK.Storage.mode === 'sqlite'));
     },
     /** Mọi khóa của app (tiền tố "hak.") — dùng cho sao lưu toàn bộ. */
     keys() {
