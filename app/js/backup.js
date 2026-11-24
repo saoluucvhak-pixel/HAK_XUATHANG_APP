@@ -1139,7 +1139,7 @@
         $('#pkApply').addEventListener('click', () => {
           const r = packApply(j);
           toast(packMsg(r), 'success');
-          setTimeout(() => root.location.reload(), 1500);
+          HAK.reloadAfterWrites ? HAK.reloadAfterWrites(1500) : root.setTimeout(() => root.location.reload(), 1500);
         });
       } catch (err) {
         pv.innerHTML = '';
@@ -2050,7 +2050,7 @@
                   ' mục mới. Hồ sơ Lưu trữ đã nhập vẫn giữ.',
                 'success'
               );
-              setTimeout(() => root.location.reload(), 1200);
+              HAK.reloadAfterWrites ? HAK.reloadAfterWrites(1200) : root.setTimeout(() => root.location.reload(), 1200);
             } catch (err) {
               toast(err.message || String(err), 'error');
             }
@@ -2113,7 +2113,7 @@
             '.',
           r.conflicts ? 'warning' : 'success'
         );
-        setTimeout(() => root.location.reload(), 1500);
+        HAK.reloadAfterWrites ? HAK.reloadAfterWrites(1500) : root.setTimeout(() => root.location.reload(), 1500);
       } catch (err) {
         console.error(err);
         toast(err.message || String(err), 'error');

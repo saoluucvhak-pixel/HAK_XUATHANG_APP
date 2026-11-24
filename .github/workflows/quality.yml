@@ -147,9 +147,15 @@ jobs:
           for ($i = 0; $i -lt 40 -and -not $up; $i++) { try { Invoke-RestMethod http://127.0.0.1:31879/status -TimeoutSec 2 | Out-Null; $up = $true } catch { Start-Sleep -Milliseconds 500 } }
           if (-not $up) { throw 'HAKDocs không trả lời' }
           $env:HAK_DB_EXTERNAL_TOKEN = [regex]::Match((Get-Content app/native/hakdocs-token.js -Raw), "HAK_DOCS_TOKEN='([0-9a-f]{32})'").Groups[1].Value
+          $env:NODE_OPTIONS = "--require $env:GITHUB_WORKSPACE/tools/pw-channel.cjs"
+          $extra = @()
+          foreach ($t in 'e2e-sqlite-backup', 'e2e-persist-keys', 'e2e-company-scope', 'e2e-backup-ui', 'e2e-month-backup') {
+            node tools/e2e-sqlite.cjs "tools/$t.cjs"
+            if ($LASTEXITCODE -ne 0) { $extra += $t }
+          }
           node tools/e2e-sqlite.cjs tools/e2e-customs.cjs
           $a = $LASTEXITCODE
           node tools/e2e-sqlite.cjs tools/accept.cjs --release
           $b = $LASTEXITCODE
           Stop-Process -Id $p.Id -Force
-          if ($a -ne 0 -or $b -ne 0) { throw "Nghiệm thu SQLite lỗi (e2e:customs=$a, accept:release=$b)" }
+          if ($a -ne 0 -or $b -ne 0 -or $extra.Count) { throw "Nghiệm thu SQLite lỗi (e2e:customs=$a, accept:release=$b, mở rộng=$($extra -join ','))" }
