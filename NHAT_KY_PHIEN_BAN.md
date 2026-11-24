@@ -1,5 +1,11 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.25.17 — Kiểm tra dữ liệu trước khi hoàn tất sao lưu
+- Đọc danh sách SQLite theo từng trang có thứ tự và đối chiếu số bản ghi, tránh thiếu hồ sơ ở ngưỡng 50.000 dòng.
+- Báo mã hồ sơ thiếu nội dung và dừng tạo bản sao lưu thay vì bỏ qua hồ sơ.
+- HAKDocs từ chối các thao tác được bảo vệ nếu không tạo được tệp mã bảo vệ.
+- Phạm vi vận hành: các tài khoản trong app phục vụ phân quyền giao diện. Chỉ triển khai nơi mỗi người dùng có tài khoản Windows và kho dữ liệu riêng nếu cần bảo mật dữ liệu giữa người dùng.
+
 ## v2.25.16 — Chờ ghi dữ liệu trước khi tự tải lại
 - Theo dõi đầy đủ lệnh ghi/xóa nền, gồm phần chuẩn bị trước HTTP; đổi công ty, khôi phục và đóng năm chờ các lệnh hoàn tất trước khi tải lại.
 - Khi ghi SQLite lỗi hoặc chờ quá 15 giây, giữ nguyên trang và báo chưa lưu được; không bỏ dữ liệu vừa nhập chỉ vì bộ đệm trình duyệt đã ghi xong. Cảnh báo khi đóng trang còn dữ liệu chưa lưu.

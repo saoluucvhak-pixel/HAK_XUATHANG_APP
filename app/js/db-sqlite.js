@@ -139,12 +139,35 @@
     const g = await getRow(store, key);
     return g ? g.rec : undefined;
   }
+  async function queryAll(table, pk, cols) {
+    const rows = [];
+    const order = [[pk, 'asc']];
+    const projection = cols && !cols.includes(pk) ? [pk, ...cols] : cols;
+    let cursor;
+    let total;
+    let limit = 200;
+    for (;;) {
+      const where = cursor === undefined ? undefined : { [pk]: { gt: cursor } };
+      let page;
+      try {
+        page = await S().call('/db/query', { table, cols: projection, order, where, limit, count: cursor === undefined });
+      } catch (e) {
+        if (e.code !== 'too-large' || limit === 1) throw e;
+        limit = Math.max(1, Math.floor(limit / 2));
+        continue;
+      }
+      if (cursor === undefined) total = page.total;
+      for (const row of page.rows) rows.push(row);
+      if (page.rows.length < limit) break;
+      cursor = page.rows[page.rows.length - 1][pk];
+    }
+    if (rows.length !== total) throw Error('Số bản ghi SQLite đã thay đổi trong lúc đọc (' + table + '). Hãy thử lại.');
+    return rows;
+  }
   async function getAll(store) {
     S().assertOpen();
     const m = map(store);
-    const q = { table: m.table };
-    if (m.cols) q.cols = m.cols;
-    return (await S().call('/db/query', q)).rows.map(m.fromRow);
+    return (await queryAll(m.table, m.pk, m.cols)).map(m.fromRow);
   }
 
   /* ---------------- phần chiếu quan hệ của Danh mục ---------------- */
@@ -205,7 +228,7 @@
       dels = [],
       audit = [];
     for (const t of CR.TABLES) {
-      const old = new Map((await S().call('/db/query', { table: t })).rows.map((r) => [r.id, r]));
+      const old = new Map((await queryAll(t, 'id')).map((r) => [r.id, r]));
       const seen = new Set();
       for (const row of built.tables[t]) {
         seen.add(row.id);
@@ -440,7 +463,7 @@
   const archive = {
     async metas() {
       S().assertOpen();
-      return (await S().call('/db/query', { table: 'archive_records', cols: ['meta'] })).rows.map((r) => JSON.parse(r.meta));
+      return (await queryAll('archive_records', 'id', ['meta'])).map((r) => JSON.parse(r.meta));
     },
     async meta(id) {
       S().assertOpen();

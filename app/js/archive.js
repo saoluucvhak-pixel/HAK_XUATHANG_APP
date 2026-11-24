@@ -528,11 +528,15 @@
    * ------------------------------------------------------------- */
   /** Toàn bộ hồ sơ dạng [{meta, data}] (dùng cho sao lưu riêng Lưu trữ và sao lưu toàn bộ). */
   async function collectItems(ids) {
-    const metas = (await list()).filter((m) => !ids || ids.includes(m.id));
+    const selected = ids && new Set(ids);
+    return collectContents((await list()).filter((m) => !selected || selected.has(m.id)));
+  }
+  async function collectContents(metas) {
     const items = [];
     for (const m of metas) {
       const data = await getOne('data', m.id);
-      if (data !== undefined) items.push({ meta: m, data });
+      if (data === undefined) throw Error('Thiếu nội dung hồ sơ ' + m.id + '. Chưa tạo bản sao lưu.');
+      items.push({ meta: m, data });
     }
     return items;
   }
@@ -872,11 +876,7 @@
       btn.disabled = true;
       Loading.show('Đang xuất ' + sel.length + ' hồ sơ…');
       try {
-        const items = [];
-        for (const m of sel) {
-          const data = await getOne('data', m.id);
-          if (data !== undefined) items.push({ meta: m, data });
-        }
+        const items = await collectContents(sel);
         const from = isoDay(sel[sel.length - 1].updatedAt).replace(/-/g, ''),
           to = isoDay(sel[0].updatedAt).replace(/-/g, '');
         const name = 'HAK_LuuTru_HoSoCu_' + from + '-' + to + '.json';
