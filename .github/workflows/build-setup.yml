@@ -58,6 +58,26 @@ jobs:
             if ($b.StatusCode -ne 413) { throw "oversized request returned $($b.StatusCode), expected 413" }
             Write-Host 'HAKDocs smoke test passed'
           } finally { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue }
+      - name: Check protected operations when token storage is unavailable
+        shell: pwsh
+        run: |
+          $dir = Join-Path $env:RUNNER_TEMP ([guid]::NewGuid().ToString())
+          New-Item -ItemType Directory -Path $dir | Out-Null
+          Copy-Item app/native/HAKDocs.exe $dir
+          New-Item -ItemType Directory -Path (Join-Path $dir 'hakdocs-token.js') | Out-Null
+          $env:HAK_DATA_DIR = Join-Path $dir 'data'
+          $p = Start-Process -FilePath (Join-Path $dir 'HAKDocs.exe') -ArgumentList '--serve' -PassThru -WindowStyle Hidden
+          try {
+            $up = $false
+            for ($i = 0; $i -lt 20 -and -not $up; $i++) {
+              Start-Sleep -Milliseconds 500
+              try { $up = (Invoke-WebRequest http://127.0.0.1:31879/status -TimeoutSec 2).StatusCode -eq 200 } catch { }
+            }
+            if (-not $up) { throw 'HAKDocs status endpoint did not start' }
+            $headers = @{ 'X-HAK-Client' = 'documents-v1'; 'X-HAK-Token' = ('0' * 32) }
+            $r = Invoke-WebRequest http://127.0.0.1:31879/db/status -Headers $headers -SkipHttpErrorCheck
+            if ($r.StatusCode -ne 403) { throw "Expected protected status to return 403, got $($r.StatusCode)" }
+          } finally { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue }
       - name: Build setup.exe
         shell: pwsh
         run: |
@@ -127,7 +147,8 @@ jobs:
           name: HAK Quản lý xuất hàng v${{ env.VERSION }}
           body: |
             Bộ cài Windows **v${{ env.VERSION }}** — dựng tự động từ commit ${{ github.sha }}.
-            Tải file `HAK_QuanLyXuatHang_Setup_v${{ env.VERSION }}.exe`, chạy để cài / cập nhật (giữ nguyên đường dẫn cài mặc định để không mất dữ liệu).
+            Sao lưu dữ liệu trước khi nâng cấp và giữ nguyên đường dẫn cài hiện tại. Tải `HAK_QuanLyXuatHang_Setup_v${{ env.VERSION }}.exe` để cài hoặc cập nhật.
+            Các tài khoản trong app dùng để phân quyền giao diện. Phạm vi bản này là môi trường Windows có tài khoản và kho dữ liệu riêng cho từng người dùng nếu cần cách ly dữ liệu.
             SHA-256: `${{ env.SHA256 }}` (PowerShell: `Get-FileHash .\HAK_QuanLyXuatHang_Setup_v${{ env.VERSION }}.exe`).
             Bộ cài chưa ký số: Windows có thể hiện cảnh báo SmartScreen. Chi tiết thay đổi: NHAT_KY_PHIEN_BAN.md.
           files: HAK_QuanLyXuatHang_Setup_v*.exe

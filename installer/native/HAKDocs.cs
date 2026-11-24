@@ -198,7 +198,7 @@ class HAKDocs {
  /* Mã bảo vệ: HAKDocs ghi vào native\hakdocs-token.js (app nạp bằng thẻ script). Trang web bên ngoài (iframe sandbox cũng có Origin "null") không đọc được file này nên không gọi được OCR / hộp Lưu / mở thư mục. */
  static string TokenFile {get{return Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"hakdocs-token.js");}}
  static string cachedToken=null;
- static bool tokenFileOk=false;   // false = không ghi được file mã (vd cài trong Program Files) → không bắt buộc mã, để app vẫn dùng được
+ static bool tokenFileOk=false;   // Không ghi được file mã: từ chối mọi thao tác được bảo vệ.
  static string EnsureToken(){
   if(cachedToken!=null)return cachedToken;
   try{if(File.Exists(TokenFile)){var m=System.Text.RegularExpressions.Regex.Match(File.ReadAllText(TokenFile),"HAK_DOCS_TOKEN='([0-9a-f]{32})'");if(m.Success){cachedToken=m.Groups[1].Value;tokenFileOk=true;return cachedToken;}}}catch{}
@@ -207,7 +207,7 @@ class HAKDocs {
   try{File.WriteAllText(TokenFile,"window.HAK_DOCS_TOKEN='"+t+"';\r\n",new UTF8Encoding(false));tokenFileOk=true;}catch{tokenFileOk=false;}
   cachedToken=t;return t;
  }
- static bool TokenOk(string given){var want=EnsureToken();if(!tokenFileOk)return true;if(given==null||given.Length!=want.Length)return false;int diff=0;for(int i=0;i<want.Length;i++)diff|=want[i]^given[i];return diff==0;}
+ static bool TokenOk(string given){var want=EnsureToken();if(!tokenFileOk)return false;if(given==null||given.Length!=want.Length)return false;int diff=0;for(int i=0;i<want.Length;i++)diff|=want[i]^given[i];return diff==0;}
  /* Đọc bỏ phần thân yêu cầu trước khi trả lỗi: đóng kết nối khi còn dữ liệu chưa đọc làm Windows gửi RST → trình duyệt chỉ thấy "Failed to fetch" thay vì lỗi 403 rõ ràng. */
  static void DrainBody(Stream s,Dictionary<string,string> h){int n;if(h.ContainsKey("Content-Length")&&Int32.TryParse(h["Content-Length"],out n)&&n>0){var buf=new byte[65536];long left=Math.Min((long)n,64L*1024*1024);try{while(left>0){int r=s.Read(buf,0,(int)Math.Min((long)buf.Length,left));if(r<=0)break;left-=r;}}catch{}}}
  static async Task Reply(Stream s,int code,object data,bool cors){byte[] bytes;try{bytes=Encoding.UTF8.GetBytes(Json.Serialize(data));}catch(InvalidOperationException){code=500;bytes=Encoding.UTF8.GetBytes("{\"error\":{\"code\":\"too-large\",\"message\":\"Kết quả vượt 45 MB. Hãy truy vấn theo từng phần (limit / offset).\"}}");}var head="HTTP/1.1 "+code+" "+(code==200?"OK":"Error")+"\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-store\r\nConnection: close\r\nContent-Length: "+bytes.Length+"\r\n"+(cors?"Access-Control-Allow-Origin: null\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type, X-HAK-Client, X-HAK-Token, X-HAK-Session\r\nAccess-Control-Allow-Private-Network: true\r\n":"")+"\r\n";var h=Encoding.ASCII.GetBytes(head);await s.WriteAsync(h,0,h.Length);await s.WriteAsync(bytes,0,bytes.Length);}

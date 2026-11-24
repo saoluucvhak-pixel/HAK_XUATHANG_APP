@@ -552,3 +552,26 @@ test('bản portable / HTML (không có mã bảo vệ, chưa từng dùng SQLit
   global.HAK_DOCS_TOKEN = oldTok;
   ls.clear();
 });
+
+test('đọc đủ mục lục SQLite có hơn 50.000 hồ sơ', async () => {
+  const { srv } = await boot(true);
+  srv.hakdb.db.exec(`
+    WITH RECURSIVE seq(n) AS (VALUES (1) UNION ALL SELECT n + 1 FROM seq WHERE n < 50001)
+    INSERT INTO archive_records (id, meta)
+    SELECT printf('paging-%05d', n), json_object('id', printf('paging-%05d', n)) FROM seq
+  `);
+  const records = await HAK.DBSqlite.archive.metas();
+  assert.equal(records.length, 50001);
+  assert.equal(new Set(records.map((r) => r.id)).size, 50001);
+  assert.equal(records.at(-1).id, 'paging-50001');
+});
+
+test('thu thập bản sao lưu dừng nếu mục lục thiếu nội dung hồ sơ', async () => {
+  const { srv } = await boot(true);
+  require('../app/js/archive.js');
+  srv.hakdb.db.exec(`
+    INSERT INTO archive_records (id, meta) VALUES ('missing-content', '{"id":"missing-content"}')
+  `);
+  assert.equal((await HAK.Archive.list()).length, 1);
+  await assert.rejects(HAK.Archive.collectItems(), /Thiếu nội dung hồ sơ missing-content/);
+});
