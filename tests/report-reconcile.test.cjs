@@ -32,7 +32,7 @@ test('L-22: Archive.setContract cập nhật updatedAt và làm mới bộ đệ
   };
 
   HAK.Archive._mem.meta.set('rec1', m);
-  HAK.Archive.load = async (id) => d;
+  HAK.Archive._mem.data.set('rec1', 'raw:' + JSON.stringify(d));
 
   const cache = new Map();
   const tk1 = await HAK.Report.prepareTickets([m], cache, true);

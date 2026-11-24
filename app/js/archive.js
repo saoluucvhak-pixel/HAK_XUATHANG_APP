@@ -23,6 +23,11 @@
   let dbp = null;
   const mem = { meta: new Map(), data: new Map() };
   const state = { backend: 'idb' };
+  const metaSnapshots = new WeakMap();
+  function rememberMeta(meta) {
+    if (meta) metaSnapshots.set(meta, JSON.stringify(meta));
+    return meta;
+  }
 
   function openDb() {
     if (dbp) return dbp;
@@ -67,15 +72,17 @@
     const q = await sq();
     if (q) return store === 'meta' ? q.metas() : Promise.reject(Error('getAll không áp dụng cho kho data ở SQLite'));
     const db = await openDb();
-    if (!db) return Array.from(mem[store].values());
-    return reqP(db.transaction(store, 'readonly').objectStore(store).getAll());
+    const values = db
+      ? await reqP(db.transaction(store, 'readonly').objectStore(store).getAll())
+      : Array.from(mem[store].values(), (value) => structuredClone(value));
+    return store === 'meta' ? values.map(rememberMeta) : values;
   };
   const getOne = async (store, k) => {
     const q = await sq();
     if (q) return store === 'meta' ? q.meta(k) : q.data(k);
     const db = await openDb();
-    if (!db) return mem[store].get(k);
-    return reqP(db.transaction(store, 'readonly').objectStore(store).get(k));
+    const value = db ? await reqP(db.transaction(store, 'readonly').objectStore(store).get(k)) : structuredClone(mem[store].get(k));
+    return store === 'meta' ? rememberMeta(value) : value;
   };
   /**
    * Giao dịch ghi vào 2 kho meta + data. Lỗi ĐỒNG BỘ (cơ sở dữ liệu đang đóng do cửa sổ khác nâng cấp, dữ liệu không sao chép được…)
@@ -93,7 +100,10 @@
         tx = db.transaction(['meta', 'data'], 'readwrite');
         tx.oncomplete = () => ok();
         tx.onerror = tx.onabort = () => no(tx.error || new Error('Không ghi được dữ liệu lưu trữ'));
-        work(tx);
+        work(tx, (error) => {
+          no(error);
+          tx.abort();
+        });
       } catch (e) {
         // Lỗi đồng bộ GIỮA hai lần ghi (vd meta đã put, data chưa) → phải HỦY giao dịch, nếu không phần đã ghi sẽ được commit → meta mồ côi.
         try {
@@ -113,23 +123,44 @@
       /* môi trường không có sự kiện */
     }
   };
-  const putBoth = async (meta, data) => {
+  const putBoth = async (meta, data, previous = meta) => {
     const q = await sq();
-    const r = q ? await q.put(meta, data) : await putBothIdb(meta, data);
+    const r = q ? await q.put(meta, data, previous) : await putBothIdb(meta, data, previous);
     changed();
     return r;
   };
-  const putBothIdb = (meta, data) =>
-    writeTx(
-      (tx) => {
-        tx.objectStore('meta').put(meta);
-        if (data !== undefined) tx.objectStore('data').put(data, meta.id);
+  const putBothIdb = (meta, data, previous) => {
+    const check = (current, content) => {
+      if (!current || content === undefined || JSON.stringify(current) !== metaSnapshots.get(previous))
+        throw Object.assign(Error('Mục lục hoặc nội dung hồ sơ ' + meta.id + ' đã thay đổi. Hãy mở lại hồ sơ.'), { code: 'conflict' });
+    };
+    return writeTx(
+      (tx, abort) => {
+        const metas = tx.objectStore('meta');
+        const contents = tx.objectStore('data');
+        if (data !== undefined) {
+          metas.put(meta);
+          contents.put(data, meta.id);
+          return;
+        }
+        const current = metas.get(meta.id);
+        const content = contents.get(meta.id);
+        content.onsuccess = () => {
+          try {
+            check(current.result, content.result);
+            metas.put(meta);
+          } catch (e) {
+            abort(e);
+          }
+        };
       },
       () => {
-        mem.meta.set(meta.id, meta);
+        if (data === undefined) check(mem.meta.get(meta.id), mem.data.get(meta.id));
+        mem.meta.set(meta.id, structuredClone(meta));
         if (data !== undefined) mem.data.set(meta.id, data);
       }
     );
+  };
   const delOne = async (id) => {
     const q = await sq();
     const r = q ? await q.del(id) : await delOneIdb(id);
@@ -339,7 +370,7 @@
         data = await pack({ v: 1, type, params, rows, custom });
         meta.size = data.length;
       }
-      await putBoth(meta, data);
+      await putBoth(meta, data, old);
       trim();
       updateBadge();
       if (navigator.storage && navigator.storage.persist) {
@@ -386,20 +417,25 @@
 
   /** Hồ sơ lưu từ bản trước chưa có số liệu báo cáo → tính bổ sung từ dữ liệu đã lưu (1 lần). */
   async function ensureStats(metas) {
+    const result = [];
     for (const m of metas) {
-      if (m.sv >= 2) continue;
+      if (m.sv >= 2) {
+        result.push(m);
+        continue;
+      }
       try {
         const d = await load(m.id);
-        Object.assign(m, stats(d.type, d.params, d.rows));
-        await putBoth(m);
+        const updated = Object.assign({}, m, stats(d.type, d.params, d.rows));
+        await putBoth(updated, undefined, m);
+        result.push(updated);
       } catch (e) {
         console.warn('Không bổ sung được số liệu cho hồ sơ', m.id, e);
-        m.sv = 2;
-        m.retKg = m.retKg || 0;
-        m.retTrips = m.retTrips || 0;
+        // Nếu hồ sơ đã bị xóa hoặc sửa ở cửa sổ khác, không cộng mục lục cũ vào báo cáo.
+        const current = await getOne('meta', m.id);
+        if (current) result.push(Object.assign(current, { sv: 2, retKg: current.retKg || 0, retTrips: current.retTrips || 0 }));
       }
     }
-    return metas;
+    return result;
   }
 
   const list = async () => (await getAll('meta')).sort((a, b) => b.updatedAt - a.updatedAt);

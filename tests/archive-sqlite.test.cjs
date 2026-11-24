@@ -145,3 +145,50 @@ test('mất kết nối khi lưu: trả false kèm lý do, không treo', async (
   assert.equal(r, false);
   assert.match(A.lastError, /không kết nối được|SQLite/);
 });
+
+test('cập nhật mục lục từ dữ liệu cũ không tạo lại hồ sơ đã xóa', async () => {
+  const srv = await boot();
+  assert.equal(await A.save(...args()), true);
+  const Q = HAK.DBSqlite.archive;
+  const [held] = await A.list();
+  await Q.del(held.id);
+  await assert.rejects(Q.put(held), { code: 'conflict' });
+  assert.equal(srv.hakdb.counts().archive_records, 0);
+  assert.equal(srv.hakdb.counts().archive_data, 0);
+});
+
+test('cập nhật mục lục kiểm cả phiên bản và sự tồn tại của nội dung', async () => {
+  const srv = await boot();
+  assert.equal(await A.save(...args()), true);
+  const Q = HAK.DBSqlite.archive;
+  const [held] = await A.list();
+  await A.setContract([held.id], 'new-contract');
+  await assert.rejects(Q.put(held), { code: 'conflict' });
+  const current = await Q.meta(held.id);
+  assert.equal(current.contract, 'new-contract');
+  srv.hakdb.tx([{ op: 'del', table: 'archive_data', key: held.id }]);
+  await assert.rejects(Q.put(current), { code: 'conflict' });
+  assert.equal((await Q.meta(held.id)).contract, 'new-contract');
+});
+
+test('báo cáo loại mục lục cũ khi cửa sổ khác xóa hồ sơ trong lúc bổ sung thống kê', async () => {
+  const srv = await boot();
+  assert.equal(await A.save(...args()), true);
+  const Q = HAK.DBSqlite.archive;
+  const [original] = await A.list();
+  original.sv = 1;
+  await Q.put(original);
+  const metas = await A.list();
+  const call = S.call;
+  S.call = async (endpoint, body, options) => {
+    if (endpoint === '/db/tx' && body.ops.some((op) => op.op === 'guard' && op.table === 'archive_data')) await Q.del(original.id);
+    return call(endpoint, body, options);
+  };
+  try {
+    assert.deepEqual(await A.ensureStats(metas), []);
+  } finally {
+    S.call = call;
+  }
+  assert.equal(srv.hakdb.counts().archive_records, 0);
+  assert.equal(srv.hakdb.counts().archive_data, 0);
+});

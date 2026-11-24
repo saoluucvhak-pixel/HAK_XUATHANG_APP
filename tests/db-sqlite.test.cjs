@@ -575,3 +575,15 @@ test('thu thập bản sao lưu dừng nếu mục lục thiếu nội dung hồ
   assert.equal((await HAK.Archive.list()).length, 1);
   await assert.rejects(HAK.Archive.collectItems(), /Thiếu nội dung hồ sơ missing-content/);
 });
+
+test('sao lưu toàn bộ và theo tháng từ chối đợt thiếu tệp cân gốc', async () => {
+  await boot(true);
+  require('../app/js/records.js');
+  require('../app/js/backup-month.js');
+  require('../app/js/backup.js');
+  HAK.Store = { keys: () => [] };
+  await DB.put('batches', { id: 'missing-xlsx', fileName: 'missing.xlsx' });
+  await assert.rejects(HAK.Backup.buildFull(), /Thiếu tệp Excel gốc của đợt missing-xlsx/);
+  await assert.rejects(HAK.Backup.buildMonth('2026-11'), /Thiếu tệp Excel gốc của đợt missing-xlsx/);
+  assert.deepEqual(await HAK.Batches.loadAll(), []);
+});

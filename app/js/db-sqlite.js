@@ -460,15 +460,21 @@
     updated_at: intOrNull(m.updatedAt),
     meta: J(m),
   });
+  const archiveRevisions = new WeakMap();
+  function archiveMeta(row) {
+    const meta = JSON.parse(row.meta);
+    archiveRevisions.set(meta, row.rev);
+    return meta;
+  }
   const archive = {
     async metas() {
       S().assertOpen();
-      return (await queryAll('archive_records', 'id', ['meta'])).map((r) => JSON.parse(r.meta));
+      return (await queryAll('archive_records', 'id', ['meta', 'rev'])).map(archiveMeta);
     },
     async meta(id) {
       S().assertOpen();
-      const r = (await S().call('/db/query', { table: 'archive_records', where: { id }, cols: ['meta'], limit: 1 })).rows[0];
-      return r ? JSON.parse(r.meta) : undefined;
+      const r = (await S().call('/db/query', { table: 'archive_records', where: { id }, cols: ['meta', 'rev'], limit: 1 })).rows[0];
+      return r ? archiveMeta(r) : undefined;
     },
     async data(id) {
       S().assertOpen();
@@ -480,10 +486,16 @@
       return (await S().call('/db/query', { table: 'archive_records', cols: ['id'], count: true, limit: 1 })).total;
     },
     /** Lưu meta (+ dữ liệu nếu có) trong MỘT giao dịch: hoặc cả hai, hoặc không gì (không còn meta mồ côi). */
-    async put(meta, data) {
+    async put(meta, data, previous = meta) {
       S().assertOpen();
       const ops = [{ op: 'put', table: 'archive_records', row: recordRow(meta) }];
-      if (data !== undefined)
+      if (data === undefined) {
+        const rev = archiveRevisions.get(previous);
+        if (!Number.isInteger(rev)) throw Object.assign(Error('Cần đọc lại mục lục hồ sơ ' + meta.id), { code: 'conflict' });
+        ops[0].ifRev = rev;
+        // Bảng nội dung không có cột rev; guard dùng 1 cho bản ghi tồn tại.
+        ops.unshift({ op: 'guard', table: 'archive_data', key: meta.id, ifRev: 1 });
+      } else
         ops.push({
           op: 'put',
           table: 'archive_data',

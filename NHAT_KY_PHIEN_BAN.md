@@ -1,5 +1,10 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.25.18 — Bảo toàn đợt cân và mục lục hồ sơ
+- Sao lưu toàn bộ và theo tháng dừng, báo mã đợt khi thiếu tệp Excel cân gốc.
+- Cập nhật riêng mục lục kiểm tra phiên bản đã đọc và sự tồn tại của nội dung trong cùng giao dịch. Báo cáo bỏ hồ sơ đã bị xóa khi đang bổ sung thống kê.
+- Nghiệm thu đóng phiên trình duyệt cũ trước khi đặt lại dữ liệu SQLite thử.
+
 ## v2.25.17 — Kiểm tra dữ liệu trước khi hoàn tất sao lưu
 - Đọc danh sách SQLite theo từng trang có thứ tự và đối chiếu số bản ghi, tránh thiếu hồ sơ ở ngưỡng 50.000 dòng.
 - Báo mã hồ sơ thiếu nội dung và dừng tạo bản sao lưu thay vì bỏ qua hồ sơ.
