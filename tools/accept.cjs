@@ -152,6 +152,7 @@ async function login(p) {
   let p = null;
   /** Mỗi phần chạy trong một phiên trình duyệt MỚI (kho dữ liệu trống) để số hồ sơ đếm được không lẫn với phần trước. */
   const fresh = async () => {
+    if (p) await p.context().close();
     const ctx = await browser.newContext({ viewport: { width: 1500, height: 1000 }, acceptDownloads: true });
     p = await ctx.newPage();
     p.on('pageerror', (e) => errs.push(e.message));

@@ -118,18 +118,19 @@
       }
     },
     /** Toàn bộ đợt đã lưu, cũ → mới: [{ meta, bytes }]. */
-    async loadAll() {
+    async loadAll({ requireFiles = false } = {}) {
       const metas = (await DB().getAll('batches')).sort((a, b) => a.addedAt - b.addedAt);
       const out = [];
       for (const m of metas) {
         const bytes = await DB().get('batchdata', m.id);
         if (bytes) out.push({ meta: m, bytes });
+        else if (requireFiles) throw Error('Thiếu tệp Excel gốc của đợt ' + m.id + '. Chưa tạo bản sao lưu.');
       }
       return out;
     },
     /** Dùng cho sao lưu toàn bộ. */
     async exportAll() {
-      const list = await this.loadAll();
+      const list = await this.loadAll({ requireFiles: true });
       return list.map((x) => ({ meta: x.meta, b64: bufToB64(x.bytes) }));
     },
     /** opts.keepNewer: không đè đợt đang có trên máy nếu phiên bản (rev) máy này >= bản sao (nhập bổ sung theo phiên bản; nhập lặp không đổi gì). */
