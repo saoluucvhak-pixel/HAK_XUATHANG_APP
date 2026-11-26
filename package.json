@@ -6,6 +6,7 @@
     "check": "node tools/check.cjs",
     "quality": "node tools/hak-quality/bin/hak-quality.js app --out reports/quality --fail-on error",
     "release": "node tools/build-release.cjs",
+    "setup:build": "bash tools/build-setup.sh",
     "lint": "eslint app/js",
     "smoke": "node tools/smoke.cjs",
     "verify": "npm run check && npm run format:check && npm run lint && npm test && npm run smoke",
