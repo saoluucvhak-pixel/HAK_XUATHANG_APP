@@ -168,9 +168,10 @@
       </div>
       <div id="fileResult" class="mt-3" hidden>
         <div class="row g-3 align-items-end mb-3">
-          <div class="col-md-5"><div class="card"><div class="card-body py-3"><div class="muted small">Đợt đang xem</div><div class="fw-semibold text-break" id="fileName"></div><div class="muted small" id="fileMeta"></div></div></div></div>
-          <div class="col-md-4"><label class="form-label" for="sheetSelect">Chọn Sheet</label><select class="form-select" id="sheetSelect"></select></div>
-          <div class="col-md-3 d-grid"><button class="btn btn-outline-primary" id="btnReparse" type="button">↻ Đọc lại sheet</button></div>
+          <div class="col-md-4"><div class="card"><div class="card-body py-3"><div class="muted small">Đợt đang xem</div><div class="fw-semibold text-break" id="fileName"></div><div class="muted small" id="fileMeta"></div></div></div></div>
+          <div class="col-md-3"><label class="form-label" for="sheetSelect">Chọn Sheet</label><select class="form-select" id="sheetSelect"></select></div>
+          <div class="col-md-3"><label class="form-label" for="batchTemplateSelect">Mẫu nhập Excel</label><select class="form-select" id="batchTemplateSelect"></select></div>
+          <div class="col-md-2 d-grid"><button class="btn btn-outline-primary" id="btnReparse" type="button">↻ Đọc lại sheet</button></div>
         </div>
         <div id="fileAlerts" class="mb-3"></div>
         <div id="fileSmartFilter"></div><div class="d-flex flex-wrap align-items-center gap-2 mb-3"><span class="form-text m-0 flex-grow-1"><b>Lọc xem trước</b>: chỉ áp dụng cho bảng và thống kê bên dưới, KHÔNG làm thay đổi phạm vi lập chứng từ (đặt ở trang biên bản) hay kỳ báo cáo (đặt ở Báo cáo).</span><button class="btn btn-outline-primary btn-sm" id="btnUseScope" type="button">Dùng phạm vi đang xem</button></div>
@@ -407,6 +408,7 @@
         <li class="nav-item admin-only"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#tab-company" type="button">🏢 Công ty</button></li>
         <li class="nav-item admin-only"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-wh" type="button">🏭 Kho</button></li>
         <li class="nav-item admin-only"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-tpl" type="button">📑 Mẫu Word</button></li>
+        <li class="nav-item admin-only"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-excel-tpl" type="button">📊 Mẫu nhập Excel</button></li>
         <li class="nav-item admin-only"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-general" type="button">🛠️ Chung</button></li>
         <li class="nav-item admin-only"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-backup" type="button">💾 Sao lưu &amp; khôi phục</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-account" type="button">👤 Tài khoản</button></li>
@@ -429,6 +431,7 @@
           <div class="card"><div class="card-header">📖 Danh sách placeholder</div>
             <div class="card-body"><div class="tbl-wrap" style="max-height:none"><table class="table"><thead><tr><th>Placeholder</th><th>Ý nghĩa</th></tr></thead><tbody id="phList"></tbody></table></div></div></div>
         </div>
+        <div class="tab-pane fade" id="tab-excel-tpl"></div>
         <div class="tab-pane fade" id="tab-account"><div id="authAccount"></div></div>
         <div class="tab-pane fade" id="tab-general">
           <div class="card"><div class="card-header">Cài đặt chung</div><div class="card-body" id="generalBody"></div></div>
@@ -506,6 +509,7 @@
 <script src="js/generator.js"></script>
 <script src="js/batch-merge.js"></script>
 <script src="js/read-config.js"></script>
+<script src="js/excel-template.js"></script>
 <script src="js/templates-data.js"></script>
 <script src="js/docx-worker-source.js"></script>
 <script src="js/docx-worker.js"></script>

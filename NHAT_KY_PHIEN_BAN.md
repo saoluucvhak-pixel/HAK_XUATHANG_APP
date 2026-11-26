@@ -1,5 +1,11 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.25.19 — Cấu hình Mẫu nhập Excel tùy biến và tự động xuất file mẫu
+- **Cấu hình Mẫu nhập Excel (Cài đặt → Mẫu nhập Excel):** Cho phép người quản trị tạo, sửa, sao chép, xóa và đặt mẫu mặc định khi nhà cung cấp hoặc trạm cân đổi mẫu phiếu cân. Hỗ trợ tiêu đề ở dòng bất kỳ, đổi vị trí cột và chuẩn hóa đơn vị (kg / tấn).
+- **Đọc thử & Đối chiếu:** Quét thử cấu hình với file mẫu trực tiếp trên máy, hiển thị 5 dòng chuẩn hóa, tổng số phiếu, tổng kg và đối chiếu với số liệu công bố nếu có.
+- **Tự động sinh và tải file Excel mẫu (.xlsx):** Bổ sung nút tải file mẫu chuẩn chuyên nghiệp (4 sheet) và tính năng tự động tạo file mẫu (.xlsx) theo đúng từng cấu hình mẫu của đối tác để gửi trạm cân điền.
+- **Bảo toàn đợt dữ liệu cũ:** Mỗi đợt lưu snapshot cấu hình đọc đã áp dụng, mở lại đợt cũ luôn đọc đúng định dạng kể cả khi mẫu mặc định đã thay đổi.
+
 ## v2.25.18 — Bảo toàn đợt cân và mục lục hồ sơ
 - Sao lưu toàn bộ và theo tháng dừng, báo mã đợt khi thiếu tệp Excel cân gốc.
 - Cập nhật riêng mục lục kiểm tra phiên bản đã đọc và sự tồn tại của nội dung trong cùng giao dịch. Báo cáo bỏ hồ sơ đã bị xóa khi đang bổ sung thống kê.
