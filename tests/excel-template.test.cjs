@@ -483,3 +483,38 @@ test('11. Ghép riêng cột Ngày cân, Giờ cân vào và Giờ cân ra: tạ
   assert.equal(r.time2, '26/11/2026 09:15:00');
   assert.equal(r.net, 15000);
 });
+
+test('12. Hỗ trợ sheet có ô gộp tiêu đề (merged cells): tự động lan tỏa giá trị ô gộp không làm mất tiêu đề', () => {
+  const ws = XLSX.utils.aoa_to_sheet([
+    ['BÁO CÁO CÂN'],
+    ['STT', 'Số phiếu', 'Ngày cân', 'Thời gian cân', null, 'Biển số xe', 'Khối lượng hàng'],
+    [null, null, null, 'Giờ vào', 'Giờ ra', null, null],
+    [1, 'P-099', '26/11/2026', '08:10', '08:45', '29C-888.99', 24000],
+  ]);
+  // Giả lập ô gộp 2 dòng của STT (A2:A3), Số phiếu (B2:B3), Ngày cân (C2:C3), Biển số (F2:F3), Khối lượng (G2:G3)
+  ws['!merges'] = [
+    { s: { r: 1, c: 0 }, e: { r: 2, c: 0 } },
+    { s: { r: 1, c: 1 }, e: { r: 2, c: 1 } },
+    { s: { r: 1, c: 2 }, e: { r: 2, c: 2 } },
+    { s: { r: 1, c: 3 }, e: { r: 1, c: 4 } },
+    { s: { r: 1, c: 5 }, e: { r: 2, c: 5 } },
+    { s: { r: 1, c: 6 }, e: { r: 2, c: 6 } },
+  ];
+  const wb = { SheetNames: ['Sheet1'], Sheets: { Sheet1: ws } };
+  const G = HAK.Excel.getSheetGrid(ws);
+
+  // Kiểm tra dòng 3 (index 2) đã được tự động lan tỏa 'Số phiếu' và 'Biển số xe'
+  assert.equal(G[2][1], 'Số phiếu');
+  assert.equal(G[2][2], 'Ngày cân');
+  assert.equal(G[2][5], 'Biển số xe');
+
+  const parsed = HAK.Excel.parseSheet(wb, 'Sheet1', {
+    headerRow: 3,
+    fallbackUnit: 'kg',
+  });
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.rows.length, 1);
+  assert.equal(parsed.rows[0].ticket, 'P-099');
+  assert.equal(parsed.rows[0].plate, '29C-888.99');
+  assert.equal(parsed.rows[0].net, 24000);
+});

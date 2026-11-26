@@ -398,6 +398,34 @@
     return meta;
   }
 
+  function getSheetGrid(ws) {
+    if (!ws) return [];
+    const G = root.XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null, blankrows: true });
+    if (ws['!merges'] && Array.isArray(ws['!merges'])) {
+      const range = root.XLSX.utils.decode_range(ws['!ref'] || 'A1');
+      const r0 = range.s.r;
+      const c0 = range.s.c;
+      ws['!merges'].forEach((m) => {
+        const topR = m.s.r - r0;
+        const topC = m.s.c - c0;
+        const topVal = G[topR]?.[topC];
+        if (topVal !== null && topVal !== undefined && topVal !== '') {
+          for (let r = m.s.r; r <= m.e.r; r++) {
+            const gr = r - r0;
+            if (!G[gr]) G[gr] = [];
+            for (let c = m.s.c; c <= m.e.c; c++) {
+              const gc = c - c0;
+              if (G[gr][gc] === null || G[gr][gc] === undefined || G[gr][gc] === '') {
+                G[gr][gc] = topVal;
+              }
+            }
+          }
+        }
+      });
+    }
+    return G;
+  }
+
   /**
    * parseSheet(workbook, sheetName, opts)
    *   opts.mapping   : ghi đè ánh xạ cột { field: colIndex | -1 }
@@ -411,7 +439,7 @@
     const range = root.XLSX.utils.decode_range(ws['!ref'] || 'A1');
     const rowOff = range.s.r,
       colOff = range.s.c;
-    const G = root.XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null, blankrows: true });
+    const G = getSheetGrid(ws);
 
     const ds = {
       sheetName,
@@ -907,6 +935,7 @@
     readFile,
     readBuffer,
     parseSheet,
+    getSheetGrid,
     findHeaderRow,
     detectMapping,
     computeStats,

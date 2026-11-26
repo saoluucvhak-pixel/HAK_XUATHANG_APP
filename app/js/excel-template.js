@@ -621,10 +621,12 @@
         '        <button class="btn btn-sm btn-outline-primary w-100" id="wizBtnScan" type="button">🔍 Quét tiêu đề</button>' +
         '      </div>' +
         '    </div>' +
+        '    <div id="wizHeaderPreviewArea"></div>' +
         '  </div>' +
         // Bước 2: Ghép cột
         '  <div class="p-3 mb-3 border rounded bg-light-subtle">' +
         '    <h6 class="text-primary fw-bold mb-2">2. Ghép cột & Đơn vị tính</h6>' +
+        '    <div id="wizHeaderAlert"></div>' +
         '    <div class="row g-2 mb-3">' +
         '      <div class="col-md-6">' +
         '        <label class="form-label small fw-semibold">Tên mẫu phiếu cân <span class="text-danger">*</span></label>' +
@@ -764,8 +766,8 @@
               .join('');
             this._state.currentSheet = info.sheetNames[0] || '';
 
-            // Tự động quét tiêu đề
-            this.scanHeaderRow();
+            // Tự động quét và tìm dòng tiêu đề
+            this.scanHeaderRow(true);
           } catch (err) {
             HAK.UI.toast('Lỗi đọc file: ' + err.message, 'error');
           }
@@ -775,13 +777,24 @@
       if (sheetSelect) {
         sheetSelect.addEventListener('change', () => {
           this._state.currentSheet = sheetSelect.value;
-          this.scanHeaderRow();
+          this.scanHeaderRow(true);
         });
       }
 
       if (btnScan) {
         btnScan.addEventListener('click', () => {
-          this.scanHeaderRow();
+          this.scanHeaderRow(false);
+        });
+      }
+
+      const rowInput = body.querySelector('#wizHeaderRow');
+      if (rowInput) {
+        let debounceTimer;
+        rowInput.addEventListener('input', () => {
+          clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(() => {
+            this.scanHeaderRow(false);
+          }, 250);
         });
       }
 
@@ -828,7 +841,7 @@
       }
     },
 
-    scanHeaderRow() {
+    scanHeaderRow(forceAutoDetect = false) {
       const wb = this._state.tempWb;
       if (!wb) {
         HAK.UI.toast('Vui lòng chọn file Excel mẫu trước.', 'warning');
@@ -838,28 +851,120 @@
       const ws = wb.Sheets[sheetName];
       if (!ws) return;
 
-      const G = root.XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null, blankrows: true });
+      const G = HAK.Excel.getSheetGrid
+        ? HAK.Excel.getSheetGrid(ws)
+        : root.XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null, blankrows: true });
       const rowInput = document.getElementById('wizHeaderRow');
       const { r: rowOff, c: colOff } = root.XLSX.utils.decode_range(ws['!ref'] || 'A1').s;
       let hr = parseInt(rowInput.value, 10);
 
-      if (!hr || hr < 1) {
+      if (forceAutoDetect || !hr || hr < 1) {
         const found = HAK.Excel.findHeaderRow(G);
-        hr = rowOff + Math.max(0, found) + 1;
-        rowInput.value = hr;
+        if (found >= 0) {
+          hr = rowOff + found + 1;
+          if (rowInput) rowInput.value = hr;
+        } else if (!hr || hr < 1) {
+          hr = 1;
+          if (rowInput) rowInput.value = 1;
+        }
       }
 
       this._state.currentHeaderRow = hr;
       const headerCells = G[hr - 1 - rowOff] || [];
       this._state.currentHeaders = headerCells.map((c) => (c == null ? '' : String(c).trim()));
 
+      // Cập nhật bảng xem trước các dòng đầu tiên
+      const body = document.getElementById('tplWizardBody');
+      if (!body) return;
+
+      const previewEl = body.querySelector('#wizHeaderPreviewArea');
+      if (previewEl) {
+        const maxRows = Math.min(G.length, 12);
+        let previewHtml =
+          '<div class="card mt-2 border-secondary-subtle">' +
+          '  <div class="card-header py-1 px-2 d-flex align-items-center bg-body-tertiary">' +
+          '    <span class="small fw-semibold text-secondary">📋 Xem trước các dòng đầu tiên của sheet (bấm để chọn dòng tiêu đề)</span>' +
+          '  </div>' +
+          '  <div class="table-responsive" style="max-height: 180px; overflow-y: auto;">' +
+          '    <table class="table table-sm table-hover align-middle mb-0" style="font-size: 12px;">' +
+          '      <thead class="table-light sticky-top"><tr><th style="width:65px">Dòng</th><th style="width:105px">Thao tác</th><th>Nội dung xem trước các ô trên dòng</th></tr></thead>' +
+          '      <tbody>';
+
+        for (let r = 0; r < maxRows; r++) {
+          const actualRow = r + rowOff + 1;
+          const rowData = G[r] || [];
+          const isSelected = actualRow === hr;
+          const rowText = rowData
+            .map((c, ci) => (c == null || c === '' ? '' : HAK.Excel.util.colName(ci + colOff) + ': ' + String(c).trim()))
+            .filter(Boolean)
+            .slice(0, 10)
+            .join(' | ');
+
+          previewHtml +=
+            '<tr class="' +
+            (isSelected ? 'table-success fw-semibold' : '') +
+            '">' +
+            '  <td>Dòng ' +
+            actualRow +
+            '</td>' +
+            '  <td>' +
+            (isSelected
+              ? '<span class="badge bg-success">Đang chọn</span>'
+              : '<button type="button" class="btn btn-xs btn-outline-primary btn-pick-row py-0 px-1" data-row="' +
+                actualRow +
+                '">👉 Chọn dòng</button>') +
+            '  </td>' +
+            '  <td class="text-truncate" style="max-width: 500px;" title="' +
+            HAK.UI.esc(rowText) +
+            '">' +
+            (rowText ? HAK.UI.esc(rowText) : '<span class="text-muted fst-italic">(dòng trống)</span>') +
+            '</td>' +
+            '</tr>';
+        }
+
+        previewHtml += '</tbody></table></div></div>';
+        previewEl.innerHTML = previewHtml;
+
+        previewEl.querySelectorAll('.btn-pick-row').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const pick = parseInt(btn.getAttribute('data-row'), 10);
+            if (pick > 0) {
+              if (rowInput) rowInput.value = pick;
+              this.scanHeaderRow(false);
+            }
+          });
+        });
+      }
+
+      // Đánh giá số cột có tiêu đề hợp lệ để cảnh báo người dùng nếu chọn sai dòng
+      const validHeadersCount = this._state.currentHeaders.filter((h) => h && h.trim()).length;
+      const alertEl = body.querySelector('#wizHeaderAlert');
+      if (alertEl) {
+        if (validHeadersCount === 0) {
+          alertEl.innerHTML =
+            '<div class="alert alert-warning py-2 px-3 small mb-2">' +
+            '  <strong>⚠️ Dòng ' +
+            hr +
+            ' không có tên tiêu đề cột nào!</strong> Toàn bộ các cột đang là <i>(không tiêu đề)</i>.<br>' +
+            '  Hãy xem bảng <b>"📋 Xem trước các dòng đầu tiên"</b> ở trên và bấm nút <b>"👉 Chọn dòng"</b> tại dòng chứa tên cột (thường là dòng 5, 6 hoặc 7 có chữ <i>Số phiếu, Ngày cân, Biển số...</i>).' +
+            '</div>';
+        } else if (validHeadersCount < 2) {
+          alertEl.innerHTML =
+            '<div class="alert alert-info py-2 px-3 small mb-2">' +
+            '  ℹ️ Dòng ' +
+            hr +
+            ' chỉ có ' +
+            validHeadersCount +
+            ' cột có tên. Hãy kiểm tra lại dòng tiêu đề chính ở bảng xem trước phía trên.' +
+            '</div>';
+        } else {
+          alertEl.innerHTML = '';
+        }
+      }
+
       // Tự động gợi ý ghép cột bằng detectMapping
       const sample = G.slice(Math.max(0, hr - rowOff), Math.max(0, hr - rowOff) + 100);
       const autoM = HAK.Excel.detectMapping(this._state.currentHeaders, sample);
-
-      // Cập nhật lại các dropdown cột và tiêu đề
-      const body = document.getElementById('tplWizardBody');
-      if (!body) return;
 
       TEMPLATE_FIELDS.forEach((f) => {
         const sel = body.querySelector('.wiz-col-select[data-field="' + f.key + '"]');
@@ -867,7 +972,7 @@
         if (!sel) return;
 
         let curVal = parseInt(sel.value, 10);
-        if (curVal < 0) {
+        if (curVal < 0 || !this._state.currentHeaders[curVal]) {
           if (autoM[f.key] !== undefined) {
             curVal = autoM[f.key];
           } else if (f.key === 'date' && autoM.datetime1 !== undefined) {
@@ -894,7 +999,7 @@
             .join('');
 
         if (hdr && curVal >= 0 && this._state.currentHeaders[curVal]) {
-          if (!hdr.value.trim()) hdr.value = this._state.currentHeaders[curVal];
+          hdr.value = this._state.currentHeaders[curVal];
         }
       });
 
