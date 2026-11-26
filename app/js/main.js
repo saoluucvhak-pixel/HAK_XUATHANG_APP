@@ -1165,7 +1165,7 @@
     let html =
       '<div class="row g-2 align-items-end mb-2"><div class="col-auto"><label class="form-label small mb-0">Dòng tiêu đề (số dòng Excel)</label>' +
       '<input class="form-control form-control-sm" style="width:110px" type="number" min="1" id="hdrRow" value="' +
-      (App.headerRow || (ds.headerRow >= 0 ? ds.headerRow + 1 : '')) +
+      (App.headerRow || ds.headerExcelRow || '') +
       '" placeholder="tự dò"></div>' +
       '<div class="col-auto"><button class="btn btn-sm btn-outline-primary" id="btnHdr" type="button">Áp dụng</button></div></div>';
     if (!cols.length) {

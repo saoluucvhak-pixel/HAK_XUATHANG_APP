@@ -39,21 +39,21 @@
   /* Quy tắc nhận diện cột theo tiêu đề đã chuẩn hoá (không dấu, chữ thường). Thứ tự = độ ưu tiên. */
   const RULES = [
     ['datetime2', /ngay gio can 2|thoi gian can 2|ngay can 2/],
-    ['datetime1', /ngay gio can 1|thoi gian can 1|ngay gio can( vao)?$/],
+    ['datetime1', /ngay gio can 1|thoi gian can 1|ngay gio can( vao)?$|^thoi gian can$|^weigh(ing)? date time$/],
     ['timeIn', /gio can vao|gio vao|gio can 1|gio can lan 1/],
     ['timeOut', /gio can ra|gio ra|gio can 2|gio can lan 2/],
-    ['date', /^ngay( can)?( 1| vao)?$|^ngay xuat|^ngay can|^ngay$/],
-    ['ticket', /phieu/],
-    ['tare', /xe khong|can lan 1|tl xe|^bi$|^tare|trong luong xe$|khoi luong xe$/],
-    ['gross', /co hang|can lan 2|tong trong luong|^gross/],
-    ['net', /luong hang|kl hang|khoi luong hang|^khoi luong$|^trong luong$|^net/],
+    ['date', /^ngay( can)?( 1| vao)?$|^ngay xuat|^ngay can|^(weigh(ing)? )?date$/],
+    ['ticket', /phieu|^(ma|so) can$|^(weigh(ing)? )?ticket( no| number)?$/],
+    ['tare', /xe khong|can lan 1|tl xe|^(bi|kl bi|tl bi)$|^tare|trong luong xe$|khoi luong xe$/],
+    ['gross', /co hang|can lan 2|tong trong luong|^kl tong$|^tl tong$|^gross/],
+    ['net', /luong hang|kl hang|khoi luong hang|^khoi luong$|^trong luong$|^(kl|tl) tinh$|^net/],
     ['unit', /^don vi tinh$|^dvt$/],
     ['weigher', /nguoi can/],
     ['driver', /tai xe|lai xe/],
     ['carrier', /don vi van (chuyen|tai)|dvvc|nha xe|nha van tai|chu xe/],
-    ['wh', /^kho( xuat| nhap| giao| nhan| gui)?$|ten kho|kho xuat|kho nhan/],
+    ['wh', /^kho( hang| xuat| nhap| giao| nhan| gui)?$|ten kho|kho xuat|kho nhan/],
     ['weightType', /loai can|kieu can/],
-    ['plate', /so xe|bien so|bien kiem soat|^xe$|^bks$/],
+    ['plate', /so xe|bien so|bien kiem soat|^xe$|^bks$|^(vehicle (no|number|plate)|license plate|plate number|plate)$/],
     ['note', /ghi chu|^tau$|chuyen tau|lo hang|^nhom$/],
   ];
 
@@ -296,47 +296,83 @@
   /* ---------------------------------------------------------------
    * Phân tích 1 sheet
    * ------------------------------------------------------------- */
-  function findHeaderRow(grid) {
-    let best = { row: -1, score: 0 };
+  const unitSuffix = /(?:\s*[(\[]\s*(kg|tấn|tan|t)\s*[)\]]|\s+(kg|tấn|tan|t))$/i;
+  const unitOnly = /^(?:kg|tấn|tan|t)$/i;
+  const headerKey = (value) =>
+    norm(
+      String(value ?? '')
+        .trim()
+        .replace(unitSuffix, '')
+    );
+  const weightUnit = (value) => {
+    const m = String(value ?? '')
+      .trim()
+      .match(unitSuffix);
+    return m ? (/^kg$/i.test(m[1] || m[2]) ? 1 : 1000) : null;
+  };
+  function mapHeaders(cells) {
+    const mapping = {};
+    cells.forEach((cell, index) => {
+      const key = headerKey(cell);
+      const rule = key && RULES.find(([, re]) => re.test(key));
+      if (rule && mapping[rule[0]] === undefined) mapping[rule[0]] = index;
+    });
+    return mapping;
+  }
+  function headerScore(cells) {
+    const m = mapHeaders(cells);
+    const recognized = Object.keys(m).length;
+    const complete =
+      m.plate !== undefined &&
+      (m.date !== undefined || m.datetime1 !== undefined) &&
+      (m.net !== undefined || (m.gross !== undefined && m.tare !== undefined));
+    return recognized + (complete ? RULES.length : 0);
+  }
+  function headerAt(grid, row) {
+    const top = grid[row] || [];
+    const next = grid[row + 1] || [];
+    const score = headerScore(top);
+    // Một dòng số liệu có thể chứa chữ giống tiêu đề trong cột ghi chú.
+    if (
+      top.every(isBlank) ||
+      next.some((cell) => typeof cell === 'number' || (typeof cell === 'string' && (PLATE_RE.test(cell.trim()) || parseDT(cell))))
+    )
+      return { row, end: row, cells: top, score };
+    const full = Array.from({ length: Math.max(top.length, next.length) }, (_, i) => {
+      const upper = String(top[i] ?? '').trim();
+      const lower = String(next[i] ?? '').trim();
+      if (upper && unitOnly.test(lower)) return upper + ' (' + lower + ')';
+      if (!lower || typeof next[i] !== 'string') return upper;
+      const key = headerKey(lower);
+      if (!RULES.some(([, re]) => re.test(key))) return upper;
+      const topKey = headerKey(upper);
+      if (/^(khoi luong|trong luong|can)$/.test(topKey)) return lower;
+      if (!upper || !RULES.some(([, re]) => re.test(topKey))) return lower;
+      return upper;
+    });
+    const fullScore = headerScore(full);
+    const hasUnits = full.some((cell, i) => weightUnit(cell) !== weightUnit(top[i]) && unitOnly.test(String(next[i] ?? '').trim()));
+    return fullScore > score || (hasUnits && fullScore === score)
+      ? { row, end: row + 1, cells: full, score: fullScore }
+      : { row, end: row, cells: top, score };
+  }
+  function findHeader(grid) {
+    let best = null;
     const lim = Math.min(grid.length, 60);
     for (let r = 0; r < lim; r++) {
-      const row = grid[r] || [];
-      let score = 0;
-      const used = new Set();
-      row.forEach((c) => {
-        if (isBlank(c) || typeof c === 'number') return;
-        const n = norm(c);
-        if (!n) return;
-        for (const [f, re] of RULES)
-          if (re.test(n) && !used.has(f)) {
-            used.add(f);
-            score++;
-            break;
-          }
-      });
-      if (score > best.score) best = { row: r, score };
+      const candidate = headerAt(grid, r);
+      if (candidate.score >= 3 && (!best || candidate.score > best.score)) best = candidate;
     }
-    return best.score >= 3 ? best.row : -1;
+    return best;
   }
 
   function detectMapping(headerCells, dataSample) {
-    const mapping = {};
-    const used = new Set();
-    headerCells.forEach((h, ci) => {
-      const n = norm(h);
-      if (!n) return;
-      for (const [f, re] of RULES) {
-        if (mapping[f] === undefined && re.test(n)) {
-          mapping[f] = ci;
-          used.add(ci);
-          break;
-        }
-      }
-    });
+    const mapping = mapHeaders(headerCells);
+    const used = new Set(Object.values(mapping));
     // --- Dự phòng theo nội dung cho cột chưa nhận diện ---
     const ncol = headerCells.length;
     for (let ci = 0; ci < ncol; ci++) {
-      if (used.has(ci)) continue;
+      if (used.has(ci) || /^(stt|so thu tu)$/.test(headerKey(headerCells[ci]))) continue;
       const vals = dataSample.map((r) => r[ci]).filter((v) => !isBlank(v));
       if (!vals.length) continue;
       if (mapping.plate === undefined && vals.filter((v) => PLATE_RE.test(String(v).trim())).length > vals.length * 0.8) {
@@ -429,14 +465,16 @@
       ok: false,
     };
     // Cho phép người dùng chỉ định dòng tiêu đề (số dòng Excel, bắt đầu từ 1) nếu tự dò thất bại
-    const hr = opts.headerRow ? opts.headerRow - 1 - rowOff : findHeaderRow(G);
-    if (hr < 0 || hr >= G.length) {
+    const explicitRow = opts.headerRow ? opts.headerRow - 1 - rowOff : null;
+    const header = explicitRow === null ? findHeader(G) : explicitRow >= 0 && explicitRow < G.length ? headerAt(G, explicitRow) : null;
+    if (!header) {
       ds.errors.push('Không tìm thấy dòng tiêu đề (cần ít nhất 3 cột như Số phiếu / Ngày cân / Số xe / Trọng lượng…).');
       return ds;
     }
+    const { row: hr, end: headerEnd, cells: headerCells } = header;
     ds.headerRow = hr;
-    const headerCells = G[hr] || [];
-    const width = Math.max(headerCells.length, ...G.slice(hr + 1, hr + 50).map((r) => (r || []).length));
+    ds.headerExcelRow = hr + rowOff + 1;
+    const width = Math.max(headerCells.length, ...G.slice(headerEnd + 1, headerEnd + 50).map((r) => (r || []).length));
     ds.columns = [];
     for (let i = 0; i < width; i++) {
       const h = headerCells[i];
@@ -446,7 +484,7 @@
         letter: colName(i + colOff),
       });
     }
-    const sample = G.slice(hr + 1, hr + 301).map((r) => r || []);
+    const sample = G.slice(headerEnd + 1, headerEnd + 301).map((r) => r || []);
     ds.autoMapping = detectMapping(
       Array.from({ length: width }, (_, i) => headerCells[i]),
       sample
@@ -483,8 +521,8 @@
     if (ds.errors.length) return ds;
 
     // ---- đơn vị ----
-    let unitFactor = 1; // → kg
-    if (/\(t[ấáa]n\)|\(tan\)|\(t\)/i.test(String(headerCells[M.net] || ''))) unitFactor = 1000;
+    const units = Object.fromEntries(['net', 'tare', 'gross'].map((field) => [field, weightUnit(headerCells[M[field]])]));
+    const unitFactor = units.net ?? units.gross ?? units.tare ?? 1;
 
     // ---- chuẩn hoá từng dòng ----
     const is1904 = !!(workbook && workbook.Workbook && workbook.Workbook.WBProps && workbook.Workbook.WBProps.date1904);
@@ -506,7 +544,7 @@
     const excluded = []; // phiếu KL ≤ 0 (kể cả âm): KHÔNG cộng vào tổng, KHÔNG đưa vào biên bản — liệt kê riêng để đối soát (quy tắc 29)
     const cancelled = []; // phiếu "BO" (bỏ cân — xe cân lại phiếu khác) → loại khỏi biên bản
     let skipped = 0;
-    for (let r = hr + 1; r < G.length; r++) {
+    for (let r = headerEnd + 1; r < G.length; r++) {
       const raw = G[r] || [];
       const g = (k) => (has(k) ? raw[M[k]] : null);
       const plate = isBlank(g('plate')) ? '' : String(g('plate')).trim();
@@ -524,6 +562,12 @@
       const plateNorm = norm(plate);
       const noIdentity =
         (!plate || /^(tong(\s+cong)?|cong)\b/.test(plateNorm)) && isBlank(g('ticket')) && isBlank(g('datetime1')) && isBlank(g('date'));
+      // Mẫu có thể đặt ngày ký hoặc dòng ký tên ngay trong cột khối lượng hàng.
+      const signatureDate = ['net', 'gross', 'tare'].some((field) => /\bngay \d{1,2} thang \d{1,2} nam \d{4}\b/.test(norm(g(field))));
+      if (noIdentity && signatureDate) {
+        skipped++;
+        continue;
+      }
       if (noIdentity && raw.some((c) => !isBlank(c) && /^(tong(\s+cong)?|cong)\b/.test(norm(c)))) {
         skipped++;
         continue;
@@ -538,15 +582,15 @@
         if (plate || !isBlank(g('ticket'))) issues.noWeight.push(r + 1 + rowOff);
         continue;
       }
-      let rowUnit = unitFactor;
+      let rowUnit;
       if (has('unit')) {
         const u = norm(g('unit'));
         if (/^t(an)?$/.test(u)) rowUnit = 1000;
         else if (/^kg$/.test(u)) rowUnit = 1;
       }
-      if (tare !== null) tare *= rowUnit;
-      if (gross !== null) gross *= rowUnit;
-      if (net !== null) net *= rowUnit;
+      if (tare !== null) tare *= rowUnit ?? units.tare ?? unitFactor;
+      if (gross !== null) gross *= rowUnit ?? units.gross ?? unitFactor;
+      if (net !== null) net *= rowUnit ?? units.net ?? unitFactor;
 
       const row = {
         idx: r + 1 + rowOff, // số dòng thực trong Excel

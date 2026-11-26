@@ -97,3 +97,61 @@ test('L-19: đọc giờ AM/PM, hệ ngày 1904, và 24:00:00 không làm ts1 l�
     'phải cảnh báo giờ 24:00:00'
   );
 });
+
+test('nhập mẫu cân hai dòng tiêu đề và giữ số dòng Excel khi bảng bắt đầu dưới A1', () => {
+  global.XLSX = require('../app/libs/xlsx.full.min.js');
+  const sheet = XLSX.utils.aoa_to_sheet([]);
+  XLSX.utils.sheet_add_aoa(
+    sheet,
+    [
+      ['Số phiếu', 'Ngày giờ cân', 'Biển số xe', 'Khối lượng', null],
+      [null, null, null, 'Bì (kg)', 'KL tổng (tấn)'],
+      ['0007', '25/11/2026 08:30', '43C-12345', 12000, 32.5],
+    ],
+    { origin: 'C8' }
+  );
+  const workbook = { Sheets: { Can: sheet } };
+  for (const options of [{}, { headerRow: 8 }]) {
+    const ds = HAK.Excel.parseSheet(workbook, 'Can', options);
+    assert.equal(ds.ok, true, ds.errors.join('; '));
+    assert.equal(ds.headerExcelRow, 8);
+    assert.equal(ds.rows.length, 1);
+    assert.equal(ds.rows[0].idx, 10);
+    assert.equal(ds.rows[0].ticket, '0007');
+    assert.equal(ds.rows[0].net, 20500);
+  }
+});
+
+test('nhập tiêu đề tiếng Anh và dòng đơn vị riêng, giữ nguyên dòng dữ liệu đầu tiên', () => {
+  global.XLSX = require('../app/libs/xlsx.full.min.js');
+  const columns = ['Ticket No.', 'Weighing Date', 'Vehicle No.', 'Net Weight'];
+  const data = ['0008', '25/11/2026', '43C-12345', 20.5, 'Phiếu cân'];
+  for (const rows of [
+    [columns, [null, null, null, 'tấn'], data],
+    [[...columns.slice(0, 3), 'Net Weight [t]'], data],
+  ]) {
+    const ds = HAK.Excel.parseSheet({ Sheets: { Can: XLSX.utils.aoa_to_sheet(rows) } }, 'Can');
+    assert.equal(ds.ok, true, ds.errors.join('; '));
+    assert.equal(ds.rows.length, 1);
+    assert.equal(ds.rows[0].ticket, '0008');
+    assert.equal(ds.rows[0].net, 20500);
+  }
+});
+
+test('mẫu TC: dòng ngày ký trong cột kg không trở thành phiếu cân', () => {
+  global.XLSX = require('../app/libs/xlsx.full.min.js');
+  const rows = [
+    ['Bảng cân xuất hàng'],
+    [],
+    ['STT', 'Số phiếu', 'Ngày cân 1', 'Giờ cân 1', 'Biển số 1', 'Cân lần 1', 'Cân lần 2', 'KL hàng (KG)', 'Kho hàng'],
+    [1, '0009', '26/11/2026', '08:30', '43C-12345', 12000, 31000, 19000, 'Kho A'],
+    [],
+    [null, null, null, null, null, null, null, 'Ngày 26 tháng 11 năm 2026'],
+  ];
+  const ds = HAK.Excel.parseSheet({ Sheets: { Can: XLSX.utils.aoa_to_sheet(rows) } }, 'Can');
+  assert.equal(ds.ok, true, ds.errors.join('; '));
+  assert.equal(ds.headerExcelRow, 3);
+  assert.equal(ds.rows.length, 1);
+  assert.equal(ds.rows[0].wh, 'Kho A');
+  assert.equal(ds.stats.kg, 19000);
+});
