@@ -305,3 +305,76 @@ test('8. Tải lại app: khôi phục mẫu và giữ nguyên cấu hình của
   assert.equal(parsed.stats.trips, 1);
   assert.equal(parsed.stats.kg, 19000);
 });
+
+test('7. Tự động xuất và tải file Excel mẫu (.xlsx) theo cấu hình mẫu mới', async () => {
+  const tpl = {
+    name: 'Mẫu Cân Cảng Thị Vải',
+    sheet: 'PHIEU CAN THI VAI',
+    headerRow: 3,
+    fallbackUnit: 'tan',
+    headerNames: {
+      ticket: 'Số Phiếu Cân',
+      plate: 'Biển Số Xe',
+      date: 'Thời Gian Cân',
+      tare: 'TL Xe Không',
+      gross: 'TL Có Hàng',
+      net: 'Trọng Lượng Hàng',
+      unit: 'ĐVT',
+      wh: 'Kho Hàng',
+      note: 'Ghi Chú Đợt',
+    },
+    columns: {
+      ticket: 0,
+      date: 1,
+      plate: 2,
+      tare: 3,
+      gross: 4,
+      net: 5,
+      unit: 6,
+      wh: 7,
+      note: 8,
+    },
+  };
+
+  const wb = ExcelTemplate.buildTemplateWorkbook(tpl);
+  assert.ok(wb);
+  assert.ok(wb.Sheets['PHIEU CAN THI VAI']);
+  assert.ok(wb.Sheets['DS XE - TAI XE']);
+  assert.ok(wb.Sheets['HUONG DAN']);
+
+  // Kiểm tra sheet chính
+  const rows = XLSX.utils.sheet_to_json(wb.Sheets['PHIEU CAN THI VAI'], { header: 1, raw: true });
+  assert.ok(rows.length >= 6); // dòng 1 (tiêu đề), dòng 2 (trống), dòng 3 (tiêu đề cột), dòng 4-6 (3 dòng mẫu)
+
+  // Dòng 1: Tiêu đề phiếu
+  assert.match(String(rows[0][0]), /BẢNG KÊ PHIẾU CÂN/i);
+
+  // Dòng 3 (0-indexed = 2): Tiêu đề các cột
+  const headerCells = rows[2];
+  assert.equal(headerCells[0], 'Số Phiếu Cân');
+  assert.equal(headerCells[1], 'Thời Gian Cân');
+  assert.equal(headerCells[2], 'Biển Số Xe');
+  assert.equal(headerCells[5], 'Trọng Lượng Hàng');
+  assert.equal(headerCells[6], 'ĐVT');
+
+  // Dòng dữ liệu mẫu 4 (0-indexed = 3): Đơn vị tấn
+  const sample1 = rows[3];
+  assert.equal(sample1[0], '00101');
+  assert.equal(sample1[2], '51C-123.45');
+  assert.equal(sample1[5], 15.5); // 15.5 tấn
+  assert.equal(sample1[6], 'tấn');
+
+  // Sheet DS XE - TAI XE có thông tin 3 xe
+  const xeRows = XLSX.utils.sheet_to_json(wb.Sheets['DS XE - TAI XE'], { header: 1, raw: true });
+  assert.equal(xeRows[1][1], '51C-123.45');
+  assert.equal(xeRows[2][1], '60A-987.65');
+  assert.equal(xeRows[3][1], '72B-456.78');
+
+  // Sheet HUONG DAN có thông tin mẫu
+  const hdRows = XLSX.utils.sheet_to_json(wb.Sheets['HUONG DAN'], { header: 1, raw: true });
+  assert.match(String(hdRows[0][0]), /HƯỚNG DẪN/i);
+
+  // Thử downloadTemplateFile với cấu hình object
+  const out = await ExcelTemplate.downloadTemplateFile(tpl);
+  assert.ok(out);
+});

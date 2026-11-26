@@ -396,7 +396,7 @@
         '            <th>Cột đã ghép</th>' +
         '            <th>Đơn vị</th>' +
         '            <th>Mặc định</th>' +
-        '            <th style="min-width:210px">Thao tác</th>' +
+        '            <th style="min-width:280px">Thao tác</th>' +
         '          </tr>' +
         '        </thead>' +
         '        <tbody id="tplTableBody">';
@@ -440,6 +440,9 @@
             '</td>' +
             '  <td>' +
             '    <div class="btn-group btn-group-sm">' +
+            '      <button class="btn btn-outline-success btn-tpl-dl" data-id="' +
+            t.id +
+            '" title="Tải file Excel mẫu (.xlsx) theo đúng các cột của mẫu này">📥 Tải mẫu</button>' +
             '      <button class="btn btn-outline-primary btn-tpl-edit" data-id="' +
             t.id +
             '" title="Sửa mẫu">✏️ Sửa</button>' +
@@ -495,6 +498,18 @@
           const t = this.get(id);
           HAK.UI.toast('Đã đặt "' + (t ? t.name : '') + '" làm mẫu mặc định.', 'success');
           this.renderUI();
+        });
+      });
+
+      el.querySelectorAll('.btn-tpl-dl').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const id = btn.getAttribute('data-id');
+          try {
+            await this.downloadTemplateFile(id);
+            HAK.UI.toast('Đang tạo và tải file Excel mẫu...', 'success');
+          } catch (e) {
+            HAK.UI.toast('Lỗi tải file mẫu: ' + e.message, 'error');
+          }
         });
       });
 
@@ -702,8 +717,9 @@
         '    </div>' +
         '  </div>' +
         // Bước 4 & 5: Lưu & Đặt mặc định
-        '  <div class="d-flex align-items-center gap-2">' +
+        '  <div class="d-flex flex-wrap align-items-center gap-2">' +
         '    <button class="btn btn-primary" id="wizBtnSave" type="button">💾 Lưu mẫu</button>' +
+        '    <button class="btn btn-outline-success" id="wizBtnDownloadTpl" type="button" title="Tải file Excel mẫu (.xlsx) theo cấu hình các cột đang thiết lập">📥 Tải file mẫu này</button>' +
         '    <button class="btn btn-outline-secondary" id="wizBtnCancel" type="button">Hủy</button>' +
         '    <div id="wizSaveMsg" class="small ms-2"></div>' +
         '  </div>' +
@@ -783,6 +799,19 @@
       if (btnSave) {
         btnSave.addEventListener('click', () => {
           this.saveWizard();
+        });
+      }
+
+      const btnDownloadTpl = body.querySelector('#wizBtnDownloadTpl');
+      if (btnDownloadTpl) {
+        btnDownloadTpl.addEventListener('click', async () => {
+          const cfg = this.getWizardConfig();
+          try {
+            await this.downloadTemplateFile(cfg);
+            HAK.UI.toast('Đang tạo và tải file Excel mẫu...', 'success');
+          } catch (e) {
+            HAK.UI.toast('Lỗi tải file mẫu: ' + e.message, 'error');
+          }
         });
       }
 
@@ -1061,6 +1090,215 @@
       } catch (err) {
         HAK.UI.toast('Không thể lưu: ' + err.message, 'error');
       }
+    },
+
+    buildTemplateWorkbook(template) {
+      const X = root.XLSX;
+      if (!X || !X.utils) throw new Error('Thư viện XLSX chưa được nạp.');
+
+      const tpl = template || {};
+      const sheetTitle = (tpl.sheet || 'BANG CAN').trim() || 'BANG CAN';
+      const headerRowIdx = Math.max(1, parseInt(tpl.headerRow, 10) || 1);
+      const isTan = tpl.fallbackUnit === 'tan';
+      const unitStr = isTan ? 'tấn' : 'kg';
+
+      const headerNames = tpl.headerNames || {};
+      const columns = tpl.columns || {};
+      const mappedEntries = Object.entries(headerNames).filter(([, name]) => name && String(name).trim());
+
+      let maxColIdx = -1;
+      mappedEntries.forEach(([key]) => {
+        if (typeof columns[key] === 'number' && columns[key] >= 0) {
+          if (columns[key] > maxColIdx) maxColIdx = columns[key];
+        }
+      });
+
+      const headerRowArr = [];
+      if (maxColIdx >= 0) {
+        for (let c = 0; c <= maxColIdx; c++) headerRowArr.push('');
+        mappedEntries.forEach(([key, name]) => {
+          const col = columns[key];
+          if (typeof col === 'number' && col >= 0) {
+            headerRowArr[col] = String(name).trim();
+          }
+        });
+      } else {
+        TEMPLATE_FIELDS.forEach((f) => {
+          if (headerNames[f.key]) headerRowArr.push(headerNames[f.key]);
+        });
+        if (!headerRowArr.length) {
+          headerRowArr.push('Số phiếu', 'Biển số', 'Ngày cân', 'Khối lượng hàng', 'Đơn vị tính', 'Kho', 'Ghi chú');
+        }
+      }
+
+      const sheet1Data = [];
+      for (let r = 1; r < headerRowIdx; r++) {
+        if (r === 1) {
+          sheet1Data.push(['BẢNG KÊ PHIẾU CÂN - MẪU: ' + String(tpl.name || 'MẪU CHUẨN').toUpperCase()]);
+        } else {
+          sheet1Data.push([]);
+        }
+      }
+      sheet1Data.push(headerRowArr);
+
+      const sampleRowsData = [
+        {
+          ticket: '00101',
+          plate: '51C-123.45',
+          date: '26/11/2026 08:30',
+          tare: isTan ? 12.5 : 12500,
+          gross: isTan ? 28.0 : 28000,
+          net: isTan ? 15.5 : 15500,
+          unit: unitStr,
+          wh: 'Kho A',
+          note: 'Xuất kho đợt 1',
+          driver: 'Nguyễn Văn An',
+          carrier: 'HAK-VC01',
+        },
+        {
+          ticket: '00102',
+          plate: '60A-987.65',
+          date: '26/11/2026 09:15',
+          tare: isTan ? 11.2 : 11200,
+          gross: isTan ? 25.4 : 25400,
+          net: isTan ? 14.2 : 14200,
+          unit: unitStr,
+          wh: 'Kho B',
+          note: 'Hàng xuất khẩu',
+          driver: 'Trần Văn Bình',
+          carrier: 'HAK-VC02',
+        },
+        {
+          ticket: '00103',
+          plate: '72B-456.78',
+          date: '26/11/2026 10:00',
+          tare: isTan ? 13.0 : 13000,
+          gross: isTan ? 31.0 : 31000,
+          net: isTan ? 18.0 : 18000,
+          unit: unitStr,
+          wh: 'Kho C',
+          note: 'Niêm chì nguyên vẹn',
+          driver: 'Lê Hoàng Cường',
+          carrier: 'HAK-VC01',
+        },
+      ];
+
+      sampleRowsData.forEach((sampleItem) => {
+        const rowArr = [];
+        if (maxColIdx >= 0) {
+          for (let c = 0; c <= maxColIdx; c++) rowArr.push('');
+          mappedEntries.forEach(([key]) => {
+            const col = columns[key];
+            if (typeof col === 'number' && col >= 0) {
+              rowArr[col] = sampleItem[key] !== undefined ? sampleItem[key] : '';
+            }
+          });
+        } else {
+          TEMPLATE_FIELDS.forEach((f) => {
+            if (headerNames[f.key]) {
+              rowArr.push(sampleItem[f.key] !== undefined ? sampleItem[f.key] : '');
+            }
+          });
+        }
+        sheet1Data.push(rowArr);
+      });
+
+      const wb = X.utils.book_new();
+      const ws1 = X.utils.aoa_to_sheet(sheet1Data);
+      X.utils.book_append_sheet(wb, ws1, sheetTitle.slice(0, 31));
+
+      // Sheet 2: DS XE - TAI XE
+      const sheet2Data = [
+        ['STT', 'Biển số xe', 'Họ tên tài xế', 'Số điện thoại', 'Số CCCD', 'Mã ĐVVC', 'Tên đơn vị vận chuyển', 'Ghi chú'],
+        [1, '51C-123.45', 'Nguyễn Văn An', '0903123456', '079085001234', 'HAK-VC01', 'Vận tải HAK Miền Nam', 'Xe 15 tấn thùng kín'],
+        [2, '60A-987.65', 'Trần Văn Bình', '0918765432', '079086002345', 'HAK-VC02', 'Vận tải Đồng Nai Express', 'Xe 15 tấn'],
+        [3, '72B-456.78', 'Lê Hoàng Cường', '0987654321', '079087003456', 'HAK-VC01', 'Vận tải HAK Miền Nam', 'Xe 18 tấn bạt'],
+      ];
+      const ws2 = X.utils.aoa_to_sheet(sheet2Data);
+      X.utils.book_append_sheet(wb, ws2, 'DS XE - TAI XE');
+
+      // Sheet 3: HUONG DAN
+      const sheet3Data = [
+        ['HƯỚNG DẪN SỬ DỤNG FILE MẪU EXCEL NHẬP PHIẾU CÂN HAK'],
+        [''],
+        ['1. THÔNG TIN CẤU HÌNH MẪU ÁP DỤNG:'],
+        ['- Tên mẫu cấu hình:', tpl.name || 'Mặc định'],
+        ['- Sheet dữ liệu:', sheetTitle],
+        ['- Dòng tiêu đề:', 'Dòng số ' + headerRowIdx],
+        ['- Đơn vị tính dự phòng:', unitStr],
+        [''],
+        ['2. NGUYÊN TẮC NHẬP LIỆU:'],
+        ['- Điền dữ liệu từ dòng kế tiếp ngay sau dòng tiêu đề.'],
+        ['- Cột biển số xe phải có đủ để ứng dụng nhận diện và gán xe.'],
+        ['- Khối lượng có thể ghi số kg hoặc số tấn theo đúng đơn vị cấu hình.'],
+        ['- Mã số phiếu có thể chứa các số 0 ở đầu (ví dụ: 00101, 00102), hệ thống sẽ giữ nguyên vẹn.'],
+        ['- Sheet "DS XE - TAI XE" để khai báo trước tài xế, SĐT và ĐVVC của từng biển số.'],
+        [''],
+        ['3. ĐƯA VÀO HỆ THỐNG:'],
+        ['- Lưu file Excel này sau khi trạm cân hoặc thủ kho đã điền xong.'],
+        ['- Mở trang Nhập liệu của phần mềm Quản lý xuất hàng HAK và kéo thả file vào ô đợt cân.'],
+        ['- Hệ thống sẽ tự động đối chiếu với cấu hình mẫu "' + (tpl.name || '') + '" để đọc chính xác 100%.'],
+      ];
+      const ws3 = X.utils.aoa_to_sheet(sheet3Data);
+      X.utils.book_append_sheet(wb, ws3, 'HUONG DAN');
+
+      return wb;
+    },
+
+    async downloadTemplateFile(target) {
+      let tpl = null;
+      if (typeof target === 'string') {
+        tpl = this.get(target);
+      } else if (target && typeof target === 'object') {
+        tpl = target;
+      }
+
+      if (!tpl) {
+        if (typeof root.downloadSampleXlsx === 'function') {
+          return root.downloadSampleXlsx();
+        }
+        throw new Error('Không tìm thấy mẫu hoặc hàm tải mẫu chuẩn.');
+      }
+
+      const X = root.XLSX;
+      if (!X || !X.utils || !X.write) {
+        throw new Error('Thư viện XLSX chưa sẵn sàng để tạo file mẫu.');
+      }
+
+      const wb = this.buildTemplateWorkbook(tpl);
+      const wbout = X.write(wb, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([wbout], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+
+      const slug =
+        String(tpl.name || 'Mau_Nhap')
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/đ/g, 'd')
+          .replace(/Đ/g, 'D')
+          .replace(/[^a-zA-Z0-9_-]+/g, '_')
+          .replace(/^_+|_+$/g, '') || 'Mau_Nhap';
+      const fileName = 'Mau_PhieuCan_' + slug + '.xlsx';
+
+      if (HAK.Word && HAK.Word.Files && typeof HAK.Word.Files.saveBlob === 'function') {
+        return await HAK.Word.Files.saveBlob(blob, fileName);
+      }
+
+      if (typeof document !== 'undefined') {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }, 500);
+        return true;
+      }
+      return blob;
     },
   };
 
