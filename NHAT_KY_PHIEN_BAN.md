@@ -1,5 +1,12 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.25.21 — Nâng cấp cấu hình mẫu nhập Excel: tự động dò dòng tiêu đề, xem trước dòng và tách giờ vào/ra
+- **Ghép riêng giờ cân vào và ra:** Bổ sung 2 trường `Giờ cân vào (lần 1)` và `Giờ cân ra (lần 2)` trong wizard cấu hình mẫu Excel. Tự động kết hợp `Ngày cân` và giờ vào/ra tương ứng thành `Thời gian cân 1` và `Thời gian cân 2`.
+- **Tự động nhận diện dòng tiêu đề:** Quét và phát hiện chính xác dòng tiêu đề thực tế ngay khi mở file Excel mẫu, không còn bắt buộc người dùng phải tự dò số dòng.
+- **Bảng xem trước các dòng đầu tiên:** Hiển thị trực tiếp nội dung các dòng đầu của file Excel kèm nút "👉 Chọn dòng", giúp chọn dòng tiêu đề trực quan và dễ dàng.
+- **Hỗ trợ ô gộp (Merged Cells):** Tự động lan tỏa tiêu đề cho các bảng cân có ô gộp nhiều dòng/cột, không bị mất tên cột hoặc hiển thị "(không tiêu đề)".
+- **Quét dòng tiêu đề tức thời:** Thay đổi dòng tiêu đề sẽ tự động cập nhật ngay danh sách cột và ánh xạ, không cần bấm thêm nút quét.
+
 ## v2.25.20 — Sửa nhập Excel theo mẫu và chuyển đợt cân
 - Ưu tiên đơn vị ghi trên dòng và tiêu đề cột Excel khi quy đổi kg/tấn. Khi chuyển đợt, giữ cấu hình đọc và đối chiếu số phiếu, tổng khối lượng với đợt nguồn.
 - Kiểm tra tên cột bắt buộc và phiếu trùng trên sheet thực tế sẽ lưu. Đọc đúng tọa độ tiêu đề và giữ mẫu hiện tại khi từ chối mẫu mới.
