@@ -25,6 +25,7 @@
     DRAFT_GENERAL: 'hak.draft.general',
     RESTORE_UNDO: 'hak.restore.undo.v1',
     REPORT_MANUAL: 'hak.report.manual',
+    EXCEL_TEMPLATES: 'hak.excel.templates.v1',
   });
   HAK.Constants = Object.freeze({
     KEYS,

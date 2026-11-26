@@ -15,7 +15,21 @@
    *  - Các trang biên bản đọc slot.ds (gộp mọi đợt của loại đó, đã khử phiếu trùng) — không bao giờ dùng nhầm dữ liệu của loại khác.
    *  - App.wb / fileName / size / sheet / mapping / headerRow / ds / previewPage là lối tắt tới ĐỢT đang xem ở trang Nhập liệu
    *    (slot.sel) — nhờ vậy code cũ (xem trước, ánh xạ cột…) không phải đổi. */
-  const newBatch = () => ({ wb: null, fileName: '', size: 0, sheet: '', mapping: {}, headerRow: null, ds: null, previewPage: 0 });
+  const newBatch = () => ({
+    wb: null,
+    fileName: '',
+    size: 0,
+    sheet: '',
+    mapping: {},
+    headerRow: null,
+    fallbackUnit: null,
+    templateId: null,
+    templateName: null,
+    headerNames: null,
+    templateError: null,
+    ds: null,
+    previewPage: 0,
+  });
   const NOBATCH = newBatch();
   const newSlot = () => ({ batches: [], sel: -1, ds: null });
   const App = (HAK.App = {
@@ -603,15 +617,55 @@
       App.size = file.size;
       App.mapping = {};
       App.headerRow = null;
-      // ưu tiên sheet đầu tiên đọc được
-      let pick = info.sheetNames[0];
-      for (const n of info.sheetNames) {
-        if (X.parseSheet(App.wb, n, { autoSwap: HAK.Config.data.general.autoSwap }).ok) {
-          pick = n;
-          break;
+      App.fallbackUnit = null;
+
+      const defTpl = HAK.ExcelTemplate ? HAK.ExcelTemplate.getDefault() : null;
+      let tplMatch = null;
+      if (defTpl) {
+        App.cur().templateId = defTpl.id;
+        App.cur().templateName = defTpl.name;
+        App.cur().fallbackUnit = defTpl.fallbackUnit || null;
+        App.cur().headerNames = defTpl.headerNames || null;
+        App.fallbackUnit = defTpl.fallbackUnit || null;
+        App.headerRow = defTpl.headerRow || 1;
+      } else {
+        App.cur().templateId = null;
+        App.cur().templateName = null;
+        App.cur().fallbackUnit = null;
+        App.cur().headerNames = null;
+        App.cur().templateError = null;
+      }
+
+      // ưu tiên sheet theo mẫu nếu có hoặc sheet đầu tiên đọc được
+      let pick = defTpl && defTpl.sheet && info.sheetNames.includes(defTpl.sheet) ? defTpl.sheet : info.sheetNames[0];
+      if (defTpl) {
+        const ws = App.wb.Sheets[pick];
+        if (ws) {
+          const G = root.XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
+          const hrIdx = Math.max(0, (defTpl.headerRow || 1) - 1);
+          const headerCells = G[hrIdx] || [];
+          tplMatch = HAK.ExcelTemplate.matchTemplate(defTpl, headerCells);
+          if (tplMatch.ok) {
+            App.mapping = tplMatch.mapping;
+            App.cur().templateError = null;
+          } else {
+            App.cur().templateError = tplMatch.errors;
+          }
+        }
+      }
+      if (!tplMatch || !tplMatch.ok) {
+        for (const n of info.sheetNames) {
+          if (X.parseSheet(App.wb, n, { autoSwap: HAK.Config.data.general.autoSwap }).ok) {
+            pick = n;
+            break;
+          }
         }
       }
       App.sheet = pick;
+      App.cur().sheet = pick;
+      App.cur().mapping = App.mapping;
+      App.cur().headerRow = App.headerRow;
+      App.cur().fallbackUnit = App.fallbackUnit;
       // v2.7.2 danh sách xe RIÊNG của đợt: sheet "DS XE - TAI XE" trong chính file (file mẫu); không có → giữ danh sách đã gắn khi thay file cùng tên
       const fv = HAK.Vehicles.fromWorkbook(info.workbook, file.name, pick);
       App.cur().veh = fv || keepVeh || null;
@@ -665,6 +719,7 @@
   function parseSlot(sl) {
     const opts = { mapping: sl.mapping, autoSwap: HAK.Config.data.general.autoSwap };
     if (sl.headerRow) opts.headerRow = sl.headerRow;
+    if (sl.fallbackUnit) opts.fallbackUnit = sl.fallbackUnit;
     try {
       sl.ds = X.parseSheet(sl.wb, sl.sheet, opts);
     } catch (e) {
@@ -681,7 +736,12 @@
     const b = App.cur();
     if (!b || !b.wb) return false;
     const RC = HAK.ReadConfig,
-      prev = { sheet: b.sheet, mapping: JSON.parse(JSON.stringify(b.mapping || {})), headerRow: b.headerRow || null },
+      prev = {
+        sheet: b.sheet,
+        mapping: JSON.parse(JSON.stringify(b.mapping || {})),
+        headerRow: b.headerRow || null,
+        fallbackUnit: b.fallbackUnit || null,
+      },
       next = JSON.parse(JSON.stringify(prev));
     mutate(next);
     const wasOk = !!(b.ds && b.ds.ok),
@@ -702,6 +762,11 @@
     App.sheet = next.sheet;
     App.mapping = next.mapping;
     App.headerRow = next.headerRow;
+    App.fallbackUnit = next.fallbackUnit;
+    b.sheet = next.sheet;
+    b.mapping = next.mapping;
+    b.headerRow = next.headerRow;
+    b.fallbackUnit = next.fallbackUnit;
     parseCurrent(true);
     return true;
   }
@@ -825,6 +890,10 @@
           b.sheet = info.sheetNames.indexOf(m.sheet) >= 0 ? m.sheet : info.sheetNames[0];
           b.mapping = m.mapping || {};
           b.headerRow = m.headerRow || null;
+          b.fallbackUnit = m.fallbackUnit || null;
+          b.templateId = m.templateId || null;
+          b.templateName = m.templateName || null;
+          b.headerNames = m.headerNames || null;
           b.addedAt = m.addedAt;
           b.saved = true;
           b.rev = m.rev || 0;
@@ -1083,10 +1152,41 @@
     $('#sheetSelect').innerHTML = (App.wb.SheetNames || [])
       .map((n) => '<option' + (n === App.sheet ? ' selected' : '') + '>' + esc(n) + '</option>')
       .join('');
+    const tplSel = $('#batchTemplateSelect');
+    if (tplSel && HAK.ExcelTemplate) {
+      const curTplId = App.cur().templateId || '';
+      tplSel.innerHTML =
+        '<option value="">Tự nhận diện (mặc định app)</option>' +
+        HAK.ExcelTemplate.list()
+          .map(
+            (t) =>
+              '<option value="' +
+              esc(t.id) +
+              '"' +
+              (curTplId === t.id ? ' selected' : '') +
+              '>' +
+              esc(t.name) +
+              (t.isDefault ? ' (Mặc định)' : '') +
+              '</option>'
+          )
+          .join('');
+    }
     $('#fileMeta').textContent = (App.size / 1024).toFixed(1) + ' KB · ' + (App.wb.SheetNames || []).length + ' sheet';
 
     // ---- cảnh báo ----
     let al = '';
+    if (App.cur().templateError && App.cur().templateError.length) {
+      al +=
+        '<div class="alert alert-warning py-2 mb-2"><b>Mẫu "' +
+        esc(App.cur().templateName || 'đang dùng') +
+        '" không khớp hoàn toàn với file:</b><ul class="alert-list small mb-2">' +
+        App.cur()
+          .templateError.map((e) => '<li>' + esc(e) + '</li>')
+          .join('') +
+        '</ul><div class="d-flex flex-wrap gap-2">' +
+        '<button class="btn btn-sm btn-outline-primary" id="btnSwitchAutoDetect" type="button">Chuyển sang "Tự nhận diện"</button>' +
+        '</div></div>';
+    }
     if (ds.errors && ds.errors.length)
       al +=
         '<div class="alert alert-danger"><b>Không thể tạo biên bản:</b><ul class="alert-list">' +
@@ -1458,6 +1558,57 @@
         c.mapping = {};
         c.headerRow = null;
       });
+    });
+    const batchTplSelect = $('#batchTemplateSelect');
+    if (batchTplSelect) {
+      batchTplSelect.addEventListener('change', (e) => {
+        const tplId = e.target.value;
+        const b = App.cur();
+        if (!b || !b.wb) return;
+        applyReadConfig((c) => {
+          if (!tplId) {
+            b.templateId = null;
+            b.templateName = null;
+            b.fallbackUnit = null;
+            b.headerNames = null;
+            b.templateError = null;
+            c.headerRow = null;
+            c.fallbackUnit = null;
+            c.mapping = {};
+          } else if (HAK.ExcelTemplate) {
+            const tpl = HAK.ExcelTemplate.get(tplId);
+            if (tpl) {
+              b.templateId = tpl.id;
+              b.templateName = tpl.name;
+              b.fallbackUnit = tpl.fallbackUnit || null;
+              b.headerNames = tpl.headerNames || null;
+              c.headerRow = tpl.headerRow || 1;
+              c.fallbackUnit = tpl.fallbackUnit || null;
+              if (tpl.sheet && b.wb.SheetNames.includes(tpl.sheet)) {
+                c.sheet = tpl.sheet;
+              }
+              const ws = b.wb.Sheets[c.sheet || b.sheet];
+              if (ws) {
+                const G = root.XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
+                const hrIdx = Math.max(0, (tpl.headerRow || 1) - 1);
+                const headerCells = G[hrIdx] || [];
+                const mRes = HAK.ExcelTemplate.matchTemplate(tpl, headerCells);
+                c.mapping = mRes.mapping;
+                b.templateError = mRes.ok ? null : mRes.errors;
+              }
+            }
+          }
+        });
+      });
+    }
+    document.addEventListener('click', (e) => {
+      if (e.target && e.target.id === 'btnSwitchAutoDetect') {
+        const sel = $('#batchTemplateSelect');
+        if (sel) {
+          sel.value = '';
+          sel.dispatchEvent(new Event('change'));
+        }
+      }
     });
     $('#btnReparse').addEventListener('click', () => applyReadConfig(() => {}));
     $('#btnUseScope').addEventListener('click', useViewScope);

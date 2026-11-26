@@ -27,6 +27,10 @@
     conv: b.conv || null,
     from: b.from || null,
     veh: b.veh || null,
+    templateId: b.templateId || null,
+    templateName: b.templateName || null,
+    fallbackUnit: b.fallbackUnit || null,
+    headerNames: b.headerNames || null,
     rev,
   }); // conv = đã chuyển sang hình thức; from = chép từ hình thức; veh = danh sách xe riêng của đợt; rev = phiên bản (phát hiện sửa đồng thời ở 2 cửa sổ)
   const Batches = {

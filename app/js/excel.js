@@ -42,7 +42,7 @@
     ['datetime1', /ngay gio can 1|thoi gian can 1|ngay gio can( vao)?$/],
     ['timeIn', /gio can vao|gio vao|gio can 1|gio can lan 1/],
     ['timeOut', /gio can ra|gio ra|gio can 2|gio can lan 2/],
-    ['date', /^ngay( can)?( 1| vao)?$|^ngay xuat|^ngay can|^ngay$/],
+    ['date', /^ngay( can)?( 1| vao)?$|^ngay xuat|^ngay can|^ngay$|thoi gian can|ngay gio can|^thoi gian$|^ngay gio$/],
     ['ticket', /phieu/],
     ['tare', /xe khong|can lan 1|tl xe|^bi$|^tare|trong luong xe$|khoi luong xe$/],
     ['gross', /co hang|can lan 2|tong trong luong|^gross/],
@@ -485,6 +485,7 @@
     // ---- đơn vị ----
     let unitFactor = 1; // → kg
     if (/\(t[ấáa]n\)|\(tan\)|\(t\)/i.test(String(headerCells[M.net] || ''))) unitFactor = 1000;
+    else if (opts.fallbackUnit === 'tan' || opts.fallbackUnit === 'tấn') unitFactor = 1000;
 
     // ---- chuẩn hoá từng dòng ----
     const is1904 = !!(workbook && workbook.Workbook && workbook.Workbook.WBProps && workbook.Workbook.WBProps.date1904);
@@ -522,6 +523,23 @@
         continue;
       }
       const plateNorm = norm(plate);
+      const isSigText = (str) =>
+        /(nguoi\s*lap|thu\s*kho|ke\s*toan|giam\s*doc|dai\s*dien|ban\s*giam\s*doc|chu\s*ky|ky|ghi\s*ro|ho\s*ten|ngay\s*\d+\s*thang\s*\d+|dia\s*diem)/i.test(
+          String(str == null ? '' : str)
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
+        );
+      if (
+        (isSigText(plate) || isSigText(raw[0]) || isSigText(raw[1]) || !plateNorm) &&
+        net === null &&
+        tare === null &&
+        gross === null &&
+        isBlank(g('ticket'))
+      ) {
+        skipped++;
+        continue;
+      }
       const noIdentity =
         (!plate || /^(tong(\s+cong)?|cong)\b/.test(plateNorm)) && isBlank(g('ticket')) && isBlank(g('datetime1')) && isBlank(g('date'));
       if (noIdentity && raw.some((c) => !isBlank(c) && /^(tong(\s+cong)?|cong)\b/.test(norm(c)))) {
@@ -548,9 +566,18 @@
       if (gross !== null) gross *= rowUnit;
       if (net !== null) net *= rowUnit;
 
+      let rawTicket = g('ticket');
+      if (typeof rawTicket === 'number' && ws && has('ticket')) {
+        const addr =
+          root.XLSX && root.XLSX.utils && root.XLSX.utils.encode_cell ? root.XLSX.utils.encode_cell({ r, c: M.ticket + colOff }) : null;
+        if (addr && ws[addr] && typeof ws[addr].w === 'string' && /^0+\d+$/.test(ws[addr].w.trim())) {
+          rawTicket = ws[addr].w.trim();
+        }
+      }
+
       const row = {
         idx: r + 1 + rowOff, // số dòng thực trong Excel
-        ticket: normTicket(g('ticket')),
+        ticket: normTicket(rawTicket),
         plate,
         driver: has('driver') && !isBlank(g('driver')) ? String(g('driver')).trim() : '',
         carrier: has('carrier') && !isBlank(g('carrier')) ? String(g('carrier')).trim() : '',
@@ -871,6 +898,8 @@
     readFile,
     readBuffer,
     parseSheet,
+    findHeaderRow,
+    detectMapping,
     computeStats,
     util: { norm, parseNum, parseNumWarn, parseDT, partsToTs, tsToParts, fmtDate, fmtDateTime, normTicket, plateKey, colName, isBlank },
   };

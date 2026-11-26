@@ -133,7 +133,10 @@ async function login(p) {
   await pdfjsReady;
   const exe = process.env.HAK_CHROMIUM || undefined,
     channel = process.env.HAK_BROWSER_CHANNEL || undefined;
-  const browser = await chromium.launch(exe ? { executablePath: exe, args: ['--no-sandbox'] } : channel ? { channel } : {});
+  const commonArgs = ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'];
+  const browser = await chromium.launch(
+    exe ? { executablePath: exe, args: commonArgs } : channel ? { channel, args: commonArgs } : { args: commonArgs }
+  );
   console.log(
     'Môi trường: ' +
       process.platform +

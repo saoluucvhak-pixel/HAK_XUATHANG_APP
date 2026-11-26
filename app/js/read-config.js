@@ -34,6 +34,7 @@
   function probeRead(wb, cfg, autoSwap) {
     const opts = { mapping: cfg.mapping || {}, autoSwap: !!autoSwap };
     if (cfg.headerRow) opts.headerRow = cfg.headerRow;
+    if (cfg.fallbackUnit) opts.fallbackUnit = cfg.fallbackUnit;
     let ds;
     try {
       ds = HAK.Excel.parseSheet(wb, cfg.sheet, opts);
