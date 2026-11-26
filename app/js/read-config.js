@@ -32,7 +32,7 @@
 
   /** Đọc thử một cấu hình { sheet, mapping, headerRow } mà KHÔNG đụng dữ liệu đang dùng; trả { ds, dups, sheet }. */
   function probeRead(wb, cfg, autoSwap) {
-    const opts = { mapping: cfg.mapping || {}, autoSwap: !!autoSwap };
+    const opts = { mapping: cfg.mapping || {}, autoSwap: !!autoSwap, weightUnit: cfg.weightUnit };
     if (cfg.headerRow) opts.headerRow = cfg.headerRow;
     let ds;
     try {

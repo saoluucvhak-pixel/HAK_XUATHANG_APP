@@ -407,6 +407,7 @@
         <li class="nav-item admin-only"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#tab-company" type="button">🏢 Công ty</button></li>
         <li class="nav-item admin-only"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-wh" type="button">🏭 Kho</button></li>
         <li class="nav-item admin-only"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-tpl" type="button">📑 Mẫu Word</button></li>
+        <li class="nav-item admin-only"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-excel-import" type="button">Mẫu nhập Excel</button></li>
         <li class="nav-item admin-only"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-general" type="button">🛠️ Chung</button></li>
         <li class="nav-item admin-only"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-backup" type="button">💾 Sao lưu &amp; khôi phục</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-account" type="button">👤 Tài khoản</button></li>
@@ -430,6 +431,9 @@
             <div class="card-body"><div class="tbl-wrap" style="max-height:none"><table class="table"><thead><tr><th>Placeholder</th><th>Ý nghĩa</th></tr></thead><tbody id="phList"></tbody></table></div></div></div>
         </div>
         <div class="tab-pane fade" id="tab-account"><div id="authAccount"></div></div>
+        <div class="tab-pane fade" id="tab-excel-import">
+          <div class="card"><div class="card-header">Mẫu nhập Excel phiếu cân</div><div class="card-body" id="excelImportSettings"></div></div>
+        </div>
         <div class="tab-pane fade" id="tab-general">
           <div class="card"><div class="card-header">Cài đặt chung</div><div class="card-body" id="generalBody"></div></div>
           <div class="card mt-3"><div class="card-header">🚚 Bảng đổi mã đơn vị vận chuyển <span class="muted small fw-normal">— mã trong file danh sách xe → tên in ở cột ĐVVC</span>
@@ -526,6 +530,7 @@
 <script src="js/pages-filter.js"></script>
 <script src="js/pages-bkls.js"></script>
 <script src="js/pages.js"></script>
+<script src="js/excel-import-templates.js"></script>
 <script src="js/settings.js"></script>
 <script src="js/bkls.js"></script>
 <script src="js/bkls-form01.js"></script>

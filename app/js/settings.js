@@ -759,9 +759,11 @@
         if (gDirty && !/^#\/settings/.test(location.hash))
           toast('Cài đặt chung có thay đổi CHƯA LƯU — quay lại Cài đặt → Chung bấm 💾 Lưu (hoặc Hủy thay đổi).', 'warning');
       });
+      HAK.ExcelImportTemplates.init($('#excelImportSettings'));
       this.render();
     },
     render() {
+      HAK.ExcelImportTemplates.refresh();
       renderCompanies();
       renderWarehouses();
       renderTemplates();

@@ -177,6 +177,7 @@
     'hak.yearbook.v1',
     'hak.sf.presets',
     'hak.report.manual',
+    'hak.excel.import.v1',
   ]);
   function isAllowedBackupKey(k) {
     if (typeof k !== 'string' || k === '__proto__' || k === 'constructor' || k === 'prototype') return false;
@@ -188,6 +189,7 @@
   function validateBackupKey(k, v) {
     if (!isAllowedBackupKey(k)) return false;
     if (k === 'hak.config.v1') validateConfigData(v);
+    else if (k === 'hak.excel.import.v1' && HAK.ExcelImportTemplates) HAK.ExcelImportTemplates.validate(v);
     else if (k === 'hak.auth.v1') cleanAuthStore(v);
     else if (k === 'hak.gsync.v2') validateGsyncConfig(v);
     else if (k === 'hak.auth.lastco') {

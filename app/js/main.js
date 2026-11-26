@@ -15,7 +15,17 @@
    *  - Các trang biên bản đọc slot.ds (gộp mọi đợt của loại đó, đã khử phiếu trùng) — không bao giờ dùng nhầm dữ liệu của loại khác.
    *  - App.wb / fileName / size / sheet / mapping / headerRow / ds / previewPage là lối tắt tới ĐỢT đang xem ở trang Nhập liệu
    *    (slot.sel) — nhờ vậy code cũ (xem trước, ánh xạ cột…) không phải đổi. */
-  const newBatch = () => ({ wb: null, fileName: '', size: 0, sheet: '', mapping: {}, headerRow: null, ds: null, previewPage: 0 });
+  const newBatch = () => ({
+    wb: null,
+    fileName: '',
+    size: 0,
+    sheet: '',
+    mapping: {},
+    headerRow: null,
+    weightUnit: null,
+    ds: null,
+    previewPage: 0,
+  });
   const NOBATCH = newBatch();
   const newSlot = () => ({ batches: [], sel: -1, ds: null });
   const App = (HAK.App = {
@@ -558,31 +568,40 @@
         }
         Loading.show('Đang đọc file "' + file.name + '"…');
       }
-      // Dòng TRÙNG HOÀN TOÀN trong file (cùng số phiếu, biển số, giờ cân): cảnh báo và CHẶN nạp — làm trước khi đổi bất kỳ dữ liệu đợt nào.
-      {
-        let probe = null;
-        for (const n of info.sheetNames) {
-          const r = X.parseSheet(info.workbook, n, { autoSwap: HAK.Config.data.general.autoSwap });
-          if (r.ok) {
-            probe = Object.assign({ sheetName: n }, r);
-            break;
-          }
-        }
-        const dups = probe ? G.duplicateRows(probe.rows) : [];
-        if (dups.length) {
-          Loading.hide();
-          toast(
-            '⛔ Chưa nạp "' +
-              file.name +
-              '": sheet "' +
-              probe.sheetName +
-              '" có ' +
-              HAK.ReadConfig.dupSummary(dups) +
-              '. Xóa dòng thừa trong file Excel rồi nạp lại.',
-            'error'
-          );
-          return;
-        }
+      const profile = HAK.ExcelImportTemplates.defaultProfile();
+      const autoSwap = HAK.Config.data.general.autoSwap;
+      let config = { sheet: info.sheetNames[0], mapping: {}, headerRow: null, weightUnit: null };
+      let probe;
+      for (const sheet of info.sheetNames) {
+        const candidate = profile ? HAK.ExcelImportTemplates.resolve(info.workbook, sheet, profile) : { ...config, sheet };
+        if (!candidate) continue;
+        const result = HAK.ReadConfig.probeRead(info.workbook, candidate, autoSwap);
+        if (!result.ds.ok) continue;
+        config = candidate;
+        probe = result;
+        break;
+      }
+      if (profile && !probe) {
+        toast(
+          'Chưa nhập: không đọc được file bằng mẫu mặc định "' +
+            profile.name +
+            '". Kiểm tra tiêu đề hoặc đổi mẫu trong Cài đặt → Mẫu nhập Excel.',
+          'error'
+        );
+        return;
+      }
+      if (probe && probe.dups.length) {
+        toast(
+          '⛔ Chưa nạp "' +
+            file.name +
+            '": sheet "' +
+            probe.sheet +
+            '" có ' +
+            HAK.ReadConfig.dupSummary(probe.dups) +
+            '. Xóa dòng thừa trong file Excel rồi nạp lại.',
+          'error'
+        );
+        return;
       }
       const keepRev = replaced ? sl.batches[bi].rev || 0 : 0;
       const keepAdded = replaced ? sl.batches[bi].addedAt : 0,
@@ -601,19 +620,12 @@
       App.wb = info.workbook;
       App.fileName = file.name;
       App.size = file.size;
-      App.mapping = {};
-      App.headerRow = null;
-      // ưu tiên sheet đầu tiên đọc được
-      let pick = info.sheetNames[0];
-      for (const n of info.sheetNames) {
-        if (X.parseSheet(App.wb, n, { autoSwap: HAK.Config.data.general.autoSwap }).ok) {
-          pick = n;
-          break;
-        }
-      }
-      App.sheet = pick;
+      App.mapping = config.mapping;
+      App.headerRow = config.headerRow;
+      App.weightUnit = config.weightUnit;
+      App.sheet = config.sheet;
       // v2.7.2 danh sách xe RIÊNG của đợt: sheet "DS XE - TAI XE" trong chính file (file mẫu); không có → giữ danh sách đã gắn khi thay file cùng tên
-      const fv = HAK.Vehicles.fromWorkbook(info.workbook, file.name, pick);
+      const fv = HAK.Vehicles.fromWorkbook(info.workbook, file.name, config.sheet);
       App.cur().veh = fv || keepVeh || null;
       parseCurrent(true);
       let savedOk = true;
@@ -636,6 +648,7 @@
             ' phiếu cân — ' +
             G.fmtTon(App.ds.stats.kg) +
             ' tấn.' +
+            (profile ? ' Mẫu nhập: ' + profile.name + '.' : '') +
             (fv
               ? ' Danh sách xe của đợt: ' + fv.count + ' xe (sheet "' + fv.sheet + '").'
               : App.cur().veh
@@ -663,7 +676,7 @@
 
   /** Phân tích lại 1 ngăn dữ liệu (theo sheet / ánh xạ cột của chính ngăn đó). */
   function parseSlot(sl) {
-    const opts = { mapping: sl.mapping, autoSwap: HAK.Config.data.general.autoSwap };
+    const opts = { mapping: sl.mapping, autoSwap: HAK.Config.data.general.autoSwap, weightUnit: sl.weightUnit };
     if (sl.headerRow) opts.headerRow = sl.headerRow;
     try {
       sl.ds = X.parseSheet(sl.wb, sl.sheet, opts);
@@ -681,7 +694,12 @@
     const b = App.cur();
     if (!b || !b.wb) return false;
     const RC = HAK.ReadConfig,
-      prev = { sheet: b.sheet, mapping: JSON.parse(JSON.stringify(b.mapping || {})), headerRow: b.headerRow || null },
+      prev = {
+        sheet: b.sheet,
+        mapping: JSON.parse(JSON.stringify(b.mapping || {})),
+        headerRow: b.headerRow || null,
+        weightUnit: b.weightUnit || null,
+      },
       next = JSON.parse(JSON.stringify(prev));
     mutate(next);
     const wasOk = !!(b.ds && b.ds.ok),
@@ -702,6 +720,7 @@
     App.sheet = next.sheet;
     App.mapping = next.mapping;
     App.headerRow = next.headerRow;
+    App.weightUnit = next.weightUnit;
     parseCurrent(true);
     return true;
   }
@@ -770,6 +789,7 @@
         sheet: b.sheet,
         mapping: Object.assign({}, b.mapping || {}),
         headerRow: b.headerRow || null,
+        weightUnit: b.weightUnit || null,
         addedAt: i >= 0 ? sl.batches[i].addedAt : 0,
         rev: i >= 0 ? sl.batches[i].rev || 0 : 0,
         from: { type: src, fileName: b.fileName, at: Date.now() },
@@ -825,6 +845,7 @@
           b.sheet = info.sheetNames.indexOf(m.sheet) >= 0 ? m.sheet : info.sheetNames[0];
           b.mapping = m.mapping || {};
           b.headerRow = m.headerRow || null;
+          b.weightUnit = m.weightUnit || null;
           b.addedAt = m.addedAt;
           b.saved = true;
           b.rev = m.rev || 0;
@@ -1240,6 +1261,7 @@
       const v = parseInt($('#hdrRow').value, 10);
       applyReadConfig((c) => {
         c.headerRow = v > 0 ? v : null;
+        c.weightUnit = null;
         c.mapping = {};
       });
     });
@@ -1457,6 +1479,7 @@
         c.sheet = name;
         c.mapping = {};
         c.headerRow = null;
+        c.weightUnit = null;
       });
     });
     $('#btnReparse').addEventListener('click', () => applyReadConfig(() => {}));
@@ -1466,6 +1489,7 @@
         applyReadConfig((c) => {
           c.mapping = {};
           c.headerRow = null;
+          c.weightUnit = null;
         })
       )
         toast('Đã nhận diện lại các cột.', 'info');

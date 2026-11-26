@@ -22,6 +22,7 @@
     sheet: b.sheet,
     mapping: b.mapping || {},
     headerRow: b.headerRow || null,
+    weightUnit: b.weightUnit || null,
     addedAt: b.addedAt || Date.now(),
     updatedAt: Date.now(),
     conv: b.conv || null,

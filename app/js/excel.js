@@ -480,6 +480,7 @@
       const h = headerCells[i];
       ds.columns.push({
         index: i,
+        header: isBlank(h) ? '' : String(h).trim(),
         label: isBlank(h) ? '(cột ' + colName(i + colOff) + ' — không có tiêu đề)' : String(h).trim(),
         letter: colName(i + colOff),
       });
@@ -490,6 +491,7 @@
       sample
     );
     ds.mapping = Object.assign({}, ds.autoMapping);
+    if (opts.inspectOnly) return ds;
     if (opts.mapping)
       Object.keys(opts.mapping).forEach((k) => {
         if (opts.mapping[k] === -1 || opts.mapping[k] === null) delete ds.mapping[k];
@@ -522,7 +524,7 @@
 
     // ---- đơn vị ----
     const units = Object.fromEntries(['net', 'tare', 'gross'].map((field) => [field, weightUnit(headerCells[M[field]])]));
-    const unitFactor = units.net ?? units.gross ?? units.tare ?? 1;
+    const unitFactor = units.net ?? units.gross ?? units.tare ?? (opts.weightUnit === 't' ? 1000 : 1);
 
     // ---- chuẩn hoá từng dòng ----
     const is1904 = !!(workbook && workbook.Workbook && workbook.Workbook.WBProps && workbook.Workbook.WBProps.date1904);
