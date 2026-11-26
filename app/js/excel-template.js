@@ -16,7 +16,9 @@
   const TEMPLATE_FIELDS = [
     { key: 'ticket', label: 'Số phiếu', req: false },
     { key: 'plate', label: 'Biển số xe', req: true },
-    { key: 'date', label: 'Ngày giờ cân / Ngày cân', req: true },
+    { key: 'date', label: 'Ngày cân (hoặc Ngày giờ cân)', req: true },
+    { key: 'timeIn', label: 'Giờ cân vào (lần 1)', req: false },
+    { key: 'timeOut', label: 'Giờ cân ra (lần 2)', req: false },
     { key: 'net', label: 'Khối lượng hàng', req: true, note: 'Bắt buộc nếu không có cả hai cột Cân 1 và Cân 2' },
     { key: 'tare', label: 'Cân lần 1 (xe không)', req: false },
     { key: 'gross', label: 'Cân lần 2 (có hàng)', req: false },

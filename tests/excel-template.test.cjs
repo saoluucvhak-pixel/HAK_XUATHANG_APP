@@ -435,3 +435,51 @@ test('7. Tự động xuất và tải file Excel mẫu (.xlsx) theo cấu hình
   const out = await ExcelTemplate.downloadTemplateFile(tpl);
   assert.ok(out);
 });
+
+test('11. Ghép riêng cột Ngày cân, Giờ cân vào và Giờ cân ra: tạo đúng thời gian cân 1 và 2', () => {
+  const wb = createWorkbook({
+    Sheet1: [
+      ['STT', 'Số phiếu', 'Ngày cân', 'Giờ cân vào', 'Giờ cân ra', 'Biển số xe', 'Khối lượng hàng (kg)'],
+      [1, '00101', '26/11/2026', '08:30:00', '09:15:00', '51C-123.45', 15000],
+    ],
+  });
+
+  const tpl = {
+    name: 'Mẫu Cân Tách Giờ Vào Ra',
+    sheet: 'Sheet1',
+    headerRow: 1,
+    headerNames: {
+      ticket: 'Số phiếu',
+      date: 'Ngày cân',
+      timeIn: 'Giờ cân vào',
+      timeOut: 'Giờ cân ra',
+      plate: 'Biển số xe',
+      net: 'Khối lượng hàng (kg)',
+    },
+    columns: {
+      ticket: 1,
+      date: 2,
+      timeIn: 3,
+      timeOut: 4,
+      plate: 5,
+      net: 6,
+    },
+    fallbackUnit: 'kg',
+  };
+
+  const parsed = HAK.Excel.parseSheet(wb, 'Sheet1', {
+    headerRow: 1,
+    mapping: tpl.columns,
+    fallbackUnit: 'kg',
+  });
+
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.rows.length, 1);
+  const r = parsed.rows[0];
+  assert.equal(r.ticket, '00101');
+  assert.equal(r.plate, '51C-123.45');
+  assert.equal(r.dateStr, '26/11/2026');
+  assert.equal(r.time1, '26/11/2026 08:30:00');
+  assert.equal(r.time2, '26/11/2026 09:15:00');
+  assert.equal(r.net, 15000);
+});
