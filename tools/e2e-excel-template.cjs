@@ -137,6 +137,11 @@ const XLSX = require('../app/libs/xlsx.full.min.js');
   console.log('Selected batch template:', batchTemplateValue);
   console.log('First ticket with leading zeroes:', ticketValue);
 
+  // Chụp ảnh Screenshot 4: Nạp file đợt áp dụng mẫu mặc định
+  const shot4 = path.resolve(screenshotsDir, 'screenshot-file-import-template.png');
+  await page.screenshot({ path: shot4, fullPage: false });
+  console.log('✓ Screenshot 4 saved:', shot4);
+
   await browser.close();
 
   if (errors.length) {
