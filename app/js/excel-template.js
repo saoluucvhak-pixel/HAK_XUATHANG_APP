@@ -115,6 +115,7 @@
         columns: Object.assign({}, tpl.columns || {}),
         fallbackUnit: tpl.fallbackUnit === 'tan' ? 'tan' : 'kg',
         isDefault: !!tpl.isDefault,
+        explicitTime: tpl.explicitTime === true,
         createdAt: tpl.createdAt || now,
         updatedAt: now,
       };
@@ -147,6 +148,7 @@
         headerNames: Object.assign({}, orig.headerNames || {}),
         columns: Object.assign({}, orig.columns || {}),
         fallbackUnit: orig.fallbackUnit,
+        explicitTime: orig.explicitTime,
         isDefault: false,
       };
       return this.save(copyTpl);
@@ -241,6 +243,13 @@
         matchedHeaders[fieldKey] = chosen.raw;
       }
 
+      if (template.explicitTime === true) {
+        // Các ô giờ để trống trong mẫu là lựa chọn có chủ ý.
+        for (const field of ['datetime1', 'datetime2', 'timeIn', 'timeOut']) {
+          if (mapping[field] === undefined) mapping[field] = -1;
+        }
+      }
+
       // Kiểm tra các trường bắt buộc
       const has = (k) => mapping[k] >= 0;
       if (!has('plate')) {
@@ -325,6 +334,9 @@
 
       const allWarnings = [...(match.warnings || []), ...(ds.warnings || [])];
       const allErrors = [...(match.errors || []), ...(ds.errors || [])];
+      if (ds.rows && ds.rows.length && !ds.rows.some((row) => row.ts1 != null)) {
+        allErrors.push('Cột ngày cân không có giá trị ngày hợp lệ. Nếu ngày và giờ tách cột, chọn cột ngày trước rồi ghép thêm cột giờ.');
+      }
 
       let reconciliation = null;
       if (ds.meta && (ds.meta.declaredTrips !== null || ds.meta.declaredKg !== null)) {
@@ -345,7 +357,7 @@
       }
 
       return {
-        ok: ds.ok && match.ok,
+        ok: ds.ok && match.ok && !allErrors.length,
         ds,
         match,
         headerCells: match.headerCells,
@@ -1098,6 +1110,7 @@
         columns,
         fallbackUnit,
         isDefault,
+        explicitTime: true,
       };
     },
 

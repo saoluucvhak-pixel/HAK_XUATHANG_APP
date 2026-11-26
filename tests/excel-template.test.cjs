@@ -644,3 +644,58 @@ test('15. Sửa mẫu cũ khi nhà cung cấp đổi vị trí cột: ghép lạ
   assert.equal(row.net, 25000);
   assert.equal(row.tare, 12000);
 });
+
+test('16. Tiêu đề gộp dọc và ngày, giờ vào, giờ ra riêng (kể cả giờ ra sau nửa đêm 00:00 số serial 0)', () => {
+  const wb = createWorkbook({
+    Can: [
+      ['Số phiếu', 'Biển số', 'Thời gian', null, null, 'Khối lượng (kg)'],
+      [null, null, 'Ngày cân', 'Giờ cân vào', 'Giờ cân ra'],
+      ['0101', '43C-12345', '26/11/2026', 23.5 / 24, 0, 25000],
+    ],
+  });
+  wb.Sheets.Can['!merges'] = ['A1:A2', 'B1:B2', 'C1:E1', 'F1:F2'].map(XLSX.utils.decode_range);
+  const template = {
+    headerRow: 2,
+    headerNames: {
+      ticket: 'Số phiếu',
+      plate: 'Biển số',
+      date: 'Ngày cân',
+      timeIn: 'Giờ cân vào',
+      timeOut: 'Giờ cân ra',
+      net: 'Khối lượng',
+    },
+    fallbackUnit: 'tan',
+    explicitTime: true,
+  };
+  const result = ExcelTemplate.probeTemplate(wb, 'Can', template);
+  assert.equal(result.ok, true);
+  assert.equal(result.stats.kg, 25000);
+  assert.equal(result.sampleRows[0].ts1, Date.UTC(2026, 10, 26, 23, 30));
+  assert.equal(result.sampleRows[0].ts2, Date.UTC(2026, 10, 27));
+  assert.equal(result.headerCells[2], 'Ngày cân');
+
+  const timeAsDate = ExcelTemplate.probeTemplate(wb, 'Can', {
+    ...template,
+    headerNames: { ...template.headerNames, date: 'Giờ cân vào', timeIn: '' },
+  });
+  assert.equal(timeAsDate.ok, false);
+  assert.match(timeAsDate.errors.join(' '), /không có giá trị ngày hợp lệ/);
+});
+
+test('17. Mẫu có ngày giờ chung tôn trọng lựa chọn để trống các cột giờ riêng (explicitTime)', () => {
+  const wb = createWorkbook({
+    Can: [
+      ['Biển số', 'Ngày giờ cân', 'Giờ cân vào', 'Giờ cân ra', 'Khối lượng'],
+      ['43C-12345', '26/11/2026 08:20', '12:10', '13:15', 21000],
+    ],
+  });
+  const template = {
+    headerRow: 1,
+    headerNames: { plate: 'Biển số', date: 'Ngày giờ cân', net: 'Khối lượng' },
+    explicitTime: true,
+  };
+  const result = ExcelTemplate.probeTemplate(wb, 'Can', template);
+  assert.equal(result.ok, true);
+  assert.equal(result.sampleRows[0].ts1, Date.UTC(2026, 10, 26, 8, 20));
+  assert.equal(result.sampleRows[0].ts2, null);
+});

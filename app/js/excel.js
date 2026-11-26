@@ -675,8 +675,10 @@
       let d1 = has('datetime1') ? parseDT(g('datetime1'), is1904) : null;
       let dDate = has('date') ? parseDT(g('date'), is1904) : null;
       const base = d1 && d1.hasDate ? d1 : dDate;
-      const tIn = has('timeIn') ? parseDT(g('timeIn'), is1904) : d1 && d1.hasTime ? d1 : null;
-      const tOut = has('timeOut') ? parseDT(g('timeOut'), is1904) : null;
+      const inValue = has('timeIn') ? g('timeIn') : null;
+      const tIn = has('timeIn') ? parseDT(inValue, is1904) : d1 && d1.hasTime ? d1 : null;
+      const outValue = has('timeOut') ? g('timeOut') : null;
+      const tOut = has('timeOut') ? parseDT(outValue, is1904) : null;
       let d2 = has('datetime2') ? parseDT(g('datetime2'), is1904) : null;
       if (!base || !base.hasDate) {
         issues.noDate.push(row.idx);
@@ -691,9 +693,9 @@
           y: base.y,
           m: base.m,
           d: base.d,
-          hh: tIn ? tIn.hh : base.hasTime ? base.hh : 0,
-          mm: tIn ? tIn.mm : base.hasTime ? base.mm : 0,
-          ss: tIn ? tIn.ss : base.hasTime ? base.ss : 0,
+          hh: tIn ? tIn.hh : inValue === 0 ? 0 : base.hasTime ? base.hh : 0,
+          mm: tIn ? tIn.mm : inValue === 0 ? 0 : base.hasTime ? base.mm : 0,
+          ss: tIn ? tIn.ss : inValue === 0 ? 0 : base.hasTime ? base.ss : 0,
         };
         row.ts1 = partsToTs(p1);
         if (p1.hh === 24) {
@@ -708,7 +710,7 @@
         }
         let ts2 = null;
         if (d2 && d2.hasDate) ts2 = partsToTs(d2);
-        else if (tOut && tOut.hasTime) {
+        else if (tOut && (tOut.hasTime || outValue === 0)) {
           ts2 = partsToTs({ y: base.y, m: base.m, d: base.d, hh: tOut.hh, mm: tOut.mm, ss: tOut.ss });
           if (ts2 < row.ts1) ts2 += 86400000; // ra sau nửa đêm
         } else if (d2 && d2.hasTime) {
