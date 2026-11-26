@@ -148,6 +148,22 @@ test('4. Thiếu hoặc trùng tiêu đề: phát hiện và báo lỗi rõ ràn
   assert.equal(matchMissing.ok, false);
   assert.ok(matchMissing.errors.some((e) => e.includes('Biển số xe')));
 
+  // Cột tại vị trí cũ có nội dung khác thì mẫu phải được xác nhận lại.
+  const wrongHeader = ExcelTemplate.matchTemplate({ ...tpl, columns: { net: 3 } }, ['Số phiếu', 'Biển số', 'Ngày cân', 'Đơn giá']);
+  assert.equal(wrongHeader.ok, false);
+  assert.equal(wrongHeader.mapping.net, -1);
+  const qualifiedTemplate = { ...tpl, headerNames: { ...tpl.headerNames, net: 'Khối lượng (khô)' } };
+  const qualified = ExcelTemplate.matchTemplate(qualifiedTemplate, [
+    'Số phiếu',
+    'Biển số',
+    'Ngày cân',
+    'Khối lượng (tươi)',
+    'Khối lượng (khô)',
+  ]);
+  assert.equal(qualified.ok, true);
+  assert.equal(qualified.mapping.net, 4);
+  assert.equal(ExcelTemplate.matchTemplate(qualifiedTemplate, ['Số phiếu', 'Biển số', 'Ngày cân', 'Khối lượng (tươi)']).ok, false);
+
   // Trùng tiêu đề Biển số ở 2 cột
   const headersDup = ['Số phiếu', 'Biển số', 'Ngày cân', 'Khối lượng', 'Biển số'];
   const matchDup = ExcelTemplate.matchTemplate(tpl, headersDup);
@@ -203,6 +219,47 @@ test('5. Chuẩn hóa đơn vị kg / tấn (dòng, tiêu đề, fallbackUnit)',
   const p3 = ExcelTemplate.probeTemplate(wb3, 'S3', tplFallbackTan);
   assert.equal(p3.ok, true);
   assert.equal(p3.sampleRows[0].net, 18400); // 18.4 * 1000 = 18,400 kg
+
+  const wb4 = createWorkbook({
+    S4: [
+      ['Số phiếu', 'Biển số', 'Ngày cân', 'Khối lượng (kg)', 'Đơn vị tính'],
+      ['P5', '43C-555.55', '22/10/2026', 25000, ''],
+      ['P6', '43C-666.66', '22/10/2026', 20, 'tấn'],
+    ],
+  });
+  const p4 = ExcelTemplate.probeTemplate(wb4, 'S4', { ...tplUnitCol, fallbackUnit: 'tan' });
+  assert.equal(p4.ok, true);
+  assert.deepEqual(
+    p4.sampleRows.map((r) => r.net),
+    [25000, 20000]
+  );
+});
+
+test('Tiêu đề ngoài dòng/cột đầu dùng đúng tọa độ Excel và giữ số 0 của mã phiếu', () => {
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet([]);
+  XLSX.utils.sheet_add_aoa(
+    ws,
+    [
+      ['Số phiếu', 'Biển số', 'Ngày cân', 'Khối lượng'],
+      [102, '43C-12345', '22/10/2026', 25000],
+    ],
+    {
+      origin: 'C5',
+    }
+  );
+  ws['!ref'] = 'C5:F6';
+  ws.C6.z = '0000';
+  ws.C6.w = '0102';
+  XLSX.utils.book_append_sheet(wb, ws, 'Cân');
+  const probe = ExcelTemplate.probeTemplate(wb, 'Cân', {
+    headerRow: 5,
+    headerNames: { ticket: 'Số phiếu', plate: 'Biển số', date: 'Ngày cân', net: 'Khối lượng' },
+  });
+  assert.equal(probe.ok, true);
+  assert.equal(probe.ds.headerRow, 4);
+  assert.equal(probe.ds.columns[0].letter, 'C');
+  assert.equal(probe.sampleRows[0].ticket, '0102');
 });
 
 test('6. Bỏ qua dòng chữ ký / ngày ký ở cuối bảng không bị coi là lỗi', () => {

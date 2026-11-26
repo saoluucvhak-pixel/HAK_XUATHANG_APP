@@ -434,7 +434,7 @@
       ds.errors.push('Không tìm thấy dòng tiêu đề (cần ít nhất 3 cột như Số phiếu / Ngày cân / Số xe / Trọng lượng…).');
       return ds;
     }
-    ds.headerRow = hr;
+    ds.headerRow = hr + rowOff;
     const headerCells = G[hr] || [];
     const width = Math.max(headerCells.length, ...G.slice(hr + 1, hr + 50).map((r) => (r || []).length));
     ds.columns = [];
@@ -483,9 +483,16 @@
     if (ds.errors.length) return ds;
 
     // ---- đơn vị ----
-    let unitFactor = 1; // → kg
-    if (/\(t[ấáa]n\)|\(tan\)|\(t\)/i.test(String(headerCells[M.net] || ''))) unitFactor = 1000;
-    else if (opts.fallbackUnit === 'tan' || opts.fallbackUnit === 'tấn') unitFactor = 1000;
+    const headerUnit = (key) => {
+      const title = String(headerCells[M[key]] || '').toLowerCase();
+      if (/\bkg\b/.test(title)) return 1;
+      if (/\bt[ấáa]n\b|\(\s*t\s*\)/.test(title)) return 1000;
+      return null;
+    };
+    const netUnit = headerUnit('net');
+    const defaultUnit = netUnit ?? (opts.fallbackUnit === 'tan' || opts.fallbackUnit === 'tấn' ? 1000 : 1);
+    const tareUnit = headerUnit('tare') ?? defaultUnit;
+    const grossUnit = headerUnit('gross') ?? defaultUnit;
 
     // ---- chuẩn hoá từng dòng ----
     const is1904 = !!(workbook && workbook.Workbook && workbook.Workbook.WBProps && workbook.Workbook.WBProps.date1904);
@@ -556,20 +563,22 @@
         if (plate || !isBlank(g('ticket'))) issues.noWeight.push(r + 1 + rowOff);
         continue;
       }
-      let rowUnit = unitFactor;
+      let rowUnit = null;
       if (has('unit')) {
         const u = norm(g('unit'));
         if (/^t(an)?$/.test(u)) rowUnit = 1000;
         else if (/^kg$/.test(u)) rowUnit = 1;
       }
-      if (tare !== null) tare *= rowUnit;
-      if (gross !== null) gross *= rowUnit;
-      if (net !== null) net *= rowUnit;
+      if (tare !== null) tare *= rowUnit ?? tareUnit;
+      if (gross !== null) gross *= rowUnit ?? grossUnit;
+      if (net !== null) net *= rowUnit ?? defaultUnit;
 
       let rawTicket = g('ticket');
       if (typeof rawTicket === 'number' && ws && has('ticket')) {
         const addr =
-          root.XLSX && root.XLSX.utils && root.XLSX.utils.encode_cell ? root.XLSX.utils.encode_cell({ r, c: M.ticket + colOff }) : null;
+          root.XLSX && root.XLSX.utils && root.XLSX.utils.encode_cell
+            ? root.XLSX.utils.encode_cell({ r: r + rowOff, c: M.ticket + colOff })
+            : null;
         if (addr && ws[addr] && typeof ws[addr].w === 'string' && /^0+\d+$/.test(ws[addr].w.trim())) {
           rawTicket = ws[addr].w.trim();
         }
