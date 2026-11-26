@@ -528,9 +528,7 @@ test('13. Ô gộp trong vùng dữ liệu: không tự ý nhân bản khối l�
     ['P-002', '26/11/2026', '29C-222.22', null],
   ]);
   // Gộp ô khối lượng hàng (cột D = index 3) từ dòng 3 (r:2) đến dòng 4 (r:3)
-  ws['!merges'] = [
-    { s: { r: 2, c: 3 }, e: { r: 3, c: 3 } }
-  ];
+  ws['!merges'] = [{ s: { r: 2, c: 3 }, e: { r: 3, c: 3 } }];
   const wb = { SheetNames: ['Sheet1'], Sheets: { Sheet1: ws } };
 
   const parsed = HAK.Excel.parseSheet(wb, 'Sheet1', {
@@ -545,7 +543,7 @@ test('13. Ô gộp trong vùng dữ liệu: không tự ý nhân bản khối l�
   assert.equal(parsed.stats.kg, 25000); // KHÔNG bị tính nhân đôi thành 50.000 kg!
 
   // Đã phát cảnh báo đối soát yêu cầu kiểm tra với phiếu gốc
-  const auditWarning = parsed.warnings.find(w => w.includes('Cảnh báo đối soát') && w.includes('bị gộp'));
+  const auditWarning = parsed.warnings.find((w) => w.includes('Cảnh báo đối soát') && w.includes('bị gộp'));
   assert.ok(auditWarning, 'Phải có cảnh báo đối soát khi ô khối lượng bị gộp trong vùng dữ liệu');
 });
 
@@ -586,7 +584,7 @@ test('14. Dùng chung cách đọc dòng tiêu đề có ô gộp cho Tạo mẫ
       date: 1,
       plate: 2,
       net: 3,
-    }
+    },
   };
 
   const match = HAK.ExcelTemplate.matchSheet(wb, 'Sheet1', template);
@@ -617,7 +615,7 @@ test('15. Sửa mẫu cũ khi nhà cung cấp đổi vị trí cột: ghép lạ
       tare: 1,
       net: 2,
       date: 3,
-    }
+    },
   };
 
   // Nhà cung cấp gửi file mới đổi chỗ: Cột B thành 'Khối lượng hàng', Cột C thành 'Trọng lượng xe'
@@ -646,4 +644,3 @@ test('15. Sửa mẫu cũ khi nhà cung cấp đổi vị trí cột: ghép lạ
   assert.equal(row.net, 25000);
   assert.equal(row.tare, 12000);
 });
-

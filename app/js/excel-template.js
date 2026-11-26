@@ -279,10 +279,11 @@
       const hr = Math.max(1, parseInt(headerRowNumber, 10) || 1) - 1; // 0-based
       const r0 = range.s.r;
       const gr = hr - r0;
-      const G = HAK.Excel && HAK.Excel.getSheetGrid
-        ? HAK.Excel.getSheetGrid(ws, hr)
-        : root.XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null, blankrows: true });
-      return (G && G[gr]) ? G[gr] : [];
+      const G =
+        HAK.Excel && HAK.Excel.getSheetGrid
+          ? HAK.Excel.getSheetGrid(ws, hr)
+          : root.XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null, blankrows: true });
+      return G && G[gr] ? G[gr] : [];
     },
 
     matchSheet(workbook, sheetName, template) {
