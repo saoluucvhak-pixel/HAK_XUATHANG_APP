@@ -398,19 +398,26 @@
     return meta;
   }
 
-  function getSheetGrid(ws) {
+  function getSheetGrid(ws, maxHeaderRow) {
     if (!ws) return [];
     const G = root.XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null, blankrows: true });
     if (ws['!merges'] && Array.isArray(ws['!merges'])) {
       const range = root.XLSX.utils.decode_range(ws['!ref'] || 'A1');
       const r0 = range.s.r;
       const c0 = range.s.c;
+      // Chỉ mở rộng ô gộp trong vùng tiêu đề. maxHeaderRow có thể là 0-based hoặc Excel row index.
+      const limitR = typeof maxHeaderRow === 'number' && maxHeaderRow >= 0 ? maxHeaderRow : null;
       ws['!merges'].forEach((m) => {
+        // Nếu ô gộp bắt đầu sau vùng tiêu đề -> bỏ qua không nhân bản dọc vào dữ liệu
+        if (limitR !== null && m.s.r > limitR) {
+          return;
+        }
         const topR = m.s.r - r0;
         const topC = m.s.c - c0;
         const topVal = G[topR]?.[topC];
         if (topVal !== null && topVal !== undefined && topVal !== '') {
-          for (let r = m.s.r; r <= m.e.r; r++) {
+          const maxR = limitR !== null ? Math.min(m.e.r, limitR) : m.e.r;
+          for (let r = m.s.r; r <= maxR; r++) {
             const gr = r - r0;
             if (!G[gr]) G[gr] = [];
             for (let c = m.s.c; c <= m.e.c; c++) {
@@ -439,7 +446,11 @@
     const range = root.XLSX.utils.decode_range(ws['!ref'] || 'A1');
     const rowOff = range.s.r,
       colOff = range.s.c;
-    const G = getSheetGrid(ws);
+
+    // Xác định dòng tiêu đề ban đầu (nếu có cấu hình hoặc tự dò trên 35 dòng đầu)
+    const initialHr = opts.headerRow ? opts.headerRow - 1 - rowOff : -1;
+    let G = getSheetGrid(ws, initialHr >= 0 ? initialHr + rowOff : 35);
+    const hr = initialHr >= 0 ? initialHr : findHeaderRow(G);
 
     const ds = {
       sheetName,
@@ -456,12 +467,12 @@
       stats: null,
       ok: false,
     };
-    // Cho phép người dùng chỉ định dòng tiêu đề (số dòng Excel, bắt đầu từ 1) nếu tự dò thất bại
-    const hr = opts.headerRow ? opts.headerRow - 1 - rowOff : findHeaderRow(G);
     if (hr < 0 || hr >= G.length) {
       ds.errors.push('Không tìm thấy dòng tiêu đề (cần ít nhất 3 cột như Số phiếu / Ngày cân / Số xe / Trọng lượng…).');
       return ds;
     }
+    // Giới hạn unmerge ô gộp CHÍNH XÁC tới dòng tiêu đề hr + rowOff; dữ liệu phía sau giữ nguyên, không sao chép dọc
+    G = getSheetGrid(ws, hr + rowOff);
     ds.headerRow = hr + rowOff;
     const headerCells = G[hr] || [];
     const width = Math.max(headerCells.length, ...G.slice(hr + 1, hr + 50).map((r) => (r || []).length));
@@ -509,6 +520,33 @@
       );
     }
     if (ds.errors.length) return ds;
+
+    // Đối soát ô gộp trong vùng dữ liệu: Nếu ô khối lượng bị gộp dọc qua nhiều dòng phiếu,
+    // app không sao chép giá trị (tránh nhân đôi khối lượng) và phát cảnh báo đối soát.
+    if (ws['!merges'] && Array.isArray(ws['!merges'])) {
+      const weightColIdxs = [M.net, M.gross, M.tare].filter((c) => c !== undefined && c !== null);
+      const warnedCols = new Set();
+      ws['!merges'].forEach((m) => {
+        if (m.e.r > m.s.r && m.s.r > hr + rowOff) {
+          for (let c = m.s.c; c <= m.e.c; c++) {
+            const colIdx = c - colOff;
+            if (weightColIdxs.includes(colIdx) && !warnedCols.has(c)) {
+              warnedCols.add(c);
+              const colLetter = colName(c);
+              ds.warnings.push(
+                'Cảnh báo đối soát: Ô khối lượng tại cột ' +
+                  colLetter +
+                  ' bị gộp qua các dòng ' +
+                  (m.s.r + 1) +
+                  ' – ' +
+                  (m.e.r + 1) +
+                  '. Để tránh tính dư khối lượng, app chỉ tính giá trị một lần cho phiếu đầu. Vui lòng đối soát lại với phiếu gốc!'
+              );
+            }
+          }
+        }
+      });
+    }
 
     // ---- đơn vị ----
     const headerUnit = (key) => {
