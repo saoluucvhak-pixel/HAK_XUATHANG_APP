@@ -54,7 +54,7 @@ async function main() {
   let browser;
   try {
     const exe = process.env.HAK_CHROMIUM;
-    browser = await chromium.launch(exe ? { executablePath: exe, args: ['--no-sandbox'] } : {});
+    browser = await chromium.launch(exe ? { executablePath: exe, args: ['--no-sandbox', '--disable-dev-shm-usage'] } : {});
     const page = await browser.newPage({ viewport: { width: 1280, height: 850 } });
     page.setDefaultTimeout(15000);
     const errors = [];

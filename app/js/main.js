@@ -225,10 +225,12 @@
       })
       .join('');
     $('#fileTypeHint').textContent = App.type
-      ? 'Các file đợt thêm ở bước ② chỉ dùng cho "' + D[App.type].title + '" — các loại khác có dữ liệu riêng, không dùng chung.'
-      : 'Hãy chọn loại biên bản trước, rồi mới thêm file Excel.';
-    $('#dropzone').classList.toggle('locked', !App.type);
-    $('#fileInput').disabled = !App.type;
+      ? 'Đang chọn hình thức: "' +
+        D[App.type].title +
+        '". Các file đợt thêm ở bước ② sẽ gán vào hình thức này (bạn có thể chuyển sang hình thức khác bất kỳ lúc nào).'
+      : 'Có thể thả file Excel vào khung bên dưới ngay (mặc định nạp vào Xuất khẩu nếu chưa chọn).';
+    $('#dropzone').classList.remove('locked');
+    $('#fileInput').disabled = false;
     renderBatches();
   }
   /** Danh sách các đợt (file Excel) của loại đang chọn + dòng tổng gộp. */
@@ -281,7 +283,9 @@
           '<td class="text-nowrap">' +
           vehCell(b) +
           '</td>' +
-          '<td class="text-end text-nowrap"><button class="btn btn-sm btn-outline-secondary me-1" data-view-batch="' +
+          '<td class="text-end text-nowrap"><button class="btn btn-sm btn-outline-primary me-1" data-move-batch="' +
+          i +
+          '" type="button" title="Chuyển đợt này sang hình thức khác">Chuyển sang…</button><button class="btn btn-sm btn-outline-secondary me-1" data-view-batch="' +
           i +
           '" type="button">Xem</button><button class="btn btn-sm btn-outline-danger" data-del-batch="' +
           esc(b.fileName) +
@@ -564,8 +568,9 @@
   async function handleFile(file) {
     if (!file) return;
     if (!App.type) {
-      toast('Hãy chọn loại biên bản trước khi chọn file Excel.', 'warning');
-      return;
+      App.type = 'xuatkhau';
+      renderTypePicker();
+      toast('Tự động chọn hình thức "' + HAK.Pages.DOCS[App.type].title + '" cho file vừa nạp.', 'info');
     }
     if (!/\.(xlsx|xlsm|xls|csv)$/i.test(file.name)) {
       toast('Vui lòng chọn file Excel (.xlsx, .xls, .xlsm) hoặc .csv', 'error');
@@ -1446,6 +1451,71 @@
     $('#btnTheme').addEventListener('click', toggleTheme);
     $('#btnThemeSb').addEventListener('click', toggleTheme);
 
+    function openMoveBatchModal(bi) {
+      const sl = App.slot();
+      if (!sl || !sl.batches || !sl.batches[bi]) return;
+      const batch = sl.batches[bi];
+      const D = HAK.Pages.DOCS;
+      const options = Object.keys(D).filter((k) => k !== App.type);
+      const html =
+        '<div class="modal fade" id="moveBatchModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content">' +
+        '<div class="modal-header"><h5 class="modal-title">🔄 Chuyển đợt sang hình thức khác</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>' +
+        '<div class="modal-body">' +
+        '<p class="mb-2">Đang chọn chuyển đợt: <b>' +
+        esc(batch.fileName) +
+        '</b> ' +
+        (batch.ds && batch.ds.ok ? '(' + fmtInt(batch.ds.stats.trips) + ' xe · ' + G.fmtTon(batch.ds.stats.kg) + ' tấn)' : '') +
+        '</p>' +
+        '<p class="small text-muted mb-3">Chọn hình thức xuất hàng bạn muốn chuyển đợt này sang:</p>' +
+        '<div class="d-grid gap-2">' +
+        options
+          .map(
+            (k) =>
+              '<button type="button" class="btn btn-outline-primary text-start d-flex justify-content-between align-items-center py-2" data-target-type="' +
+              k +
+              '">' +
+              '<span>' +
+              D[k].icon +
+              ' ' +
+              esc(D[k].title) +
+              '</span>' +
+              '<span class="badge text-bg-light">Chuyển sang ➡</span>' +
+              '</button>'
+          )
+          .join('') +
+        '</div></div>' +
+        '<div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button></div>' +
+        '</div></div></div>';
+
+      let mEl = document.getElementById('moveBatchModal');
+      if (mEl) mEl.remove();
+      document.body.insertAdjacentHTML('beforeend', html);
+      mEl = document.getElementById('moveBatchModal');
+      const modal = new bootstrap.Modal(mEl);
+      modal.show();
+
+      mEl.addEventListener('click', async (e) => {
+        const btn = e.target.closest('[data-target-type]');
+        if (!btn) return;
+        const dst = btn.dataset.targetType;
+        modal.hide();
+        Loading.show('Đang chuyển đợt sang "' + D[dst].title + '"…');
+        try {
+          const ok = await App.copyBatches(App.type, [batch], dst);
+          if (ok) {
+            toast('Đã chuyển thành công đợt "' + batch.fileName + '" sang "' + D[dst].title + '".', 'success');
+          } else {
+            toast('Chuyển đợt không thành công hoặc đợt đã tồn tại.', 'warning');
+          }
+        } catch (err) {
+          toast('Lỗi chuyển đợt: ' + err.message, 'error');
+        } finally {
+          Loading.hide();
+          renderBatches();
+        }
+      });
+    }
+
     // Chọn loại biên bản (bước ① trang Chọn File) + link "Chọn file Excel cho loại này" ở các trang biên bản
     $('#fileTypes').addEventListener('click', (e) => {
       const b = e.target.closest('[data-ft]');
@@ -1470,6 +1540,11 @@
       if (e.target.closest('#btnConflicts')) openConflicts();
     });
     $('#batchBody').addEventListener('click', (e) => {
+      const mv = e.target.closest('[data-move-batch]');
+      if (mv) {
+        openMoveBatchModal(+mv.dataset.moveBatch);
+        return;
+      }
       const d = e.target.closest('[data-del-batch]');
       const rt = e.target.closest('[data-retry-batch]');
       if (rt) {

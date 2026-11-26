@@ -1,5 +1,13 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.25.23 — Tinh gọn quy trình nghiệp vụ: Nạp file trước chọn sau, điền dây chuyền Cascade, 1-Click trọn bộ và phân bổ thông minh
+- **Nâng cấp 1: Nạp file trước – Chọn mục đích sau:** Mở khóa hoàn toàn khung kéo thả file Bảng cân (#dropzone) ngay khi vào ứng dụng. Không còn bắt buộc phải chọn 1 trong 7 hình thức trước mới được nạp file. Thêm nút "Chuyển sang…" trên từng đợt để chuyển đổi mục đích linh hoạt chỉ bằng 1 cú nhấp chuột.
+- **Nâng cấp 2: Tự động điền dây chuyền từ Hợp đồng (Auto-Fill & Cascade):** Chọn Hợp đồng/Tàu tự động điền đồng bộ Số tờ khai Hải quan, Ngày tờ khai, Loại lâm sản, Nguồn gốc lâm sản, Tên hàng hóa, Cảng xuất và Cảng đến. Tích hợp ô tìm kiếm nhanh HĐ/Tàu ngay trên dropdown để tra cứu hợp đồng tức thì.
+- **Nâng cấp 3: Phân bổ phiếu cân thông minh theo Tàu/HĐ (Smart Matching):** Tự động phát hiện các xe/phiếu cân thuộc về Tàu đang lập hồ sơ qua tên trạm/kho/ghi chú và hiển thị thanh gợi ý chọn nhanh 1-chạm, tiết kiệm thời gian lọc thủ công khi 1 file cân chứa nhiều tàu.
+- **Nâng cấp 4: Xuất trọn bộ hồ sơ 1-chạm (1-Click Package):** Thêm nút "⚡ Xuất trọn bộ hồ sơ (1-Click)" trên thanh công cụ biên bản, tự động tải đồng thời trọn bộ: Biên bản Word + Bảng kê Excel chi tiết + Bảng kê Lâm sản Mẫu 01 (cho xuất khẩu/ủy thác), không cần tải lẻ từng file.
+- **Nâng cấp 5: Cảnh báo trùng lặp phiếu cân liên hồ sơ & Thanh tiến độ hợp đồng:** Quét đối chiếu toàn bộ các hồ sơ năm đã lưu để cảnh báo ngay nếu có phiếu cân bị trùng chéo giữa các hồ sơ; kèm nút 1-chạm "Bỏ chọn các phiếu trùng". Hiển thị thanh tiến độ thực hiện hợp đồng (% và số tấn thiếu/vượt) trực quan ngay dưới thông tin hợp đồng.
+- **Nâng cấp 6: Tinh giản Menu điều hướng:** Gom gọn 7 hình thức xuất hàng trong thanh điều hướng sidebar; đồng thời bổ sung thanh Sub-Nav Tabs ngang ở đầu mỗi trang biên bản cho phép chuyển đổi nhanh qua lại giữa các hình thức xuất hàng mà không cần quay lại menu chính.
+
 ## v2.25.22 — Tối ưu hóa xử lý ô gộp, so khớp tiêu đề và đối soát dữ liệu Excel
 - **Chỉ xử lý ô gộp trong vùng tiêu đề:** Giới hạn mở rộng ô gộp (unmerge) trong phạm vi dòng tiêu đề. Không tự động sao chép giá trị ô gộp dọc vào vùng dữ liệu, loại bỏ hoàn toàn nguy cơ nhân đôi/tính dư khối lượng (ví dụ 1 ô 25.000 kg gộp qua 2 dòng).
 - **Cảnh báo đối soát ô khối lượng gộp:** Tự động phát hiện các ô khối lượng gộp nhiều dòng trong vùng dữ liệu và hiển thị cảnh báo đối soát rõ ràng, chỉ tính một lần cho phiếu đầu.

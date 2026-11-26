@@ -52,14 +52,16 @@
       <div class="sb-label">① Chuẩn bị dữ liệu</div>
       <a class="sb-link" href="#/catalog" data-nav="catalog"><span class="ico">📇</span> Danh mục HĐ &amp; khách hàng</a>
       <a class="sb-link" href="#/file" data-nav="file"><span class="ico">📂</span> Nhập liệu (bảng cân) <span class="dot"></span></a>
-      <div class="sb-label">② Lập hồ sơ — loại biên bản</div>
-      <a class="sb-link" href="#/guikho" data-nav="guikho"><span class="ico">📄</span> Trung chuyển gửi kho <span class="dot"></span></a>
-      <a class="sb-link" href="#/xuatkhogui" data-nav="xuatkhogui"><span class="ico">📦</span> Xuất hàng kho gửi <span class="dot"></span></a>
-      <a class="sb-link" href="#/xuatkhau" data-nav="xuatkhau"><span class="ico">📤</span> Xuất khẩu <span class="dot"></span></a>
-      <a class="sb-link" href="#/uythac" data-nav="uythac"><span class="ico">🚢</span> Ủy thác xuất khẩu <span class="dot"></span></a>
-      <a class="sb-link" href="#/dieuchuyen" data-nav="dieuchuyen"><span class="ico">🔄</span> Điều chuyển <span class="dot"></span></a>
-      <a class="sb-link" href="#/traodoi" data-nav="traodoi"><span class="ico">🤝</span> Trao đổi hàng hóa <span class="dot"></span></a>
-      <a class="sb-link" href="#/xuatban" data-nav="xuatban"><span class="ico">💰</span> Xuất bán <span class="dot"></span></a>
+      <div class="sb-label">② Lập hồ sơ — Nghiệp vụ xuất hàng</div>
+      <div class="sb-group ps-1 border-start border-secondary border-opacity-25 ms-2 mb-2">
+        <a class="sb-link" href="#/guikho" data-nav="guikho"><span class="ico">📄</span> Trung chuyển gửi kho <span class="dot"></span></a>
+        <a class="sb-link" href="#/xuatkhogui" data-nav="xuatkhogui"><span class="ico">📦</span> Xuất hàng kho gửi <span class="dot"></span></a>
+        <a class="sb-link" href="#/xuatkhau" data-nav="xuatkhau"><span class="ico">📤</span> Xuất khẩu <span class="dot"></span></a>
+        <a class="sb-link" href="#/uythac" data-nav="uythac"><span class="ico">🚢</span> Ủy thác xuất khẩu <span class="dot"></span></a>
+        <a class="sb-link" href="#/dieuchuyen" data-nav="dieuchuyen"><span class="ico">🔄</span> Điều chuyển <span class="dot"></span></a>
+        <a class="sb-link" href="#/traodoi" data-nav="traodoi"><span class="ico">🤝</span> Trao đổi hàng hóa <span class="dot"></span></a>
+        <a class="sb-link" href="#/xuatban" data-nav="xuatban"><span class="ico">💰</span> Xuất bán <span class="dot"></span></a>
+      </div>
       <div class="sb-label">③ Xuất chứng từ</div>
       <a class="sb-link" href="#/chungtu" data-nav="chungtu"><span class="ico">🧾</span> Chứng từ PXKKVCNB</a>
       <div class="sb-label">④ Báo cáo &amp; theo dõi</div>
@@ -124,15 +126,15 @@
       <div class="row g-3">
         <div class="col-12">
           <div class="card mb-3"><div class="card-body py-3">
-            <div class="sec-title mb-2">① Chọn hình thức (loại biên bản / chứng từ)</div>
+            <div class="sec-title mb-2">① Chọn hình thức xuất hàng (hoặc nạp file trực tiếp ở khung dưới)</div>
             <div class="d-flex flex-wrap gap-2" id="fileTypes"></div>
             <div class="form-text mt-2" id="fileTypeHint"></div>
           </div></div>
-          <label class="dropzone d-block locked" id="dropzone" for="fileInput">
+          <label class="dropzone d-block" id="dropzone" for="fileInput">
             <div class="big mb-2">📂</div>
-            <div class="fs-5 fw-semibold">② Kéo thả hoặc bấm để thêm file Bảng Cân Xuất Hàng của từng đợt</div>
+            <div class="fs-5 fw-semibold">② Kéo thả hoặc bấm để thêm file Bảng Cân Xuất Hàng (tự động nhận diện)</div>
             <div class="muted">Mỗi file = một đợt, có thể chọn nhiều file cùng lúc · .xlsx · .xls · .xlsm · .csv — không giới hạn số phiếu cân</div>
-            <input type="file" id="fileInput" accept=".xlsx,.xls,.xlsm,.csv" multiple hidden disabled>
+            <input type="file" id="fileInput" accept=".xlsx,.xls,.xlsm,.csv" multiple hidden>
           </label>
           <div class="small muted mt-2">Chưa có file? <a href="#" data-sample-xlsx>⬇ Tải file Excel mẫu</a> (bảng cân + danh sách xe, tài xế của đợt — 1 file = 1 đợt).</div>
         </div>

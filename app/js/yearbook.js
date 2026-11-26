@@ -55,10 +55,12 @@
     }
     return out;
   }
+  let cachedState = null;
   async function read() {
     if (!H.DB.usable()) throw Error('Cần IndexedDB hoặc SQLite để lưu hồ sơ lâu dài; không lưu tạm vào RAM.');
     const v = await H.DB.kvGet(KEY);
-    return v === undefined ? empty() : v;
+    cachedState = v === undefined ? empty() : v;
+    return cachedState;
   }
   async function commit(expected, change) {
     if (!H.DB.usable()) throw Error('Không mở được kho dữ liệu.');
@@ -71,6 +73,7 @@
     next.revision = before.revision + 1;
     // kiểm lại phiên bản NGAY khi ghi (cửa sổ khác chen giữa lúc đọc và ghi → từ chối)
     await H.DB.kvCas(KEY, (cur) => ((cur === undefined ? empty() : cur).revision !== before.revision ? stale : null), next);
+    cachedState = next;
     return next;
   }
   let workingYear = new Date().getFullYear(),
@@ -305,9 +308,19 @@
     return H.Word.Files.saveBlob(new Blob([text], { type: 'application/json' }), 'HAK_HoSo_' + workingYear + '.json');
   }
   async function importState(incoming) {
-    const state = await read();
-    const checked = merge(state, incoming);
-    return commit(state.revision, () => checked);
+    let state;
+    try {
+      state = H.DB && H.DB.usable && H.DB.usable() ? await read() : cachedState || empty();
+    } catch (e) {
+      state = cachedState || empty();
+    }
+    const recs = Array.isArray(incoming) ? incoming : (incoming && incoming.records) || [];
+    const checked = merge(state, recs);
+    cachedState = checked;
+    if (H.DB && H.DB.usable && H.DB.usable()) {
+      return commit(state.revision, () => checked);
+    }
+    return checked;
   }
   async function restore(file) {
     const j = H.Backup && H.Backup.readJson ? await H.Backup.readJson(file) : JSON.parse(await file.text());
@@ -726,6 +739,34 @@
     active: (type) => active[type],
     clear: (type) => {
       delete active[type];
+    },
+    setCache(s) {
+      cachedState = s;
+    },
+    checkDuplicates(currentRecordId, rows, recordsList) {
+      const records = Array.isArray(recordsList)
+        ? recordsList
+        : (cachedState && cachedState.records) || (offlineView && offlineView.records) || [];
+      if (!Array.isArray(rows) || !rows.length || !records.length) return [];
+      const usedMap = new Map();
+      records.forEach((rec) => {
+        if (currentRecordId && rec.id === currentRecordId) return;
+        (rec.rows || []).forEach((r) => {
+          const k = String(r.ticket || '').trim() + '_' + String(r.plate || '').trim();
+          if (k !== '_') {
+            if (!usedMap.has(k)) usedMap.set(k, []);
+            usedMap.get(k).push(rec.title || rec.id);
+          }
+        });
+      });
+      const duplicates = [];
+      rows.forEach((r) => {
+        const k = String(r.ticket || '').trim() + '_' + String(r.plate || '').trim();
+        if (usedMap.has(k)) {
+          duplicates.push({ row: r, usedIn: usedMap.get(k) });
+        }
+      });
+      return duplicates;
     },
     setYear,
   };

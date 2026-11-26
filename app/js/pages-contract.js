@@ -156,6 +156,33 @@
         if (c.currency === 'VND') own('unitPrice', numTxt(c.priceUsd));
         else notes.push('Đơn giá hợp đồng tính ' + (c.currency || 'USD') + ' — biên bản in đồng/tấn nên không điền ô Đơn giá.');
       }
+
+      // Tự động điền tờ khai hải quan (từ Customs hoặc chi tiết HĐ)
+      const parent = K.parent && c.parentId ? K.parent(c.parentId) : null;
+      const decls = HAK.Customs && HAK.Customs.activeDecls ? HAK.Customs.activeDecls() : [];
+      const decl = decls.find(
+        (d) => d.contractDetailId === c.id || (d.contractNo && (d.contractNo === c.no || (parent && d.contractNo === parent.no)))
+      );
+      if (decl) {
+        own('customsNo', decl.customsNo || decl.no || '');
+        own('customsDate', decl.customsDate || decl.date || '');
+        own('soToKhai', decl.customsNo || decl.no || '');
+        own('ngayToKhai', decl.customsDate || decl.date || '');
+      } else if (c.tkhq) {
+        own('customsNo', c.tkhq);
+        own('customsDate', c.tkhqDate || '');
+        own('soToKhai', c.tkhq);
+        own('ngayToKhai', c.tkhqDate || '');
+      }
+
+      // Hàng hóa, lâm sản và cảng xuất nhập
+      if (has('bklsLoaiLamSan')) own('bklsLoaiLamSan', c.woodType || (parent && parent.woodType) || 'Dăm gỗ keo');
+      if (has('bklsNguonGoc')) own('bklsNguonGoc', c.origin || (parent && parent.origin) || 'Khai thác từ rừng trồng sản xuất trong nước');
+      if (has('hangHoa')) own('hangHoa', c.commodity || (parent && parent.commodity) || 'Dăm gỗ keo xuất khẩu');
+      if (has('cangXuat')) own('cangXuat', c.port || (parent && parent.port) || '');
+      if (has('port')) own('port', c.port || (parent && parent.port) || '');
+      if (has('cangDen')) own('cangDen', c.destPort || (parent && parent.destPort) || '');
+
       const filter =
         c.filterTrips && (c.fromDate || c.toDate || c.fromTime || c.toTime || c.ticketFrom || c.ticketTo)
           ? {

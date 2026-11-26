@@ -85,6 +85,7 @@
       $('#gen-' + type).disabled = !ds;
       $('#pdf-' + type).disabled = !ds;
       $('#xls-' + type).disabled = !ds;
+      if ($('#btnQuickPackage-' + type)) $('#btnQuickPackage-' + type).disabled = !ds;
       if (pageBkls(type)) $('#bkls-' + type).disabled = !ds;
       if (!ds) {
         box.innerHTML = '';
@@ -299,6 +300,114 @@
                 : '<span class="badge text-bg-light border">Hồ sơ mới — chưa lưu</span>')
       );
       bar.innerHTML = p.join(' <span class="muted">·</span> ');
+
+      if (ds) {
+        const rows = currentRows(type),
+          sum = G().summarize(rows),
+          retKg = DOCS[type].extra === 'returned' ? rows.filter((r) => st.returned.has(G().retKey(r))).reduce((n, r) => n + r.net, 0) : 0,
+          deliveredTon = (sum.kg - retKg) / 1000;
+
+        // 1. Tiến độ hợp đồng (Progress Bar)
+        const cqStr = $('#' + fid(type, 'contractQty')) ? $('#' + fid(type, 'contractQty')).value : '';
+        const cq = HAK.Excel && HAK.Excel.util && HAK.Excel.util.parseNum ? HAK.Excel.util.parseNum(cqStr) : parseFloat(cqStr);
+        let progressHtml = '';
+        if (cq && cq > 0) {
+          const pct = Math.round((deliveredTon / cq) * 100);
+          const diffTon = deliveredTon - cq;
+          const pCls = pct > 105 ? 'bg-danger' : pct >= 95 ? 'bg-success' : 'bg-primary';
+          const statusTxt =
+            diffTon > 0
+              ? 'Vượt HĐ: +' + G().fmtTon(diffTon * 1000) + ' tấn'
+              : diffTon === 0
+                ? 'Đủ 100% hợp đồng'
+                : 'Còn thiếu: ' + G().fmtTon(-diffTon * 1000) + ' tấn';
+          progressHtml =
+            '<div class="mt-2 pt-2 border-top">' +
+            '  <div class="d-flex justify-content-between small mb-1">' +
+            '    <span><b>📊 Tiến độ thực hiện hợp đồng:</b> ' +
+            G().fmtTon(deliveredTon * 1000) +
+            ' / ' +
+            G().fmtTon(cq * 1000) +
+            ' tấn (' +
+            pct +
+            '%)</span>' +
+            '    <span class="' +
+            (diffTon > 0 ? 'text-danger fw-bold' : pct >= 95 ? 'text-success fw-bold' : 'text-primary fw-semibold') +
+            '">' +
+            statusTxt +
+            '</span>' +
+            '  </div>' +
+            '  <div class="progress" style="height: 10px;">' +
+            '    <div class="progress-bar ' +
+            pCls +
+            '" role="progressbar" style="width: ' +
+            Math.min(pct, 100) +
+            '%" aria-valuenow="' +
+            pct +
+            '" aria-valuemin="0" aria-valuemax="100"></div>' +
+            '  </div>' +
+            '</div>';
+        }
+
+        // 2. Gợi ý phân bổ thông minh theo tàu (Smart Matching)
+        let matchBanner = '';
+        const shipEl = $('#' + fid(type, 'ship'));
+        const shipName = (shipEl ? shipEl.value : '').trim();
+        const shipNorm = HAK.Excel && HAK.Excel.util && HAK.Excel.util.norm ? HAK.Excel.util.norm(shipName) : shipName.toLowerCase();
+        if (shipNorm.length >= 2 && ds.rows && ds.rows.length > 1) {
+          const matched = ds.rows.filter((r) => {
+            const wh = HAK.Excel && HAK.Excel.util && HAK.Excel.util.norm ? HAK.Excel.util.norm(r.wh || '') : (r.wh || '').toLowerCase();
+            const nt =
+              HAK.Excel && HAK.Excel.util && HAK.Excel.util.norm ? HAK.Excel.util.norm(r.note || '') : (r.note || '').toLowerCase();
+            return wh.includes(shipNorm) || nt.includes(shipNorm);
+          });
+          if (matched.length > 0 && matched.length < ds.rows.length && rows.length !== matched.length) {
+            const mKg = matched.reduce((a, r) => a + (r.net || 0), 0);
+            matchBanner =
+              '<div class="alert alert-info py-1 px-2 d-flex justify-content-between align-items-center mt-2 mb-0 small">' +
+              '  <span>⚡ <b>Phân bổ thông minh:</b> Phát hiện <b>' +
+              matched.length +
+              '</b> phiếu cân ghi nhận cho tàu "' +
+              esc(shipName) +
+              '" (' +
+              G().fmtTon(mKg) +
+              ' tấn).</span>' +
+              '  <button class="btn btn-xs btn-primary py-0 px-2 fw-semibold" type="button" data-smart-match-ship="' +
+              type +
+              '">👉 Chỉ chọn ' +
+              matched.length +
+              ' phiếu này</button>' +
+              '</div>';
+          }
+        }
+
+        // 3. Cảnh báo trùng chéo phiếu cân với các hồ sơ khác
+        let dupBanner = '';
+        if (HAK.Yearbook && HAK.Yearbook.checkDuplicates) {
+          const currentRecId = act ? act.id : null;
+          const dups = HAK.Yearbook.checkDuplicates(currentRecId, rows);
+          if (dups.length > 0) {
+            const dupKg = dups.reduce((a, d) => a + (d.row.net || 0), 0);
+            const firstDoc = dups[0].usedIn[0] || 'hồ sơ khác';
+            dupBanner =
+              '<div class="alert alert-warning py-1 px-2 d-flex justify-content-between align-items-center mt-2 mb-0 small">' +
+              '  <span>⚠️ <b>Cảnh báo trùng lặp:</b> Phát hiện <b>' +
+              dups.length +
+              '</b> phiếu cân (' +
+              G().fmtTon(dupKg) +
+              ' tấn) đã nằm trong ' +
+              esc(firstDoc) +
+              (dups.length > 1 ? ', …' : '') +
+              '.</span>' +
+              '  <button class="btn btn-xs btn-outline-warning text-dark py-0 px-2 fw-semibold" type="button" data-omit-dups="' +
+              type +
+              '">Bỏ chọn các phiếu trùng</button>' +
+              '</div>';
+          }
+        }
+
+        bar.innerHTML += progressHtml + matchBanner + dupBanner;
+      }
     }
     /**
      * Danh mục đổi lúc đang lập hồ sơ: so các ô điền từ hợp đồng (giá trị lần điền gần nhất) với Danh mục hiện tại.
