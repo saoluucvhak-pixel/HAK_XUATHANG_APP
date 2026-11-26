@@ -793,7 +793,9 @@
         rowInput.addEventListener('input', () => {
           clearTimeout(debounceTimer);
           debounceTimer = setTimeout(() => {
-            this.scanHeaderRow(false);
+            if (document.getElementById('wizHeaderRow')) {
+              this.scanHeaderRow(false);
+            }
           }, 250);
         });
       }
@@ -855,6 +857,7 @@
         ? HAK.Excel.getSheetGrid(ws)
         : root.XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null, blankrows: true });
       const rowInput = document.getElementById('wizHeaderRow');
+      if (!rowInput) return;
       const { r: rowOff, c: colOff } = root.XLSX.utils.decode_range(ws['!ref'] || 'A1').s;
       let hr = parseInt(rowInput.value, 10);
 
@@ -862,10 +865,10 @@
         const found = HAK.Excel.findHeaderRow(G);
         if (found >= 0) {
           hr = rowOff + found + 1;
-          if (rowInput) rowInput.value = hr;
+          rowInput.value = hr;
         } else if (!hr || hr < 1) {
           hr = 1;
-          if (rowInput) rowInput.value = 1;
+          rowInput.value = 1;
         }
       }
 
