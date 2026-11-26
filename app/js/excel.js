@@ -38,9 +38,9 @@
 
   /* Quy tắc nhận diện cột theo tiêu đề đã chuẩn hoá (không dấu, chữ thường). Thứ tự = độ ưu tiên. */
   const RULES = [
-    ['datetime2', /ngay gio can 2|thoi gian can 2|ngay can 2/],
+    ['datetime2', /ngay gio can (2|ra)|thoi gian can (2|ra)|ngay can 2/],
     ['datetime1', /ngay gio can 1|thoi gian can 1|ngay gio can( vao)?$/],
-    ['timeIn', /gio can vao|gio vao|gio can 1|gio can lan 1/],
+    ['timeIn', /gio can vao|gio vao|gio can 1|gio can lan 1|^gio can$|^gio$/],
     ['timeOut', /gio can ra|gio ra|gio can 2|gio can lan 2/],
     ['date', /^ngay( can)?( 1| vao)?$|^ngay xuat|^ngay can|^ngay$|thoi gian can|ngay gio can|^thoi gian$|^ngay gio$/],
     ['ticket', /phieu/],
@@ -296,6 +296,19 @@
   /* ---------------------------------------------------------------
    * Phân tích 1 sheet
    * ------------------------------------------------------------- */
+  /** Điền tiêu đề gộp dọc vào đúng cột của dòng người dùng chọn. */
+  function headerCells(ws, row, cells, colOffset) {
+    const headers = cells.slice();
+    for (const { s, e } of ws['!merges'] || []) {
+      if (s.c !== e.c || row <= s.r || row > e.r) continue;
+      const index = s.c - colOffset;
+      if (index < 0 || !isBlank(headers[index])) continue;
+      const address = root.XLSX.utils.encode_cell(s);
+      headers[index] = ws[address]?.v ?? null;
+    }
+    return headers;
+  }
+
   function findHeaderRow(grid) {
     let best = { row: -1, score: 0 };
     const lim = Math.min(grid.length, 60);
@@ -435,11 +448,11 @@
       return ds;
     }
     ds.headerRow = hr + rowOff;
-    const headerCells = G[hr] || [];
-    const width = Math.max(headerCells.length, ...G.slice(hr + 1, hr + 50).map((r) => (r || []).length));
+    const headings = headerCells(ws, hr + rowOff, G[hr] || [], colOff);
+    const width = Math.max(headings.length, ...G.slice(hr + 1, hr + 50).map((r) => (r || []).length));
     ds.columns = [];
     for (let i = 0; i < width; i++) {
-      const h = headerCells[i];
+      const h = headings[i];
       ds.columns.push({
         index: i,
         label: isBlank(h) ? '(cột ' + colName(i + colOff) + ' — không có tiêu đề)' : String(h).trim(),
@@ -448,7 +461,7 @@
     }
     const sample = G.slice(hr + 1, hr + 301).map((r) => r || []);
     ds.autoMapping = detectMapping(
-      Array.from({ length: width }, (_, i) => headerCells[i]),
+      Array.from({ length: width }, (_, i) => headings[i]),
       sample
     );
     ds.mapping = Object.assign({}, ds.autoMapping);
@@ -484,7 +497,7 @@
 
     // ---- đơn vị ----
     const headerUnit = (key) => {
-      const title = String(headerCells[M[key]] || '').toLowerCase();
+      const title = String(headings[M[key]] || '').toLowerCase();
       if (/\bkg\b/.test(title)) return 1;
       if (/\bt[ấáa]n\b|\(\s*t\s*\)/.test(title)) return 1000;
       return null;
@@ -610,7 +623,8 @@
       let dDate = has('date') ? parseDT(g('date'), is1904) : null;
       const base = d1 && d1.hasDate ? d1 : dDate;
       const tIn = has('timeIn') ? parseDT(g('timeIn'), is1904) : d1 && d1.hasTime ? d1 : null;
-      const tOut = has('timeOut') ? parseDT(g('timeOut'), is1904) : null;
+      const outValue = g('timeOut');
+      const tOut = parseDT(outValue, is1904);
       let d2 = has('datetime2') ? parseDT(g('datetime2'), is1904) : null;
       if (!base || !base.hasDate) {
         issues.noDate.push(row.idx);
@@ -642,7 +656,7 @@
         }
         let ts2 = null;
         if (d2 && d2.hasDate) ts2 = partsToTs(d2);
-        else if (tOut && tOut.hasTime) {
+        else if (tOut && (tOut.hasTime || outValue === 0)) {
           ts2 = partsToTs({ y: base.y, m: base.m, d: base.d, hh: tOut.hh, mm: tOut.mm, ss: tOut.ss });
           if (ts2 < row.ts1) ts2 += 86400000; // ra sau nửa đêm
         } else if (d2 && d2.hasTime) {
@@ -908,6 +922,7 @@
     readBuffer,
     parseSheet,
     findHeaderRow,
+    headerCells,
     detectMapping,
     computeStats,
     util: { norm, parseNum, parseNumWarn, parseDT, partsToTs, tsToParts, fmtDate, fmtDateTime, normTicket, plateKey, colName, isBlank },

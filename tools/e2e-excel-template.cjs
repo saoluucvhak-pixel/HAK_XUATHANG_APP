@@ -165,8 +165,50 @@ async function main() {
     });
     assert.equal(restored.defaultId, defaultTemplate.id);
     assert.deepEqual(restored.templates.map((t) => t.id).sort(), [defaultTemplate.id, rejectedId].sort());
+    // Chọn nhầm dòng trống rồi sửa theo xem trước; trường ngày, giờ vào và giờ ra tách cột.
+    const separate = writeWorkbook(dir, 'ngay-gio-rieng.xlsx', [
+      [
+        mainSheet,
+        [
+          ['Báo cáo xe qua cân'],
+          [],
+          [],
+          [],
+          ['Mã phiếu', 'Số xe', 'Ngày cân', 'Giờ cân vào', 'Giờ cân ra', 'Khối lượng hàng'],
+          ['0103', '43C-111.22', '20/10/2026', '23:30', '00:15', 24000],
+        ],
+      ],
+    ]);
+    await page.click('a[href="#/settings"]');
+    await page.click('button[data-bs-target="#tab-excel-tpl"]');
+    await page.click('#tplBtnNew');
+    await page.fill('#wizTplName', 'Ngày và giờ tách cột');
+    await page.setInputFiles('#wizFileInput', separate);
+    await page.getByText('Đã tìm dòng tiêu đề 5.', { exact: false }).waitFor();
+    assert.equal(await page.locator('#wizHeaderRow').inputValue(), '5');
+    await page.locator('[data-wiz-row="3"]').click();
+    assert.match(await page.locator('#wizHeaderPreview').innerText(), /Dòng 3 trống/);
+    const plateOptions = await page.locator('.wiz-col-select[data-field="plate"] option').allTextContents();
+    assert.ok(plateOptions.some((option) => /Cột B.*không tiêu đề.*43C-111\.22/.test(option)));
+    await page.click('#wizBtnAuto');
+    assert.equal(await page.locator('.wiz-col-select[data-field="date"]').inputValue(), '2');
+    assert.equal(await page.locator('.wiz-col-select[data-field="timeIn"]').inputValue(), '3');
+    assert.equal(await page.locator('.wiz-col-select[data-field="timeOut"]').inputValue(), '4');
+    await page.click('#wizBtnProbe');
+    const times = await page.locator('#wizProbeResult').innerText();
+    assert.match(times, /20\/10\/2026 23:30/);
+    assert.match(times, /21\/10\/2026 00:15/);
+    await page.check('#wizIsDefault');
+    await page.click('#wizBtnSave');
+    assert.equal(await page.evaluate(() => HAK.ExcelTemplate.getDefault().headerNames.timeOut), 'Giờ cân ra');
+    await page.click('a[href="#/file"]');
+    await page.click('button[data-ft="' + sourceType + '"]');
+    await input(separate);
+    await waitForSaved('ngay-gio-rieng.xlsx');
+    assert.equal(await page.evaluate(() => HAK.App.ds.rows[0].ts2), Date.UTC(2026, 9, 21, 0, 15));
+
     assert.deepEqual(errors, []);
-    console.log('✓ Mẫu Excel: tiêu đề C5, kg/tấn, chuyển đợt, từ chối mẫu sai, chặn phiếu trùng và khôi phục.');
+    console.log('✓ Mẫu Excel: quét dòng, xem giá trị mẫu, ghép ngày và giờ, kg/tấn, chuyển đợt, phiếu trùng và khôi phục.');
   } finally {
     if (browser) await browser.close();
     fs.rmSync(dir, { recursive: true, force: true });

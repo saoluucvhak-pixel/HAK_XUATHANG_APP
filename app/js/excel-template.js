@@ -16,7 +16,10 @@
   const TEMPLATE_FIELDS = [
     { key: 'ticket', label: 'Số phiếu', req: false },
     { key: 'plate', label: 'Biển số xe', req: true },
-    { key: 'date', label: 'Ngày giờ cân / Ngày cân', req: true },
+    { key: 'date', label: 'Ngày cân / Ngày giờ cân vào', req: true },
+    { key: 'timeIn', label: 'Giờ cân vào (cột riêng)', req: false },
+    { key: 'timeOut', label: 'Giờ cân ra (cột riêng)', req: false },
+    { key: 'datetime2', label: 'Ngày giờ cân ra (chung một cột)', req: false },
     { key: 'net', label: 'Khối lượng hàng', req: true, note: 'Bắt buộc nếu không có cả hai cột Cân 1 và Cân 2' },
     { key: 'tare', label: 'Cân lần 1 (xe không)', req: false },
     { key: 'gross', label: 'Cân lần 2 (có hàng)', req: false },
@@ -113,6 +116,7 @@
         columns: Object.assign({}, tpl.columns || {}),
         fallbackUnit: tpl.fallbackUnit === 'tan' ? 'tan' : 'kg',
         isDefault: !!tpl.isDefault,
+        explicitTime: tpl.explicitTime === true,
         createdAt: tpl.createdAt || now,
         updatedAt: now,
       };
@@ -145,6 +149,7 @@
         headerNames: Object.assign({}, orig.headerNames || {}),
         columns: Object.assign({}, orig.columns || {}),
         fallbackUnit: orig.fallbackUnit,
+        explicitTime: orig.explicitTime,
         isDefault: false,
       };
       return this.save(copyTpl);
@@ -239,6 +244,13 @@
         matchedHeaders[fieldKey] = chosen.raw;
       }
 
+      if (template.explicitTime === true) {
+        // Các ô giờ để trống trong mẫu là lựa chọn có chủ ý.
+        for (const field of ['datetime1', 'datetime2', 'timeIn', 'timeOut']) {
+          if (mapping[field] === undefined) mapping[field] = -1;
+        }
+      }
+
       // Kiểm tra các trường bắt buộc
       const has = (k) => mapping[k] >= 0;
       if (!has('plate')) {
@@ -271,7 +283,7 @@
       const ws = workbook.Sheets?.[sheetName];
       const range = root.XLSX.utils.decode_range(ws?.['!ref'] || 'A1');
       const row = (template.headerRow || 1) - 1;
-      const headerCells =
+      const cells =
         ws && row >= range.s.r && row <= range.e.r
           ? root.XLSX.utils.sheet_to_json(ws, {
               header: 1,
@@ -281,6 +293,7 @@
               range: { s: { r: row, c: range.s.c }, e: { r: row, c: range.e.c } },
             })[0] || []
           : [];
+      const headerCells = ws ? HAK.Excel.headerCells(ws, row, cells, range.s.c) : cells;
       return { ...this.matchTemplate(template, headerCells), headerCells };
     },
 
@@ -315,6 +328,9 @@
 
       const allWarnings = [...(match.warnings || []), ...(ds.warnings || [])];
       const allErrors = [...(match.errors || []), ...(ds.errors || [])];
+      if (ds.rows?.length && !ds.rows.some((row) => row.ts1 != null)) {
+        allErrors.push('Cột ngày cân không có giá trị ngày hợp lệ. Nếu ngày và giờ tách cột, chọn cột ngày trước rồi ghép thêm cột giờ.');
+      }
 
       let reconciliation = null;
       if (ds.meta && (ds.meta.declaredTrips !== null || ds.meta.declaredKg !== null)) {
@@ -335,7 +351,7 @@
       }
 
       return {
-        ok: ds.ok && match.ok,
+        ok: ds.ok && match.ok && !allErrors.length,
         ds,
         match,
         headerCells: match.headerCells,
@@ -355,7 +371,8 @@
       tempWb: null,
       tempFileName: '',
       currentSheet: '',
-      currentHeaderRow: 1,
+      currentHeaderRow: null,
+      scannedSheet: null,
       currentHeaders: [],
       probeResult: null,
     },
@@ -570,7 +587,8 @@
       this._state.tempWb = null;
       this._state.tempFileName = '';
       this._state.currentSheet = tpl ? tpl.sheet || '' : '';
-      this._state.currentHeaderRow = tpl ? tpl.headerRow || 1 : 1;
+      this._state.currentHeaderRow = tpl?.headerRow || null;
+      this._state.scannedSheet = null;
       this._state.currentHeaders = [];
       this._state.probeResult = null;
 
@@ -612,17 +630,20 @@
         '      <div class="col-md-2">' +
         '        <label class="form-label small fw-semibold">Dòng tiêu đề</label>' +
         '        <input class="form-control form-control-sm" type="number" min="1" id="wizHeaderRow" value="' +
-        this._state.currentHeaderRow +
-        '">' +
+        (this._state.currentHeaderRow || '') +
+        '" placeholder="Tự nhận diện">' +
         '      </div>' +
         '      <div class="col-md-2">' +
-        '        <button class="btn btn-sm btn-outline-primary w-100" id="wizBtnScan" type="button">🔍 Quét tiêu đề</button>' +
+        '        <button class="btn btn-sm btn-outline-primary w-100" id="wizBtnScan" type="button">Quét dòng này</button>' +
+        '        <button class="btn btn-sm btn-link w-100" id="wizBtnAuto" type="button">Tự tìm dòng</button>' +
         '      </div>' +
         '    </div>' +
+        '    <div id="wizHeaderPreview" class="small mt-2" aria-live="polite"></div>' +
         '  </div>' +
         // Bước 2: Ghép cột
         '  <div class="p-3 mb-3 border rounded bg-light-subtle">' +
         '    <h6 class="text-primary fw-bold mb-2">2. Ghép cột & Đơn vị tính</h6>' +
+        '    <p class="small text-muted">Chọn cột ngày cân. Nếu ngày và giờ cân vào cùng một ô, chọn cột đó và để trống giờ cân vào riêng. Nếu tách cột, chọn thêm giờ cân vào và giờ cân ra (nếu có).</p>' +
         '    <div class="row g-2 mb-3">' +
         '      <div class="col-md-6">' +
         '        <label class="form-label small fw-semibold">Tên mẫu phiếu cân <span class="text-danger">*</span></label>' +
@@ -659,8 +680,8 @@
       const columns = tpl ? tpl.columns || {} : {};
 
       TEMPLATE_FIELDS.forEach((f) => {
-        const savedHeader = headerNames[f.key] || '';
-        const savedCol = columns[f.key] !== undefined ? columns[f.key] : -1;
+        const savedHeader = headerNames[f.key] || (f.key === 'date' ? headerNames.datetime1 : '') || '';
+        const savedCol = columns[f.key] ?? (f.key === 'date' ? columns.datetime1 : undefined) ?? -1;
         html +=
           '<tr>' +
           '  <td>' +
@@ -752,18 +773,21 @@
           if (!file) return;
           try {
             const info = await HAK.Excel.readFile(file);
+            if (!fileInput.isConnected || fileInput.files[0] !== file) return;
             this._state.tempWb = info.workbook;
             this._state.tempFileName = file.name;
             const status = body.querySelector('#wizFileStatus');
             if (status) status.textContent = 'Đã mở: ' + file.name + ' (' + (info.sheetNames || []).length + ' sheet)';
 
-            sheetSelect.innerHTML = (info.sheetNames || [])
-              .map((n, i) => '<option value="' + HAK.UI.esc(n) + '"' + (i === 0 ? ' selected' : '') + '>' + HAK.UI.esc(n) + '</option>')
+            const savedSheet = this._state.currentSheet;
+            const keepRow = !!this._state.editingId && !this._state.scannedSheet && info.sheetNames.includes(savedSheet);
+            this._state.currentSheet = keepRow ? savedSheet : info.sheetNames[0] || '';
+            sheetSelect.innerHTML = info.sheetNames
+              .map((n) => '<option value="' + HAK.UI.esc(n) + '">' + HAK.UI.esc(n) + '</option>')
               .join('');
-            this._state.currentSheet = info.sheetNames[0] || '';
-
-            // Tự động quét tiêu đề
-            this.scanHeaderRow();
+            sheetSelect.value = this._state.currentSheet;
+            this._state.scannedSheet = null;
+            this.scanHeaderRow(!keepRow);
           } catch (err) {
             HAK.UI.toast('Lỗi đọc file: ' + err.message, 'error');
           }
@@ -773,7 +797,7 @@
       if (sheetSelect) {
         sheetSelect.addEventListener('change', () => {
           this._state.currentSheet = sheetSelect.value;
-          this.scanHeaderRow();
+          this.scanHeaderRow(true);
         });
       }
 
@@ -782,6 +806,17 @@
           this.scanHeaderRow();
         });
       }
+
+      body.querySelector('#wizBtnAuto').addEventListener('click', () => this.scanHeaderRow(true));
+      body.querySelector('#wizHeaderRow').addEventListener('change', () => {
+        if (this._state.tempWb) this.scanHeaderRow();
+      });
+      body.querySelector('#wizHeaderPreview').addEventListener('click', (event) => {
+        const row = event.target.closest('[data-wiz-row]');
+        if (!row) return;
+        body.querySelector('#wizHeaderRow').value = row.dataset.wizRow;
+        this.scanHeaderRow();
+      });
 
       // Khi chọn cột trong dropdown -> tự điền tên tiêu đề
       body.querySelectorAll('.wiz-col-select').forEach((sel) => {
@@ -826,77 +861,129 @@
       }
     },
 
-    scanHeaderRow() {
+    scanHeaderRow(auto = false) {
       const wb = this._state.tempWb;
       if (!wb) {
         HAK.UI.toast('Vui lòng chọn file Excel mẫu trước.', 'warning');
         return;
       }
-      const sheetName = this._state.currentSheet || (wb.SheetNames && wb.SheetNames[0]);
+      const sheetName = this._state.currentSheet || wb.SheetNames[0];
       const ws = wb.Sheets[sheetName];
       if (!ws) return;
 
-      const G = root.XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null, blankrows: true });
-      const rowInput = document.getElementById('wizHeaderRow');
-      const { r: rowOff, c: colOff } = root.XLSX.utils.decode_range(ws['!ref'] || 'A1').s;
-      let hr = parseInt(rowInput.value, 10);
-
-      if (!hr || hr < 1) {
-        const found = HAK.Excel.findHeaderRow(G);
-        hr = rowOff + Math.max(0, found) + 1;
-        rowInput.value = hr;
-      }
-
-      this._state.currentHeaderRow = hr;
-      const headerCells = G[hr - 1 - rowOff] || [];
-      this._state.currentHeaders = headerCells.map((c) => (c == null ? '' : String(c).trim()));
-
-      // Tự động gợi ý ghép cột bằng detectMapping
-      const sample = G.slice(Math.max(0, hr - rowOff), Math.max(0, hr - rowOff) + 100);
-      const autoM = HAK.Excel.detectMapping(this._state.currentHeaders, sample);
-
-      // Cập nhật lại các dropdown cột và tiêu đề
       const body = document.getElementById('tplWizardBody');
-      if (!body) return;
-
-      TEMPLATE_FIELDS.forEach((f) => {
+      const rowInput = body.querySelector('#wizHeaderRow');
+      const preview = body.querySelector('#wizHeaderPreview');
+      const X = root.XLSX.utils;
+      const range = X.decode_range(ws['!ref'] || 'A1');
+      const { r: rowOff, c: colOff } = range.s;
+      const scanEnd = Math.min(range.e.r, rowOff + 59);
+      const grid = (first, last) =>
+        X.sheet_to_json(ws, {
+          header: 1,
+          raw: true,
+          defval: null,
+          blankrows: true,
+          range: {
+            s: { r: first, c: colOff },
+            e: { r: last, c: range.e.c },
+          },
+        });
+      const display = (value) => String(value ?? '').trim();
+      const clipped = (value) => display(value).slice(0, 48);
+      let hr = auto ? 0 : Number(rowInput.value);
+      let guessed = false;
+      const autoScan = !hr;
+      if (autoScan) {
+        const candidateRows = grid(rowOff, scanEnd).map((cells, i) => HAK.Excel.headerCells(ws, rowOff + i, cells, colOff));
+        const found = HAK.Excel.findHeaderRow(candidateRows);
+        guessed = found >= 0;
+        hr = guessed ? rowOff + found + 1 : rowOff + 1;
+      }
+      const row = hr - 1;
+      if (!Number.isInteger(hr) || row < rowOff || row > range.e.r) {
+        preview.textContent = 'Dòng này nằm ngoài vùng dữ liệu. Bấm “Tự tìm dòng” hoặc chọn một dòng trong file Excel.';
+        return;
+      }
+      const sameRow = this._state.scannedSheet === sheetName && this._state.currentHeaderRow === hr;
+      this._state.scannedSheet = sheetName;
+      this._state.currentHeaderRow = hr;
+      rowInput.value = hr;
+      const [rawHeaders, ...sample] = grid(row, Math.min(range.e.r, row + 16));
+      const headers = HAK.Excel.headerCells(ws, row, rawHeaders || [], colOff);
+      this._state.currentHeaders = headers.map(display);
+      const autoM = HAK.Excel.detectMapping(headers, sample);
+      const prev = this.getWizardConfig();
+      const matched = this.matchTemplate(prev, headers).mapping;
+      const labels = this._state.currentHeaders.map((header, i) => {
+        const examples = [
+          ...new Set(
+            sample
+              .map((_, offset) => {
+                const cell = ws[X.encode_cell({ r: row + offset + 1, c: colOff + i })];
+                return clipped(cell?.w ?? sample[offset][i]);
+              })
+              .filter(Boolean)
+          ),
+        ].slice(0, 2);
+        return (
+          'Cột ' +
+          HAK.Excel.util.colName(i + colOff) +
+          ' · ' +
+          (header || '(không tiêu đề)') +
+          (examples.length ? ' · VD: ' + examples.join(' | ') : '')
+        );
+      });
+      for (const f of TEMPLATE_FIELDS) {
         const sel = body.querySelector('.wiz-col-select[data-field="' + f.key + '"]');
         const hdr = body.querySelector('.wiz-hdr-input[data-field="' + f.key + '"]');
-        if (!sel) return;
-
-        let curVal = parseInt(sel.value, 10);
-        if (curVal < 0) {
-          if (autoM[f.key] !== undefined) {
-            curVal = autoM[f.key];
-          } else if (f.key === 'date' && autoM.datetime1 !== undefined) {
-            curVal = autoM.datetime1;
-          }
-        }
-
+        const suggestion = f.key === 'date' ? (autoM.datetime1 ?? autoM.date) : autoM[f.key];
+        const index = sameRow ? Number(sel.value) : matched[f.key] >= 0 ? matched[f.key] : (suggestion ?? -1);
         sel.innerHTML =
           '<option value="-1">— Chưa chọn cột —</option>' +
-          this._state.currentHeaders
-            .map(
-              (h, i) =>
-                '<option value="' +
-                i +
-                '"' +
-                (curVal === i ? ' selected' : '') +
-                '>' +
-                'Cột ' +
-                HAK.Excel.util.colName(i + colOff) +
-                ' · ' +
-                HAK.UI.esc(h || '(không tiêu đề)') +
-                '</option>'
-            )
-            .join('');
+          labels.map((label, i) => '<option value="' + i + '">' + HAK.UI.esc(label) + '</option>').join('');
+        sel.value = labels[index] ? String(index) : '-1';
+        if (!sameRow) hdr.value = this._state.currentHeaders[index] || '';
+      }
 
-        if (hdr && curVal >= 0 && this._state.currentHeaders[curVal]) {
-          if (!hdr.value.trim()) hdr.value = this._state.currentHeaders[curVal];
-        }
-      });
-
-      HAK.UI.toast('Đã quét ' + this._state.currentHeaders.length + ' cột tiêu đề trên dòng ' + hr + '.', 'info');
+      const first = Math.max(rowOff, row - 4);
+      const nearby = grid(first, Math.min(range.e.r, row + (autoScan && !guessed ? 12 : 4)));
+      const warning = this._state.currentHeaders.some(Boolean)
+        ? guessed
+          ? 'Đã tìm dòng tiêu đề ' + hr + '. '
+          : ''
+        : 'Dòng ' + hr + ' trống ở phần tiêu đề. ';
+      preview.innerHTML =
+        '<div class="mb-1">' +
+        warning +
+        'Chọn dòng chứa tên cột. Nếu file không có tiêu đề, dùng giá trị mẫu trong danh sách cột để ghép theo vị trí.</div>' +
+        nearby
+          .map((cells, i) => {
+            const line = first + i + 1;
+            const summary = cells
+              .map((value, col) => {
+                const content = clipped(value);
+                return content ? HAK.Excel.util.colName(col + colOff) + ': ' + content : '';
+              })
+              .filter(Boolean)
+              .slice(0, 8)
+              .join(' · ');
+            return (
+              '<button class="btn btn-sm ' +
+              (line === hr ? 'btn-primary' : 'btn-outline-secondary') +
+              ' d-block text-start text-wrap mb-1" type="button" data-wiz-row="' +
+              line +
+              '" aria-pressed="' +
+              (line === hr) +
+              '">Dòng ' +
+              line +
+              ' · ' +
+              HAK.UI.esc(summary || '(trống)') +
+              '</button>'
+            );
+          })
+          .join('');
+      body.querySelector('#wizProbeResult').textContent = '';
     },
 
     getWizardConfig() {
@@ -904,7 +991,7 @@
       if (!body) return null;
 
       const name = (body.querySelector('#wizTplName').value || '').trim();
-      const headerRow = parseInt(body.querySelector('#wizHeaderRow').value, 10) || 1;
+      const headerRow = Number(body.querySelector('#wizHeaderRow').value) || this._state.currentHeaderRow || 1;
       const fallbackUnit = body.querySelector('#wizFallbackUnit').value || 'kg';
       const isDefault = body.querySelector('#wizIsDefault').checked;
 
@@ -932,11 +1019,11 @@
         columns,
         fallbackUnit,
         isDefault,
+        explicitTime: true,
       };
     },
 
-    runProbe() {
-      const cfg = this.getWizardConfig();
+    runProbe(result) {
       const resContainer = document.getElementById('wizProbeResult');
       if (!resContainer) return;
 
@@ -946,12 +1033,14 @@
         return;
       }
 
-      const res = this.probeTemplate(
-        this._state.tempWb,
-        this._state.currentSheet,
-        cfg,
-        HAK.Config && HAK.Config.data && HAK.Config.data.general ? HAK.Config.data.general.autoSwap : true
-      );
+      const res =
+        result ||
+        this.probeTemplate(
+          this._state.tempWb,
+          this._state.currentSheet,
+          this.getWizardConfig(),
+          HAK.Config?.data?.general?.autoSwap ?? true
+        );
       this._state.probeResult = res;
 
       let html = '';
@@ -1014,7 +1103,7 @@
           ' dòng đầu):</div>' +
           '<div class="table-responsive" style="max-height:220px">' +
           '<table class="table table-sm table-striped align-middle mb-0" style="font-size:12px">' +
-          '  <thead class="table-light"><tr><th>Dòng</th><th>Số phiếu</th><th>Biển số</th><th>Ngày giờ cân</th><th class="text-end">Cân 1 (kg)</th><th class="text-end">Cân 2 (kg)</th><th class="text-end">KL hàng (kg)</th><th>Kho</th><th>Ghi chú</th></tr></thead>' +
+          '  <thead class="table-light"><tr><th>Dòng</th><th>Số phiếu</th><th>Biển số</th><th>Ngày giờ cân vào</th><th>Ngày giờ cân ra</th><th class="text-end">Cân 1 (kg)</th><th class="text-end">Cân 2 (kg)</th><th class="text-end">KL hàng (kg)</th><th>Kho</th><th>Ghi chú</th></tr></thead>' +
           '  <tbody>';
         res.sampleRows.slice(0, 5).forEach((r) => {
           html +=
@@ -1030,6 +1119,8 @@
             '</td>' +
             '  <td>' +
             HAK.UI.esc(r.time1 || r.dateStr || '') +
+            '</td><td>' +
+            HAK.UI.esc(r.time2 || '') +
             '</td>' +
             '  <td class="text-end">' +
             (r.tare !== null ? r.tare.toLocaleString('vi-VN') : '') +
@@ -1079,6 +1170,15 @@
       if (!hasNet && !hasTareGross) {
         HAK.UI.toast('Chưa ghép cột Khối lượng hàng (cần Khối lượng hoặc cả Cân 1 và Cân 2).', 'error');
         return;
+      }
+
+      if (this._state.tempWb) {
+        const result = this.probeTemplate(this._state.tempWb, cfg.sheet, cfg, HAK.Config?.data?.general?.autoSwap ?? true);
+        if (!result.ok) {
+          this.runProbe(result);
+          HAK.UI.toast('Kiểm tra lại dòng tiêu đề và các cột được ghép trước khi lưu mẫu.', 'warning');
+          return;
+        }
       }
 
       try {
@@ -1146,6 +1246,9 @@
           ticket: '00101',
           plate: '51C-123.45',
           date: '26/11/2026 08:30',
+          timeIn: '08:30',
+          timeOut: '09:00',
+          datetime2: '26/11/2026 09:00',
           tare: isTan ? 12.5 : 12500,
           gross: isTan ? 28.0 : 28000,
           net: isTan ? 15.5 : 15500,
@@ -1159,6 +1262,9 @@
           ticket: '00102',
           plate: '60A-987.65',
           date: '26/11/2026 09:15',
+          timeIn: '09:15',
+          timeOut: '09:45',
+          datetime2: '26/11/2026 09:45',
           tare: isTan ? 11.2 : 11200,
           gross: isTan ? 25.4 : 25400,
           net: isTan ? 14.2 : 14200,
@@ -1172,6 +1278,9 @@
           ticket: '00103',
           plate: '72B-456.78',
           date: '26/11/2026 10:00',
+          timeIn: '10:00',
+          timeOut: '10:30',
+          datetime2: '26/11/2026 10:30',
           tare: isTan ? 13.0 : 13000,
           gross: isTan ? 31.0 : 31000,
           net: isTan ? 18.0 : 18000,
@@ -1184,6 +1293,7 @@
       ];
 
       sampleRowsData.forEach((sampleItem) => {
+        if (headerNames.timeIn) sampleItem.date = sampleItem.date.split(' ')[0];
         const rowArr = [];
         if (maxColIdx >= 0) {
           for (let c = 0; c <= maxColIdx; c++) rowArr.push('');
