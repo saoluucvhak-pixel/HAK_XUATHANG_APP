@@ -269,20 +269,27 @@
       };
     },
 
+    /**
+     * Đọc các ô tiêu đề trên dòng headerRow của sheet (dùng chung cho Tạo mẫu, Đọc thử và Nhập thật).
+     * Tự động mở rộng các ô gộp trong vùng tiêu đề qua HAK.Excel.getSheetGrid.
+     */
+    getHeaderRow(ws, headerRowNumber) {
+      if (!ws) return [];
+      const range = root.XLSX.utils.decode_range(ws?.['!ref'] || 'A1');
+      const hr = Math.max(1, parseInt(headerRowNumber, 10) || 1) - 1; // 0-based
+      const r0 = range.s.r;
+      const gr = hr - r0;
+      const G = HAK.Excel && HAK.Excel.getSheetGrid
+        ? HAK.Excel.getSheetGrid(ws, hr)
+        : root.XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null, blankrows: true });
+      return (G && G[gr]) ? G[gr] : [];
+    },
+
     matchSheet(workbook, sheetName, template) {
       const ws = workbook.Sheets?.[sheetName];
-      const range = root.XLSX.utils.decode_range(ws?.['!ref'] || 'A1');
-      const row = (template.headerRow || 1) - 1;
-      const headerCells =
-        ws && row >= range.s.r && row <= range.e.r
-          ? root.XLSX.utils.sheet_to_json(ws, {
-              header: 1,
-              raw: true,
-              defval: null,
-              blankrows: true,
-              range: { s: { r: row, c: range.s.c }, e: { r: row, c: range.e.c } },
-            })[0] || []
-          : [];
+      if (!ws) return { ok: false, errors: ['Không tìm thấy sheet "' + sheetName + '"'], headerCells: [] };
+      const hr = (template && template.headerRow) || 1;
+      const headerCells = this.getHeaderRow(ws, hr);
       return { ...this.matchTemplate(template, headerCells), headerCells };
     },
 
@@ -969,13 +976,51 @@
       const sample = G.slice(Math.max(0, hr - rowOff), Math.max(0, hr - rowOff) + 100);
       const autoM = HAK.Excel.detectMapping(this._state.currentHeaders, sample);
 
+      const normStr = (s) =>
+        String(s || '')
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^a-z0-9]/g, '');
+
+      let hasMismatch = false;
+
       TEMPLATE_FIELDS.forEach((f) => {
         const sel = body.querySelector('.wiz-col-select[data-field="' + f.key + '"]');
         const hdr = body.querySelector('.wiz-hdr-input[data-field="' + f.key + '"]');
         if (!sel) return;
 
         let curVal = parseInt(sel.value, 10);
-        if (curVal < 0 || !this._state.currentHeaders[curVal]) {
+        const savedHeader = hdr ? hdr.value.trim() : '';
+
+        // Khi sửa mẫu cũ hoặc mở file mới có thể nhà cung cấp đã đổi vị trí cột:
+        // So khớp lại theo tên tiêu đề đã lưu
+        if (savedHeader) {
+          const targetNorm = normStr(savedHeader);
+          const curHeader = curVal >= 0 && this._state.currentHeaders[curVal] ? this._state.currentHeaders[curVal] : '';
+          const curNorm = normStr(curHeader);
+
+          // Nếu cột hiện tại không khớp với tên tiêu đề đã lưu
+          if (!curNorm || (curNorm !== targetNorm && !curNorm.includes(targetNorm) && !targetNorm.includes(curNorm))) {
+            const foundIdx = this._state.currentHeaders.findIndex((h) => {
+              const hn = normStr(h);
+              return hn && targetNorm && (hn === targetNorm || hn.includes(targetNorm) || targetNorm.includes(hn));
+            });
+
+            if (foundIdx >= 0) {
+              // Đổi vị trí cột sang vị trí mới khớp với tiêu đề đã lưu
+              curVal = foundIdx;
+            } else if (autoM[f.key] !== undefined) {
+              curVal = autoM[f.key];
+            } else if (f.key === 'date' && autoM.datetime1 !== undefined) {
+              curVal = autoM.datetime1;
+            } else {
+              // Tên cột không khớp và không dò được -> yêu cầu chọn lại
+              curVal = -1;
+              hasMismatch = true;
+            }
+          }
+        } else if (curVal < 0 || !this._state.currentHeaders[curVal]) {
           if (autoM[f.key] !== undefined) {
             curVal = autoM[f.key];
           } else if (f.key === 'date' && autoM.datetime1 !== undefined) {
@@ -1005,6 +1050,16 @@
           hdr.value = this._state.currentHeaders[curVal];
         }
       });
+
+      this._state.hasColumnMismatch = hasMismatch;
+      if (hasMismatch && alertEl && validHeadersCount > 0) {
+        alertEl.innerHTML =
+          '<div class="alert alert-warning py-2 px-3 small mb-2">' +
+          '  <strong>⚠️ Phát hiện vị trí cột thay đổi so với mẫu:</strong> ' +
+          'Một số cột không còn khớp với tên tiêu đề đã lưu. App đã tự tìm lại hoặc để trống các cột bị lệch. ' +
+          'Vui lòng kiểm tra lại các cột và bấm <b>"🔬 Đọc thử dữ liệu"</b> để kiểm tra trước khi lưu mẫu.' +
+          '</div>';
+      }
 
       HAK.UI.toast('Đã quét ' + this._state.currentHeaders.length + ' cột tiêu đề trên dòng ' + hr + '.', 'info');
     },
@@ -1188,6 +1243,13 @@
       }
       if (!hasNet && !hasTareGross) {
         HAK.UI.toast('Chưa ghép cột Khối lượng hàng (cần Khối lượng hoặc cả Cân 1 và Cân 2).', 'error');
+        return;
+      }
+
+      // Khi tên cột không khớp hoặc có thay đổi vị trí cột:
+      // yêu cầu chọn lại và kiểm tra kết quả đọc thử trước khi lưu mẫu
+      if (this._state.hasColumnMismatch && (!this._state.probeResult || !this._state.probeResult.ok)) {
+        HAK.UI.toast('Vị trí cột đã thay đổi so với mẫu. Vui lòng kiểm tra lại các cột và bấm "Đọc thử dữ liệu" trước khi lưu!', 'warning');
         return;
       }
 

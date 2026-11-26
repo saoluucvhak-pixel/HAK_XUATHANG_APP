@@ -518,3 +518,132 @@ test('12. Hỗ trợ sheet có ô gộp tiêu đề (merged cells): tự động
   assert.equal(parsed.rows[0].plate, '29C-888.99');
   assert.equal(parsed.rows[0].net, 24000);
 });
+
+test('13. Ô gộp trong vùng dữ liệu: không tự ý nhân bản khối lượng sang dòng sau, phát cảnh báo đối soát (không tính dư khối lượng)', () => {
+  // Giả lập file có 1 ô khối lượng 25.000 kg gộp dòng 3 và 4 (chỉ 1 giá trị 25.000 kg cho 2 dòng xe)
+  const ws = XLSX.utils.aoa_to_sheet([
+    ['BẢNG KÊ CÂN XE'],
+    ['Số phiếu', 'Ngày cân', 'Biển số xe', 'Khối lượng hàng'],
+    ['P-001', '26/11/2026', '29C-111.11', 25000],
+    ['P-002', '26/11/2026', '29C-222.22', null],
+  ]);
+  // Gộp ô khối lượng hàng (cột D = index 3) từ dòng 3 (r:2) đến dòng 4 (r:3)
+  ws['!merges'] = [
+    { s: { r: 2, c: 3 }, e: { r: 3, c: 3 } }
+  ];
+  const wb = { SheetNames: ['Sheet1'], Sheets: { Sheet1: ws } };
+
+  const parsed = HAK.Excel.parseSheet(wb, 'Sheet1', {
+    headerRow: 2,
+    fallbackUnit: 'kg',
+  });
+
+  assert.equal(parsed.ok, true);
+  // Dòng 1 có khối lượng 25.000 kg
+  assert.equal(parsed.rows.length, 1);
+  assert.equal(parsed.rows[0].net, 25000);
+  assert.equal(parsed.stats.kg, 25000); // KHÔNG bị tính nhân đôi thành 50.000 kg!
+
+  // Đã phát cảnh báo đối soát yêu cầu kiểm tra với phiếu gốc
+  const auditWarning = parsed.warnings.find(w => w.includes('Cảnh báo đối soát') && w.includes('bị gộp'));
+  assert.ok(auditWarning, 'Phải có cảnh báo đối soát khi ô khối lượng bị gộp trong vùng dữ liệu');
+});
+
+test('14. Dùng chung cách đọc dòng tiêu đề có ô gộp cho Tạo mẫu, Đọc thử và Nhập thật qua getHeaderRow / matchSheet', () => {
+  // File có ô tiêu đề 'Biển số xe' và 'Ngày cân' nằm ở ô gộp
+  const ws = XLSX.utils.aoa_to_sheet([
+    ['PHIẾU GIAO HÀNG'],
+    ['Số phiếu', 'Thông tin cân', null, 'Khối lượng'],
+    [null, 'Ngày cân', 'Biển số xe', 'Khối lượng hàng'],
+    ['P-101', '26/11/2026', '51D-999.88', 18000],
+  ]);
+  // Ô 'Số phiếu' gộp dòng 2-3 (A2:A3), 'Thông tin cân' gộp cột B2:C2, 'Khối lượng' gộp dòng 2-3
+  ws['!merges'] = [
+    { s: { r: 1, c: 0 }, e: { r: 2, c: 0 } },
+    { s: { r: 1, c: 1 }, e: { r: 1, c: 2 } },
+    { s: { r: 1, c: 3 }, e: { r: 2, c: 3 } },
+  ];
+  const wb = { SheetNames: ['Sheet1'], Sheets: { Sheet1: ws } };
+
+  // 1. Kiểm tra getHeaderRow (dùng chung cho mọi nơi)
+  const headersRow3 = HAK.ExcelTemplate.getHeaderRow(ws, 3);
+  assert.equal(headersRow3[0], 'Số phiếu'); // Lan tỏa từ A2 xuống A3
+  assert.equal(headersRow3[1], 'Ngày cân');
+  assert.equal(headersRow3[2], 'Biển số xe');
+  assert.equal(headersRow3[3], 'Khối lượng hàng');
+
+  // 2. Kiểm tra matchSheet (Đọc thử & Nhập thật) nhận diện đủ cả Biển số và Ngày cân
+  const template = {
+    headerRow: 3,
+    headerNames: {
+      ticket: 'Số phiếu',
+      date: 'Ngày cân',
+      plate: 'Biển số xe',
+      net: 'Khối lượng hàng',
+    },
+    columns: {
+      ticket: 0,
+      date: 1,
+      plate: 2,
+      net: 3,
+    }
+  };
+
+  const match = HAK.ExcelTemplate.matchSheet(wb, 'Sheet1', template);
+  assert.equal(match.ok, true, 'Đọc thử qua matchSheet phải hợp lệ, không được báo thiếu cột');
+  assert.equal(match.missing.length, 0);
+
+  // 3. probeTemplate đọc thử thành công
+  const probe = HAK.ExcelTemplate.probeTemplate(wb, 'Sheet1', template);
+  assert.equal(probe.ok, true);
+  assert.equal(probe.sampleRows.length, 1);
+  assert.equal(probe.sampleRows[0].plate, '51D-999.88');
+  assert.equal(probe.sampleRows[0].net, 18000);
+});
+
+test('15. Sửa mẫu cũ khi nhà cung cấp đổi vị trí cột: ghép lại đúng theo tên tiêu đề đã lưu', () => {
+  // Giả lập mẫu cũ đã lưu:
+  // tare (Trọng lượng xe) ở cột B (index 1), net (Khối lượng hàng) ở cột C (index 2)
+  const template = {
+    headerRow: 2,
+    headerNames: {
+      plate: 'Biển số',
+      tare: 'Trọng lượng xe',
+      net: 'Khối lượng hàng',
+      date: 'Ngày cân',
+    },
+    columns: {
+      plate: 0,
+      tare: 1,
+      net: 2,
+      date: 3,
+    }
+  };
+
+  // Nhà cung cấp gửi file mới đổi chỗ: Cột B thành 'Khối lượng hàng', Cột C thành 'Trọng lượng xe'
+  const wsSwapped = XLSX.utils.aoa_to_sheet([
+    ['BẢNG KÊ CÂN ĐÃ ĐỔI CỘT'],
+    ['Biển số', 'Khối lượng hàng', 'Trọng lượng xe', 'Ngày cân'],
+    ['29A-123.45', 25000, 12000, '26/11/2026'],
+  ]);
+  const wbSwapped = { SheetNames: ['Sheet1'], Sheets: { Sheet1: wsSwapped } };
+
+  // matchSheet ghép lại theo tên tiêu đề đã lưu
+  const match = HAK.ExcelTemplate.matchSheet(wbSwapped, 'Sheet1', template);
+  assert.equal(match.ok, true);
+
+  // Khi parseSheet với mapping ghép lại theo tên tiêu đề:
+  const parsed = HAK.Excel.parseSheet(wbSwapped, 'Sheet1', {
+    headerRow: 2,
+    mapping: match.mapping,
+    fallbackUnit: 'kg',
+  });
+
+  assert.equal(parsed.ok, true);
+  const row = parsed.rows[0];
+  assert.equal(row.plate, '29A-123.45');
+  // Khối lượng hàng phải đọc đúng 25.000 kg (không bị đọc nhầm 12.000 kg của Trọng lượng xe)
+  assert.equal(row.net, 25000);
+  assert.equal(row.tare, 12000);
+});
+

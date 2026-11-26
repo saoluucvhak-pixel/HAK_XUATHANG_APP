@@ -1,5 +1,11 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.25.22 — Tối ưu hóa xử lý ô gộp, so khớp tiêu đề và đối soát dữ liệu Excel
+- **Chỉ xử lý ô gộp trong vùng tiêu đề:** Giới hạn mở rộng ô gộp (unmerge) trong phạm vi dòng tiêu đề. Không tự động sao chép giá trị ô gộp dọc vào vùng dữ liệu, loại bỏ hoàn toàn nguy cơ nhân đôi/tính dư khối lượng (ví dụ 1 ô 25.000 kg gộp qua 2 dòng).
+- **Cảnh báo đối soát ô khối lượng gộp:** Tự động phát hiện các ô khối lượng gộp nhiều dòng trong vùng dữ liệu và hiển thị cảnh báo đối soát rõ ràng, chỉ tính một lần cho phiếu đầu.
+- **Ghép lại thông minh theo tên tiêu đề đã lưu khi đổi vị trí cột:** Khi nhà cung cấp hoán đổi vị trí cột (ví dụ tráo Khối lượng hàng và Trọng lượng xe), hệ thống tự động dò tìm và ghép lại đúng cột theo tên tiêu đề đã lưu; cảnh báo chọn lại và yêu cầu kiểm tra đọc thử trước khi lưu mẫu nếu tên cột không khớp.
+- **Dùng chung cách đọc dòng tiêu đề có ô gộp:** Thống nhất một hàm đọc tiêu đề (`getHeaderRow`) cho toàn bộ màn hình Tạo mẫu, Đọc thử (`probeTemplate`) và Nhập thật (`matchSheet`), đảm bảo không còn tình trạng thấy tiêu đề gộp trong màn hình tạo mẫu nhưng Đọc thử lại báo thiếu cột.
+
 ## v2.25.21 — Nâng cấp cấu hình mẫu nhập Excel: tự động dò dòng tiêu đề, xem trước dòng và tách giờ vào/ra
 - **Ghép riêng giờ cân vào và ra:** Bổ sung 2 trường `Giờ cân vào (lần 1)` và `Giờ cân ra (lần 2)` trong wizard cấu hình mẫu Excel. Tự động kết hợp `Ngày cân` và giờ vào/ra tương ứng thành `Thời gian cân 1` và `Thời gian cân 2`.
 - **Tự động nhận diện dòng tiêu đề:** Quét và phát hiện chính xác dòng tiêu đề thực tế ngay khi mở file Excel mẫu, không còn bắt buộc người dùng phải tự dò số dòng.
