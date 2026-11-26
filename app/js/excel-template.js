@@ -381,6 +381,7 @@
         '    <div class="ms-md-auto d-flex flex-wrap align-items-center gap-2">' +
         '      <span class="small muted">Mẫu mặc định đang dùng:</span> ' +
         defaultText +
+        '      <button class="btn btn-sm btn-outline-success" type="button" data-sample-xlsx title="Tải file Excel mẫu chuẩn (gồm 4 sheet: Bảng cân, DS Xe - Tài xế, Mã ĐVVC, Hướng dẫn)">⬇ Tải file mẫu chuẩn</button>' +
         '      <button class="btn btn-sm btn-outline-secondary" id="tplSetAutoDefault" type="button" title="Đặt Tự nhận diện làm mặc định">⚙️ Dùng Tự nhận diện</button>' +
         '      <button class="btn btn-sm btn-primary" id="tplBtnNew" type="button">＋ Tạo mẫu mới</button>' +
         '    </div>' +
@@ -580,6 +581,7 @@
         '        <div class="form-text small" id="wizFileStatus">' +
         (this._state.tempFileName ? 'Đang mở: ' + HAK.UI.esc(this._state.tempFileName) : 'Chọn file phiếu cân mẫu để tự quét tiêu đề') +
         '</div>' +
+        '        <div class="small mt-1">Chưa có file mẫu? <a href="#" data-sample-xlsx class="text-success text-decoration-underline fw-semibold">⬇ Tải file Excel mẫu chuẩn</a></div>' +
         '      </div>' +
         '      <div class="col-md-3">' +
         '        <label class="form-label small fw-semibold">Sheet dữ liệu</label>' +
