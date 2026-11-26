@@ -36,6 +36,7 @@
     "e2e:roundtrip-cross": "node tools/e2e-roundtrip-cross.cjs",
     "e2e:archive-ops": "node tools/e2e-archive-ops.cjs",
     "e2e:gsync-parity": "node tools/e2e-gsync-parity.cjs",
+    "e2e:excel-template": "node tools/e2e-excel-template.cjs",
     "e2e:import-warn": "node tools/e2e-import-warn.cjs",
     "e2e:import-hostile": "node tools/e2e-import-hostile.cjs",
     "e2e:import-hostile-sqlite": "node tools/e2e-sqlite.cjs tools/e2e-import-hostile.cjs",

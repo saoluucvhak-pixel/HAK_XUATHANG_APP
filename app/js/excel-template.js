@@ -41,6 +41,9 @@
       .trim();
   }
 
+  const headerKey = (value) => norm(String(value ?? '').replace(/[()]/g, ' '));
+  const withoutWeightUnit = (title) => title.replace(/ (kg|tan|t)$/, '');
+
   function store() {
     return HAK.Store;
   }
@@ -189,57 +192,55 @@
       const normalizedHeaders = headerCells.map((h, idx) => ({
         idx,
         raw: String(h == null ? '' : h).trim(),
-        n: norm(h),
+        key: headerKey(h),
       }));
 
       const headerNames = template.headerNames || {};
-      const usedCols = new Set();
+      const configuredFields = new Set([...Object.keys(headerNames), ...Object.keys(template.columns || {})]);
+      const assigned = new Map();
 
-      for (const [fieldKey, targetHeader] of Object.entries(headerNames)) {
-        if (!targetHeader || !String(targetHeader).trim()) continue;
-        const targetNorm = norm(targetHeader);
-        if (!targetNorm) continue;
-
-        // Tìm cột trùng tên hoàn toàn trước
-        const exactMatches = normalizedHeaders.filter((col) => col.n && col.n === targetNorm);
-        let chosen = null;
-
-        if (exactMatches.length === 1) {
-          chosen = exactMatches[0];
-        } else if (exactMatches.length > 1) {
-          duplicates.push({ fieldKey, name: targetHeader, cols: exactMatches.map((c) => c.idx) });
-          chosen = exactMatches[0]; // tạm chọn cột đầu
-        } else {
-          // Tìm theo chuỗi con nếu không có khớp hoàn toàn
-          const partialMatches = normalizedHeaders.filter((col) => col.n && (col.n.includes(targetNorm) || targetNorm.includes(col.n)));
-          if (partialMatches.length === 1) {
-            chosen = partialMatches[0];
-          } else if (partialMatches.length > 1) {
-            duplicates.push({ fieldKey, name: targetHeader, cols: partialMatches.map((c) => c.idx) });
-            chosen = partialMatches[0];
-          } else {
-            // Không thấy theo tên tiêu đề → thử kiểm tra chỉ số cột cũ nếu còn hợp lệ
-            const fallbackCol = template.columns ? template.columns[fieldKey] : undefined;
-            if (typeof fallbackCol === 'number' && fallbackCol >= 0 && fallbackCol < headerCells.length) {
-              chosen = normalizedHeaders[fallbackCol];
-              warnings.push(
-                'Cột cho "' + targetHeader + '" không tìm thấy theo tên, tạm dùng vị trí cột cũ (cột ' + (fallbackCol + 1) + ').'
-              );
-            } else {
-              missing.push({ fieldKey, name: targetHeader });
-            }
+      for (const field of [...TEMPLATE_FIELDS, { key: 'datetime1' }]) {
+        const fieldKey = field.key;
+        if (!configuredFields.has(fieldKey)) continue;
+        const targetHeader = headerNames[fieldKey];
+        const targetKey = headerKey(targetHeader);
+        const position = template.columns?.[fieldKey];
+        let matches = [];
+        if (targetKey) {
+          matches = normalizedHeaders.filter((col) => col.key === targetKey);
+          // Tiêu đề cột cân có thể ghi thêm đơn vị. Giữ các phần phân biệt như "tươi" và "khô".
+          if (!matches.length && ['net', 'tare', 'gross'].includes(fieldKey)) {
+            matches = normalizedHeaders.filter((col) => col.key && withoutWeightUnit(col.key) === withoutWeightUnit(targetKey));
           }
+        } else if (!targetHeader && Number.isInteger(position) && normalizedHeaders[position]?.raw === '') {
+          // Vị trí chỉ áp dụng cho cột không có tiêu đề mà người dùng đã chọn khi tạo mẫu.
+          matches = [normalizedHeaders[position]];
         }
-
-        if (chosen) {
-          mapping[fieldKey] = chosen.idx;
-          matchedHeaders[fieldKey] = chosen.raw;
-          usedCols.add(chosen.idx);
+        if (matches.length > 1) {
+          duplicates.push({ fieldKey, name: targetHeader, cols: matches.map((c) => c.idx) });
         }
+        if (matches.length !== 1) {
+          mapping[fieldKey] = -1;
+          if (!matches.length) {
+            missing.push({ fieldKey, name: targetHeader });
+            warnings.push('Không tìm thấy cột "' + (targetHeader || field.label || fieldKey) + '" theo cấu hình mẫu.');
+          }
+          continue;
+        }
+        const chosen = matches[0];
+        const previous = assigned.get(chosen.idx);
+        if (previous) {
+          errors.push(
+            'Cột "' + (chosen.raw || chosen.idx + 1) + '" được ghép cho cả ' + previous + ' và ' + (field.label || fieldKey) + '.'
+          );
+        }
+        assigned.set(chosen.idx, field.label || fieldKey);
+        mapping[fieldKey] = chosen.idx;
+        matchedHeaders[fieldKey] = chosen.raw;
       }
 
       // Kiểm tra các trường bắt buộc
-      const has = (k) => mapping[k] !== undefined;
+      const has = (k) => mapping[k] >= 0;
       if (!has('plate')) {
         errors.push('Thiếu cột Biển số xe (mẫu yêu cầu tiêu đề: "' + (headerNames.plate || 'Biển số') + '").');
       }
@@ -266,6 +267,23 @@
       };
     },
 
+    matchSheet(workbook, sheetName, template) {
+      const ws = workbook.Sheets?.[sheetName];
+      const range = root.XLSX.utils.decode_range(ws?.['!ref'] || 'A1');
+      const row = (template.headerRow || 1) - 1;
+      const headerCells =
+        ws && row >= range.s.r && row <= range.e.r
+          ? root.XLSX.utils.sheet_to_json(ws, {
+              header: 1,
+              raw: true,
+              defval: null,
+              blankrows: true,
+              range: { s: { r: row, c: range.s.c }, e: { r: row, c: range.e.c } },
+            })[0] || []
+          : [];
+      return { ...this.matchTemplate(template, headerCells), headerCells };
+    },
+
     /**
      * Đọc thử một file mẫu với cấu hình mẫu.
      * @param {Object} workbook Workbook SheetJS
@@ -280,27 +298,14 @@
       const ws = workbook.Sheets && workbook.Sheets[sName];
       if (!ws) return { ok: false, errors: ['Không tìm thấy sheet "' + sName + '" trong file mẫu.'] };
 
-      const range = root.XLSX.utils.decode_range(ws['!ref'] || 'A1');
-      const rowOff = range.s.r;
-      const G = root.XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null, blankrows: true });
-
       const hr1 = Math.max(1, parseInt(template.headerRow, 10) || 1);
-      const hrIdx = hr1 - 1 - rowOff;
-      if (hrIdx < 0 || hrIdx >= G.length) {
-        return { ok: false, errors: ['Dòng tiêu đề ' + hr1 + ' vượt quá số dòng của sheet.'] };
-      }
-
-      const headerCells = G[hrIdx] || [];
-      const match = this.matchTemplate(template, headerCells);
-
-      // Nếu người dùng đang chỉnh mapping tay trên wizard, cho phép override mapping
-      const effectiveMapping = Object.assign({}, match.mapping, template.overrideMapping || {});
+      const match = this.matchSheet(workbook, sName, { ...template, headerRow: hr1 });
 
       let ds;
       try {
         ds = HAK.Excel.parseSheet(workbook, sName, {
           headerRow: hr1,
-          mapping: effectiveMapping,
+          mapping: match.mapping,
           fallbackUnit: template.fallbackUnit,
           autoSwap: !!autoSwap,
         });
@@ -333,7 +338,7 @@
         ok: ds.ok && match.ok,
         ds,
         match,
-        headerCells,
+        headerCells: match.headerCells,
         stats: ds.stats || null,
         sampleRows: ds.rows ? ds.rows.slice(0, 10) : [],
         warnings: allWarnings,
@@ -680,7 +685,7 @@
                     (savedCol === i ? ' selected' : '') +
                     '>' +
                     'Cột ' +
-                    String.fromCharCode(65 + i) +
+                    HAK.Excel.util.colName(i) +
                     ' · ' +
                     HAK.UI.esc(h || '(không tiêu đề)') +
                     '</option>'
@@ -784,9 +789,7 @@
           const field = sel.getAttribute('data-field');
           const colIdx = parseInt(sel.value, 10);
           const hdrInput = body.querySelector('.wiz-hdr-input[data-field="' + field + '"]');
-          if (hdrInput && colIdx >= 0 && this._state.currentHeaders[colIdx]) {
-            hdrInput.value = this._state.currentHeaders[colIdx];
-          }
+          if (hdrInput) hdrInput.value = this._state.currentHeaders[colIdx] || '';
         });
       });
 
@@ -835,21 +838,21 @@
 
       const G = root.XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null, blankrows: true });
       const rowInput = document.getElementById('wizHeaderRow');
-      let hr = parseInt(rowInput.value, 10) || 1;
+      const { r: rowOff, c: colOff } = root.XLSX.utils.decode_range(ws['!ref'] || 'A1').s;
+      let hr = parseInt(rowInput.value, 10);
 
-      // Tìm dòng tiêu đề tốt nhất nếu chưa nhập
       if (!hr || hr < 1) {
         const found = HAK.Excel.findHeaderRow(G);
-        hr = found >= 0 ? found + 1 : 1;
+        hr = rowOff + Math.max(0, found) + 1;
         rowInput.value = hr;
       }
 
       this._state.currentHeaderRow = hr;
-      const headerCells = G[hr - 1] || [];
+      const headerCells = G[hr - 1 - rowOff] || [];
       this._state.currentHeaders = headerCells.map((c) => (c == null ? '' : String(c).trim()));
 
       // Tự động gợi ý ghép cột bằng detectMapping
-      const sample = G.slice(hr, hr + 100);
+      const sample = G.slice(Math.max(0, hr - rowOff), Math.max(0, hr - rowOff) + 100);
       const autoM = HAK.Excel.detectMapping(this._state.currentHeaders, sample);
 
       // Cập nhật lại các dropdown cột và tiêu đề
@@ -881,7 +884,7 @@
                 (curVal === i ? ' selected' : '') +
                 '>' +
                 'Cột ' +
-                String.fromCharCode(65 + i) +
+                HAK.Excel.util.colName(i + colOff) +
                 ' · ' +
                 HAK.UI.esc(h || '(không tiêu đề)') +
                 '</option>'
@@ -907,7 +910,6 @@
 
       const headerNames = {};
       const columns = {};
-      const overrideMapping = {};
 
       TEMPLATE_FIELDS.forEach((f) => {
         const sel = body.querySelector('.wiz-col-select[data-field="' + f.key + '"]');
@@ -918,7 +920,6 @@
         if (hdrVal) headerNames[f.key] = hdrVal;
         if (colVal >= 0) {
           columns[f.key] = colVal;
-          overrideMapping[f.key] = colVal;
         }
       });
 
@@ -929,7 +930,6 @@
         headerRow,
         headerNames,
         columns,
-        overrideMapping,
         fallbackUnit,
         isDefault,
       };

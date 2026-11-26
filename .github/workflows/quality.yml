@@ -72,6 +72,7 @@ jobs:
       - run: npm run e2e:archive-ops   # lưu / lưu lặp / xóa hồ sơ Lưu trữ kèm lỗi giữa chừng; mục lục ↔ nội dung khớp (IndexedDB)
       - run: node tools/e2e-sqlite.cjs tools/e2e-archive-ops.cjs   # như trên trên SQLite, kể cả mất phản hồi sau khi đã ghi
       - run: npm run e2e:gsync-parity   # Google Sheet GIẢ LẬP (chạy đúng Code.gs): KL ≤ 0 loại, đồng bộ lại / mất phản hồi không nhân đôi, trạng thái hợp đồng một nguồn
+      - run: npm run e2e:excel-template   # nhập theo mẫu NCC, đơn vị kg/tấn, đổi mẫu, chuyển đợt và khôi phục
       - run: npm run e2e:import-warn   # nhập tờ khai / khai bổ sung từ Excel: ô dạng ngoặc "(1.200)" được cảnh báo (quy tắc 28), nhập lại không trùng
       - run: node tools/e2e-sqlite.cjs tools/e2e-import-warn.cjs
       - run: npm run e2e:import-hostile   # bản sao lưu độc (XSS trong meta hồ sơ, chứng từ, đợt Excel; khóa lạ; cấu hình hỏng): không kích hoạt script, không ghi khóa lạ

@@ -27,6 +27,7 @@
     templateName: null,
     headerNames: null,
     templateError: null,
+    templateWarnings: null,
     ds: null,
     previewPage: 0,
   });
@@ -531,7 +532,35 @@
   /* ===============================================================
    * Đọc file Excel
    * ============================================================= */
-  /** Thêm 1 file Excel = 1 ĐỢT của loại đang chọn (trùng tên file thì thay đợt cũ). */
+  function templateReadConfig(wb, sheet, template) {
+    const config = {
+      sheet,
+      mapping: {},
+      headerRow: null,
+      fallbackUnit: null,
+      templateId: null,
+      templateName: null,
+      headerNames: null,
+      templateError: null,
+      templateWarnings: null,
+    };
+    if (!template) return config;
+
+    config.sheet = wb.SheetNames.includes(template.sheet) ? template.sheet : sheet;
+    const match = HAK.ExcelTemplate.matchSheet(wb, config.sheet, template);
+    return Object.assign(config, {
+      mapping: match.mapping,
+      headerRow: template.headerRow || 1,
+      fallbackUnit: template.fallbackUnit || null,
+      templateId: template.id,
+      templateName: template.name,
+      headerNames: template.headerNames || null,
+      templateError: match.ok ? null : match.errors,
+      templateWarnings: match.warnings,
+    });
+  }
+
+  /** Thêm 1 file Excel = 1 đợt của loại đang chọn. */
   async function handleFile(file) {
     if (!file) return;
     if (!App.type) {
@@ -542,17 +571,19 @@
       toast('Vui lòng chọn file Excel (.xlsx, .xls, .xlsm) hoặc .csv', 'error');
       return;
     }
+    const type = App.type;
     Loading.show('Đang đọc file "' + file.name + '"…');
     try {
       const info = await X.readFile(file, (p) => Loading.set(p));
       const bytes = HAK.Batches ? await file.arrayBuffer() : null; // file gốc → lưu bền để mở lại app vẫn còn
+      if (App.type !== type) return;
       const sl = App.slot();
-      let bi = sl.batches.findIndex((b) => b.fileName === file.name),
-        replaced = bi >= 0;
+      const bi = sl.batches.findIndex((b) => b.fileName === file.name);
+      const replaced = bi >= 0;
+      const old = sl.batches[bi];
       if (replaced) {
         // nạp file trùng tên = THAY đợt cũ: nói rõ đợt nào sẽ bị thay
-        const old = sl.batches[bi],
-          os = old.ds && old.ds.ok ? old.ds.stats : null,
+        const os = old.ds && old.ds.ok ? old.ds.stats : null,
           D = HAK.Pages.DOCS;
         Loading.hide();
         const ok = confirm(
@@ -572,133 +603,72 @@
         }
         Loading.show('Đang đọc file "' + file.name + '"…');
       }
-      // Dòng TRÙNG HOÀN TOÀN trong file (cùng số phiếu, biển số, giờ cân): cảnh báo và CHẶN nạp — làm trước khi đổi bất kỳ dữ liệu đợt nào.
-      {
-        let probe = null;
-        for (const n of info.sheetNames) {
-          const r = X.parseSheet(info.workbook, n, { autoSwap: HAK.Config.data.general.autoSwap });
-          if (r.ok) {
-            probe = Object.assign({ sheetName: n }, r);
-            break;
-          }
-        }
-        const dups = probe ? G.duplicateRows(probe.rows) : [];
-        if (dups.length) {
-          Loading.hide();
-          toast(
-            '⛔ Chưa nạp "' +
-              file.name +
-              '": sheet "' +
-              probe.sheetName +
-              '" có ' +
-              HAK.ReadConfig.dupSummary(dups) +
-              '. Xóa dòng thừa trong file Excel rồi nạp lại.',
-            'error'
-          );
-          return;
-        }
-      }
-      const keepRev = replaced ? sl.batches[bi].rev || 0 : 0;
-      const keepAdded = replaced ? sl.batches[bi].addedAt : 0,
-        keepConv = replaced ? sl.batches[bi].conv : null,
-        keepFrom = replaced ? sl.batches[bi].from : null;
-      const keepVeh = replaced ? sl.batches[bi].veh : null;
-      if (!replaced) {
-        sl.batches.push(newBatch());
-        bi = sl.batches.length - 1;
-      } else sl.batches[bi] = newBatch();
-      if (keepAdded) sl.batches[bi].addedAt = keepAdded;
-      if (keepRev) sl.batches[bi].rev = keepRev;
-      if (keepConv) sl.batches[bi].conv = keepConv; // nạp lại file cùng tên: vẫn giữ dấu "đã chuyển sang" (mỗi đợt 1 hình thức)
-      if (keepFrom) sl.batches[bi].from = keepFrom;
-      sl.sel = bi;
-      App.wb = info.workbook;
-      App.fileName = file.name;
-      App.size = file.size;
-      App.mapping = {};
-      App.headerRow = null;
-      App.fallbackUnit = null;
-
-      const defTpl = HAK.ExcelTemplate ? HAK.ExcelTemplate.getDefault() : null;
-      let tplMatch = null;
-      if (defTpl) {
-        App.cur().templateId = defTpl.id;
-        App.cur().templateName = defTpl.name;
-        App.cur().fallbackUnit = defTpl.fallbackUnit || null;
-        App.cur().headerNames = defTpl.headerNames || null;
-        App.fallbackUnit = defTpl.fallbackUnit || null;
-        App.headerRow = defTpl.headerRow || 1;
-      } else {
-        App.cur().templateId = null;
-        App.cur().templateName = null;
-        App.cur().fallbackUnit = null;
-        App.cur().headerNames = null;
-        App.cur().templateError = null;
-      }
-
-      // ưu tiên sheet theo mẫu nếu có hoặc sheet đầu tiên đọc được
-      let pick = defTpl && defTpl.sheet && info.sheetNames.includes(defTpl.sheet) ? defTpl.sheet : info.sheetNames[0];
-      if (defTpl) {
-        const ws = App.wb.Sheets[pick];
-        if (ws) {
-          const G = root.XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
-          const hrIdx = Math.max(0, (defTpl.headerRow || 1) - 1);
-          const headerCells = G[hrIdx] || [];
-          tplMatch = HAK.ExcelTemplate.matchTemplate(defTpl, headerCells);
-          if (tplMatch.ok) {
-            App.mapping = tplMatch.mapping;
-            App.cur().templateError = null;
-          } else {
-            App.cur().templateError = tplMatch.errors;
-          }
-        }
-      }
-      if (!tplMatch || !tplMatch.ok) {
-        for (const n of info.sheetNames) {
-          if (X.parseSheet(App.wb, n, { autoSwap: HAK.Config.data.general.autoSwap }).ok) {
-            pick = n;
+      const RC = HAK.ReadConfig;
+      const autoSwap = HAK.Config.data.general.autoSwap;
+      const defTpl = HAK.ExcelTemplate?.getDefault();
+      const config = templateReadConfig(info.workbook, info.sheetNames[0], defTpl);
+      let probe = RC.probeRead(info.workbook, config, autoSwap);
+      if (!defTpl && !probe.ds.ok) {
+        for (const sheet of info.sheetNames.slice(1)) {
+          const candidate = RC.probeRead(info.workbook, { ...config, sheet }, autoSwap);
+          if (candidate.ds.ok) {
+            config.sheet = sheet;
+            probe = candidate;
             break;
           }
         }
       }
-      App.sheet = pick;
-      App.cur().sheet = pick;
-      App.cur().mapping = App.mapping;
-      App.cur().headerRow = App.headerRow;
-      App.cur().fallbackUnit = App.fallbackUnit;
-      // v2.7.2 danh sách xe RIÊNG của đợt: sheet "DS XE - TAI XE" trong chính file (file mẫu); không có → giữ danh sách đã gắn khi thay file cùng tên
-      const fv = HAK.Vehicles.fromWorkbook(info.workbook, file.name, pick);
-      App.cur().veh = fv || keepVeh || null;
-      parseCurrent(true);
-      let savedOk = true;
-      if (App.ds.ok && bytes) savedOk = await HAK.Batches.save(App.type, App.cur(), bytes); // true chỉ khi giao dịch IndexedDB đã hoàn tất
-      if (App.ds.ok && !savedOk)
+      const verdict = RC.decide(!!old?.ds?.ok, probe);
+      if (!verdict.apply) {
+        toast('⛔ Chưa nạp "' + file.name + '": ' + verdict.why + '. ' + verdict.hint, 'error');
+        return;
+      }
+
+      const fv = HAK.Vehicles.fromWorkbook(info.workbook, file.name, config.sheet);
+      const batch = Object.assign(newBatch(), config, {
+        wb: info.workbook,
+        fileName: file.name,
+        size: file.size,
+        addedAt: old?.addedAt || 0,
+        rev: old?.rev || 0,
+        conv: old?.conv,
+        from: old?.from,
+        veh: fv || old?.veh || null,
+        pendingBytes: bytes,
+      });
+      if (replaced) sl.batches[bi] = batch;
+      else sl.batches.push(batch);
+      sl.sel = replaced ? bi : sl.batches.length - 1;
+      parseCurrent(probe.ds);
+      const savedOk = !batch.ds.ok || !bytes || (await HAK.Batches.save(type, batch, bytes));
+      if (type === App.type) renderBatches();
+      if (batch.ds.ok && !savedOk)
         toast(
           '⚠ Đã đọc "' +
             file.name +
             '" (' +
-            fmtInt(App.ds.stats.trips) +
+            fmtInt(batch.ds.stats.trips) +
             ' phiếu) nhưng CHƯA lưu được vào bộ nhớ trình duyệt: ' +
-            (App.cur().saveError || 'lỗi không rõ') +
+            (batch.saveError || 'lỗi không rõ') +
             ' — đợt chỉ tồn tại đến khi đóng trang. Bấm "Thử lưu lại" ở dòng đợt.',
           'error'
         );
-      else if (App.ds.ok)
+      else if (batch.ds.ok)
         toast(
           (replaced ? 'Đã thay đợt "' + file.name + '": ' : 'Đã thêm đợt: ') +
-            fmtInt(App.ds.stats.trips) +
+            fmtInt(batch.ds.stats.trips) +
             ' phiếu cân — ' +
-            G.fmtTon(App.ds.stats.kg) +
+            G.fmtTon(batch.ds.stats.kg) +
             ' tấn.' +
             (fv
               ? ' Danh sách xe của đợt: ' + fv.count + ' xe (sheet "' + fv.sheet + '").'
-              : App.cur().veh
+              : batch.veh
                 ? ' Giữ danh sách xe đã gắn cho đợt.'
                 : ' Đợt chưa có danh sách xe — bấm 🚚 ở dòng đợt để gắn.'),
-          fv || App.cur().veh ? 'success' : 'warning'
+          fv || batch.veh ? 'success' : 'warning'
         );
-      else toast(App.ds.errors[0] || 'Không đọc được dữ liệu.', 'error');
-      const cf = App.slot() && App.slot().ds && App.slot().ds.conflicts;
+      else toast((batch.templateError || batch.ds.errors)[0] || 'Không đọc được dữ liệu.', 'error');
+      const cf = sl.ds?.conflicts;
       if (cf && cf.length)
         toast(
           '⚠ ' + cf.length + ' phiếu trùng giữa các đợt nhưng KHÁC khối lượng — bấm "Xem & chọn" ở khung Dữ liệu gộp để chọn số đúng.',
@@ -716,42 +686,37 @@
   }
 
   /** Phân tích lại 1 ngăn dữ liệu (theo sheet / ánh xạ cột của chính ngăn đó). */
-  function parseSlot(sl) {
-    const opts = { mapping: sl.mapping, autoSwap: HAK.Config.data.general.autoSwap };
-    if (sl.headerRow) opts.headerRow = sl.headerRow;
-    if (sl.fallbackUnit) opts.fallbackUnit = sl.fallbackUnit;
-    try {
-      sl.ds = X.parseSheet(sl.wb, sl.sheet, opts);
-    } catch (e) {
-      console.error(e);
-      sl.ds = { ok: false, errors: [e.message], warnings: [], columns: [], mapping: {}, autoMapping: {}, rows: [] };
-    }
-    if (sl.ds.ok) HAK.Vehicles.enrich(sl.ds, sl.veh || null); // v2.7.2: điền Tài xế / ĐVVC theo danh sách xe RIÊNG của đợt (null → cảnh báo)
+  function parseSlot(sl, ds) {
+    sl.ds = ds || HAK.ReadConfig.read(sl.wb, sl, HAK.Config.data.general.autoSwap);
+    if (sl.ds.ok) HAK.Vehicles.enrich(sl.ds, sl.veh || null);
   }
-  /**
-   * Đổi cách đọc của đợt đang xem (đổi sheet, dòng tiêu đề, ánh xạ cột, nhận diện lại cột): đọc thử TRƯỚC khi áp dụng (xem read-config.js).
-   * Từ chối thì vẽ lại màn hình để các ô chọn về đúng giá trị đang dùng. Trả true nếu đã áp dụng.
-   */
+
+  /** Kiểm tra cấu hình mới trước khi đổi dữ liệu, cấu hình và mẫu đang hiển thị. */
   function applyReadConfig(mutate) {
     const b = App.cur();
     if (!b || !b.wb) return false;
-    const RC = HAK.ReadConfig,
-      prev = {
-        sheet: b.sheet,
-        mapping: JSON.parse(JSON.stringify(b.mapping || {})),
-        headerRow: b.headerRow || null,
-        fallbackUnit: b.fallbackUnit || null,
-      },
-      next = JSON.parse(JSON.stringify(prev));
+    const RC = HAK.ReadConfig;
+    const next = {
+      sheet: b.sheet,
+      mapping: { ...b.mapping },
+      headerRow: b.headerRow,
+      fallbackUnit: b.fallbackUnit,
+      templateId: b.templateId,
+      templateName: b.templateName,
+      headerNames: b.headerNames,
+      templateError: b.templateError,
+      templateWarnings: b.templateWarnings,
+    };
     mutate(next);
-    const wasOk = !!(b.ds && b.ds.ok),
-      verdict = RC.decide(wasOk, RC.probeRead(b.wb, next, HAK.Config.data.general.autoSwap));
+    const wasOk = !!b.ds?.ok;
+    const probe = RC.probeRead(b.wb, next, HAK.Config.data.general.autoSwap);
+    const verdict = RC.decide(wasOk, probe);
     if (!verdict.apply) {
       toast(
         '⛔ Chưa áp dụng: ' +
           verdict.why +
           '. Giữ nguyên cách đọc đang dùng' +
-          (wasOk ? ' (sheet "' + prev.sheet + '")' : '') +
+          (wasOk ? ' (sheet "' + b.sheet + '")' : '') +
           '. ' +
           verdict.hint,
         'error'
@@ -759,23 +724,32 @@
       renderFile();
       return false;
     }
-    App.sheet = next.sheet;
-    App.mapping = next.mapping;
-    App.headerRow = next.headerRow;
-    App.fallbackUnit = next.fallbackUnit;
-    b.sheet = next.sheet;
-    b.mapping = next.mapping;
-    b.headerRow = next.headerRow;
-    b.fallbackUnit = next.fallbackUnit;
-    parseCurrent(true);
+    Object.assign(b, next);
+    const type = App.type;
+    parseCurrent(probe.ds);
+    if (b.ds.ok && !b.saved && b.pendingBytes && HAK.Batches) {
+      HAK.Batches.retry(type, b).then(() => {
+        if (App.type === type) renderBatches();
+      });
+    }
     return true;
   }
-  /** Phân tích lại sheet của loại đang chọn. */
-  function parseCurrent(resetPages) {
+
+  function applyManualReadConfig(mutate) {
+    return applyReadConfig((config) => {
+      const manual = templateReadConfig(App.wb, config.sheet, null);
+      const { mapping, headerRow, fallbackUnit, templateError } = config;
+      Object.assign(config, manual, { mapping, headerRow, fallbackUnit: templateError ? null : fallbackUnit });
+      mutate(config);
+    });
+  }
+
+  /** Cập nhật dữ liệu của đợt hiện tại và các màn hình dùng dữ liệu đó. */
+  function parseCurrent(ds) {
     if (!App.wb) return;
-    parseSlot(App.cur());
+    parseSlot(App.cur(), ds);
     mergeSlot(App.slot());
-    if (HAK.Batches && App.cur().saved) HAK.Batches.saveMeta(App.type, App.cur()); // đổi sheet / ánh xạ cột → cập nhật đợt đã lưu
+    if (HAK.Batches && App.cur().saved) HAK.Batches.saveMeta(App.type, App.cur());
     App.previewPage = 0;
     renderVehicles();
     renderTypePicker();
@@ -814,41 +788,50 @@
    */
   App.copyBatches = async (src, list, dst) => {
     const sl = App.slots[dst] || (App.slots[dst] = newSlot());
+    let copied = 0;
     for (const b of list) {
-      let bytes = null;
-      if (HAK.Batches && HAK.Batches.bytes) {
-        try {
-          bytes = await HAK.Batches.bytes(src, b.fileName);
-        } catch (e) {
-          /* đợt chưa lưu bền */
-        }
-      }
-      let wb = b.wb;
-      if (!wb && bytes) wb = (await X.readFile(new File([bytes], b.fileName))).workbook;
-      if (!wb) continue;
-      let i = sl.batches.findIndex((x) => x.fileName === b.fileName);
-      const nb = newBatch();
-      Object.assign(nb, {
+      const bytes = b.pendingBytes || (await HAK.Batches.bytes(src, b.fileName));
+      const wb = b.wb || (bytes && (await X.readFile(new File([bytes], b.fileName))).workbook);
+      if (!wb || !bytes) break;
+
+      const i = sl.batches.findIndex((x) => x.fileName === b.fileName);
+      const previous = sl.batches[i];
+      const nb = Object.assign(newBatch(), {
         wb,
         fileName: b.fileName,
         size: b.size,
         sheet: b.sheet,
-        mapping: Object.assign({}, b.mapping || {}),
-        headerRow: b.headerRow || null,
-        addedAt: i >= 0 ? sl.batches[i].addedAt : 0,
-        rev: i >= 0 ? sl.batches[i].rev || 0 : 0,
+        mapping: { ...b.mapping },
+        headerRow: b.headerRow,
+        fallbackUnit: b.fallbackUnit,
+        templateId: b.templateId,
+        templateName: b.templateName,
+        headerNames: b.headerNames,
+        templateWarnings: b.templateWarnings,
+        addedAt: previous?.addedAt || 0,
+        rev: previous?.rev || 0,
         from: { type: src, fileName: b.fileName, at: Date.now() },
-        veh: b.veh ? Object.assign({}, b.veh) : null,
-      }); // v2.7.2: cùng lô hàng → mang theo danh sách xe của đợt gốc
-      if (i >= 0) sl.batches[i] = nb;
-      else {
-        sl.batches.push(nb);
-        i = sl.batches.length - 1;
-      }
+        veh: b.veh ? { ...b.veh } : null,
+      });
       parseSlot(nb);
-      if (nb.ds && nb.ds.ok && bytes && HAK.Batches) await HAK.Batches.save(dst, nb, bytes);
+      if (
+        !b.ds?.ok ||
+        !nb.ds.ok ||
+        b.ds.stats.trips !== nb.ds.stats.trips ||
+        b.ds.stats.kg !== nb.ds.stats.kg ||
+        !(await HAK.Batches.save(dst, nb, bytes))
+      )
+        break;
+
+      if (i < 0) sl.batches.push(nb);
+      else sl.batches[i] = nb;
+      const priorConversion = b.conv;
       b.conv = { to: dst, at: Date.now() };
-      if (b.saved && HAK.Batches) await HAK.Batches.saveMeta(src, b);
+      if (b.saved && !(await HAK.Batches.saveMeta(src, b))) {
+        b.conv = priorConversion;
+        break;
+      }
+      copied++;
     }
     if (sl.sel < 0 && sl.batches.length) sl.sel = 0;
     mergeSlot(sl);
@@ -856,7 +839,7 @@
     renderTypePicker();
     renderFile();
     updateChips();
-    return sl.ds && sl.ds.ok;
+    return copied === list.length && !!sl.ds?.ok;
   };
 
   /** Mở app → nạp lại các đợt đã lưu (file gốc + sheet + ánh xạ cột), đọc bằng đúng bộ đọc hiện hành. */
@@ -1326,7 +1309,7 @@
     body.innerHTML = html;
     $$('#mapBody [data-map]').forEach((s) =>
       s.addEventListener('change', () => {
-        applyReadConfig((c) => {
+        applyManualReadConfig((c) => {
           c.mapping[s.dataset.map] = +s.value;
         });
       })
@@ -1338,7 +1321,7 @@
     if (!b) return;
     b.addEventListener('click', () => {
       const v = parseInt($('#hdrRow').value, 10);
-      applyReadConfig((c) => {
+      applyManualReadConfig((c) => {
         c.headerRow = v > 0 ? v : null;
         c.mapping = {};
       });
@@ -1553,52 +1536,17 @@
 
     $('#sheetSelect').addEventListener('change', (e) => {
       const name = e.target.value;
-      applyReadConfig((c) => {
-        c.sheet = name;
-        c.mapping = {};
-        c.headerRow = null;
-      });
+      const b = App.cur();
+      const template = HAK.ExcelTemplate?.get(b.templateId);
+      applyReadConfig((config) => Object.assign(config, templateReadConfig(b.wb, name, template ? { ...template, sheet: name } : null)));
     });
     const batchTplSelect = $('#batchTemplateSelect');
     if (batchTplSelect) {
       batchTplSelect.addEventListener('change', (e) => {
-        const tplId = e.target.value;
         const b = App.cur();
-        if (!b || !b.wb) return;
-        applyReadConfig((c) => {
-          if (!tplId) {
-            b.templateId = null;
-            b.templateName = null;
-            b.fallbackUnit = null;
-            b.headerNames = null;
-            b.templateError = null;
-            c.headerRow = null;
-            c.fallbackUnit = null;
-            c.mapping = {};
-          } else if (HAK.ExcelTemplate) {
-            const tpl = HAK.ExcelTemplate.get(tplId);
-            if (tpl) {
-              b.templateId = tpl.id;
-              b.templateName = tpl.name;
-              b.fallbackUnit = tpl.fallbackUnit || null;
-              b.headerNames = tpl.headerNames || null;
-              c.headerRow = tpl.headerRow || 1;
-              c.fallbackUnit = tpl.fallbackUnit || null;
-              if (tpl.sheet && b.wb.SheetNames.includes(tpl.sheet)) {
-                c.sheet = tpl.sheet;
-              }
-              const ws = b.wb.Sheets[c.sheet || b.sheet];
-              if (ws) {
-                const G = root.XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null });
-                const hrIdx = Math.max(0, (tpl.headerRow || 1) - 1);
-                const headerCells = G[hrIdx] || [];
-                const mRes = HAK.ExcelTemplate.matchTemplate(tpl, headerCells);
-                c.mapping = mRes.mapping;
-                b.templateError = mRes.ok ? null : mRes.errors;
-              }
-            }
-          }
-        });
+        if (!b.wb) return;
+        const template = HAK.ExcelTemplate?.get(e.target.value);
+        applyReadConfig((config) => Object.assign(config, templateReadConfig(b.wb, b.sheet, template)));
       });
     }
     document.addEventListener('click', (e) => {
@@ -1613,12 +1561,7 @@
     $('#btnReparse').addEventListener('click', () => applyReadConfig(() => {}));
     $('#btnUseScope').addEventListener('click', useViewScope);
     $('#btnResetMap').addEventListener('click', () => {
-      if (
-        applyReadConfig((c) => {
-          c.mapping = {};
-          c.headerRow = null;
-        })
-      )
+      if (applyReadConfig((config) => Object.assign(config, templateReadConfig(App.wb, config.sheet, null))))
         toast('Đã nhận diện lại các cột.', 'info');
     });
     $('#plateSearch').addEventListener(

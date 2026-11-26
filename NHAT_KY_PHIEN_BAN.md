@@ -1,5 +1,11 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.25.20 — Sửa nhập Excel theo mẫu và chuyển đợt cân
+- Ưu tiên đơn vị ghi trên dòng và tiêu đề cột Excel khi quy đổi kg/tấn. Khi chuyển đợt, giữ cấu hình đọc và đối chiếu số phiếu, tổng khối lượng với đợt nguồn.
+- Kiểm tra tên cột bắt buộc và phiếu trùng trên sheet thực tế sẽ lưu. Đọc đúng tọa độ tiêu đề và giữ mẫu hiện tại khi từ chối mẫu mới.
+- Khôi phục danh sách mẫu Excel và mẫu mặc định từ bản sao lưu toàn bộ.
+- Nếu đã nhập hoặc chuyển đợt bằng mẫu có đơn vị dự phòng là tấn trên bản cũ, đối chiếu số liệu đã lưu với file Excel gốc.
+
 ## v2.25.19 — Cấu hình Mẫu nhập Excel tùy biến và tự động xuất file mẫu
 - **Cấu hình Mẫu nhập Excel (Cài đặt → Mẫu nhập Excel):** Cho phép người quản trị tạo, sửa, sao chép, xóa và đặt mẫu mặc định khi nhà cung cấp hoặc trạm cân đổi mẫu phiếu cân. Hỗ trợ tiêu đề ở dòng bất kỳ, đổi vị trí cột và chuẩn hóa đơn vị (kg / tấn).
 - **Đọc thử & Đối chiếu:** Quét thử cấu hình với file mẫu trực tiếp trên máy, hiển thị 5 dòng chuẩn hóa, tổng số phiếu, tổng kg và đối chiếu với số liệu công bố nếu có.

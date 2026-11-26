@@ -30,8 +30,7 @@
     );
   }
 
-  /** Đọc thử một cấu hình { sheet, mapping, headerRow } mà KHÔNG đụng dữ liệu đang dùng; trả { ds, dups, sheet }. */
-  function probeRead(wb, cfg, autoSwap) {
+  function read(wb, cfg, autoSwap) {
     const opts = { mapping: cfg.mapping || {}, autoSwap: !!autoSwap };
     if (cfg.headerRow) opts.headerRow = cfg.headerRow;
     if (cfg.fallbackUnit) opts.fallbackUnit = cfg.fallbackUnit;
@@ -41,6 +40,18 @@
     } catch (e) {
       ds = { ok: false, errors: [e.message], rows: [] };
     }
+    if (cfg.templateError?.length) {
+      ds.ok = false;
+      ds.rows = [];
+      ds.templateError = cfg.templateError;
+    }
+    if (cfg.templateWarnings?.length) ds.warnings = [...cfg.templateWarnings, ...(ds.warnings || [])];
+    return ds;
+  }
+
+  /** Đọc thử đúng cấu hình sẽ áp dụng, rồi đối chiếu phiếu trùng. */
+  function probeRead(wb, cfg, autoSwap) {
+    const ds = read(wb, cfg, autoSwap);
     return { ds, dups: ds.ok ? HAK.Generator.duplicateRows(ds.rows) : [], sheet: cfg.sheet };
   }
 
@@ -63,12 +74,12 @@
       return {
         apply: false,
         code: 'invalid',
-        why: 'cách đọc mới không hợp lệ (' + (probe.ds.errors || []).join('; ') + ')',
+        why: 'cách đọc mới không hợp lệ (' + (probe.ds.templateError || probe.ds.errors || []).join('; ') + ')',
         hint: 'Sửa cấu hình (dòng tiêu đề / ánh xạ cột) hoặc chọn sheet khác.',
       };
     return { apply: true };
   }
 
-  HAK.ReadConfig = { dupSummary, probeRead, decide };
+  HAK.ReadConfig = { dupSummary, read, probeRead, decide };
   if (typeof module === 'object' && module.exports) module.exports = HAK.ReadConfig;
 })(typeof window !== 'undefined' ? window : globalThis);

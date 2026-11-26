@@ -177,6 +177,7 @@
     'hak.yearbook.v1',
     'hak.sf.presets',
     'hak.report.manual',
+    'hak.excel.templates.v1',
   ]);
   function isAllowedBackupKey(k) {
     if (typeof k !== 'string' || k === '__proto__' || k === 'constructor' || k === 'prototype') return false;
@@ -185,11 +186,42 @@
     return false;
   }
 
+  function validateExcelTemplates(data) {
+    const fail = () => {
+      throw new Error('Cấu hình mẫu nhập Excel trong sao lưu không hợp lệ.');
+    };
+    if (!isPlainObj(data) || !Array.isArray(data.templates)) fail();
+    const ids = new Set();
+    for (const template of data.templates) {
+      if (
+        !isPlainObj(template) ||
+        typeof template.id !== 'string' ||
+        asId(template.id) !== template.id ||
+        !template.id ||
+        ids.has(template.id) ||
+        typeof template.name !== 'string' ||
+        !template.name.trim() ||
+        typeof template.sheet !== 'string' ||
+        !Number.isInteger(template.headerRow) ||
+        template.headerRow < 1 ||
+        !['kg', 'tan'].includes(template.fallbackUnit) ||
+        !isPlainObj(template.headerNames) ||
+        !isPlainObj(template.columns) ||
+        Object.entries(template.headerNames).some(([key, name]) => !asId(key) || typeof name !== 'string') ||
+        Object.entries(template.columns).some(([key, column]) => !asId(key) || !Number.isInteger(column) || column < 0)
+      )
+        fail();
+      ids.add(template.id);
+    }
+    if (data.defaultId !== null && !ids.has(data.defaultId)) fail();
+  }
+
   function validateBackupKey(k, v) {
     if (!isAllowedBackupKey(k)) return false;
     if (k === 'hak.config.v1') validateConfigData(v);
     else if (k === 'hak.auth.v1') cleanAuthStore(v);
     else if (k === 'hak.gsync.v2') validateGsyncConfig(v);
+    else if (k === 'hak.excel.templates.v1') validateExcelTemplates(v);
     else if (k === 'hak.auth.lastco') {
       if (v !== '' && v !== '*' && v !== null) {
         if (isPlainObj(v)) {
