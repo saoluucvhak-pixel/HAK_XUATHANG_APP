@@ -44,29 +44,6 @@ test('1. HAK.Weigh.detectAnomalies: phát hiện xe quá tải, xe quá nhẹ v�
   assert.equal(p4.issues[0].type, 'rapid_repeat');
 });
 
-test('2. Customs Tolerance: tính đúng độ lệch % dung sai so với khối lượng tờ khai hải quan', () => {
-  const cq = 10000; // 10.000 tấn đăng ký trên tờ khai
-
-  // Trường hợp 1: Xuất 9.800 tấn -> lệch -2% (nằm trong dung sai cho phép)
-  const ton1 = 9800;
-  const pct1 = Math.round((ton1 / cq) * 100);
-  assert.equal(pct1, 98);
-  assert.ok(Math.abs(pct1 - 100) <= 5);
-
-  // Trường hợp 2: Xuất 10.700 tấn -> lệch +7% (cảnh báo dung sai > 5%)
-  const ton2 = 10700;
-  const pct2 = Math.round((ton2 / cq) * 100);
-  assert.equal(pct2, 107);
-  assert.ok(Math.abs(pct2 - 100) > 5);
-  assert.ok(Math.abs(pct2 - 100) <= 10);
-
-  // Trường hợp 3: Xuất 11.500 tấn -> lệch +15% (cảnh báo nghiêm trọng > 10%)
-  const ton3 = 11500;
-  const pct3 = Math.round((ton3 / cq) * 100);
-  assert.equal(pct3, 115);
-  assert.ok(Math.abs(pct3 - 100) > 10);
-});
-
 test('3. JSZip Packaging: đóng gói file Word và file Excel thành 1 file zip hợp lệ', async () => {
   const JSZip = require('../app/libs/jszip.min.js');
 
@@ -132,4 +109,14 @@ test('4. Auto-Save Draft Filter: lưu và khôi phục nháp phạm vi lọc và
   assert.equal(ST[type].filter.to, '2026-11-26');
   assert.deepEqual(ST[type].filter.pick, [1, 2, 5, 8]);
   assert.ok(ST[type].omit.has(3));
+});
+
+test('Đối chiếu hải quan chỉ dùng tấn tươi từ tờ khai gắn với chi tiết đang chọn', () => {
+  const customs = require('../app/js/customs-model.js');
+  const detail = { id: 'd1', parentId: 'c1', contractQty: 6500 };
+  const decl = { id: 'tk1', no: '123', contractId: 'c1', detailId: 'd1', qtyTon: 1000, qtyBdmt: 520 };
+  assert.deepEqual(customs.wetQuantityDifference(1060000, detail, [decl]), { no: '123', qtyTon: 1000, percent: 6 });
+  assert.equal(customs.wetQuantityDifference(1060000, detail, [{ ...decl, qtyTon: null }]), null);
+  assert.equal(customs.wetQuantityDifference(1060000, detail, [{ ...decl, detailId: 'd2' }]), null);
+  assert.equal(customs.wetQuantityDifference(1060000, detail, [decl, { ...decl, id: 'tk2' }]), null);
 });

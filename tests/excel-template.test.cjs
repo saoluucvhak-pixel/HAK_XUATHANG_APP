@@ -699,3 +699,22 @@ test('17. Mẫu có ngày giờ chung tôn trọng lựa chọn để trống c�
   assert.equal(result.sampleRows[0].ts1, Date.UTC(2026, 10, 26, 8, 20));
   assert.equal(result.sampleRows[0].ts2, null);
 });
+
+test('Mẫu tên cột tự theo dòng tiêu đề được chèn thêm trong cùng sheet', () => {
+  const wb = createWorkbook({
+    Can: [['Báo cáo mới'], ['Số phiếu', 'Biển số', 'Ngày cân', 'Khối lượng'], ['P1', '43C-11111', '25/11/2026', 25000]],
+  });
+  const template = { headerRow: 1, headerNames: { ticket: 'Số phiếu', plate: 'Biển số', date: 'Ngày cân', net: 'Khối lượng' } };
+  const probe = ExcelTemplate.probeTemplate(wb, 'Can', template);
+  assert.equal(probe.ok, true);
+  assert.equal(probe.match.headerRow, 2);
+  assert.equal(probe.stats.kg, 25000);
+  assert.match(probe.warnings.join(' '), /dòng tiêu đề.*2/i);
+});
+
+test('Mẫu không chọn một trong hai dòng tiêu đề khớp khi dòng đã lưu không còn đúng', () => {
+  const headings = ['Số phiếu', 'Biển số', 'Ngày cân', 'Khối lượng'];
+  const wb = createWorkbook({ Can: [['Báo cáo'], headings, ['P1', '43C-11111', '25/11/2026', 25000], headings] });
+  const template = { headerRow: 1, headerNames: { ticket: 'Số phiếu', plate: 'Biển số', date: 'Ngày cân', net: 'Khối lượng' } };
+  assert.equal(ExcelTemplate.matchSheet(wb, 'Can', template).ok, false);
+});

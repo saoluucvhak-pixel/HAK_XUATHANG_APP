@@ -1,5 +1,13 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.25.25 — Sửa xuất hồ sơ, nhập Excel và khôi phục
+- Bỏ qua ô ngày ký trong cột khối lượng. Mẫu ghép theo tên cột tự tìm lại dòng tiêu đề bị dịch chuyển khi chỉ có một dòng khớp.
+- Cảnh báo đối chiếu chỉ dùng tấn tươi trên tờ khai gắn đúng chi tiết hợp đồng. Phần chứng thư và hợp đồng đối chiếu theo BDMT.
+- Xuất ZIP gồm biên bản Word, bảng kê Excel và BKLS Mẫu 01 ở các loại hồ sơ hỗ trợ. App chỉ báo thành công sau khi lưu tệp.
+- Lọc theo tàu và bỏ phiếu trùng dựa trên khóa phiếu chuẩn hóa. Cảnh báo phiếu trùng theo phạm vi công ty và thời điểm cân.
+- Khôi phục sổ hồ sơ chỉ hoàn tất sau khi ghi vào kho dữ liệu.
+- Tăng tương phản tại thanh điều hướng và vùng nhập Excel.
+
 ## v2.25.24 — Nâng cấp chất lượng toàn diện: Cảnh báo bất thường/quá tải, dung sai HQ, 1-Click ZIP, phím tắt và chẩn đoán sức khỏe dữ liệu
 - **1. Phát hiện & Cảnh báo phiếu cân bất thường / quá tải (Data Integrity Guardrail):** Tự động phát hiện các xe quá tải trọng (> 45 tấn), xe quá nhẹ (≤ 500 kg), hoặc xe cân lặp lại cùng biển số trong thời gian ngắn (< 15 phút); hiển thị banner cảnh báo và hộp thoại chi tiết giúp kế toán đối soát trước khi lập biên bản.
 - **2. Kiểm soát & Cảnh báo dung sai Tờ khai Hải quan (±5% ~ ±10%):** Đối chiếu tổng khối lượng xuất thực tế với số lượng đăng ký trên Tờ khai Hải quan; cảnh báo trực quan khi độ lệch vượt quá dung sai cho phép của cơ quan hải quan.

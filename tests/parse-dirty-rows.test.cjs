@@ -48,3 +48,19 @@ test('N-13: khối lượng bất thường (> 200.000 kg) có cảnh báo', () 
   assert.equal(ds.rows.length, 1);
   assert.ok(ds.rows[0].warn.some((w) => /bất thường|200/i.test(w)));
 });
+
+test('Ngày ký dạng chữ và ô Excel định dạng ngày trong cột khối lượng không thành phiếu cân', () => {
+  const wb = sheet([
+    ['Tổng số: 20 xe; Tổng KL: 379.830 kg'],
+    HEAD,
+    ...Array.from({ length: 20 }, (_, i) => [String(i + 1), '43C-' + String(11000 + i), '25/11/2026', i ? 19000 : 18830]),
+    ['', '', '', 'Ngày 26 tháng 11 năm 2026'],
+    ['', '', '', 46352],
+  ]);
+  wb.Sheets.S.D24.w = '26/11/2026';
+  const ds = HAK.Excel.parseSheet(wb, 'S');
+  assert.equal(ds.stats.trips, 20);
+  assert.equal(ds.stats.kg, 379830);
+  assert.equal(ds.reconciled, true);
+  assert.match(ds.warnings.join('\n'), /Ngày.*trong cột khối lượng.*23, 24/i);
+});
