@@ -175,7 +175,7 @@ class HAKDocs {
    if(method=="OPTIONS"){await Reply(stream,200,new{ok=true},origin=="null");return;}
    if(method=="GET"&&path=="/status"){await Reply(stream,200,Status(),origin=="null");return;}
    if(path.StartsWith("/db/")){await HandleDb(stream,method,path,headers,origin=="null");return;}
-   if(method!="POST"||(path!="/ocr"&&path!="/downloads"&&path!="/save-download"&&path!="/download-files"&&path!="/verify-download")||!headers.ContainsKey("X-HAK-Client")||headers["X-HAK-Client"]!="documents-v1"){DrainBody(stream,headers);await Reply(stream,403,new{error="Invalid local OCR request."},origin=="null");return;}
+   if(method!="POST"||(path!="/ocr"&&path!="/downloads"&&path!="/save-download"&&path!="/download-files"&&path!="/verify-download"&&path!="/install-login/consumed")||!headers.ContainsKey("X-HAK-Client")||headers["X-HAK-Client"]!="documents-v1"){DrainBody(stream,headers);await Reply(stream,403,new{error="Invalid local OCR request."},origin=="null");return;}
    if(!headers.ContainsKey("X-HAK-Token")||!TokenOk(headers["X-HAK-Token"])){DrainBody(stream,headers);await Reply(stream,403,new{error="Thiếu hoặc sai mã bảo vệ của app. Hãy mở app bằng lối tắt HAK (không mở trực tiếp file index.html)."},origin=="null");return;}
    int length;if(!headers.ContainsKey("Content-Length")||!Int32.TryParse(headers["Content-Length"],out length)||length<1||length>36*1024*1024){int declared;if(headers.ContainsKey("Content-Length")&&Int32.TryParse(headers["Content-Length"],out declared)&&declared>0){var sink=new byte[65536];long left=Math.Min((long)declared,256L*1024*1024);try{while(left>0){int got=await stream.ReadAsync(sink,0,(int)Math.Min((long)sink.Length,left));if(got<=0)break;left-=got;}}catch{}}await Reply(stream,413,new{error="Request is too large (limit 36 MB)."},origin=="null");return;}
    var gate=path=="/ocr"?Busy:FileBusy;
@@ -184,7 +184,8 @@ class HAKDocs {
    object response=null;int responseCode=200;
    try {var body=new byte[length];int count=0;while(count<length){int n=await stream.ReadAsync(body,count,length-count);if(n==0)throw new Exception("Incomplete request.");count+=n;}
     var data=Json.Deserialize<Dictionary<string,object>>(Encoding.UTF8.GetString(body));
-    if(path=="/verify-download"){response=VerifyDownload(data);}
+    if(path=="/install-login/consumed"){response=new{ok=InstallLogin.Consume(Root,Convert.ToString(Get(data,"id","")))};}
+    else if(path=="/verify-download"){response=VerifyDownload(data);}
     else if(path=="/download-files"){response=DownloadAction(data);}
     else if(path=="/save-download"){response=SaveDownload(data);}
     else if(path=="/downloads"){var action=(string)Get(data,"action","");if(action!="open"&&action!="create")throw new Exception("Unknown folder action.");var name=(string)Get(data,"name","");if(action=="create"&&String.IsNullOrWhiteSpace(name))throw new Exception("Nhập tên thư mục.");var folder=DownloadFolder(name);if(action=="create")Directory.CreateDirectory(folder);if(!Directory.Exists(folder))throw new Exception("Thư mục chưa tồn tại.");Process.Start(new ProcessStartInfo(folder){UseShellExecute=true});response=new{ok=true,path=folder};}
@@ -213,6 +214,7 @@ class HAKDocs {
  static async Task Reply(Stream s,int code,object data,bool cors){byte[] bytes;try{bytes=Encoding.UTF8.GetBytes(Json.Serialize(data));}catch(InvalidOperationException){code=500;bytes=Encoding.UTF8.GetBytes("{\"error\":{\"code\":\"too-large\",\"message\":\"Kết quả vượt 45 MB. Hãy truy vấn theo từng phần (limit / offset).\"}}");}var head="HTTP/1.1 "+code+" "+(code==200?"OK":"Error")+"\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-store\r\nConnection: close\r\nContent-Length: "+bytes.Length+"\r\n"+(cors?"Access-Control-Allow-Origin: null\r\nAccess-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type, X-HAK-Client, X-HAK-Token, X-HAK-Session\r\nAccess-Control-Allow-Private-Network: true\r\n":"")+"\r\n";var h=Encoding.ASCII.GetBytes(head);await s.WriteAsync(h,0,h.Length);await s.WriteAsync(bytes,0,bytes.Length);}
  static void Serve(){EnsureToken();using(var single=new Mutex(false,"Local\\HAK.WindowsOCR.31879")){if(!single.WaitOne(0))return;try{var listener=new TcpListener(IPAddress.Loopback,Port);listener.Start(512);DateTime last=DateTime.UtcNow;while(DateTime.UtcNow-last<TimeSpan.FromHours(24)){if(!listener.Server.Poll(200000,System.Net.Sockets.SelectMode.SelectRead))continue;var c=listener.AcceptTcpClient();last=DateTime.UtcNow;Task.Run(async()=>{try{await Handle(c);}catch{c.Close();}});}listener.Stop();}finally{single.ReleaseMutex();}}}
  [STAThread]static int Main(string[] args){try{
+  if(args.Length==1&&args[0]=="--setup-login")return InstallLogin.Configure(Root);
   if(args.Length>0&&args[0]=="--status"){Console.WriteLine(Json.Serialize(Status()));return 0;}
   if(args.Length>=3&&args[0]=="--ocr"){var result=Read(ParseFile(args[1]),args.Length>3?Int32.Parse(args[3]):1,args.Length>4?Int32.Parse(args[4]):0,"",args.Length>5?args[5]:"document").GetAwaiter().GetResult();File.WriteAllText(args[2],Json.Serialize(result),new UTF8Encoding(false));return 0;}
   if(args.Length>0&&args[0]=="--serve"){Serve();return 0;}

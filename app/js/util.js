@@ -93,6 +93,36 @@
   }
 
   function cleanAuthStore(raw) {
+    if (isPlainObj(raw) && raw.v === 2) {
+      const invalid = () => {
+        throw new Error('Cấu hình chế độ đăng nhập không hợp lệ.');
+      };
+      const validId = (value) => typeof value === 'string' && !!value && asId(value) === value;
+      const validVerifier = (record) =>
+        isPlainObj(record) &&
+        typeof record.salt === 'string' &&
+        !!record.salt &&
+        typeof record.hash === 'string' &&
+        /^[0-9a-f]{64}$/.test(record.hash) &&
+        (record.alg === undefined || (record.alg === 'p2' && Number.isInteger(record.iter) && record.iter > 0 && record.iter <= 1000000));
+      if (!validId(raw.profileId) || !Array.isArray(raw.users)) invalid();
+      if (raw.mode === 'single' && raw.users.length === 0 && raw.rec === undefined) return raw;
+      const account = raw.users[0];
+      if (
+        raw.mode !== 'account' ||
+        raw.users.length !== 1 ||
+        !validVerifier(account) ||
+        account.id !== raw.profileId ||
+        !validId(account.stamp) ||
+        typeof account.name !== 'string' ||
+        !account.name.trim() ||
+        typeof account.username !== 'string' ||
+        !account.username.trim() ||
+        (raw.rec !== undefined && !validVerifier(raw.rec))
+      )
+        invalid();
+      return raw;
+    }
     if (!isPlainObj(raw) || !Array.isArray(raw.users) || !raw.users.length) {
       throw new Error('Dữ liệu tài khoản không hợp lệ (thiếu danh sách tài khoản).');
     }

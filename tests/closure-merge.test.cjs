@@ -74,7 +74,7 @@ test('đóng / mở lại qua thao tác của form: tăng phiên bản, mở l�
   M.closeContract(c, '2026-10-09');
   assert.deepEqual([c.closedAt, c.closeRev, c.reopenedAt], ['2026-10-09', 3, undefined]);
 });
-test('luồng phục hồi thực tế: Gói cấu hình (packApply) vào máy đã mở lại không làm hợp đồng đóng lại; bản sao lưu cũ nhập lại vẫn giữ mở', () => {
+test('luồng phục hồi thực tế: Gói cấu hình (packApply) vào máy đã mở lại không làm hợp đồng đóng lại; bản sao lưu cũ nhập lại vẫn giữ mở', async () => {
   const store = new Map();
   global.HAK.Store = {
     get: (k, d) => (store.has(k) ? JSON.parse(store.get(k)) : d),
@@ -84,20 +84,20 @@ test('luồng phục hồi thực tế: Gói cấu hình (packApply) vào máy �
     keys: () => Array.from(store.keys()),
   };
   global.HAK.ContractModel = M;
-  global.HAK.Auth = { packIn: () => ({ added: 0, updated: 0, skipped: [] }) };
+  global.HAK.Auth = { packIn: () => null };
   global.document = { querySelector: () => null, querySelectorAll: () => [], getElementById: () => null, addEventListener() {} };
   global.navigator = global.navigator || {};
   delete require.cache[require.resolve('../app/js/backup.js')];
   require('../app/js/backup.js');
   const pack = (catalog) => ({ app: 'hak-bienban-pack', config: { companies: [], warehouses: [] }, catalog, tpl: {}, gsync: {}, auth: {} });
   store.set('hak.catalog.v1', JSON.stringify(closed1())); // máy này: đang đóng (bản cũ)
-  HAK.Backup.packApply(pack(reopened())); // gói mới có bản mở lại
+  await HAK.Backup.packApply(pack(reopened())); // gói mới có bản mở lại
   assert.equal(HAK.Store.get('hak.catalog.v1').contracts[0].closedAt, undefined, 'sau khi nhập gói mở lại → đang mở');
-  HAK.Backup.packApply(pack(closed1()));
-  HAK.Backup.packApply(pack(closed1())); // nhập lại gói cũ (bản đóng) hai lần
+  await HAK.Backup.packApply(pack(closed1()));
+  await HAK.Backup.packApply(pack(closed1())); // nhập lại gói cũ (bản đóng) hai lần
   const after = HAK.Store.get('hak.catalog.v1').contracts[0];
   assert.equal(after.closedAt, undefined, 'giữ trạng thái đang mở');
   assert.equal(M.closeRevOf(after), 2);
-  HAK.Backup.packApply(pack(reopened()));
+  await HAK.Backup.packApply(pack(reopened()));
   assert.equal(HAK.Store.get('hak.catalog.v1').contracts[0].closedAt, undefined, 'nhập lặp lại bản mở lại → vẫn mở');
 });

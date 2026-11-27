@@ -156,8 +156,7 @@ async function login(p) {
       pxkTo: 6,
     });
     const a = HAK.Store.get('hak.auth.v1', null);
-    a.users[0].role = 'staff';
-    a.users[0].companies = ['hak'];
+    a.station = { cos: ['hak'] };
     HAK.Store.set('hak.auth.v1', a);
   });
   await reopen('hak');

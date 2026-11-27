@@ -179,30 +179,23 @@ Cộng các hồ sơ trong Lưu trữ: thẻ tổng theo loại (Ủy thác xu�
 - Chỉ gồm các lần đã xuất từ khi có Lưu trữ; muốn có tháng cũ thì nạp lại file Excel cân cũ và xuất lại.
 - **📑 Xuất hàng theo hợp đồng** (v2.5.3): Xuất khẩu / Ủy thác / Xuất bán / Trao đổi gộp theo hợp đồng trong 📇 Danh mục. Nút **📊 Xuất Excel Xuất hàng** ra 2 sheet đúng cột file XUATHANG_DN: NL_DH_XB (mỗi hợp đồng 1 dòng) và NL_PC_XH (mỗi phiếu cân 1 dòng; Ngày xuất = ngày cân; Số BKLS = số đã cấp khi tạo BKLS; M3 = tấn ÷ 0,7). Cột nền xám là cột bổ sung ngoài mẫu gốc.
 
-## Đăng nhập & người dùng (🔒 — v2.6.1)
-- **Lần đầu mở bản v2.6.1**: màn hình **Tạo tài khoản quản trị** (họ tên, tên đăng nhập không dấu, mật khẩu ≥ 6 ký tự). Sau đó app hiện **mã khôi phục** (dạng XXXX-XXXX-XXXX) — chép / in / tải file .txt và cất kỹ: dùng để đặt lại mật khẩu Quản trị khi quên (hoặc dùng công cụ khôi phục của nhóm — xem mục 🛡 bên dưới). Dữ liệu cũ (danh mục, lưu trữ, đợt Excel…) giữ nguyên.
-- **Mỗi lần mở app**: đăng nhập; giữ đăng nhập tới khi đóng trình duyệt. Nút **🔒 Đăng xuất** ở góc trên. Sai mật khẩu 5 lần → chờ 30 giây.
-- **Cài đặt → 👤 Tài khoản**: đổi họ tên / mật khẩu của mình. Quản trị thấy thêm bảng **Người dùng**: thêm, sửa, khóa / mở khóa, đặt lại mật khẩu, chọn quyền và **công ty được làm**; nút **🔑 Tạo mã khôi phục mới** (mã cũ hết hiệu lực). Luôn phải còn ít nhất 1 Quản trị đang dùng.
-- **Quyền**: *Quản trị* làm được tất cả. *Nhân viên*: lập biên bản / BKLS / chứng từ, xem báo cáo, xuất Excel, đồng bộ Google Sheet; KHÔNG vào Cài đặt (trừ tab Tài khoản), Danh mục chỉ xem, không xóa hồ sơ Lưu trữ / dòng nhật ký, không khôi phục sao lưu.
-- **Người lập**: tên người đăng nhập được ghi vào hồ sơ Lưu trữ (dòng 👤 dưới tên hồ sơ) và cột **Người lập** ở nhật ký chứng từ. Hồ sơ lập trước v2.6 hiện "(trước v2.6)".
-- **Quên mật khẩu Quản trị**: màn đăng nhập → *Quên mật khẩu Quản trị?* → nhập mã khôi phục + tên đăng nhập Quản trị + mật khẩu mới → app cấp mã khôi phục mới. Nhân viên quên mật khẩu: nhờ Quản trị đặt lại.
-- Lưu ý: app chạy offline trong trình duyệt nên đăng nhập là để **chặn người lạ mở app và ghi người lập**, không phải bảo mật máy chủ. Mật khẩu chỉ lưu dạng mã hóa một chiều. Danh sách người dùng nằm trong **Sao lưu toàn bộ** — khôi phục sang máy khác đăng nhập bằng tài khoản cũ.
+## Chế độ sử dụng và đăng nhập
+- Khi cài mới, chọn **Bỏ qua · Một người sử dụng** để mở app trực tiếp. Chọn **Sử dụng tài khoản đăng nhập** để tạo một tài khoản với họ tên, tên đăng nhập và mật khẩu. Hãy cất mã khôi phục được cấp khi tạo tài khoản.
+- Vào **Cài đặt → Tài khoản** để bật đăng nhập, đổi mật khẩu hoặc chuyển sang một người sử dụng. Tắt đăng nhập cần xác nhận tên đăng nhập và mật khẩu hiện tại.
+- Khi nâng cấp từ bản dùng phân quyền, đăng nhập Quản trị cũ một lần để chuyển tài khoản đó sang chế độ mới và nhận mã khôi phục mới. Dữ liệu nghiệp vụ vẫn được giữ.
+- Khi quên mật khẩu, dùng **Quên mật khẩu?** và nhập mã khôi phục. Đăng nhập là khóa mở giao diện offline. Quyền truy cập dữ liệu cục bộ do tài khoản Windows quản lý.
 
 ## Công ty làm việc (🏢 — v2.6.2)
-- Đăng nhập xong chọn **công ty làm việc** (chỉ hiện các công ty người dùng được làm; Quản trị thấy mọi công ty; được làm 1 công ty thì vào thẳng). App nhớ công ty lần trước.
+- Dùng nút 🏢 trên thanh trên cùng để chọn **công ty làm việc**. App nhớ công ty lần trước.
 - Công ty này là **bên xuất** (ô "Của" / chủ lâm sản): mỗi lần mở app, các trang biên bản (trừ Điều chuyển), BKLS và Chứng từ PXK tự chọn sẵn bên xuất + kho xuất / bàn cân theo kho mặc định của công ty (Cài đặt → Công ty). Vẫn đổi được trên từng trang khi cần. Số BKLS / PXK gợi ý theo dãy số của công ty.
 - **Tờ khai hải quan** (v2.14.0, Danh mục → tab 🛃): tờ khai là bảng cha; **khai bổ sung** và **giấy nộp tiền** là bảng con. Nhập từ file .xls, hoặc OCR tờ khai / giấy nộp tiền (PDF, ảnh). Trạng thái *Đã mở tờ khai → Chờ thông quan → Đã thông quan*; hợp đồng tự chuyển *Đang thực hiện → Đã hoàn thành* (từ v2.19.4) khi **mọi tờ khai đã thông quan VÀ mọi chi tiết (tàu) đã có chứng thư hoặc phiếu cân đều có tờ khai thông quan gắn đúng chi tiết đó**; còn chi tiết chưa có tờ khai thì hợp đồng vẫn *Đang thực hiện*. Chưa nộp đủ thuế không ngăn *Đã hoàn thành* (xem cột *Còn nợ*). Hợp đồng đóng thủ công là *Đã đóng hợp đồng*. Đợt thực hiện chọn tờ khai để lấy số TKHQ, ngày mở, lần khai, thuế xuất khẩu. Báo cáo có mục *Tình hình khai hải quan và nộp thuế*.
-- **Danh mục, Lưu trữ, Báo cáo** mặc định chỉ hiện dữ liệu liên quan công ty đang làm; bật công tắc **Xem tất cả công ty** để xem hết (Nhân viên: tất cả công ty mình được làm). Hợp đồng "liên quan" = công ty là bên bán/giao, bên mua/nhận hoặc bên giao hàng; hợp đồng chưa gán bên nội bộ nào thì công ty nào cũng thấy. Ô "Chọn hợp đồng" ở trang biên bản xếp hợp đồng của công ty đang làm lên trước, hợp đồng công ty khác ở nhóm dưới.
+- **Danh mục, Lưu trữ, Báo cáo** mặc định chỉ hiện dữ liệu liên quan công ty đang làm; bật công tắc **Xem tất cả công ty** để xem hết (máy trạm: các công ty trong gói cấu hình). Hợp đồng "liên quan" = công ty là bên bán/giao, bên mua/nhận hoặc bên giao hàng; hợp đồng chưa gán bên nội bộ nào thì công ty nào cũng thấy. Ô "Chọn hợp đồng" ở trang biên bản xếp hợp đồng của công ty đang làm lên trước, hợp đồng công ty khác ở nhóm dưới.
 - Báo cáo Xuất hàng + Đồng bộ Google Sheet theo đúng phạm vi đang xem (chỉ công ty đang làm hoặc tất cả).
 - **Đổi công ty**: bấm nút 🏢 trên thanh trên cùng → chọn công ty → app tải lại (dữ liệu đã nạp vẫn giữ).
 
-## Cài nhiều máy / công ty, phân quyền, quên mật khẩu (📘 — v2.6.4, v2.6.5)
-- **Mật khẩu chủ của nhóm (v2.7.3)**: Cài đặt → 👤 Tài khoản → 🔐 — 1 câu ≥ 12 ký tự cho cả nhóm, đi kèm Gói cấu hình. Quên mật khẩu Quản trị ở máy nào: đăng nhập → Quên mật khẩu → **🔐 Dùng mật khẩu chủ của nhóm** → tên đăng nhập Quản trị + mật khẩu chủ + mật khẩu mới (không cần file .key / công cụ). Máy chỉ lưu dạng mã hóa một chiều (PBKDF2-SHA256 310.000 vòng) — chép câu ra giấy cất két. **🖨 In phiếu khôi phục của máy** (loại máy, tên Quản trị, dấu vân tay — không có mật khẩu). Tổng quan nhắc khi chưa đặt mật khẩu chủ và khi quá 7 ngày chưa sao lưu toàn bộ.
-Hướng dẫn đầy đủ, có nút **In / lưu PDF**: trong app → menu **📘 Hướng dẫn** (Nhân viên chỉ thấy phần của mình). Tóm tắt:
-- **Máy chính** (mọi công ty) → Cài đặt → Chung → **📦 Gói cấu hình cài đặt** → tick công ty của máy sẽ cài → Xuất gói `HAK_GoiCaiDat_<công ty>_YYYYMMDD.json`. Tick đủ mọi công ty = gói máy chính.
-- **Máy mới**: cài app → màn Tạo tài khoản quản trị → **📦 Nhập gói cấu hình trước** → Áp dụng → tạo Quản trị riêng của máy. Máy cài từ gói "cho công ty X" là **máy trạm**: Quản trị ở đó chỉ làm công ty X, chỉ có Google Sheet của X, không đổi được khóa khôi phục.
-- Gói không chứa tài khoản Quản trị, Lưu trữ, đợt Excel, nhật ký chứng từ, danh sách xe. ⚠ Gói có mật khẩu Nhân viên (mã hóa) và mã bí mật Google Sheet — chỉ gửi người cài máy.
-- **Quên mật khẩu Quản trị**: mã khôi phục 12 ký tự, hoặc công cụ **HAK_KhoiPhucQuanTri.exe** (người giữ công cụ tạo *mã phản hồi* từ *mã yêu cầu* của máy; 1 lần, 24 giờ). Nhân viên quên → Quản trị của máy đặt lại. Gỡ / cài lại app **không** làm mất mật khẩu (tài khoản nằm trong bộ nhớ trình duyệt). Cách cuối cùng khi mất hết đường khôi phục: mở app bằng trình duyệt khác → tạo Quản trị mới → *Khôi phục toàn bộ* với tick **"Giữ tài khoản đang dùng trên máy này"** (v2.6.6).
+## Cài nhiều máy và công ty
+- **Cài đặt → Chung → Gói cấu hình cài đặt** giúp chuyển công ty, kho, mẫu Word, danh mục và cấu hình Google Sheet. Chọn một phần công ty để tạo gói máy trạm.
+- Tài khoản đăng nhập được cấu hình riêng trên từng máy. Bảo quản tệp gói vì có thể chứa mã bí mật Google Sheet.
 
 ## Đồng bộ Google Sheet (☁ — v2.5.4; mỗi công ty 1 Sheet từ v2.6.3)
 Đẩy báo cáo Xuất hàng lên Google Sheet (1 chiều: app → Sheet; sửa trên Sheet không làm đổi app). **Mỗi công ty 1 file Google Sheet riêng**: mỗi lô tự về Sheet của công ty bên xuất; công ty chưa cài Sheet thì bỏ qua và báo.

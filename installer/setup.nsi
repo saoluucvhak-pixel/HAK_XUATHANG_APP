@@ -110,6 +110,16 @@ Section "Ung dung Quan ly xuat hang" SecApp
   IfFileExists "$StageDir\native\HAKDocs.exe" 0 install_failed
   IfFileExists "$StageDir\Uninstall.exe" 0 install_failed
 
+  ; A fresh interactive install asks for the mode before replacing any files.
+  ; The staged helper uses the same password verifier as the application.
+  IfSilent login_configured
+  IfFileExists "$INSTDIR\index.html" login_configured
+  ExecWait '"$StageDir\native\HAKDocs.exe" --setup-login' $0
+  IfErrors install_failed
+  StrCmp $0 0 login_configured
+  StrCmp $0 2 install_cancelled install_failed
+login_configured:
+
   ; Extract the whole payload first. Never overwrite a live installation file by file.
   ; Keep the complete previous directory (including any user-added files) for recovery.
   SetOutPath "$TEMP"
@@ -160,6 +170,11 @@ install_new:
   ${EndIf}
   SetErrorLevel 0
   Goto install_done
+install_cancelled:
+  Call CleanupFailedInstall
+  SetErrorLevel 1
+  DetailPrint "Installation cancelled before the login mode was saved."
+  Abort
 install_failed:
   Call CleanupFailedInstall
   SetErrorLevel 1
