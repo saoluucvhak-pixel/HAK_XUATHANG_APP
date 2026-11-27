@@ -9,6 +9,13 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
+# The repository carries a previous native binary for portable use.
+# Always pack the helper built from this checkout's Windows source.
+if [[ ! -f "${HAK_WINDOWS_HELPER:-}" ]]; then
+  echo "Chạy installer/native/build.ps1 trên Windows rồi đặt HAK_WINDOWS_HELPER là đường dẫn đến HAKDocs.exe vừa dựng." >&2
+  exit 1
+fi
+
 # Kiểm tra công cụ makensis
 if ! command -v makensis &> /dev/null; then
   echo "Chưa cài đặt makensis. Đang cài qua apt-get..."
@@ -26,6 +33,7 @@ echo "=========================================================="
 echo "1. Chuẩn bị tài nguyên ứng dụng (installer/app)..."
 rm -rf installer/app
 cp -r app installer/app
+cp "$HAK_WINDOWS_HELPER" installer/app/native/HAKDocs.exe
 
 # Reset token bảo vệ
 echo "window.HAK_DOCS_TOKEN='';" > installer/app/native/hakdocs-token.js

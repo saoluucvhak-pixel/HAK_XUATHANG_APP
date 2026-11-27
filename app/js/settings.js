@@ -228,8 +228,6 @@
       }
       const au = HAK.Store.get('hak.auth.v1', null);
       if (au) {
-        const us = (au.users || []).filter((u) => u.role !== 'admin' && (u.companies || []).indexOf(id) >= 0);
-        if (us.length) out.push(us.length + ' nhân viên được gán (' + us.map((u) => u.username).join(', ') + ')');
         if (au.station && (au.station.cos || []).indexOf(id) >= 0) out.push('máy trạm của công ty này');
       }
       const gs = (HAK.Store.get('hak.gsync.v2', null) || {}).cos || {};

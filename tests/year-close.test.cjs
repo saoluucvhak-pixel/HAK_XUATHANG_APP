@@ -253,12 +253,12 @@ test('viewing a closed file does not import or change any active data and reject
   assert.equal(JSON.stringify(await h.Y.read()), before);
   await assert.rejects(h.C.readFile(file, { sha256: 'wrong' }), /không khớp/);
 });
-test('restricted account cannot close data outside its company scope', async () => {
+test('station cannot close data outside its company scope', async () => {
   const h = harness();
   h.window.HAK.Auth.scopeIds = () => ['limited'];
   await assert.rejects(
     h.C.closeYear(2025, () => true),
-    /Quản trị/
+    /Xem tất cả công ty/
   );
   assert.equal(h.events.length, 0);
 });

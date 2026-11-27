@@ -187,14 +187,6 @@
         act: 'autobk',
         tag: 'Cho phép & sao lưu',
       });
-    // v2.7.3: Quản trị chưa đặt mật khẩu chủ của nhóm → nhắc (quên mật khẩu Quản trị sẽ chỉ còn mã khôi phục / công cụ)
-    if (HAK.Auth && HAK.Auth.isAdmin && HAK.Auth.isAdmin() && !(HAK.Store.get('hak.auth.v1', {}) || {}).master)
-      A.push({
-        ico: '🔐',
-        txt: 'Chưa đặt <b>mật khẩu chủ của nhóm</b> — đặt 1 câu chung để mọi máy tự khôi phục khi quên mật khẩu Quản trị (Cài đặt → 👤 Tài khoản).',
-        href: '#/settings',
-        tag: 'Đặt ngay',
-      });
     return A;
   }
   const pad6 = (n) => 'PXK' + String(n).padStart(6, '0');

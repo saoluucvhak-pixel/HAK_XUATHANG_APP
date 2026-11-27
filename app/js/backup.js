@@ -110,7 +110,7 @@
         }
         if (inLs === null || r.ls === false) {
           // thiếu ở localStorage, hoặc lần ghi gần nhất không vào được localStorage (bản trong LS đã cũ)
-          HAK.Store.set(r.key, r.val);
+          HAK.Store.set(r.key, r.val, r.key === 'hak.auth.v1' ? { dbCommitted: true } : undefined);
           n++;
         }
       }
@@ -371,6 +371,9 @@
     }
   }
   /** Khóa tài khoản đăng nhập — giữ nguyên khi khôi phục với tùy chọn "Giữ tài khoản đang dùng trên máy này" (v2.6.6). */
+  const accountActive = () => !!(HAK.Auth && HAK.Auth.usesAccount && HAK.Auth.usesAccount());
+  const filterOwners = (state) =>
+    state && state.v === 2 && state.mode === 'single' ? [{ id: state.profileId, implicit: true }] : (state && state.users) || [];
   const AUTH_KEYS = ['hak.auth.v1', 'hak.auth.lastco'];
   /* v2.17.0 (theo hak-migration-manager: sao lưu TRƯỚC khi ghi đè): trước khi khôi phục, chụp cài đặt + danh mục + tài khoản đang có vào 'hak.prerestore.v1' để HOÀN TÁC.
    * Chỉ phần cài đặt / danh mục (localStorage); hồ sơ Lưu trữ nhập vào là thêm / cập nhật theo phiên bản nên không bị xóa. Bản chụp không nằm trong sao lưu toàn bộ. */
@@ -434,12 +437,14 @@
     let set = 0,
       removed = 0;
     for (const k of HAK.Store.keys()) {
+      if (accountActive() && AUTH_KEYS.includes(k)) continue;
       if (k.indexOf('hak.') === 0 && k !== LAST_KEY && k !== AUTO_KEY && k !== SQL_KEY && k !== PRE_KEY && !(k in p.keys)) {
         await removeRestoreKey(k);
         removed++;
       }
     }
     for (const k of Object.keys(p.keys)) {
+      if (accountActive() && AUTH_KEYS.includes(k)) continue;
       if (p.keys[k] !== null) {
         await writeRestoreKey(k, p.keys[k]);
         set++;
@@ -464,7 +469,10 @@
     if (final.some((u) => u && u.id === m[2])) return k;
     const src = (ctx.backupUsers || []).find((u) => u && u.id === m[2]);
     const un = src && String(src.username || '').toLowerCase();
-    const mine = un && final.find((u) => u && String(u.username || '').toLowerCase() === un);
+    const mine =
+      src && src.implicit
+        ? final.find((u) => u && u.implicit)
+        : un && final.find((u) => u && String(u.username || '').toLowerCase() === un);
     return mine ? m[1] + '@' + mine.id + '@' + m[3] + (m[4] || '') : null;
   }
   const CAT = 'hak.catalog.v1';
@@ -689,7 +697,7 @@
    * opts.parsed: kết quả inspect() để khỏi đọc lại file. Trả { …, report } hoặc ném lỗi có .report.
    */
   async function restoreFile(file, opts) {
-    const keepAuth = !!(opts && opts.keepAuth);
+    const keepAuth = accountActive() || !!(opts && opts.keepAuth);
     let mode = opts && opts.mode === 'replace' ? 'replace' : 'merge';
     const ins = (opts && opts.parsed) || (await inspect(file)),
       j = ins.j; // v2.7.5: .zip hoặc .json
@@ -747,8 +755,8 @@
         undoable: true,
         run: async () => {
           const U = (root.HAK && root.HAK.Util) || (typeof require === 'function' ? require('./util.js') : null);
-          const localUsers = (HAK.Store.get('hak.auth.v1', null) || {}).users || [],
-            backupUsers = (j.keys['hak.auth.v1'] || {}).users || [],
+          const localUsers = filterOwners(HAK.Store.get('hak.auth.v1', null)),
+            backupUsers = filterOwners(j.keys['hak.auth.v1']),
             fctx = { finalUsers: keepAuth ? localUsers : backupUsers.length ? backupUsers : localUsers, backupUsers };
           out.filtersRemapped = 0;
           out.filtersSkipped = 0;
@@ -830,10 +838,10 @@
 
   /* ---------------- v2.6.4 D2 — Gói cấu hình cài đặt (cài cho nhiều công ty / nhiều máy) ----------------
    * GỒM: Cài đặt (công ty, kho, cài đặt chung, bảng mã ĐVVC), mẫu Word đã tải lên, Danh mục (khách hàng, hợp đồng),
-   *      cấu hình Google Sheet từng công ty (URL + mã bí mật), tài khoản Nhân viên, khóa công khai khôi phục của nhóm.
-   * KHÔNG GỒM: tài khoản Quản trị (đặt riêng khi cài từng máy), hồ sơ Lưu trữ, đợt Excel, nhật ký chứng từ, danh sách xe, trạng thái đồng bộ.
+   *      cấu hình Google Sheet từng công ty (URL và mã bí mật), phạm vi công ty của máy trạm.
+   * KHÔNG GỒM: thông tin đăng nhập (thiết lập riêng trên từng máy), hồ sơ Lưu trữ, đợt Excel, nhật ký chứng từ, danh sách xe, trạng thái đồng bộ.
    * Nhập: Cài đặt + mẫu Word có trong gói → thay; Danh mục → gộp theo id (ô trống trong gói không xóa dữ liệu máy này);
-   *       Google Sheet → thay URL/mã theo từng công ty; Nhân viên → gộp theo tên đăng nhập (xem HAK.Auth.packIn). */
+   *       Google Sheet thay URL và mã theo từng công ty. */
   const PACK = 'hak-bienban-pack',
     CAT_KEY = 'hak.catalog.v1',
     GS_KEY = 'hak.gsync.v2',
@@ -885,7 +893,7 @@
       tpl,
       catalog,
       gsync: gs,
-      auth: HAK.Auth ? HAK.Auth.packOut(ids) : { users: [], groupPub: null, station: null },
+      auth: HAK.Auth ? HAK.Auth.packOut(ids) : { station: null },
     };
   }
   const asciiName = (s) =>
@@ -929,19 +937,19 @@
     }
     return j;
   }
-  /** Tóm tắt gói (HTML) — dùng ở thẻ Cài đặt và ở màn tạo Quản trị lần đầu. */
+  /** Tóm tắt gói (HTML) — dùng ở thẻ Cài đặt và ở màn chọn chế độ sử dụng. */
   function packSummaryHtml(j) {
     const cat = j.catalog || {},
-      u = HAK.Auth ? HAK.Auth.packIn(j.auth, true) : { added: 0, updated: 0, skipped: [] };
+      station = HAK.Auth ? HAK.Auth.packStation(j.auth) : null;
     const names = (j.config.companies || []).map((c) => c.short || c.name);
     const coN = (id) => {
       const c = (j.config.companies || []).find((x) => x.id === id);
       return c ? c.short || c.name : id;
     };
-    const kind = u.station
-      ? '<b class="text-primary">Máy trạm — chỉ làm: ' + esc(u.station.map(coN).join(', ')) + '</b>'
+    const kind = station
+      ? '<b class="text-primary">Máy trạm — chỉ làm: ' + esc(station.map(coN).join(', ')) + '</b>'
       : '<b>Máy chính — mọi công ty</b>' +
-        (u.wasStation ? ' <span class="text-warning">(máy này đang là máy trạm → sẽ bỏ giới hạn)</span>' : '');
+        (HAK.Auth && HAK.Auth.stationCos() ? ' <span class="text-warning">(máy này đang là máy trạm → sẽ bỏ giới hạn)</span>' : '');
     const gsN = Object.keys(j.gsync || {}).length,
       tplN = Object.keys(j.tpl || {}).length;
     return (
@@ -973,24 +981,13 @@
       ' hợp đồng</b></li>' +
       '<li><span>Google Sheet đã cấu hình</span><b>' +
       gsN +
-      ' công ty</b></li>' +
-      '<li><span>Nhân viên</span><b>thêm ' +
-      u.added +
-      ' · cập nhật ' +
-      u.updated +
-      (u.skipped.length ? ' · <span class="text-warning">bỏ qua ' + esc(u.skipped.join(', ')) + ' (trùng Quản trị máy này)</span>' : '') +
-      '</b></li>' +
-      '<li><span>Mật khẩu chủ của nhóm</span><b>' +
-      (j.auth && j.auth.master ? 'Có · <span class="mono">' + esc(j.auth.master.fp || '') + '</span>' : '—') +
-      '</b></li>' +
-      '<li><span>Khóa khôi phục của nhóm</span><b>' +
-      (j.auth && j.auth.groupPub ? 'Có' : '—') +
-      '</b></li></ul>'
+      ' công ty</b></li></ul>'
     );
   }
-  function packApply(j) {
+  async function packApply(j) {
     const r = { tpl: 0, cat: 0, gs: 0 };
     const mergedCatalog = j.catalog && HAK.ContractModel ? HAK.ContractModel.mergeCatalog(HAK.Store.get(CAT_KEY, null), j.catalog) : null;
+    r.station = HAK.Auth ? await HAK.Auth.packIn(j.auth) : null;
     HAK.Store.set(CFG_KEY, j.config);
     if (HAK.Config && typeof HAK.Config.load === 'function') HAK.Config.load(); // N-03: nạp lại để số phiên bản (rev) khớp bản vừa ghi
     Object.keys(j.tpl || {}).forEach((k) => {
@@ -1028,7 +1025,6 @@
       gs.migV1 = true;
       HAK.Store.set(GS_KEY, gs);
     }
-    r.users = HAK.Auth ? HAK.Auth.packIn(j.auth) : { added: 0, updated: 0, skipped: [] };
     return r;
   }
   const packMsg = (r) =>
@@ -1038,12 +1034,8 @@
     r.cat +
     ' mục danh mục, ' +
     r.gs +
-    ' Google Sheet, nhân viên thêm ' +
-    r.users.added +
-    ' / cập nhật ' +
-    r.users.updated +
-    (r.users.master ? ', mật khẩu chủ của nhóm' : '') +
-    (r.users.station ? ' — máy trạm (' + r.users.station.length + ' công ty)' : '') +
+    ' Google Sheet' +
+    (r.station ? ' — máy trạm (' + r.station.length + ' công ty)' : '') +
     (r.keptNewer ? ' · giữ nguyên ' + r.keptNewer + ' hợp đồng trên máy này vì mới hơn bản trong gói' : '') +
     (r.conflicts ? ' · ⚠ ' + r.conflicts + ' mục cùng phiên bản nhưng khác nội dung — đã giữ bản trên máy này, cần đối chiếu' : '') +
     (r.dupPayments ? ' · bỏ ' + r.dupPayments + ' khoản nộp thuế trùng giấy nộp tiền đã có (không cộng đôi)' : '') +
@@ -1085,23 +1077,23 @@
     const ids = pkIds();
     k.innerHTML =
       ids === null
-        ? 'Tick <b>đủ mọi công ty</b> = gói <b>máy chính</b> (mọi Google Sheet, mọi nhân viên, mọi hợp đồng).'
+        ? 'Tick <b>đủ mọi công ty</b> = gói <b>máy chính</b> (mọi Google Sheet và hợp đồng).'
         : !ids.length
           ? '<span class="text-danger">Chọn ít nhất 1 công ty.</span>'
-          : 'Gói <b>máy trạm</b>: Quản trị máy đó chỉ chọn được công ty đã tick; gói chỉ mang Google Sheet, nhân viên (được làm công ty đã tick) và hợp đồng liên quan các công ty này; khóa khôi phục bị khóa ở máy trạm.';
+          : 'Gói <b>máy trạm</b>: chỉ chọn được công ty đã tick. Gói mang Google Sheet và hợp đồng liên quan các công ty này.';
     $('#pkOut').disabled = !!ids && !ids.length;
   }
   function renderPack() {
     const box = $('#packBody');
     if (!box) return;
     box.innerHTML =
-      '<p class="small mb-2">Dùng khi <b>cài app cho máy / công ty khác</b>: xuất 1 file từ máy đã cài đặt xong, sang máy mới bấm nhập — không phải nhập lại công ty, kho, mẫu Word, danh mục, Google Sheet, nhân viên. <a href="#/help" data-help="help-install">📘 Xem hướng dẫn</a></p>' +
+      '<p class="small mb-2">Dùng khi <b>cài app cho máy / công ty khác</b>: xuất 1 file từ máy đã cài đặt xong, sang máy mới bấm nhập — không phải nhập lại công ty, kho, mẫu Word, danh mục và Google Sheet. <a href="#/help" data-help="help-install">📘 Xem hướng dẫn</a></p>' +
       pkCosHtml() +
       '<div class="d-flex flex-wrap gap-2"><button class="btn btn-primary" id="pkOut" type="button">📦 Xuất gói cấu hình (.json)</button>' +
       '<label class="btn btn-outline-primary mb-0">📥 Nhập gói cấu hình<input type="file" id="pkIn" accept=".json,application/json" hidden></label></div>' +
       '<div id="pkPreview"></div>' +
-      '<div class="form-text mt-2">Gói <b>không</b> chứa tài khoản Quản trị (mỗi máy tự đặt khi cài), hồ sơ Lưu trữ, đợt Excel, nhật ký chứng từ, danh sách xe. ' +
-      '<span class="text-warning">⚠ File có mật khẩu Nhân viên (dạng băm) và mã bí mật Google Sheet — chỉ gửi cho người cài máy, không đăng công khai.</span></div>';
+      '<div class="form-text mt-2">Gói <b>không</b> chứa thông tin đăng nhập (mỗi máy tự thiết lập), hồ sơ Lưu trữ, đợt Excel, nhật ký chứng từ, danh sách xe. ' +
+      '<span class="text-warning">⚠ File có thể chứa mã bí mật Google Sheet — chỉ gửi cho người cài máy, không đăng công khai.</span></div>';
     $('#pkCos').addEventListener('change', pkKind);
     pkKind();
     $('#pkOut').addEventListener('click', async (e) => {
@@ -1109,7 +1101,7 @@
       b.disabled = true;
       try {
         const r = await packExport(pkIds());
-        toast('Đã xuất ' + r.name + ' (' + r.j.config.companies.length + ' công ty, ' + r.j.auth.users.length + ' nhân viên).', 'success');
+        toast('Đã xuất ' + r.name + ' (' + r.j.config.companies.length + ' công ty).', 'success');
       } catch (err) {
         if (!(err && err.name === 'AbortError')) {
           console.error(err);
@@ -1131,15 +1123,22 @@
           esc(f.name) +
           '</div>' +
           packSummaryHtml(j) +
-          '<div class="small muted mb-2">Cài đặt công ty / kho / mã ĐVVC và mẫu Word trong gói sẽ <b>thay</b> bản trên máy này; danh mục và nhân viên được <b>gộp</b>. Nên Sao lưu toàn bộ trước.</div>' +
+          '<div class="small muted mb-2">Cài đặt công ty / kho / mã ĐVVC và mẫu Word trong gói sẽ <b>thay</b> bản trên máy này; danh mục được <b>gộp</b>. Nên Sao lưu toàn bộ trước.</div>' +
           '<div class="d-flex gap-2"><button class="btn btn-primary" id="pkApply" type="button">Áp dụng &amp; tải lại</button><button class="btn btn-outline-secondary" id="pkCancel" type="button">Hủy</button></div></div>';
         $('#pkCancel').addEventListener('click', () => {
           pv.innerHTML = '';
         });
-        $('#pkApply').addEventListener('click', () => {
-          const r = packApply(j);
-          toast(packMsg(r), 'success');
-          HAK.reloadAfterWrites ? HAK.reloadAfterWrites(1500) : root.setTimeout(() => root.location.reload(), 1500);
+        $('#pkApply').addEventListener('click', async (event) => {
+          const button = event.currentTarget;
+          button.disabled = true;
+          try {
+            toast(packMsg(await packApply(j)), 'success');
+            HAK.reloadAfterWrites ? await HAK.reloadAfterWrites(1500) : root.location.reload();
+          } catch (error) {
+            toast(error.message, 'error');
+          } finally {
+            button.disabled = false;
+          }
         });
       } catch (err) {
         pv.innerHTML = '';
@@ -1920,7 +1919,7 @@
         ? '<button class="btn btn-outline-secondary" id="bkPersist" type="button">Yêu cầu trình duyệt giữ dữ liệu</button>'
         : '') +
       '</div>' +
-      '<div class="form-check mt-2 admin-only"><input class="form-check-input" type="checkbox" id="bkKeepAuth" checked><label class="form-check-label small" for="bkKeepAuth"><b>Giữ tài khoản đang dùng trên máy này</b> khi khôi phục bản toàn bộ. Bỏ tick khi chuyển sang máy mới và muốn mọi người đăng nhập bằng mật khẩu cũ.</label></div>' +
+      '<div class="form-check mt-2 admin-only"><input class="form-check-input" type="checkbox" id="bkKeepAuth" checked><label class="form-check-label small" for="bkKeepAuth"><b>Giữ tài khoản đang dùng trên máy này</b> khi khôi phục bản toàn bộ. Nếu đang dùng một người, có thể bỏ chọn để lấy tài khoản từ bản sao lưu.</label></div>' +
       '<div class="form-text mt-1">Bản <b>toàn bộ</b>: chọn <b>Nhập bổ sung</b> (giữ dữ liệu mới hơn trên máy) hoặc <b>Thay thế (ghi đè các mục có trong file)</b> (về đúng thời điểm sao lưu, không xóa dữ liệu chỉ có trên máy này, có Hoàn tác). Bản <b>theo tháng</b>: chỉ Nhập bổ sung, không đụng tháng khác. Bản <b>theo năm</b>: nhập vào Sổ hồ sơ năm. Xem trước nội dung trước khi ghi.</div>' +
       blockHead('④', 'Tự sao lưu định kỳ') +
       (await autoHtml()) +
@@ -1979,6 +1978,8 @@
       }
       b.disabled = false;
     });
+    const authCheck = $('#bkKeepAuth');
+    if (authCheck) authCheck.disabled = accountActive();
     const bs = $('#bkSqlNow');
     if (bs)
       bs.addEventListener('click', async () => {

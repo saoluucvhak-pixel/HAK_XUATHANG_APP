@@ -268,18 +268,13 @@ body.gs-open { overflow: hidden; }
 .dash-doc:last-child { border-bottom: 0; }
 a.stat:hover { border-color: var(--brand); }
 
-/* ---------- v2.6.1 Đăng nhập + phân quyền (auth.js) ---------- */
+/* ---------- Chế độ đăng nhập (auth.js) ---------- */
 .auth-gate { position: fixed; inset: 0; z-index: 3000; display: flex; align-items: center; justify-content: center; padding: 16px; overflow: auto;
   background: radial-gradient(1200px 600px at 20% 0%, var(--brand-soft), transparent 60%), var(--page-bg); }
 .auth-card { width: 100%; max-width: 420px; border: 1px solid var(--card-border); background: var(--card-bg); box-shadow: var(--shadow); border-radius: 14px; }
 .auth-code { font-size: 1.5rem; letter-spacing: .12em; padding: 12px; border: 2px dashed var(--brand); border-radius: 10px; background: var(--brand-soft); }
 body.auth-locked { overflow: hidden; }
 body.auth-locked .app { visibility: hidden; }
-/* Nhân viên: ẩn chức năng quản trị (chốt ở giao diện — xem ghi chú đầu auth.js) */
-body.role-staff .admin-only,
-body.role-staff #catalogRoot label:has(#catImport),
-body.role-staff #archBody [data-act="del"], body.role-staff label:has(#archRestore),
-body.role-staff [data-del-log], body.role-staff #archClear { display: none !important; }
 /* v2.6.2 chọn công ty làm việc */
 .auth-co { border: 1px solid var(--card-border); border-radius: 10px; padding: 10px 14px; background: var(--card-bg); }
 .auth-co:hover { border-color: var(--brand); background: var(--brand-soft); }

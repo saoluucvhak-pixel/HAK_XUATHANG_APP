@@ -11,6 +11,7 @@ foreach ($reference in $references) { $compilerArgs += "/reference:$reference" }
 $schemaSql = Join-Path $PSScriptRoot 'db\schema.v1.sql'
 $compilerArgs += "/resource:$schemaSql,hak.schema.v1.sql"   # schema SQLite nhúng vào HAKDocs.exe
 $compilerArgs += Join-Path $PSScriptRoot 'HAKDocs.cs'
+$compilerArgs += Join-Path $PSScriptRoot 'InstallLogin.cs'
 $compilerArgs += Join-Path $PSScriptRoot 'HakDb.cs'
 & $compiler $compilerArgs
 if ($LASTEXITCODE -ne 0) { throw 'Windows OCR build failed' }
