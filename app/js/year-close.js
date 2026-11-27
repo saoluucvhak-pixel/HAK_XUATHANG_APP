@@ -154,7 +154,7 @@
     }
   }
   async function closeYear(year, ask = root.confirm) {
-    if (H.Auth && (!H.Auth.isAdmin() || H.Auth.scopeIds('archive') !== null)) throw Error('Đóng năm cần Quản trị xem tất cả công ty.');
+    if (H.Auth && (!H.Auth.isAdmin() || H.Auth.scopeIds('archive') !== null)) throw Error('Đóng năm cần bật Xem tất cả công ty.');
     const { state, bundle, skipped } = await build(year);
     const blob = await pack(bundle);
     const path = await H.Word.Files.saveBlob(blob, 'HAK_NamDaDong_' + year + '.zip');
@@ -254,8 +254,7 @@
    * Trả { resumed:true, records, archive, batches, leftover:{records,batches} } | { needsReview:true, diffs:{changedRecords,changedBatches,changedArchive} } | { nothing:true }.
    */
   async function resumeClose(year, file, expectedSha) {
-    if (H.Auth && (!H.Auth.isAdmin() || H.Auth.scopeIds('archive') !== null))
-      throw Error('Tiếp tục đóng năm cần Quản trị xem tất cả công ty.');
+    if (H.Auth && (!H.Auth.isAdmin() || H.Auth.scopeIds('archive') !== null)) throw Error('Tiếp tục đóng năm cần bật Xem tất cả công ty.');
     const state = await H.Yearbook.read(),
       pendings = (state.closed || []).filter((c) => c.pending && c.year === year);
     // Chỉ xét lần đóng dở ĐÚNG NĂM và (nếu có) đúng SHA-256 đã chọn; lần đã hoàn tất hoặc không còn chờ → không dọn thêm.

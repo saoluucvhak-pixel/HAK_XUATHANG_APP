@@ -839,7 +839,7 @@
   /* ---------------- v2.6.4 D2 — Gói cấu hình cài đặt (cài cho nhiều công ty / nhiều máy) ----------------
    * GỒM: Cài đặt (công ty, kho, cài đặt chung, bảng mã ĐVVC), mẫu Word đã tải lên, Danh mục (khách hàng, hợp đồng),
    *      cấu hình Google Sheet từng công ty (URL và mã bí mật), phạm vi công ty của máy trạm.
-   * KHÔNG GỒM: tài khoản Quản trị (đặt riêng khi cài từng máy), hồ sơ Lưu trữ, đợt Excel, nhật ký chứng từ, danh sách xe, trạng thái đồng bộ.
+   * KHÔNG GỒM: thông tin đăng nhập (thiết lập riêng trên từng máy), hồ sơ Lưu trữ, đợt Excel, nhật ký chứng từ, danh sách xe, trạng thái đồng bộ.
    * Nhập: Cài đặt + mẫu Word có trong gói → thay; Danh mục → gộp theo id (ô trống trong gói không xóa dữ liệu máy này);
    *       Google Sheet thay URL và mã theo từng công ty. */
   const PACK = 'hak-bienban-pack',
@@ -937,7 +937,7 @@
     }
     return j;
   }
-  /** Tóm tắt gói (HTML) — dùng ở thẻ Cài đặt và ở màn tạo Quản trị lần đầu. */
+  /** Tóm tắt gói (HTML) — dùng ở thẻ Cài đặt và ở màn chọn chế độ sử dụng. */
   function packSummaryHtml(j) {
     const cat = j.catalog || {},
       station = HAK.Auth ? HAK.Auth.packStation(j.auth) : null;
@@ -1092,7 +1092,7 @@
       '<div class="d-flex flex-wrap gap-2"><button class="btn btn-primary" id="pkOut" type="button">📦 Xuất gói cấu hình (.json)</button>' +
       '<label class="btn btn-outline-primary mb-0">📥 Nhập gói cấu hình<input type="file" id="pkIn" accept=".json,application/json" hidden></label></div>' +
       '<div id="pkPreview"></div>' +
-      '<div class="form-text mt-2">Gói <b>không</b> chứa tài khoản Quản trị (mỗi máy tự đặt khi cài), hồ sơ Lưu trữ, đợt Excel, nhật ký chứng từ, danh sách xe. ' +
+      '<div class="form-text mt-2">Gói <b>không</b> chứa thông tin đăng nhập (mỗi máy tự thiết lập), hồ sơ Lưu trữ, đợt Excel, nhật ký chứng từ, danh sách xe. ' +
       '<span class="text-warning">⚠ File có thể chứa mã bí mật Google Sheet — chỉ gửi cho người cài máy, không đăng công khai.</span></div>';
     $('#pkCos').addEventListener('change', pkKind);
     pkKind();

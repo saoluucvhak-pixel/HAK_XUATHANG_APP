@@ -11,12 +11,11 @@
   const esc = (s) =>
     String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
-  /** [id, tiêu đề, chỉ Quản trị?, nội dung HTML] */
+  /** [id, tiêu đề, nội dung HTML] */
   const SECTIONS = [
     [
       'help-install',
       'Cài đặt và chế độ đăng nhập',
-      false,
       '<ol><li>Khi cài mới, chọn <b>Bỏ qua · Một người sử dụng</b> để mở ứng dụng trực tiếp, hoặc chọn <b>Sử dụng tài khoản đăng nhập</b> và tạo tên đăng nhập, mật khẩu. Cất mã khôi phục ở nơi an toàn.</li>' +
         '<li><b>Cài đặt → Tài khoản</b> cho phép đổi chế độ. Để chuyển sang một người sử dụng, nhập đúng tên đăng nhập và mật khẩu hiện tại.</li>' +
         '<li>Máy nâng cấp từ bản cũ cần đăng nhập bằng tài khoản Quản trị cũ một lần. App chuyển tài khoản đó thành tài khoản duy nhất của máy và cấp mã khôi phục mới.</li>' +
@@ -27,7 +26,6 @@
     [
       'help-flow',
       'Quy trình lập hồ sơ',
-      false,
       '<p>Luồng đúng: <b>Danh mục → Nhập liệu (bảng cân) → Chọn phiếu → Lưu hồ sơ → Xuất chứng từ → Báo cáo.</b> Đầu trang biên bản có thanh "Đang làm việc" cho biết công ty, hình thức, đợt cân, hợp đồng và phạm vi phiếu.</p>' +
         '<ul><li><b>Nhập liệu:</b> chọn file Excel; nhãn <b>✔ Đã lưu</b> hiện khi đợt đã ghi xong, <b>⚠ Chưa lưu bền</b> kèm nút "Thử lưu lại" nếu lỗi. Nạp lại file trùng tên sẽ hỏi xác nhận thay đợt.</li>' +
         '<li><b>Ba phạm vi khác nhau:</b> "Lọc xem trước" (Nhập liệu — chỉ để xem), "Phạm vi lập chứng từ" (trang biên bản — tập phiếu sẽ lập), "Kỳ báo cáo" (Báo cáo). Bấm <b>Dùng phạm vi đang xem</b> ở Nhập liệu để chuyển điều kiện sang trang biên bản.</li>' +
@@ -47,7 +45,6 @@
     [
       'help-veh',
       'Bảng cân + danh sách xe, tài xế theo từng đợt (v2.7.2)',
-      false,
       '<p><b>Mỗi đợt xuất hàng có danh sách xe &amp; tài xế riêng</b> — chỉ áp cho bảng cân của đợt đó, không dùng cho lô / tàu khác.</p><ol>' +
         '<li>Tải <b>file Excel mẫu</b>: Nhập liệu → khung <b>Danh sách xe &amp; tài xế</b> → <button type="button" class="btn btn-sm btn-outline-success py-0" data-sample-xlsx>⬇ Tải file Excel mẫu</button>. 1 file = 1 đợt: sheet <b>BANG CAN</b> (phiếu cân) + <b>DS XE - TAI XE</b> (biển số, tài xế, SĐT, mã ĐVVC).</li>' +
         '<li>Điền xong → Nhập liệu → chọn hình thức → thêm file làm đợt. App tự đọc danh sách xe trong file; cột <b>DS xe</b> của bảng đợt ghi số xe và số biển số khớp.</li>' +
@@ -59,9 +56,8 @@
     [
       'help-autobk',
       'Tự sao lưu mỗi ngày + Sức khỏe dữ liệu (v2.7.5)',
-      false,
       '<p>Dữ liệu app nằm trong trình duyệt của máy — hỏng / xóa trình duyệt là mất. Từ v2.7.5 app <b>tự sao lưu mỗi ngày</b> vào 1 thư mục anh chọn:</p><ol>' +
-        '<li>Quản trị: ⚙️ Cài đặt → <b>💾 Sao lưu &amp; khôi phục</b> → khối ④ <b>🔁 Tự sao lưu định kỳ</b> / ⑤ Thư mục → <b>📁 Chọn thư mục tự sao lưu…</b> → chọn thư mục (nên là thư mục <b>Google Drive / OneDrive</b> đồng bộ, hoặc ổ D) → bấm <b>Cho phép</b> (Allow) khi trình duyệt hỏi quyền sửa file.</li>' +
+        '<li>⚙️ Cài đặt → <b>💾 Sao lưu &amp; khôi phục</b> → khối ④ <b>🔁 Tự sao lưu định kỳ</b> / ⑤ Thư mục → <b>📁 Chọn thư mục tự sao lưu…</b> → chọn thư mục (nên là thư mục <b>Google Drive / OneDrive</b> đồng bộ, hoặc ổ D) → bấm <b>Cho phép</b> (Allow) khi trình duyệt hỏi quyền sửa file.</li>' +
         '<li>Bấm <b>▶ Sao lưu vào thư mục ngay</b> để tạo bản đầu tiên. Chọn số bản giữ (mặc định 10).</li>' +
         '<li>Từ đó mỗi ngày, lần đầu mở app (sau khoảng 20 giây) app ghi <span class="mono">HAK_TuDong_&lt;ngày&gt;_&lt;giờ&gt;.zip</span>, đọc lại kiểm tra, rồi xóa bản <span class="mono">HAK_TuDong_*.zip</span> cũ hơn số bản giữ (không đụng file khác).</li></ol>' +
         '<ul><li>Chrome / Edge thường <b>hỏi lại quyền</b> sau mỗi lần mở trình duyệt: Tổng quan hiện dòng 🔁 → bấm <b>Cho phép &amp; sao lưu</b> (trình duyệt có lựa chọn "Cho phép mỗi lần truy cập" thì chọn để khỏi hỏi lại).</li>' +
@@ -72,12 +68,11 @@
     [
       'help-arch',
       'Lưu trữ theo năm — Sổ hồ sơ năm, sao lưu, Đóng năm (v2.10 – 2.11)',
-      false,
       '<p><b>App không tự xóa hồ sơ.</b> Hồ sơ lập ra tự vào 🗄️ Lưu trữ; trang Lưu trữ hiện 200 dòng mỗi lần, bấm <b>Hiện thêm</b> để xem tiếp (tìm kiếm / lọc vẫn tìm trong toàn bộ).</p>' +
         '<p><b>Sổ hồ sơ theo năm</b> (nút trên thanh đầu): chọn <b>Năm</b> làm việc, bấm <b>Lưu hồ sơ</b> trên biểu mẫu để lưu dù chưa xuất file. Trong sổ có thể <b>Mở / Sửa</b>, <b>Lưu trữ / Khôi phục</b> (ẩn / hiện lại, không xóa), tải <b>PDF kèm theo</b>. Năm tính theo <b>ngày bắt đầu</b> của hồ sơ.</p><ol>' +
         '<li><b>Sao lưu năm</b>: ghi 1 file ZIP của năm đang chọn (hồ sơ, các phiên bản, dữ liệu cân, hợp đồng / PDF đã chụp). Dữ liệu vẫn nằm trên máy.</li>' +
         '<li><b>Khôi phục năm</b>: chọn file ZIP / JSON → app kiểm tra rồi gộp, giữ bản mới hơn. <b>Đưa bản sao hồ sơ cũ vào năm này</b>: chép hồ sơ Lưu trữ cũ vào sổ năm (không sửa bản gốc).</li>' +
-        '<li><b>Đóng năm ra file và dọn kho</b> (chỉ Quản trị, bật <b>Xem tất cả công ty</b>): app ghi ZIP <span class="mono">HAK_NamDaDong_&lt;năm&gt;.zip</span>, <b>đọc lại file trên đĩa</b> để so mã kiểm tra, rồi mới hỏi xác nhận gỡ hồ sơ khỏi máy. Hủy hoặc kiểm tra sai thì không dọn. Xong app tự tải lại.</li>' +
+        '<li><b>Đóng năm ra file và dọn kho</b> (bật <b>Xem tất cả công ty</b>): app ghi ZIP <span class="mono">HAK_NamDaDong_&lt;năm&gt;.zip</span>, <b>đọc lại file trên đĩa</b> để so mã kiểm tra, rồi mới hỏi xác nhận gỡ hồ sơ khỏi máy. Hủy hoặc kiểm tra sai thì không dọn. Xong app tự tải lại.</li>' +
         '<li><b>Mở file năm cũ (chỉ xem)</b>: xem / xuất lại Word, Excel, PDF, BKLS từ file đã đóng mà không nhập lại vào máy. <b>Về kho đang làm việc</b> để thoát chế độ xem.</li></ol>' +
         '<ul><li>Hồ sơ Lưu trữ cũ vẫn có nút <b>📦 Xuất &amp; dọn hồ sơ cũ</b> (theo <b>ngày cập nhật</b>, không theo năm) — nên dùng Đóng năm cho gọn.</li>' +
         '<li>Giữ file ZIP năm ở nơi an toàn: <b>Sao lưu toàn bộ không tự chép các ZIP năm</b>. Mất ZIP = mất dữ liệu năm đã dọn.</li>' +
@@ -87,7 +82,6 @@
     [
       'help-tabs',
       'Trang biên bản: nhập theo 5 tab (v2.7.0)',
-      false,
       '<p>Mỗi trang biên bản chia ô nhập thành các tab, cùng thứ tự ở mọi hình thức (trang nào không có vùng đó thì bỏ tab):</p><ol>' +
         '<li><b>Dữ liệu cân</b> — lọc khoảng ngày, chọn xe trả về.</li>' +
         '<li><b>Hợp đồng &amp; bên</b> — chọn hợp đồng, tên tàu, các bên, hợp đồng ủy thác, chứng thư giám định. Điều chuyển: <b>Quyết định &amp; chiều</b> (chiều điều chuyển, kho đi / đến, số và ngày Quyết định).</li>' +
@@ -102,7 +96,6 @@
     [
       'help-convert',
       'Xuất hàng kho gửi → Xuất khẩu / Ủy thác / Xuất bán',
-      false,
       '<p>Hàng ở <b>kho gửi</b> xuất đi để bán, xuất khẩu hoặc ủy thác: trang <b>Xuất hàng kho gửi</b> chỉ lập <b>biên bản giao nhận hàng xuất kho gửi</b> (không lập BKLS). BKLS lập ở hình thức đích — khi hàng chuyển chủ sở hữu.</p><ol>' +
         '<li>Nhập liệu → <b>Xuất hàng kho gửi</b> → thêm file Excel cân của đợt.</li>' +
         '<li>Trang Xuất hàng kho gửi: nhập tàu, bên gửi, kho, lọc ngày, chọn xe trả về → <b>⚡ Tạo biên bản</b>.</li>' +
@@ -116,7 +109,6 @@
     [
       'help-errors',
       'E. Lỗi thường gặp',
-      false,
       '<div class="tbl-wrap" style="max-height:none"><table class="table table-sm align-middle help-tbl"><thead><tr><th>Báo lỗi</th><th>Nguyên nhân</th><th>Xử lý</th></tr></thead><tbody>' +
         [
           ['Sai tên đăng nhập hoặc mật khẩu', 'Gõ sai / Caps Lock', 'Nhập lại hoặc dùng mã khôi phục'],
@@ -159,15 +151,13 @@
     if (!built) {
       box.innerHTML =
         '<div class="card mb-3"><div class="card-body d-flex flex-wrap align-items-start gap-3">' +
-        '<div class="flex-grow-1" style="min-width:240px"><h5 class="mb-1">📘 Hướng dẫn cài đặt, phân quyền &amp; khôi phục</h5><div class="small muted">Bản đang chạy: <b>v' +
+        '<div class="flex-grow-1" style="min-width:240px"><h5 class="mb-1">📘 Hướng dẫn cài đặt, đăng nhập &amp; khôi phục</h5><div class="small muted">Bản đang chạy: <b>v' +
         esc(HAK.VERSION || '?') +
         '</b>. In ra hoặc lưu PDF để đưa cho người cài máy.</div>' +
         '<div class="help-toc no-print mt-2">' +
         SECTIONS.map(
           (s) =>
-            '<button type="button" class="btn btn-sm btn-outline-primary' +
-            (s[2] ? ' admin-only' : '') +
-            '" data-help-go="' +
+            '<button type="button" class="btn btn-sm btn-outline-primary" data-help-go="' +
             s[0] +
             '">' +
             esc(s[1].replace(/^[A-F]\. /, '')) +
@@ -178,14 +168,12 @@
         '<div class="no-print d-flex flex-column gap-2"><button type="button" class="btn btn-primary" id="helpPrint">🖨 In / lưu PDF</button><button type="button" class="btn btn-outline-secondary" id="helpUpdate">🔄 Kiểm tra bản mới</button><div class="small" id="helpUpdateMsg" role="status"></div></div></div></div>' +
         SECTIONS.map(
           (s) =>
-            '<div class="card mb-3 help-sec' +
-            (s[2] ? ' admin-only' : '') +
-            '" id="' +
+            '<div class="card mb-3 help-sec" id="' +
             s[0] +
             '"><div class="card-header">' +
             esc(s[1]) +
             '</div><div class="card-body">' +
-            s[3] +
+            s[2] +
             '</div></div>'
         ).join('');
       box.addEventListener('click', (e) => {
