@@ -1,5 +1,14 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
+## v2.25.24 — Nâng cấp chất lượng toàn diện: Cảnh báo bất thường/quá tải, dung sai HQ, 1-Click ZIP, phím tắt và chẩn đoán sức khỏe dữ liệu
+- **1. Phát hiện & Cảnh báo phiếu cân bất thường / quá tải (Data Integrity Guardrail):** Tự động phát hiện các xe quá tải trọng (> 45 tấn), xe quá nhẹ (≤ 500 kg), hoặc xe cân lặp lại cùng biển số trong thời gian ngắn (< 15 phút); hiển thị banner cảnh báo và hộp thoại chi tiết giúp kế toán đối soát trước khi lập biên bản.
+- **2. Kiểm soát & Cảnh báo dung sai Tờ khai Hải quan (±5% ~ ±10%):** Đối chiếu tổng khối lượng xuất thực tế với số lượng đăng ký trên Tờ khai Hải quan; cảnh báo trực quan khi độ lệch vượt quá dung sai cho phép của cơ quan hải quan.
+- **3. Đóng gói trọn bộ thành 1 file ZIP duy nhất (1-Click Zip Package):** Bổ sung nút "📦 Đóng gói trọn bộ (1 file ZIP)" tải về 1 tệp `.zip` nén sẵn trọn bộ Biên bản Word + Bảng kê Excel chi tiết + Bảng kê Lâm sản Mẫu 01, tối ưu cho việc gửi Zalo/Email cho đối tác.
+- **4. Hệ thống phím tắt bàn phím (Power-User Shortcuts):** Hỗ trợ `Ctrl+S` (Lưu nhanh hồ sơ), `Ctrl+P`/`Ctrl+E` (Xuất trọn bộ 1-chạm), `Ctrl+F` (Nhảy nhanh vào ô tìm kiếm HĐ/Tàu), và `Esc` (Đóng popup).
+- **5. Tự động lưu nháp phiên làm việc (Auto-Save Draft):** Tự động lưu trạng thái bộ lọc (ngày, danh sách xe đã chọn/bỏ chọn) vào kho lưu trữ tạm thời; tự động khôi phục khi làm việc lại, tránh mất dữ liệu khi mất điện hoặc tắt nhầm trình duyệt.
+- **6. Công cụ chẩn đoán sức khỏe dữ liệu (Data Health Check):** Thêm phân hệ "🩺 Sức khỏe dữ liệu" trong Cài đặt, cho phép quét 1-chạm kiểm tra toàn vẹn cơ sở dữ liệu SQLite/IndexedDB, tệp PDF đính kèm, danh mục hợp đồng và dung lượng lưu trữ khả dụng.
+- **7. Biểu đồ trực quan tiến độ giải phóng hàng theo Tàu:** Bổ sung thẻ thống kê tiến độ bốc hàng theo từng Tàu trên màn hình Tổng quan (Dashboard).
+
 ## v2.25.23 — Tinh gọn quy trình nghiệp vụ: Nạp file trước chọn sau, điền dây chuyền Cascade, 1-Click trọn bộ và phân bổ thông minh
 - **Nâng cấp 1: Nạp file trước – Chọn mục đích sau:** Mở khóa hoàn toàn khung kéo thả file Bảng cân (#dropzone) ngay khi vào ứng dụng. Không còn bắt buộc phải chọn 1 trong 7 hình thức trước mới được nạp file. Thêm nút "Chuyển sang…" trên từng đợt để chuyển đổi mục đích linh hoạt chỉ bằng 1 cú nhấp chuột.
 - **Nâng cấp 2: Tự động điền dây chuyền từ Hợp đồng (Auto-Fill & Cascade):** Chọn Hợp đồng/Tàu tự động điền đồng bộ Số tờ khai Hải quan, Ngày tờ khai, Loại lâm sản, Nguồn gốc lâm sản, Tên hàng hóa, Cảng xuất và Cảng đến. Tích hợp ô tìm kiếm nhanh HĐ/Tàu ngay trên dropdown để tra cứu hợp đồng tức thì.

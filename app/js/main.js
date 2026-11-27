@@ -1440,9 +1440,45 @@
     };
     $('#btnMenu').addEventListener('click', () => setMenu(!$('#sidebar').classList.contains('open')));
     document.addEventListener('keydown', (e) => {
+      // 1. Escape: đóng sidebar
       if (e.key === 'Escape' && $('#sidebar').classList.contains('open')) {
         setMenu(false);
         $('#btnMenu').focus();
+        return;
+      }
+
+      // 2. Ctrl/Cmd + S: Lưu nhanh hồ sơ hiện tại
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        const sec = $('#sec-' + App.type);
+        if (sec) {
+          const btnSave = sec.querySelector('[data-year-save]');
+          if (btnSave && !btnSave.disabled) {
+            e.preventDefault();
+            btnSave.click();
+            return;
+          }
+        }
+      }
+
+      // 3. Ctrl/Cmd + P hoặc Ctrl/Cmd + E: Xuất trọn bộ hồ sơ 1-chạm
+      if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'p' || e.key.toLowerCase() === 'e')) {
+        const btnPkg = $('#btnQuickPackage-' + App.type);
+        if (btnPkg && !btnPkg.disabled) {
+          e.preventDefault();
+          btnPkg.click();
+          return;
+        }
+      }
+
+      // 4. Ctrl/Cmd + F: Nhảy nhanh vào ô tìm kiếm HĐ/Tàu
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+        const sec = $('#sec-' + App.type);
+        const sbox = (sec && sec.querySelector('.ct-search-box')) || $('#sfGlobalSearch');
+        if (sbox) {
+          e.preventDefault();
+          sbox.focus();
+          if (typeof sbox.select === 'function') sbox.select();
+        }
       }
     });
     $('#sbBackdrop').addEventListener('click', () => {

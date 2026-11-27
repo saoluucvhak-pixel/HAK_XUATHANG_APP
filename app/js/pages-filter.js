@@ -86,10 +86,21 @@
       $('#pdf-' + type).disabled = !ds;
       $('#xls-' + type).disabled = !ds;
       if ($('#btnQuickPackage-' + type)) $('#btnQuickPackage-' + type).disabled = !ds;
+      if ($('#btnQuickZip-' + type)) $('#btnQuickZip-' + type).disabled = !ds;
       if (pageBkls(type)) $('#bkls-' + type).disabled = !ds;
       if (!ds) {
         box.innerHTML = '';
         return;
+      }
+      if (!ST[type].draftRestored && HAK.Store) {
+        const df = HAK.Store.get('hak.draftFilter.' + type, null);
+        if (df) {
+          if (df.from && !ST[type].filter.from) ST[type].filter.from = df.from;
+          if (df.to && !ST[type].filter.to) ST[type].filter.to = df.to;
+          if (Array.isArray(df.pick) && !ST[type].filter.pick) ST[type].filter.pick = df.pick;
+          if (Array.isArray(df.omit) && (!ST[type].omit || !ST[type].omit.size)) ST[type].omit = new Set(df.omit);
+        }
+        ST[type].draftRestored = true;
       }
       const groups = ds.stats.groups;
       if (!ST[type].filter.groups) ST[type].filter.groups = new Set(groups.map((g) => g.label));
@@ -321,6 +332,23 @@
               : diffTon === 0
                 ? 'Đủ 100% hợp đồng'
                 : 'Còn thiếu: ' + G().fmtTon(-diffTon * 1000) + ' tấn';
+          let toleranceHtml = '';
+          if (cq > 0 && Math.abs(pct - 100) > 5) {
+            const isOver10 = Math.abs(pct - 100) > 10;
+            const tolCls = isOver10 ? 'alert-danger' : 'alert-warning';
+            toleranceHtml =
+              '<div class="alert ' +
+              tolCls +
+              ' py-1 px-2 mt-1 mb-0 small d-flex align-items-center gap-1">' +
+              '  <span>' +
+              (isOver10 ? '⛔' : '⚠️') +
+              ' <b>Lệch dung sai Hải quan:</b> Khối lượng thực xuất đang lệch <b>' +
+              Math.abs(pct - 100) +
+              '%</b> so với số lượng đăng ký tờ khai (' +
+              G().fmtTon(cq * 1000) +
+              ' tấn). Quy định thông quan thông thường yêu cầu dung sai trong khoảng ±5% ~ ±10%.</span>' +
+              '</div>';
+          }
           progressHtml =
             '<div class="mt-2 pt-2 border-top">' +
             '  <div class="d-flex justify-content-between small mb-1">' +
@@ -346,6 +374,7 @@
             pct +
             '" aria-valuemin="0" aria-valuemax="100"></div>' +
             '  </div>' +
+            toleranceHtml +
             '</div>';
         }
 
@@ -406,7 +435,30 @@
           }
         }
 
-        bar.innerHTML += progressHtml + matchBanner + dupBanner;
+        // 4. Cảnh báo phiếu cân bất thường / quá tải (Data Integrity Guardrail)
+        let anomalyBanner = '';
+        if (HAK.Weigh && HAK.Weigh.detectAnomalies) {
+          const anom = HAK.Weigh.detectAnomalies(rows);
+          if (anom.total > 0) {
+            const detailArr = [];
+            if (anom.overweightCount) detailArr.push(anom.overweightCount + ' xe >45T');
+            if (anom.underweightCount) detailArr.push(anom.underweightCount + ' xe <500kg');
+            if (anom.rapidCount) detailArr.push(anom.rapidCount + ' xe lặp <15p');
+            anomalyBanner =
+              '<div class="alert alert-warning py-1 px-2 d-flex justify-content-between align-items-center mt-2 mb-0 small">' +
+              '  <span>🔍 <b>Cảnh báo phiếu cân bất thường:</b> Phát hiện <b>' +
+              anom.total +
+              '</b> phiếu nghi vấn (' +
+              detailArr.join(', ') +
+              ').</span>' +
+              '  <button class="btn btn-xs btn-outline-dark py-0 px-2 fw-semibold" type="button" data-view-anomalies="' +
+              type +
+              '">Chi tiết cảnh báo</button>' +
+              '</div>';
+          }
+        }
+
+        bar.innerHTML += progressHtml + matchBanner + dupBanner + anomalyBanner;
       }
     }
     /**

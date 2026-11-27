@@ -602,7 +602,7 @@
         .sort((a, b) => b.kg - a.kg)
         .slice(0, n);
     const topXe =
-      '<div class="col-lg-4"><div class="card h-100">' +
+      '<div class="col-lg-6"><div class="card h-100">' +
       cardH('🚛 Top 10 xe (tấn)') +
       '<div class="card-body">' +
       barList(
@@ -618,7 +618,7 @@
       ) +
       '</div></div></div>';
     const topTx =
-      '<div class="col-lg-4"><div class="card h-100">' +
+      '<div class="col-lg-6"><div class="card h-100">' +
       cardH('👤 Top 10 tài xế (tấn)') +
       '<div class="card-body">' +
       barList(
@@ -633,8 +633,26 @@
         (i) => fmtTon(i.kg) + ' <span class="muted">· ' + fmtInt(i.trips) + '</span>'
       ) +
       '</div></div></div>';
+    const topTau =
+      '<div class="col-lg-6"><div class="card h-100">' +
+      cardH('🚢 Tiến độ bốc hàng theo Tàu (tấn)') +
+      '<div class="card-body">' +
+      (idx.ships && idx.ships.size
+        ? barList(
+            top(idx.ships, 5).map((a) => ({
+              label: a.name,
+              v: a.kg,
+              kg: a.kg,
+              trips: a.trips,
+              search: a.name,
+              color: '--s3',
+            })),
+            (i) => fmtTon(i.kg) + ' <span class="muted">· ' + fmtInt(i.trips) + ' xe</span>'
+          )
+        : '<div class="text-muted small py-3 text-center">Chưa có dữ liệu tàu trong các đợt đang nạp.</div>') +
+      '</div></div></div>';
     const recent =
-      '<div class="col-lg-4"><div class="card h-100">' +
+      '<div class="col-lg-6"><div class="card h-100">' +
       cardH('🧾 Chứng từ gần đây', '<a href="#/chungtu" class="small">Xem tất cả</a>') +
       '<div class="card-body py-2">' +
       (issued.length
@@ -662,10 +680,12 @@
       '<div class="row g-3 mb-3">' +
       chartCard +
       typeCard +
+      '</div><div class="row g-3 mb-3">' +
+      topTau +
+      recent +
       '</div><div class="row g-3 mb-4">' +
       topXe +
       topTx +
-      recent +
       '</div>';
     monthly(d);
     if (HAK.Backup && HAK.Backup.health)

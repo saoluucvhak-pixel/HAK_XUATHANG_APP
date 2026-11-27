@@ -196,6 +196,89 @@
     o.delKg = o.kg - o.retKg;
     return o;
   }
-  HAK.Weigh = { identity, ticketsOf, clusters, resolve, overall, norm, plateKey };
+  /**
+   * Phát hiện các phiếu cân có dấu hiệu bất thường về tải trọng hoặc lặp chuyến quá nhanh:
+   *   - Quá tải trọng thông thường (mặc định > 45.000 kg).
+   *   - Quá nhỏ hoặc số âm (mặc định <= 0 hoặc < 500 kg).
+   *   - Cân lặp quá nhanh cùng biển số xe trong ngày (cách nhau < 15 phút).
+   * @param {Array} rows - Danh sách các dòng phiếu cân
+   * @param {Object} [opts] - Tùy chọn { maxNetKg: 45000, minNetKg: 500, minGapMinutes: 15 }
+   * @returns {{ list: Array, overweightCount: number, underweightCount: number, rapidCount: number, total: number }}
+   */
+  function detectAnomalies(rows, opts) {
+    if (!Array.isArray(rows) || !rows.length) {
+      return { list: [], overweightCount: 0, underweightCount: 0, rapidCount: 0, total: 0 };
+    }
+    const o = opts || {};
+    const maxNet = Number(o.maxNetKg) || 45000;
+    const minNet = Number(o.minNetKg) || 500;
+    const minGap = (Number(o.minGapMinutes) || 15) * 60 * 1000;
+
+    const list = [];
+    let overweightCount = 0;
+    let underweightCount = 0;
+    let rapidCount = 0;
+
+    const lastSeenByPlate = new Map();
+
+    rows.forEach((r, idx) => {
+      const net = Number(r.net) || 0;
+      const issues = [];
+
+      // 1. Quá tải
+      if (net > maxNet) {
+        issues.push({
+          type: 'overweight',
+          msg: 'Khối lượng ' + Math.round(net / 10) / 100 + 't > ' + maxNet / 1000 + 't (vượt tải thông thường)',
+        });
+        overweightCount++;
+      }
+      // 2. Quá nhẹ hoặc âm
+      else if (net <= 0 || net < minNet) {
+        issues.push({ type: 'underweight', msg: 'Khối lượng ' + net + ' kg bất thường (<= ' + minNet + ' kg)' });
+        underweightCount++;
+      }
+
+      // 3. Cân lặp quá nhanh
+      const pk = plateKey(r.plate);
+      const dateStr = norm(r.dateStr || r.date || '');
+      if (pk && dateStr) {
+        const key = dateStr + '|' + pk;
+        const ts = r.ts || (r.time1 ? Date.parse(dateStr + ' ' + r.time1) || null : null);
+        if (lastSeenByPlate.has(key)) {
+          const prev = lastSeenByPlate.get(key);
+          if (ts && prev.ts && Math.abs(ts - prev.ts) < minGap) {
+            issues.push({
+              type: 'rapid_repeat',
+              msg:
+                'Biển số ' +
+                (r.plate || '') +
+                ' cân lại chỉ sau ' +
+                Math.round(Math.abs(ts - prev.ts) / 60000) +
+                ' phút (phiếu trước #' +
+                (prev.row.ticket || '') +
+                ')',
+            });
+            rapidCount++;
+          }
+        }
+        if (ts) lastSeenByPlate.set(key, { row: r, ts });
+      }
+
+      if (issues.length) {
+        list.push({ row: r, index: idx, issues });
+      }
+    });
+
+    return {
+      list,
+      overweightCount,
+      underweightCount,
+      rapidCount,
+      total: list.length,
+    };
+  }
+
+  HAK.Weigh = { identity, ticketsOf, clusters, resolve, overall, norm, plateKey, detectAnomalies };
   if (typeof module === 'object' && module.exports) module.exports = HAK.Weigh;
 })(typeof window !== 'undefined' ? window : globalThis);

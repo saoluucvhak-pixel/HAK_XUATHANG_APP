@@ -850,9 +850,13 @@
       '<div class="d-flex gap-2 mb-2"><button type="button" class="btn btn-outline-primary" data-year-save>Lưu hồ sơ</button><button type="button" class="btn btn-outline-secondary" data-year-new>Thêm mới</button><button type="button" class="btn btn-outline-secondary" data-year-list>Xem năm cũ</button></div><div class="small muted mb-2" id="year-note-' +
       type +
       '"></div>' +
-      '<div class="d-grid gap-2 mb-2"><button class="btn btn-success btn-lg fw-bold shadow-sm" id="btnQuickPackage-' +
+      '<div class="d-grid gap-2 mb-2">' +
+      '<button class="btn btn-success btn-lg fw-bold shadow-sm" id="btnQuickPackage-' +
       type +
-      '" type="button">⚡ Xuất trọn bộ hồ sơ (1-Click)</button></div>' +
+      '" type="button">⚡ Xuất trọn bộ hồ sơ (Tải từng file)</button>' +
+      '<button class="btn btn-outline-success fw-bold shadow-sm" id="btnQuickZip-' +
+      type +
+      '" type="button">📦 Đóng gói trọn bộ (1 file ZIP)</button></div>' +
       '<div class="d-grid gap-2"><button class="btn btn-primary btn-lg" id="gen-' +
       type +
       '" type="button">' +
@@ -1124,6 +1128,66 @@
       });
     }
 
+    const btnQuickZip = $('#btnQuickZip-' + type);
+    if (btnQuickZip) {
+      btnQuickZip.addEventListener('click', async () => {
+        const ds = getDs(type);
+        if (!ds) {
+          toast('Chưa có dữ liệu phiếu cân.', 'warning');
+          return;
+        }
+        const rows = currentRows(type);
+        if (!rows.length) {
+          toast('Chưa chọn phiếu cân nào trong phạm vi hiện tại.', 'warning');
+          return;
+        }
+        const ZipClass = window.JSZip || (typeof JSZip !== 'undefined' ? JSZip : null);
+        if (!ZipClass) {
+          toast('Thư viện nén ZIP chưa sẵn sàng.', 'error');
+          return;
+        }
+        HAK.Loading.show('Đang đóng gói trọn bộ hồ sơ thành 1 file ZIP…');
+        try {
+          const params = collect(type);
+          const res = HAK.Yearbook
+            ? HAK.Yearbook.underContext(HAK.Yearbook.active(type), () => G().build(type, ds, params))
+            : G().build(type, ds, params);
+
+          const zip = new ZipClass();
+          const cleanName = (s) =>
+            String(s || '')
+              .trim()
+              .replace(/[\\/:*?"<>|]/g, '')
+              .replace(/\s+/g, '_');
+          const shipPart = params.ship ? '_' + cleanName(params.ship) : '';
+          const zipName =
+            'HoSo_' + cleanName(DOCS[type].title) + shipPart + '_' + (params.from || new Date().toISOString().slice(0, 10)) + '.zip';
+
+          // 1. Biên bản Word
+          for (const f of res.files) {
+            const wordBytes = await HAK.Word.Render.generate(f.tpl, f.data);
+            zip.file(f.name, wordBytes);
+          }
+
+          // 2. Bảng kê Excel chi tiết
+          if (res.excel) {
+            const exBuf = await HAK.Exporter.toBuffer(res.excel);
+            zip.file(res.excel.fileName, exBuf.buffer);
+          }
+
+          const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+          await HAK.Word.Files.saveBlob(zipBlob, zipName);
+          await archive(type, params, res, ds, 'zip');
+          toast('✅ Đã đóng gói và tải thành công file ZIP: ' + zipName, 'success');
+        } catch (err) {
+          console.error(err);
+          toast('Lỗi khi đóng gói ZIP: ' + (err.message || err), 'error');
+        } finally {
+          HAK.Loading.hide();
+        }
+      });
+    }
+
     $('#gen-' + type).addEventListener('click', () => generate(type));
     $('#pdf-' + type).addEventListener('click', () => generate(type, 'pdf'));
     $('#xls-' + type).addEventListener('click', () => generate(type, 'xlsx'));
@@ -1186,6 +1250,49 @@
             save();
             upd();
             toast('Đã bỏ chọn ' + dups.length + ' phiếu cân bị trùng với hồ sơ khác.', 'info');
+          }
+        }
+        return;
+      }
+
+      const btnAnom = e.target.closest('[data-view-anomalies]');
+      if (btnAnom) {
+        const rows = currentRows(type);
+        if (HAK.Weigh && HAK.Weigh.detectAnomalies) {
+          const anom = HAK.Weigh.detectAnomalies(rows);
+          if (anom.list.length) {
+            const listHtml = anom.list
+              .slice(0, 50)
+              .map(
+                (item) =>
+                  '<li class="mb-2"><b>Phiếu #' +
+                  esc(item.row.ticket || '—') +
+                  '</b> (Xe: ' +
+                  esc(item.row.plate || '—') +
+                  ' · ' +
+                  G().fmtTon(item.row.net || 0) +
+                  ' tấn): <span class="text-danger">' +
+                  esc(item.issues.map((x) => x.msg).join('; ')) +
+                  '</span></li>'
+              )
+              .join('');
+            const modalEl = document.createElement('div');
+            modalEl.className = 'modal fade';
+            modalEl.tabIndex = -1;
+            modalEl.innerHTML =
+              '<div class="modal-dialog modal-dialog-centered"><div class="modal-content">' +
+              '<div class="modal-header"><h5 class="modal-title">⚠️ Phiếu cân có dấu hiệu bất thường</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>' +
+              '<div class="modal-body" style="max-height:380px; overflow-y:auto">' +
+              '<p class="small text-muted mb-2">Các phiếu dưới đây có khối lượng vượt tải thông thường (>45T), quá nhẹ (&le;500kg), hoặc cân lặp lại cùng biển số trong thời gian ngắn:</p>' +
+              '<ul class="small ps-3 mb-0">' +
+              listHtml +
+              '</ul></div>' +
+              '<div class="modal-footer"><button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Đóng</button></div>' +
+              '</div></div>';
+            document.body.appendChild(modalEl);
+            const m = new bootstrap.Modal(modalEl);
+            modalEl.addEventListener('hidden.bs.modal', () => modalEl.remove());
+            m.show();
           }
         }
         return;
@@ -1682,6 +1789,16 @@
       })
     );
     HAK.Store.set('hak.form.' + type, o);
+    // Tự động lưu nháp bộ lọc phiên làm việc (Auto-Save Draft)
+    if (ST[type] && ST[type].filter) {
+      const flt = {
+        from: ST[type].filter.from || '',
+        to: ST[type].filter.to || '',
+        pick: Array.isArray(ST[type].filter.pick) ? ST[type].filter.pick : null,
+        omit: ST[type].omit ? Array.from(ST[type].omit.keys ? ST[type].omit.keys() : ST[type].omit) : null,
+      };
+      HAK.Store.set('hak.draftFilter.' + type, flt);
+    }
   }
 
   /* Bộ lọc phạm vi dữ liệu và tóm tắt trực tiếp: xem js/pages-filter.js */

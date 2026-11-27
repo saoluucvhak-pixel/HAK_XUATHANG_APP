@@ -413,6 +413,7 @@
         <li class="nav-item admin-only"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-excel-tpl" type="button">📊 Mẫu nhập Excel</button></li>
         <li class="nav-item admin-only"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-general" type="button">🛠️ Chung</button></li>
         <li class="nav-item admin-only"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-backup" type="button">💾 Sao lưu &amp; khôi phục</button></li>
+        <li class="nav-item admin-only"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-health" type="button">🩺 Sức khỏe dữ liệu</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-account" type="button">👤 Tài khoản</button></li>
       </ul>
       <div class="tab-content">
@@ -448,6 +449,10 @@
         <div class="tab-pane fade" id="tab-backup">
           <div class="card"><div class="card-header">💾 Sao lưu &amp; khôi phục <span class="muted small fw-normal">— cài đặt, danh sách xe, mẫu Word, form, đợt Excel, nhật ký chứng từ, Lưu trữ</span></div>
             <div class="card-body" id="backupBody"></div></div>
+        </div>
+        <div class="tab-pane fade" id="tab-health">
+          <div class="card"><div class="card-header d-flex justify-content-between align-items-center"><span>🩺 Chẩn đoán &amp; Sức khỏe dữ liệu</span><button class="btn btn-sm btn-primary" id="btnRunHealthCheck" type="button">🔍 Quét kiểm tra ngay</button></div>
+            <div class="card-body"><p class="muted small mb-3">Tự động quét và đánh giá tính toàn vẹn của cơ sở dữ liệu (SQLite / IndexedDB), tệp scan đính kèm, danh mục hợp đồng, phát hiện kịp thời các tệp bị lỗi hoặc sắp hết dung lượng lưu trữ.</p><div id="healthCheckResults"><div class="text-center text-muted py-4">Bấm nút "🔍 Quét kiểm tra ngay" ở trên để kiểm tra toàn diện hệ thống.</div></div></div></div>
         </div>
       </div>
     </section>
