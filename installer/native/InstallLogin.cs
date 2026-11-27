@@ -46,7 +46,7 @@ internal static class InstallLogin
             {
                 try
                 {
-                    Write(root, new { v = 2, mode = "single", profileId = "local", users = new object[0] });
+                    Write(root, new { v = 2, mode = "single", profileId = "u" + Guid.NewGuid().ToString("N"), users = new object[0] });
                     form.DialogResult = DialogResult.OK;
                 }
                 catch (Exception)
@@ -73,7 +73,7 @@ internal static class InstallLogin
                     var id = "u" + Guid.NewGuid().ToString("N");
                     var stamp = Guid.NewGuid().ToString("N");
                     var verifier = VerifyWith(password.Text);
-                    var code = Guid.NewGuid().ToString("N").Substring(0, 12).ToUpperInvariant();
+                    var code = RecoveryCode();
                     var recovery = VerifyWith(code);
                     Write(root, new
                     {
@@ -139,6 +139,16 @@ internal static class InstallLogin
             form.AcceptButton = next;
             form.ShowDialog(owner);
         }
+    }
+
+    private static string RecoveryCode()
+    {
+        const string alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        var bytes = new byte[12];
+        using (var random = RandomNumberGenerator.Create()) random.GetBytes(bytes);
+        var code = new char[bytes.Length];
+        for (var i = 0; i < bytes.Length; i++) code[i] = alphabet[bytes[i] % alphabet.Length];
+        return new string(code);
     }
 
     private sealed class Verifier

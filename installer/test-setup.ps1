@@ -49,12 +49,16 @@ try {
   Verify-Install
   'PASS fresh install, shortcuts, version and uninstall metadata'
   [IO.File]::WriteAllText((Join-Path $install 'user-note.txt'),'preserve user-added files')
+  $pendingLogin='window.HAK_INSTALL_LOGIN = {"id":"11111111111111111111111111111111","state":{"v":2,"mode":"single","profileId":"local","users":[]}};'
+  $loginFile=Join-Path $install 'js\install-login.js'
+  [IO.File]::WriteAllText($loginFile,$pendingLogin)
   Run-Setup
   Verify-Install
   $previous=@(Get-ChildItem -LiteralPath $root -Directory -Filter "app.previous-v$ExpectedVersion-*")
   if($previous.Count -ne 1){throw 'Expected exactly one preserved previous installation'}
   if((Get-Content (Join-Path $previous[0].FullName 'user-note.txt') -Raw) -ne 'preserve user-added files'){throw 'Previous user file was lost'}
-  'PASS upgrade swaps complete application and preserves previous user files'
+  if((Get-Content -LiteralPath $loginFile -Raw) -ne $pendingLogin){throw 'Pending first-run login choice was lost during upgrade'}
+  'PASS upgrade preserves previous user files and pending login choice'
   $occupied=Join-Path $root 'not a HAK installation'
   New-Item -ItemType Directory -Path $occupied | Out-Null
   $foreignFile=Join-Path $occupied 'user-file.txt'

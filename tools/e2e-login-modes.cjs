@@ -67,6 +67,7 @@ async function main() {
       await page.locator('#authGate').waitFor({ state: 'hidden' });
       const single = await state(page);
       assert.equal(single.mode, 'single');
+      const singleBackup = await page.evaluate(async () => (await HAK.Backup.buildFull()).parts.join(''));
       await page.reload();
       await page.locator('#btnCompany').waitFor();
       assert.equal(await page.locator('#authForm').count(), 0);
@@ -87,6 +88,14 @@ async function main() {
       await chooseCompany(page);
       await openSettings(page);
       assert.equal(await page.locator('#usAdd').count(), 0);
+      const protectedRestore = await page.evaluate(async (backup) => {
+        const file = new File([backup], 'test.json', { type: 'application/json' });
+        const result = await HAK.Backup.restoreFile(file, { keepAuth: false, mode: 'replace' });
+        await HAK.Backup.undoRestore();
+        return result.keepAuth;
+      }, singleBackup);
+      assert.equal(protectedRestore, true);
+      assert.deepEqual(await state(page), enabled);
       await page.click('#acDisable');
       await page.fill('#auUser', 'sai-ten');
       await page.fill('#auCurrent', password);

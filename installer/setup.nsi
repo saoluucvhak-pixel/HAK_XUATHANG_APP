@@ -112,12 +112,18 @@ Section "Ung dung Quan ly xuat hang" SecApp
 
   ; A fresh interactive install asks for the mode before replacing any files.
   ; The staged helper uses the same password verifier as the application.
+  IfFileExists "$INSTDIR\index.html" keep_pending_login
   IfSilent login_configured
-  IfFileExists "$INSTDIR\index.html" login_configured
   ExecWait '"$StageDir\native\HAKDocs.exe" --setup-login' $0
   IfErrors install_failed
   StrCmp $0 0 login_configured
   StrCmp $0 2 install_cancelled install_failed
+keep_pending_login:
+  ; Keep a choice that the previously installed app has not loaded yet.
+  IfFileExists "$INSTDIR\js\install-login.js" 0 login_configured
+  ClearErrors
+  CopyFiles /SILENT "$INSTDIR\js\install-login.js" "$StageDir\js"
+  IfErrors install_failed
 login_configured:
 
   ; Extract the whole payload first. Never overwrite a live installation file by file.

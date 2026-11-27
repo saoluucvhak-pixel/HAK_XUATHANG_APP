@@ -151,7 +151,7 @@
   }
 
   function modeData(previous, mode, account, rec) {
-    const id = account ? account.id : previous.profileId || 'local';
+    const id = account ? account.id : previous.profileId || 'u' + newStamp();
     const next = { v: 2, mode, profileId: id, users: account ? [account] : [] };
     if (rec) next.rec = rec;
     if (previous.station) next.station = previous.station;
@@ -812,7 +812,8 @@
   const scopeAll = (key) => !!(HAK.Store.get(SCOPE, {}) || {})[key];
   /** Danh sách id công ty để lọc, hoặc null = không lọc. Mặc định: chỉ công ty đang làm; bật "Xem tất cả" → mọi công ty của máy. */
   function scopeIds(key) {
-    if (!cur || !curCo) return null;
+    if (!cur) return null;
+    if (!curCo) return station() ? [] : null;
     if (!scopeAll(key)) return [curCo];
     return station() ? allowedCos() : null; // máy trạm: "tất cả" = các công ty của máy
   }

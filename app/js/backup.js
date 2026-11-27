@@ -373,7 +373,7 @@
   /** Khóa tài khoản đăng nhập — giữ nguyên khi khôi phục với tùy chọn "Giữ tài khoản đang dùng trên máy này" (v2.6.6). */
   const accountActive = () => !!(HAK.Auth && HAK.Auth.usesAccount && HAK.Auth.usesAccount());
   const filterOwners = (state) =>
-    state && state.v === 2 && state.mode === 'single' ? [{ id: state.profileId }] : (state && state.users) || [];
+    state && state.v === 2 && state.mode === 'single' ? [{ id: state.profileId, implicit: true }] : (state && state.users) || [];
   const AUTH_KEYS = ['hak.auth.v1', 'hak.auth.lastco'];
   /* v2.17.0 (theo hak-migration-manager: sao lưu TRƯỚC khi ghi đè): trước khi khôi phục, chụp cài đặt + danh mục + tài khoản đang có vào 'hak.prerestore.v1' để HOÀN TÁC.
    * Chỉ phần cài đặt / danh mục (localStorage); hồ sơ Lưu trữ nhập vào là thêm / cập nhật theo phiên bản nên không bị xóa. Bản chụp không nằm trong sao lưu toàn bộ. */
@@ -469,7 +469,10 @@
     if (final.some((u) => u && u.id === m[2])) return k;
     const src = (ctx.backupUsers || []).find((u) => u && u.id === m[2]);
     const un = src && String(src.username || '').toLowerCase();
-    const mine = un && final.find((u) => u && String(u.username || '').toLowerCase() === un);
+    const mine =
+      src && src.implicit
+        ? final.find((u) => u && u.implicit)
+        : un && final.find((u) => u && String(u.username || '').toLowerCase() === un);
     return mine ? m[1] + '@' + mine.id + '@' + m[3] + (m[4] || '') : null;
   }
   const CAT = 'hak.catalog.v1';
