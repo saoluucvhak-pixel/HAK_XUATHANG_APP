@@ -25,6 +25,26 @@
         '<p><b>Cài đặt → Chung → Gói cấu hình cài đặt</b> dùng để chuyển công ty, kho, mẫu Word, danh mục và Google Sheet sang máy khác. Máy trạm dùng các công ty được chọn trong gói. Tài khoản đăng nhập được tạo riêng trên từng máy.</p>',
     ],
     [
+      'help-flow',
+      'Quy trình lập hồ sơ',
+      false,
+      '<p>Luồng đúng: <b>Danh mục → Nhập liệu (bảng cân) → Chọn phiếu → Lưu hồ sơ → Xuất chứng từ → Báo cáo.</b> Đầu trang biên bản có thanh "Đang làm việc" cho biết công ty, hình thức, đợt cân, hợp đồng và phạm vi phiếu.</p>' +
+        '<ul><li><b>Nhập liệu:</b> chọn file Excel; nhãn <b>✔ Đã lưu</b> hiện khi đợt đã ghi xong, <b>⚠ Chưa lưu bền</b> kèm nút "Thử lưu lại" nếu lỗi. Nạp lại file trùng tên sẽ hỏi xác nhận thay đợt.</li>' +
+        '<li><b>Ba phạm vi khác nhau:</b> "Lọc xem trước" (Nhập liệu — chỉ để xem), "Phạm vi lập chứng từ" (trang biên bản — tập phiếu sẽ lập), "Kỳ báo cáo" (Báo cáo). Bấm <b>Dùng phạm vi đang xem</b> ở Nhập liệu để chuyển điều kiện sang trang biên bản.</li>' +
+        '<li><b>Chọn phiếu:</b> "Chọn … dòng đang hiển thị" chỉ chọn các dòng thấy (300 mỗi lần); "Chọn tất cả … kết quả" chọn hết kết quả lọc. Dán số phiếu: khớp đúng số trước, nếu mơ hồ sẽ hiện bảng để bạn xác nhận.</li>' +
+        '<li><b>Một ngày hai tàu:</b> lập tàu A (lọc giờ cân / số phiếu hoặc Chọn phiếu…) → Lưu hồ sơ → <b>Thêm mới</b> cho tàu B trên cùng đợt cân; cột "Đã gán" cho biết phiếu đã thuộc tàu khác. Mở lại A vẫn đúng lựa chọn của A.</li>' +
+        '<li><b>Phiếu bỏ khác xe trả về:</b> phiếu bỏ bị loại khỏi hồ sơ; xe trả về vẫn thuộc đợt cân nhưng được đánh dấu trả về.</li>' +
+        '<li><b>Thêm mới:</b> xóa sạch phiếu bỏ, xe trả về, phiếu chọn riêng, bộ lọc và liên kết hợp đồng của hồ sơ trước; nếu còn thay đổi chưa lưu sẽ hỏi Lưu / Bỏ thay đổi / Quay lại.</li>' +
+        '<li><b>Nhập từ bản sao:</b> Cài đặt → <b>💾 Sao lưu &amp; khôi phục</b> → khối ③ <b>Khôi phục</b> (một nút, tự nhận file toàn bộ / tháng / năm). Chọn <b>Nhập bổ sung</b> (giữ dữ liệu mới hơn trên máy; nhập lặp không đổi gì) hoặc <b>Khôi phục (ghi đè)</b> danh mục &amp; cài đặt về thời điểm sao lưu (có nút <b>↶ Hoàn tác khôi phục</b>). Nếu dừng giữa chừng, thông báo nêu kho đã nhập, kho chưa chạy và phần hoàn tác được.</li>' +
+        '<li><b>Đổi sheet / dòng tiêu đề / ánh xạ cột:</b> app đọc thử trước. Có dòng trùng hoàn toàn (cùng số phiếu, biển số, giờ cân) hoặc kết quả không hợp lệ thì <b>không áp dụng</b> — giữ nguyên cấu hình đang dùng và nêu sheet, số phiếu, dòng Excel cần xử lý.</li>' +
+        '<li><b>Báo cáo theo ngày cân:</b> hồ sơ không đọc được hoặc phiếu thiếu / sai ngày cân được tách thành <b>chưa phân bổ</b> (khung vàng + sheet "Chưa phân bổ" trong Excel); tháng / năm chỉ gồm phần đã xác minh, không tự dồn vào ngày bắt đầu hồ sơ.</li>' +
+        '<li><b>Mẫu báo cáo (Báo cáo tổng hợp):</b> chọn 1 trong 5 mẫu — <i>Tổng hợp theo kỳ</i> (so với kỳ trước cùng độ dài), <i>Phân tích theo tàu / kho / ĐVVC</i> (Top N + Khác, tỷ lệ xe trả về có mẫu số), <i>Tiến độ và đối chiếu hợp đồng</i> (BDMT gốc / hiện hành / chứng thư, MT thực giao), <i>Hải quan và công nợ thuế</i> (công ty → hợp đồng → tờ khai, không bù trừ), <i>Ngoại lệ cần đối soát</i>. Từ dòng tổng bấm <b>Hồ sơ / Phiếu cân / Hồ sơ hợp đồng / Giấy nộp tiền</b> để tra về nguồn. Màn hình, Excel và PDF cùng một kết quả và cùng phạm vi công ty.</li>' +
+        '<li><b>Đồng bộ Google Sheet dừng giữa chừng:</b> thông báo nêu đã ghi / lỗi / chưa chạy theo lô hoặc theo trang; bấm đồng bộ lại là gửi tiếp, không nhân đôi dòng. Bốn trang hợp đồng cần Code.gs bản 3 (dán lại mã mới).</li>' +
+        '<li><b>Đóng năm dở:</b> Sổ hồ sơ theo năm → <b>Tiếp tục đóng năm</b> → chọn lại đúng file ZIP; nếu có hồ sơ sửa sau khi đóng dở, app báo cần đối chiếu và không dọn.</li>' +
+        '<li><b>Danh mục thay đổi:</b> khi hợp đồng/danh mục đổi sau lúc mở hồ sơ, app báo "Danh mục đã thay đổi" (giá trị cũ/mới); giá trị bạn gõ tay được giữ. Hồ sơ đã lưu mở lại theo đúng nội dung lúc lưu.</li></ul>',
+    ],
+
+    [
       'help-veh',
       'Bảng cân + danh sách xe, tài xế theo từng đợt (v2.7.2)',
       false,

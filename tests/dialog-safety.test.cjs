@@ -1,5 +1,5 @@
 /* An toàn hộp thoại (quét mã nguồn): nút Hủy / Đóng (data-bs-dismiss="modal") không phải nút phá hủy;
- * nút MẶC ĐỊNH của một <form> (nút bị kích hoạt khi nhấn Enter trong ô nhập) không phải nút phá hủy; chỉ 2 xử lý phím Enter tự viết, đều không phá hủy dữ liệu. */
+ * nút MẶC ĐỊNH của một <form> (nút bị kích hoạt khi nhấn Enter trong ô nhập) không phải nút phá hủy; chỉ các xử lý phím Enter đã liệt kê, đều không phá hủy dữ liệu. */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -36,8 +36,8 @@ test('nút mặc định của <form> (Enter trong ô nhập) không phải nút
   assert.ok(n >= 4, 'quét được các form (' + n + ')');
   assert.deepEqual(bad, []);
 });
-test('xử lý phím Enter tự viết: chỉ bảng điều khiển, tìm kiếm chung, danh mục và đổi mật khẩu (không có đường Enter phá hủy khác)', () => {
+test('xử lý phím Enter tự viết: chỉ bảng điều khiển, tìm kiếm chung, và danh mục (không có đường Enter phá hủy khác)', () => {
   const hits = [];
   for (const { f, s } of sources) if (/e\.key === 'Enter'|keyCode === 13/.test(s)) hits.push(f);
-  assert.deepEqual(hits.sort(), ['app/js/auth.js', 'app/js/catalog.js', 'app/js/dashboard.js', 'app/js/search.js']);
+  assert.deepEqual(hits.sort(), ['app/js/catalog.js', 'app/js/dashboard.js', 'app/js/search.js']);
 });
