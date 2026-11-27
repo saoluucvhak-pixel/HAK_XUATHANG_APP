@@ -1,6 +1,8 @@
 # Nhật ký thay đổi — App "Quản lý xuất hàng" (hak-bienban)
 
-## v2.25.25 — Sửa xuất hồ sơ, chọn phiếu cân và khôi phục
+## v2.25.25 — Sửa xuất hồ sơ, nhập Excel và khôi phục
+- Bỏ qua ô ngày ký trong cột khối lượng. Mẫu ghép theo tên cột tự tìm lại dòng tiêu đề bị dịch chuyển khi chỉ có một dòng khớp.
+- Cảnh báo đối chiếu chỉ dùng tấn tươi trên tờ khai gắn đúng chi tiết hợp đồng. Phần chứng thư và hợp đồng đối chiếu theo BDMT.
 - Xuất ZIP gồm biên bản Word, bảng kê Excel và BKLS Mẫu 01 ở các loại hồ sơ hỗ trợ. App chỉ báo thành công sau khi lưu tệp.
 - Lọc theo tàu và bỏ phiếu trùng dựa trên khóa phiếu chuẩn hóa. Cảnh báo phiếu trùng theo phạm vi công ty và thời điểm cân.
 - Khôi phục sổ hồ sơ chỉ hoàn tất sau khi ghi vào kho dữ liệu.

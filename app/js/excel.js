@@ -575,7 +575,10 @@
       weirdNum: [],
       badTime24: [],
       hugeWeight: [],
+      dateInWeight: [],
     };
+    const isDateText = (text) =>
+      typeof text === 'string' && (/^ngay \d{1,2} thang \d{1,2} nam \d{4}\b/.test(norm(text)) || parseDT(text, is1904)?.hasDate);
     const seenTicket = new Map();
     const excluded = []; // phiếu KL ≤ 0 (kể cả âm): KHÔNG cộng vào tổng, KHÔNG đưa vào biên bản — liệt kê riêng để đối soát (quy tắc 29)
     const cancelled = []; // phiếu "BO" (bỏ cân — xe cân lại phiếu khác) → loại khỏi biên bản
@@ -584,9 +587,20 @@
       const raw = G[r] || [];
       const g = (k) => (has(k) ? raw[M[k]] : null);
       const plate = isBlank(g('plate')) ? '' : String(g('plate')).trim();
-      const pTare = parseNumWarn(g('tare')),
-        pGross = parseNumWarn(g('gross')),
-        pNet = parseNumWarn(g('net'));
+      const parseWeight = (key) => {
+        const value = g(key);
+        if (isBlank(value)) return { value: null, warn: null };
+        const addr = root.XLSX.utils.encode_cell({ r: r + rowOff, c: M[key] + colOff });
+        const cell = ws[addr];
+        if (cell?.t === 'd' || isDateText(value) || (typeof value === 'number' && isDateText(cell?.w))) {
+          if (issues.dateInWeight[issues.dateInWeight.length - 1] !== r + rowOff + 1) issues.dateInWeight.push(r + rowOff + 1);
+          return { value: null, warn: null };
+        }
+        return parseNumWarn(value);
+      };
+      const pTare = parseWeight('tare'),
+        pGross = parseWeight('gross'),
+        pNet = parseWeight('net');
       let tare = pTare.value,
         gross = pGross.value,
         net = pNet.value;
@@ -825,6 +839,8 @@
       ds.warnings.push(
         '⚠ ' + issues.weirdNum.length + ' dòng có ô số kèm chữ/đơn vị hoặc dấu phân cách bất thường: ' + lim(issues.weirdNum) + '.'
       );
+    if (issues.dateInWeight.length)
+      ds.warnings.push('⚠ Ngày hoặc ngày ký trong cột khối lượng đã bỏ qua tại dòng Excel: ' + lim(issues.dateInWeight) + '.');
     if (issues.hugeWeight.length)
       ds.warnings.push('⚠ ' + issues.hugeWeight.length + ' dòng có khối lượng bất thường (> 200 tấn): ' + lim(issues.hugeWeight) + '.');
     if (cancelled.length)

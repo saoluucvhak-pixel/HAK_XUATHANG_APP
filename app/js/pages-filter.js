@@ -329,47 +329,31 @@
         const rows = currentRows(type),
           sum = G().summarize(rows),
           retKg = DOCS[type].extra === 'returned' ? rows.filter((r) => st.returned.has(G().retKey(r))).reduce((n, r) => n + r.net, 0) : 0,
-          deliveredTon = (sum.kg - retKg) / 1000;
+          deliveredKg = sum.kg - retKg;
 
-        // 1. Tiến độ hợp đồng (Progress Bar)
-        const cqStr = $('#' + fid(type, 'contractQty')) ? $('#' + fid(type, 'contractQty')).value : '';
-        const cq = HAK.Excel && HAK.Excel.util && HAK.Excel.util.parseNum ? HAK.Excel.util.parseNum(cqStr) : parseFloat(cqStr);
+        // Tiến độ ghi BDMT, đối chiếu tờ khai ghi tấn tươi.
+        const readNumber = (field) => HAK.Excel.util.parseNum($('#' + fid(type, field))?.value);
+        const cq = readNumber('contractQty');
+        const certDry = readNumber('certDry');
         let progressHtml = '';
-        if (cq && cq > 0) {
-          const pct = Math.round((deliveredTon / cq) * 100);
-          const diffTon = deliveredTon - cq;
+        if (cq > 0 && certDry > 0) {
+          const pct = Math.round((certDry / cq) * 100);
+          const diffTon = certDry - cq;
           const pCls = pct > 105 ? 'bg-danger' : pct >= 95 ? 'bg-success' : 'bg-primary';
           const statusTxt =
             diffTon > 0
-              ? 'Vượt HĐ: +' + G().fmtTon(diffTon * 1000) + ' tấn'
+              ? 'Vượt HĐ: +' + G().fmtTon(diffTon * 1000) + ' BDMT'
               : diffTon === 0
                 ? 'Đủ 100% hợp đồng'
-                : 'Còn thiếu: ' + G().fmtTon(-diffTon * 1000) + ' tấn';
-          let toleranceHtml = '';
-          if (cq > 0 && Math.abs(pct - 100) > 5) {
-            const isOver10 = Math.abs(pct - 100) > 10;
-            const tolCls = isOver10 ? 'alert-danger' : 'alert-warning';
-            toleranceHtml =
-              '<div class="alert ' +
-              tolCls +
-              ' py-1 px-2 mt-1 mb-0 small d-flex align-items-center gap-1">' +
-              '  <span>' +
-              (isOver10 ? '⛔' : '⚠️') +
-              ' <b>Lệch dung sai Hải quan:</b> Khối lượng thực xuất đang lệch <b>' +
-              Math.abs(pct - 100) +
-              '%</b> so với số lượng đăng ký tờ khai (' +
-              G().fmtTon(cq * 1000) +
-              ' tấn). Quy định thông quan thông thường yêu cầu dung sai trong khoảng ±5% ~ ±10%.</span>' +
-              '</div>';
-          }
+                : 'Còn thiếu: ' + G().fmtTon(-diffTon * 1000) + ' BDMT';
           progressHtml =
             '<div class="mt-2 pt-2 border-top">' +
             '  <div class="d-flex justify-content-between small mb-1">' +
-            '    <span><b>📊 Tiến độ thực hiện hợp đồng:</b> ' +
-            G().fmtTon(deliveredTon * 1000) +
+            '    <span><b>📊 Tấn khô theo chứng thư / hợp đồng:</b> ' +
+            G().fmtTon(certDry * 1000) +
             ' / ' +
             G().fmtTon(cq * 1000) +
-            ' tấn (' +
+            ' BDMT (' +
             pct +
             '%)</span>' +
             '    <span class="' +
@@ -387,8 +371,26 @@
             pct +
             '" aria-valuemin="0" aria-valuemax="100"></div>' +
             '  </div>' +
-            toleranceHtml +
             '</div>';
+        }
+
+        const customsDiff =
+          !st.snapshotParams && ['xuatkhau', 'uythac'].includes(type)
+            ? HAK.CustomsModel?.wetQuantityDifference(deliveredKg, selectedContract(type), HAK.Customs?.activeDecls())
+            : null;
+        if (customsDiff && Math.abs(customsDiff.percent) > 5) {
+          const css = Math.abs(customsDiff.percent) > 10 ? 'alert-danger' : 'alert-warning';
+          progressHtml +=
+            '<div class="alert ' +
+            css +
+            ' py-1 px-2 mt-1 mb-0 small">' +
+            '<b>Đối chiếu tờ khai ' +
+            esc(customsDiff.no) +
+            ':</b> Khối lượng thực giao trong phạm vi đang chọn lệch ' +
+            G().fmtTon(Math.abs(customsDiff.percent) * 1000) +
+            '% so với ' +
+            G().fmtTon(customsDiff.qtyTon * 1000) +
+            ' tấn tươi khai báo.</div>';
         }
 
         // 2. Gợi ý phân bổ thông minh theo tàu (Smart Matching)

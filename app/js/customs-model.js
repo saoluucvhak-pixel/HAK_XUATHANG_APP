@@ -569,6 +569,15 @@
     if (!act(customs).some((x) => x.contractId === c.id && (!x.detailId || x.detailId === d.id))) missing.push('tờ khai hải quan');
     return { ok: !missing.length, missing };
   }
+  function wetQuantityDifference(actualKg, detail, declarations) {
+    if (!detail?.id || !detail.parentId || !Number.isFinite(actualKg) || actualKg <= 0) return null;
+    const matches = act(declarations).filter((d) => d.contractId === detail.parentId && d.detailId === detail.id);
+    if (matches.length !== 1) return null;
+    const decl = matches[0];
+    const qtyTon = numOrNull(decl.qtyTon);
+    if (!(qtyTon > 0) || !decl.no) return null;
+    return { no: decl.no, qtyTon, percent: ((actualKg - qtyTon * 1000) * 100) / (qtyTon * 1000) };
+  }
   HAK.CustomsModel = {
     maybeSamePayment,
     samePayment,
@@ -578,6 +587,7 @@
     taxText,
     closeHint,
     detailReady,
+    wetQuantityDifference,
     readiness,
     STATUS,
     STATUS_ORDER,

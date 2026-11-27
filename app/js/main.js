@@ -554,7 +554,7 @@
     const match = HAK.ExcelTemplate.matchSheet(wb, config.sheet, template);
     return Object.assign(config, {
       mapping: match.mapping,
-      headerRow: template.headerRow || 1,
+      headerRow: match.headerRow || template.headerRow || 1,
       fallbackUnit: template.fallbackUnit || null,
       templateId: template.id,
       templateName: template.name,

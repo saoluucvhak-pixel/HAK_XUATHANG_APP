@@ -284,23 +284,59 @@
      */
     getHeaderRow(ws, headerRowNumber) {
       if (!ws) return [];
-      const range = root.XLSX.utils.decode_range(ws?.['!ref'] || 'A1');
-      const hr = Math.max(1, parseInt(headerRowNumber, 10) || 1) - 1; // 0-based
-      const r0 = range.s.r;
-      const gr = hr - r0;
-      const G =
-        HAK.Excel && HAK.Excel.getSheetGrid
-          ? HAK.Excel.getSheetGrid(ws, hr)
-          : root.XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null, blankrows: true });
-      return G && G[gr] ? G[gr] : [];
+      const X = root.XLSX.utils;
+      const range = X.decode_range(ws['!ref'] || 'A1');
+      const row = Math.max(1, parseInt(headerRowNumber, 10) || 1) - 1;
+      if (row < range.s.r || row > range.e.r) return [];
+      const cells =
+        X.sheet_to_json(ws, {
+          header: 1,
+          raw: true,
+          defval: null,
+          blankrows: true,
+          range: { s: { r: row, c: range.s.c }, e: { r: row, c: range.e.c } },
+        })[0] || [];
+      for (const { s, e } of ws['!merges'] || []) {
+        if (row < s.r || row > e.r) continue;
+        const value = ws[X.encode_cell(s)]?.v;
+        if (value == null || value === '') continue;
+        for (let c = Math.max(s.c, range.s.c); c <= Math.min(e.c, range.e.c); c++) {
+          const i = c - range.s.c;
+          if (cells[i] == null || cells[i] === '') cells[i] = value;
+        }
+      }
+      return cells;
     },
 
     matchSheet(workbook, sheetName, template) {
       const ws = workbook.Sheets?.[sheetName];
-      if (!ws) return { ok: false, errors: ['Không tìm thấy sheet "' + sheetName + '"'], headerCells: [] };
-      const hr = (template && template.headerRow) || 1;
-      const headerCells = this.getHeaderRow(ws, hr);
-      return { ...this.matchTemplate(template, headerCells), headerCells };
+      if (!ws) return { ok: false, mapping: {}, warnings: [], errors: ['Không tìm thấy sheet "' + sheetName + '"'], headerCells: [] };
+      const savedRow = template.headerRow || 1;
+      const readRow = (headerRow) => {
+        const headerCells = this.getHeaderRow(ws, headerRow);
+        return { ...this.matchTemplate(template, headerCells), headerCells, headerRow };
+      };
+      const original = readRow(savedRow);
+      if (original.ok) return original;
+
+      // Mẫu có cột ghép theo vị trí cần người dùng xác nhận lại, vì một dòng trống cũng có thể khớp.
+      const names = template.headerNames || {};
+      if (!names.plate || !(names.date || names.datetime1) || !(names.net || (names.tare && names.gross))) return original;
+      if (Object.keys(template.columns || {}).some((key) => !names[key])) return original;
+      const range = root.XLSX.utils.decode_range(ws['!ref'] || 'A1');
+      const candidates = [];
+      for (let row = Math.max(range.s.r + 1, savedRow - 12); row <= Math.min(range.e.r + 1, savedRow + 12); row++) {
+        if (row === savedRow) continue;
+        const match = readRow(row);
+        if (match.ok) candidates.push(match);
+      }
+      if (candidates.length > 1) {
+        original.errors.push('Nhiều dòng tiêu đề khớp mẫu. Hãy chọn dòng đúng trong file Excel.');
+      }
+      if (candidates.length !== 1) return original;
+      const [match] = candidates;
+      match.warnings.unshift('Dòng tiêu đề của file được nhận diện ở dòng ' + match.headerRow + ' (mẫu lưu dòng ' + savedRow + ').');
+      return match;
     },
 
     /**
@@ -323,7 +359,7 @@
       let ds;
       try {
         ds = HAK.Excel.parseSheet(workbook, sName, {
-          headerRow: hr1,
+          headerRow: match.headerRow || hr1,
           mapping: match.mapping,
           fallbackUnit: template.fallbackUnit,
           autoSwap: !!autoSwap,

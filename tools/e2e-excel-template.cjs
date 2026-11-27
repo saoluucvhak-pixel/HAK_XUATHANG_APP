@@ -105,6 +105,13 @@ async function main() {
     assert.equal(await page.locator('#previewBody tr td:nth-child(2)').first().innerText(), '0101');
     assert.doesNotMatch(await page.locator('#fileAlerts').innerText(), /không khớp hoàn toàn/);
 
+    const shifted = writeWorkbook(dir, 'chen-dong.xlsx', [[mainSheet, [headers, ticket], 'C6']]);
+    await input(shifted);
+    await waitForSaved('chen-dong.xlsx');
+    assert.equal(await page.evaluate(() => HAK.App.headerRow), 6);
+    assert.equal(await page.evaluate(() => HAK.App.ds.stats.kg), 25000);
+    assert.match(await page.locator('#fileAlerts').innerText(), /dòng tiêu đề.*dòng 6/i);
+
     const rejectedId = await page.evaluate((template) => {
       const saved = HAK.ExcelTemplate.save({ ...template, id: null, name: 'Dòng tiêu đề khác', headerRow: 50, isDefault: false });
       return saved.id;
