@@ -7,7 +7,7 @@ const fs = require('node:fs'),
   path = require('node:path');
 const XLSX = require('../app/libs/xlsx.full.min.js');
 const JSZip = require('../app/libs/jszip.min.js');
-const APP = 'file://' + path.resolve(__dirname, '../app/index.html');
+const APP = process.env.HAK_APP_URL || 'file://' + path.resolve(__dirname, '../app/index.html');
 const T = 'uythac';
 const failures = [];
 const check = (c, m) => {
@@ -119,6 +119,45 @@ const has = (txt, id) => new RegExp('(^|[^A-Za-z0-9])' + id + '([^0-9]|$)').test
     );
     await p.waitForTimeout(600);
   };
+  await setF(CASES[0][1]);
+  await p.evaluate(() => {
+    HAK.Pages._confirmScope = () => true;
+    window.savePackageBlob = HAK.Word.Files.saveBlob;
+    HAK.Word.Files.saveBlob = async (blob, name) => {
+      window.lastPackage = { name, bytes: [...new Uint8Array(await blob.arrayBuffer())] };
+      return true;
+    };
+  });
+  await p.click('#btnQuickZip-' + T);
+  await p.waitForFunction(() => window.lastPackage, null, { timeout: 20000 });
+  const zipped = await JSZip.loadAsync(Uint8Array.from(await p.evaluate(() => window.lastPackage.bytes)));
+  const entries = Object.keys(zipped.files);
+  check(
+    entries.some((f) => /^BKLS_.*_tong\.docx$/i.test(f)),
+    'ZIP có BKLS Mẫu 01 tổng'
+  );
+  check(
+    entries.some((f) => /\.docx$/i.test(f) && !f.startsWith('BKLS_')),
+    'ZIP có biên bản Word'
+  );
+  check(
+    entries.some((f) => /\.xlsx$/i.test(f)),
+    'ZIP có bảng kê Excel'
+  );
+  await p.getByText(/Đã lưu trọn bộ hồ sơ:/).waitFor();
+  await p.evaluate(() => {
+    HAK.Pages._confirmScope = () => false;
+    window.lastPackage = null;
+  });
+  await p.click('#btnQuickZip-' + T);
+  await p.locator('#btnQuickZip-' + T + ':enabled').waitFor();
+  check(!(await p.evaluate(() => window.lastPackage)), 'Hủy xác nhận thì chưa lưu ZIP');
+  await p.evaluate(() => {
+    HAK.Word.Files.saveBlob = window.savePackageBlob;
+    delete window.savePackageBlob;
+    delete window.lastPackage;
+    delete HAK.Pages._confirmScope;
+  });
   let n = 0;
   for (const [name, f, want, plates] of CASES) {
     n++;
