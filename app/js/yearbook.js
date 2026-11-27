@@ -308,19 +308,10 @@
     return H.Word.Files.saveBlob(new Blob([text], { type: 'application/json' }), 'HAK_HoSo_' + workingYear + '.json');
   }
   async function importState(incoming) {
-    let state;
-    try {
-      state = H.DB && H.DB.usable && H.DB.usable() ? await read() : cachedState || empty();
-    } catch (e) {
-      state = cachedState || empty();
-    }
-    const recs = Array.isArray(incoming) ? incoming : (incoming && incoming.records) || [];
-    const checked = merge(state, recs);
-    cachedState = checked;
-    if (H.DB && H.DB.usable && H.DB.usable()) {
-      return commit(state.revision, () => checked);
-    }
-    return checked;
+    const records = Array.isArray(incoming) ? incoming : incoming?.records;
+    if (!Array.isArray(records)) throw Error('Dữ liệu sổ hồ sơ trong bản sao lưu không hợp lệ.');
+    const state = await read();
+    return commit(state.revision, (current) => merge(current, records));
   }
   async function restore(file) {
     const j = H.Backup && H.Backup.readJson ? await H.Backup.readJson(file) : JSON.parse(await file.text());
@@ -749,11 +740,15 @@
         : (cachedState && cachedState.records) || (offlineView && offlineView.records) || [];
       if (!Array.isArray(rows) || !rows.length || !records.length) return [];
       const usedMap = new Map();
+      const keyOf = (row) => {
+        if (!row.plate || (!row.ticket && row.ts1 == null && !row.time1)) return null;
+        return H.Generator.omitKey(row);
+      };
       records.forEach((rec) => {
-        if (currentRecordId && rec.id === currentRecordId) return;
+        if (rec.id === currentRecordId || !visible(rec)) return;
         (rec.rows || []).forEach((r) => {
-          const k = String(r.ticket || '').trim() + '_' + String(r.plate || '').trim();
-          if (k !== '_') {
+          const k = keyOf(r);
+          if (k !== null) {
             if (!usedMap.has(k)) usedMap.set(k, []);
             usedMap.get(k).push(rec.title || rec.id);
           }
@@ -761,7 +756,7 @@
       });
       const duplicates = [];
       rows.forEach((r) => {
-        const k = String(r.ticket || '').trim() + '_' + String(r.plate || '').trim();
+        const k = keyOf(r);
         if (usedMap.has(k)) {
           duplicates.push({ row: r, usedIn: usedMap.get(k) });
         }

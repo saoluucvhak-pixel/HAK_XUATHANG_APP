@@ -14,6 +14,7 @@ require('../app/libs/xlsx.full.min.js');
 require('../app/js/util.js');
 require('../app/js/excel.js');
 require('../app/js/excel-template.js');
+require('../app/js/generator.js');
 require('../app/js/yearbook.js');
 
 test('1. HAK.Yearbook.checkDuplicates: phát hiện chính xác phiếu cân đã xuất trong hồ sơ khác', async () => {
@@ -179,4 +180,49 @@ test('3. Smart Matching: phát hiện và lọc đúng tập phiếu theo từ k
   );
   const totalNet = matched.reduce((a, r) => a + r.net, 0);
   assert.equal(totalNet, 51000);
+});
+
+test('Khôi phục sổ hồ sơ phải báo lỗi khi không thể ghi bền', async () => {
+  await assert.rejects(HAK.Yearbook.importState([]), /IndexedDB|SQLite|kho dữ liệu/);
+});
+
+test('Cảnh báo trùng dùng thời điểm cân và chỉ đọc hồ sơ trong phạm vi công ty', () => {
+  const current = { ticket: 'P-1', plate: '43C-111.11', ts1: 1000 };
+  const rec = (id, company, row) => ({ id, params: { giaoId: company }, rows: [row] });
+  const auth = HAK.Auth;
+  HAK.Auth = { scopeIds: () => ['A'] };
+  try {
+    const old = { ...current, ts1: 2000 };
+    const records = [rec('khac-gio', 'A', old), rec('khac-cong-ty', 'B', current), rec('trung', 'A', current)];
+    assert.deepEqual(HAK.Yearbook.checkDuplicates(null, [current], records)[0].usedIn, ['trung']);
+  } finally {
+    HAK.Auth = auth;
+  }
+});
+
+test('Phiếu gợi ý theo tàu giữ đúng phạm vi và khóa phiếu khi hai file trùng số dòng', () => {
+  require('../app/js/pages-filter.js');
+  const rows = [
+    { idx: 5, uid: 'a.xlsx#5', ticket: '11', plate: '43C-111.11', ts1: 1, note: 'Giao Tàu 1' },
+    { idx: 5, uid: 'b.xlsx#5', ticket: '22', plate: '43C-222.22', ts1: 2, note: 'Giao Tàu 10' },
+  ];
+  const fields = HAK.PagesFilter({
+    HAK,
+    $: () => ({ value: 'Tàu 1' }),
+    fid: () => 'ship',
+    G: () => HAK.Generator,
+    getDs: () => ({ rows }),
+    collect: () => ({ filter: {} }),
+  });
+  const { matched } = fields.matchShipRows('xuatkhau');
+  const picked = HAK.Generator.filterRows(rows, { pick: matched.map(HAK.Generator.omitKey) });
+  assert.deepEqual(
+    picked.map((r) => r.uid),
+    ['a.xlsx#5']
+  );
+  const remaining = HAK.Generator.filterRows(rows, { omit: [HAK.Generator.omitKey(rows[0])] });
+  assert.deepEqual(
+    remaining.map((r) => r.uid),
+    ['b.xlsx#5']
+  );
 });

@@ -799,7 +799,7 @@
             '<a href="#/' +
             k +
             '" class="btn btn-sm ' +
-            (k === type ? 'btn-primary active fw-semibold shadow-sm' : 'btn-light border-0 text-secondary') +
+            (k === type ? 'btn-primary active fw-semibold shadow-sm' : 'btn-light border-0 text-dark') +
             '">' +
             DOCS[k].icon +
             ' ' +
@@ -1099,94 +1099,25 @@
     const btnQuickPkg = $('#btnQuickPackage-' + type);
     if (btnQuickPkg) {
       btnQuickPkg.addEventListener('click', async () => {
-        const ds = getDs(type);
-        if (!ds) {
-          toast('Chưa có dữ liệu phiếu cân.', 'warning');
-          return;
-        }
-        const rows = currentRows(type);
-        if (!rows.length) {
-          toast('Chưa chọn phiếu cân nào trong phạm vi hiện tại.', 'warning');
-          return;
-        }
-        HAK.Loading.show('Đang tạo trọn bộ hồ sơ (Biên bản + Bảng kê chi tiết' + (pageBkls(type) ? ' + BKLS Mẫu 01' : '') + ')…');
+        btnQuickPkg.disabled = true;
         try {
-          // 1. Tạo file Word Biên bản chính
-          await generate(type);
-          // 2. Xuất file Excel Bảng kê xe
-          await generate(type, 'xlsx');
-          // 3. Nếu có BKLS, xuất luôn BKLS
-          if (pageBkls(type)) {
-            await generateBkls(type);
+          if (!(await generate(type))) return;
+          if (!(await generate(type, 'xlsx'))) {
+            toast('Đã xuất biên bản Word. Bảng kê Excel chưa xuất xong.', 'warning');
+            return;
           }
-          toast('✅ Đã xuất thành công trọn bộ hồ sơ xuất hàng!', 'success');
-        } catch (err) {
-          toast('Lỗi khi xuất hồ sơ: ' + (err.message || err), 'error');
+          if (pageBkls(type) && !(await generateBkls(type))) {
+            toast('Đã xuất Word và Excel. BKLS chưa xuất xong.', 'warning');
+            return;
+          }
+          toast('Đã xuất trọn bộ hồ sơ.', 'success');
         } finally {
-          HAK.Loading.hide();
+          btnQuickPkg.disabled = false;
         }
       });
     }
 
-    const btnQuickZip = $('#btnQuickZip-' + type);
-    if (btnQuickZip) {
-      btnQuickZip.addEventListener('click', async () => {
-        const ds = getDs(type);
-        if (!ds) {
-          toast('Chưa có dữ liệu phiếu cân.', 'warning');
-          return;
-        }
-        const rows = currentRows(type);
-        if (!rows.length) {
-          toast('Chưa chọn phiếu cân nào trong phạm vi hiện tại.', 'warning');
-          return;
-        }
-        const ZipClass = window.JSZip || (typeof JSZip !== 'undefined' ? JSZip : null);
-        if (!ZipClass) {
-          toast('Thư viện nén ZIP chưa sẵn sàng.', 'error');
-          return;
-        }
-        HAK.Loading.show('Đang đóng gói trọn bộ hồ sơ thành 1 file ZIP…');
-        try {
-          const params = collect(type);
-          const res = HAK.Yearbook
-            ? HAK.Yearbook.underContext(HAK.Yearbook.active(type), () => G().build(type, ds, params))
-            : G().build(type, ds, params);
-
-          const zip = new ZipClass();
-          const cleanName = (s) =>
-            String(s || '')
-              .trim()
-              .replace(/[\\/:*?"<>|]/g, '')
-              .replace(/\s+/g, '_');
-          const shipPart = params.ship ? '_' + cleanName(params.ship) : '';
-          const zipName =
-            'HoSo_' + cleanName(DOCS[type].title) + shipPart + '_' + (params.from || new Date().toISOString().slice(0, 10)) + '.zip';
-
-          // 1. Biên bản Word
-          for (const f of res.files) {
-            const wordBytes = await HAK.Word.Render.generate(f.tpl, f.data);
-            zip.file(f.name, wordBytes);
-          }
-
-          // 2. Bảng kê Excel chi tiết
-          if (res.excel) {
-            const exBuf = await HAK.Exporter.toBuffer(res.excel);
-            zip.file(res.excel.fileName, exBuf.buffer);
-          }
-
-          const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
-          await HAK.Word.Files.saveBlob(zipBlob, zipName);
-          await archive(type, params, res, ds, 'zip');
-          toast('✅ Đã đóng gói và tải thành công file ZIP: ' + zipName, 'success');
-        } catch (err) {
-          console.error(err);
-          toast('Lỗi khi đóng gói ZIP: ' + (err.message || err), 'error');
-        } finally {
-          HAK.Loading.hide();
-        }
-      });
-    }
+    $('#btnQuickZip-' + type).addEventListener('click', (event) => generatePackage(type, event.currentTarget));
 
     $('#gen-' + type).addEventListener('click', () => generate(type));
     $('#pdf-' + type).addEventListener('click', () => generate(type, 'pdf'));
@@ -1214,27 +1145,12 @@
     sec.addEventListener('click', (e) => {
       const btnMatch = e.target.closest('[data-smart-match-ship]');
       if (btnMatch) {
-        const ds = getDs(type);
-        const shipEl = $('#' + fid(type, 'ship'));
-        const shipName = (shipEl ? shipEl.value : '').trim();
-        const shipNorm = HAK.Excel && HAK.Excel.util && HAK.Excel.util.norm ? HAK.Excel.util.norm(shipName) : shipName.toLowerCase();
-        if (ds && ds.rows && shipNorm.length >= 2) {
-          const matchedSet = new Set();
-          ds.rows.forEach((r) => {
-            const wh = HAK.Excel && HAK.Excel.util && HAK.Excel.util.norm ? HAK.Excel.util.norm(r.wh || '') : (r.wh || '').toLowerCase();
-            const nt =
-              HAK.Excel && HAK.Excel.util && HAK.Excel.util.norm ? HAK.Excel.util.norm(r.note || '') : (r.note || '').toLowerCase();
-            if (wh.includes(shipNorm) || nt.includes(shipNorm)) matchedSet.add(r.idx);
-          });
-          if (matchedSet.size > 0) {
-            ds.rows.forEach((r) => {
-              if (!matchedSet.has(r.idx)) ST[type].omit.add(r.idx);
-              else ST[type].omit.delete(r.idx);
-            });
-            save();
-            upd();
-            toast('Đã tự động lọc chính xác ' + matchedSet.size + ' phiếu cân cho tàu "' + shipName + '".', 'success');
-          }
+        const { shipName, matched } = matchShipRows(type);
+        if (matched.length) {
+          ST[type].filter.pick = [...new Set(matched.map(G().omitKey))];
+          save();
+          upd();
+          toast('Đã chọn ' + matched.length + ' phiếu cân cho tàu "' + shipName + '".', 'success');
         }
         return;
       }
@@ -1246,7 +1162,7 @@
           const act = HAK.Yearbook.active ? HAK.Yearbook.active(type) : null;
           const dups = HAK.Yearbook.checkDuplicates(act ? act.id : null, rows);
           if (dups.length > 0) {
-            dups.forEach((d) => ST[type].omit.add(d.row.idx));
+            dups.forEach((d) => ST[type].omit.add(G().omitKey(d.row)));
             save();
             upd();
             toast('Đã bỏ chọn ' + dups.length + ' phiếu cân bị trùng với hồ sơ khác.', 'info');
@@ -1806,6 +1722,7 @@
     documentSmart,
     renderFilter,
     currentRows,
+    matchShipRows,
     scopeSummary,
     renderContext,
     catalogDiff,
@@ -1971,6 +1888,52 @@
     if (HAK.UI && HAK.UI.confirm) return await HAK.UI.confirm(txt, { title: 'Xác nhận tạo biên bản', okText: 'Đồng ý', cancelText: 'Hủy' });
     return typeof root.confirm === 'function' ? root.confirm(txt) : true;
   }
+  async function generatePackage(type, button) {
+    const ds = getDs(type);
+    if (!ds) {
+      toast('Chưa có dữ liệu Excel.', 'error');
+      return;
+    }
+    button.disabled = true;
+    try {
+      const params = collect(type);
+      const res = HAK.Yearbook
+        ? HAK.Yearbook.underContext(HAK.Yearbook.active(type), () => G().build(type, ds, params))
+        : G().build(type, ds, params);
+      showMessages(type, res);
+      if (res.errors.length) {
+        toast(res.errors[0], 'error');
+        focusError(type, res.errors[0]);
+        return;
+      }
+      if (!res.files.length || !res.excel) throw new Error('Thiếu dữ liệu Word hoặc Excel cho hồ sơ này.');
+      if (!(await confirmScope(type, 'Đóng gói trọn bộ hồ sơ ZIP', res.warnings))) return;
+      if (typeof root.JSZip !== 'function') throw new Error('Thư viện nén ZIP chưa sẵn sàng.');
+      Loading.show('Đang đóng gói trọn bộ hồ sơ…');
+      const zip = new root.JSZip();
+      for (const file of res.files) zip.file(file.name, await HAK.Word.Render.render(file.tpl, file.data));
+      const excel = await HAK.Exporter.toBuffer(res.excel);
+      zip.file(res.excel.fileName, excel.buffer);
+      const ship = params.ship ? '_' + G().slug(params.ship) : '';
+      const name = 'HoSo_' + G().slug(DOCS[type].title) + ship + '_' + (params.from || todayISO()) + '.zip';
+      const saveFiles = async (files) => {
+        for (const file of files) zip.file(file.name, await file.blob.arrayBuffer());
+        const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+        return HAK.Word.Files.saveBlob(blob, name);
+      };
+      const saved = pageBkls(type) ? await generateBkls(type, null, { ds, params, saveFiles }) : await saveFiles([]);
+      if (!saved) return;
+      await archive(type, params, res, ds, 'zip');
+      toast('Đã lưu trọn bộ hồ sơ: ' + name, 'success');
+    } catch (err) {
+      console.error(err);
+      toast('Lỗi khi đóng gói ZIP: ' + (err.message || err), 'error');
+    } finally {
+      Loading.hide();
+      button.disabled = false;
+    }
+  }
+
   /** src (tùy chọn) = { ds, params } lấy từ hồ sơ Lưu trữ → dựng lại mà không cần file Excel cân. */
   async function generate(type, mode, src) {
     const ds = src ? src.ds : getDs(type);
@@ -2045,6 +2008,7 @@
             scopeSummary(type),
           'success'
         );
+        return true;
       } catch (e) {
         console.error(e);
         toast(e.message || String(e), 'error');
@@ -2070,6 +2034,7 @@
           scopeSummary(type),
         'success'
       );
+      return true;
     } catch (e) {
       console.error(e);
       toast(e.message || String(e), 'error');

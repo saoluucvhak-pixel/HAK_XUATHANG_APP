@@ -136,6 +136,19 @@
       return G().filterRows(ds.rows, p.filter);
     }
 
+    function matchShipRows(type) {
+      const ds = getDs(type);
+      const shipName = ($('#' + fid(type, 'ship'))?.value || '').trim();
+      const norm = HAK.Excel.util.norm;
+      const ship = norm(shipName);
+      if (!ds?.rows || ship.length < 2) return { shipName, eligible: [], matched: [] };
+      const filter = { ...collect(type).filter, pick: null };
+      const eligible = G().filterRows(ds.rows, filter);
+      // So tên theo ranh giới từ để "Tàu 1" không khớp "Tàu 10".
+      const hasShip = (text) => (' ' + norm(text) + ' ').includes(' ' + ship + ' ');
+      return { shipName, eligible, matched: eligible.filter((row) => hasShip(row.wh) || hasShip(row.note)) };
+    }
+
     /** Kiểm tra số liệu chứng thư ngay trên form: lỗi, lệch công thức, ô khác Danh mục (cần lý do). */
     function certCheck(type) {
       const el = $('#' + fid(type, 'moisture'));
@@ -380,34 +393,26 @@
 
         // 2. Gợi ý phân bổ thông minh theo tàu (Smart Matching)
         let matchBanner = '';
-        const shipEl = $('#' + fid(type, 'ship'));
-        const shipName = (shipEl ? shipEl.value : '').trim();
-        const shipNorm = HAK.Excel && HAK.Excel.util && HAK.Excel.util.norm ? HAK.Excel.util.norm(shipName) : shipName.toLowerCase();
-        if (shipNorm.length >= 2 && ds.rows && ds.rows.length > 1) {
-          const matched = ds.rows.filter((r) => {
-            const wh = HAK.Excel && HAK.Excel.util && HAK.Excel.util.norm ? HAK.Excel.util.norm(r.wh || '') : (r.wh || '').toLowerCase();
-            const nt =
-              HAK.Excel && HAK.Excel.util && HAK.Excel.util.norm ? HAK.Excel.util.norm(r.note || '') : (r.note || '').toLowerCase();
-            return wh.includes(shipNorm) || nt.includes(shipNorm);
-          });
-          if (matched.length > 0 && matched.length < ds.rows.length && rows.length !== matched.length) {
-            const mKg = matched.reduce((a, r) => a + (r.net || 0), 0);
-            matchBanner =
-              '<div class="alert alert-info py-1 px-2 d-flex justify-content-between align-items-center mt-2 mb-0 small">' +
-              '  <span>⚡ <b>Phân bổ thông minh:</b> Phát hiện <b>' +
-              matched.length +
-              '</b> phiếu cân ghi nhận cho tàu "' +
-              esc(shipName) +
-              '" (' +
-              G().fmtTon(mKg) +
-              ' tấn).</span>' +
-              '  <button class="btn btn-xs btn-primary py-0 px-2 fw-semibold" type="button" data-smart-match-ship="' +
-              type +
-              '">👉 Chỉ chọn ' +
-              matched.length +
-              ' phiếu này</button>' +
-              '</div>';
-          }
+        const { shipName, eligible, matched } = matchShipRows(type);
+        const matchedKeys = new Set(matched.map(G().omitKey));
+        const alreadyApplied = matched.length === rows.length && rows.every((row) => matchedKeys.has(G().omitKey(row)));
+        if (matched.length > 0 && matched.length < eligible.length && !alreadyApplied) {
+          const mKg = matched.reduce((a, r) => a + (r.net || 0), 0);
+          matchBanner =
+            '<div class="alert alert-info py-1 px-2 d-flex justify-content-between align-items-center mt-2 mb-0 small">' +
+            '  <span>⚡ <b>Phân bổ thông minh:</b> Phát hiện <b>' +
+            matched.length +
+            '</b> phiếu cân ghi nhận cho tàu "' +
+            esc(shipName) +
+            '" (' +
+            G().fmtTon(mKg) +
+            ' tấn).</span>' +
+            '  <button class="btn btn-xs btn-primary py-0 px-2 fw-semibold" type="button" data-smart-match-ship="' +
+            type +
+            '">👉 Chỉ chọn ' +
+            matched.length +
+            ' phiếu này</button>' +
+            '</div>';
         }
 
         // 3. Cảnh báo trùng chéo phiếu cân với các hồ sơ khác
@@ -689,6 +694,7 @@
       documentSmart,
       renderFilter,
       currentRows,
+      matchShipRows,
       scopeSummary,
       renderContext,
       catalogDiff,

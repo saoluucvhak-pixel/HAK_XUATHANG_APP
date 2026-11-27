@@ -55,13 +55,13 @@
     }
 
     /** src (tùy chọn) = { ds, params } lấy từ hồ sơ Lưu trữ → tạo lại BKLS không cần file Excel cân (không ghi lại nhật ký chứng từ). */
-    async function generateBkls(type, src) {
-      const ds = src ? src.ds : getDs(type);
+    async function generateBkls(type, src, packageOptions) {
+      const ds = packageOptions ? packageOptions.ds : src ? src.ds : getDs(type);
       if (!ds) {
         toast('Chưa có dữ liệu Excel.', 'error');
         return;
       }
-      const p = src ? src.params : collect(type);
+      const p = packageOptions ? { ...packageOptions.params } : src ? src.params : collect(type);
       const rowsAll = G().filterRows(ds.rows, p.filter);
       if (!rowsAll.length) {
         toast('Không có phiếu cân nào trong phạm vi đã chọn. Hãy kiểm tra bộ lọc ngày.', 'error');
@@ -69,8 +69,11 @@
       }
       // v2.12.4: LUÔN hỏi phạm vi / định dạng (mặc định "BKLS tổng · Word"), kể cả khi tạo lại từ Lưu trữ — trước đây Lưu trữ dùng 4 ô đã lưu
       // (mặc định đều tick) nên luôn tạo cả bản từng xe Word + PDF rất lâu dù chỉ cần bản tổng.
-      if (!src && !(await confirmScope(type, 'Lập Bảng kê lâm sản (BKLS) "' + DOCS[type].title + '"'))) return; // cùng hộp xác nhận phạm vi như Word / PDF / Excel
-      const chosen = await HAK.BklsTemplates.choose(p);
+      if (!src && !packageOptions && !(await confirmScope(type, 'Lập Bảng kê lâm sản (BKLS) "' + DOCS[type].title + '"'))) return;
+      const chosen = packageOptions
+        ? { template: (await HAK.BklsTemplates.list()).find((template) => template.id === 'form01'), want: { totalDocx: true } }
+        : await HAK.BklsTemplates.choose(p);
+      if (packageOptions && !chosen.template) throw new Error('Không tìm thấy Mẫu 01/BKLS.');
       if (!chosen) return;
       p.bklsTemplate = chosen.template;
       const want = chosen.want;
@@ -178,7 +181,12 @@
       const confirmKey = p.bklsSoBkls + '|' + rowsAll.length + '|' + confirmMsgs.length;
       if (confirmMsgs.length && ST[type].bklsDupKey !== confirmKey) {
         ST[type].bklsDupKey = confirmKey;
-        toast('⚠ ' + confirmMsgs.join(' ') + ' Bấm "🧾 Tạo BKLS" lần nữa nếu vẫn muốn tạo.', 'warning');
+        toast(
+          '⚠ ' +
+            confirmMsgs.join(' ') +
+            (packageOptions ? ' Bấm nút đóng gói lần nữa nếu vẫn muốn tạo.' : ' Bấm “Tạo BKLS” lần nữa nếu vẫn muốn tạo.'),
+          'warning'
+        );
         return;
       }
       ST[type].bklsDupKey = '';
@@ -271,7 +279,9 @@
         // Nhiều file (bản từng xe bị chia phần) → gói 1 ZIP để trình duyệt không hỏi tải hàng chục file; ít file → tải từng file như cũ.
         const printable = out.filter((o) => o.needsPrint);
         const downloadable = out.filter((o) => !o.needsPrint);
-        if (downloadable.length > 4) {
+        if (packageOptions) {
+          if (!downloadable.length || !(await packageOptions.saveFiles(downloadable))) return false;
+        } else if (downloadable.length > 4) {
           Loading.set(99, 'Đang gói ZIP ' + out.length + ' file…');
           const z = new JSZip();
           downloadable.forEach((o) => z.file(o.name, o.blob, { binary: true }));
@@ -370,18 +380,20 @@
           ds,
           'bkls'
         );
-        toast(
-          'Đã tạo ' +
-            out.length +
-            ' bản BKLS: ' +
-            parts.join(' + ') +
-            '.' +
-            (out.length > 4 ? ' Đã gói chung vào 1 file ZIP.' : '') +
-            (sv ? SAVED + '.' : '') +
-            (warn.length ? ' Lưu ý: ' + warn.join(' ') : ''),
-          warn.length ? 'warning' : 'success'
-        );
+        if (!packageOptions)
+          toast(
+            'Đã tạo ' +
+              out.length +
+              ' bản BKLS: ' +
+              parts.join(' + ') +
+              '.' +
+              (out.length > 4 ? ' Đã gói chung vào 1 file ZIP.' : '') +
+              (sv ? SAVED + '.' : '') +
+              (warn.length ? ' Lưu ý: ' + warn.join(' ') : ''),
+            warn.length ? 'warning' : 'success'
+          );
         bklsHint(type);
+        return true;
       } catch (e) {
         console.error(e);
         toast('Lỗi khi tạo BKLS: ' + e.message, 'error');
